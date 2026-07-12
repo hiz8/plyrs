@@ -5,13 +5,6 @@ import {
 } from "@plyrs/metamodel";
 import type { z } from "zod";
 
-interface SqlStorage {
-  exec<T extends Record<string, any>>(
-    query: string,
-    ...bindings: any[]
-  ): { toArray(): T[]; one(): T | undefined };
-}
-
 export interface ContentTypeRow {
   id: string;
   key: string;
@@ -28,7 +21,7 @@ export type RegisterContentTypeResult =
   | { ok: true; contentType: ContentTypeRow }
   | { ok: false; code: "validation_failed" | "id_mismatch"; message: string };
 
-interface RawContentTypeRow extends Record<string, any> {
+interface RawContentTypeRow extends Record<string, SqlStorageValue> {
   id: string;
   key: string;
   name: string;

@@ -43,6 +43,14 @@ describe("content type registration", () => {
       expect(result.contentType.version).toBe(2);
       expect(result.contentType.name).toBe("記事（改）");
     }
+    await runInDurableObject(stub, async (_instance, state) => {
+      const stored = state.storage.sql
+        .exec<{ version: number; name: string }>(
+          "SELECT version, name FROM content_types WHERE key = 'article'",
+        )
+        .one();
+      expect(stored).toEqual({ version: 2, name: "記事（改）" });
+    });
   });
 
   it("rejects a re-register under the same key with a different id", async () => {
