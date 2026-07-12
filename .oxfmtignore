@@ -5,3 +5,7 @@
 .claude
 .superpowers
 .mcp.json
+
+# Documentation (including user-authored design specs) is intentionally not
+# auto-formatted; oxfmt formatting policy applies to code only.
+docs/
