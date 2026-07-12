@@ -4,12 +4,15 @@ import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import * as schema from "@plyrs/db";
 import migrations from "@plyrs/db/migrations";
 import { contentTypeDefinitionSchema } from "@plyrs/metamodel";
+import { v7 as uuidv7 } from "uuid";
 import {
   loadContentTypeByKey,
   registerContentTypeCore,
   type ContentTypeRow,
   type RegisterContentTypeResult,
 } from "./do/content-types";
+import { loadRecord, writeRecordCore } from "./do/write-record";
+import type { RecordSnapshot, WriteRecordParams, WriteRecordResult } from "./do/types";
 
 export class TenantDO extends DurableObject<Env> {
   private readonly db: DrizzleSqliteDODatabase<typeof schema>;
@@ -46,5 +49,28 @@ export class TenantDO extends DurableObject<Env> {
 
   getContentType(key: string): ContentTypeRow | null {
     return loadContentTypeByKey(this.ctx.storage.sql, key);
+  }
+
+  writeRecord(typeKey: string, params: WriteRecordParams): WriteRecordResult {
+    const contentType = loadContentTypeByKey(this.ctx.storage.sql, typeKey);
+    if (contentType === null) {
+      return { ok: false, code: "unknown_type", message: `unknown content type: ${typeKey}` };
+    }
+    return this.ctx.storage.transactionSync(() =>
+      writeRecordCore(
+        {
+          sql: this.ctx.storage.sql,
+          nextSeq: () => ++this.seq,
+          now: () => new Date().toISOString(),
+          newRelationId: () => uuidv7(),
+        },
+        contentType,
+        params,
+      ),
+    );
+  }
+
+  getRecord(id: string): RecordSnapshot | null {
+    return loadRecord(this.ctx.storage.sql, id);
   }
 }
