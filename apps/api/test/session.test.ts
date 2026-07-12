@@ -15,11 +15,14 @@ describe("sessions (D1-backed)", () => {
 
   it("stores only a hash of the token (raw token absent from D1)", async () => {
     const { token } = await createSession(env.DB, "user-2", NOW);
-    const { results } = await env.DB.prepare("SELECT token_hash FROM sessions").all<{
-      token_hash: string;
-    }>();
-    expect(results.some((row) => row.token_hash === token)).toBe(false);
-    expect(results.every((row) => /^[0-9a-f]{64}$/.test(row.token_hash))).toBe(true);
+    const { results } =
+      await env.DB.prepare("SELECT * FROM sessions").all<Record<string, unknown>>();
+    expect(results.length).toBeGreaterThan(0);
+    for (const row of results) {
+      expect(Object.values(row)).not.toContain(token);
+    }
+    const hashes = results.map((row) => row["token_hash"]);
+    expect(hashes.every((h) => typeof h === "string" && /^[0-9a-f]{64}$/.test(h))).toBe(true);
   });
 
   it("returns null for unknown, expired, and revoked tokens", async () => {
@@ -31,5 +34,13 @@ describe("sessions (D1-backed)", () => {
     const { token: revoked } = await createSession(env.DB, "user-4", NOW);
     await revokeSession(env.DB, revoked, NOW);
     expect(await lookupSession(env.DB, revoked, NOW)).toBeNull();
+  });
+
+  it("treats the exact expiry instant as expired (<= boundary)", async () => {
+    const { token, expiresAt } = await createSession(env.DB, "user-5", NOW);
+    expect(await lookupSession(env.DB, token, new Date(expiresAt))).toBeNull();
+    expect(
+      await lookupSession(env.DB, token, new Date(new Date(expiresAt).getTime() - 1000)),
+    ).toEqual({ userId: "user-5" });
   });
 });
