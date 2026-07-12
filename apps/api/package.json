@@ -8,9 +8,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/zod-validator": "catalog:",
     "@plyrs/db": "workspace:*",
     "@plyrs/metamodel": "workspace:*",
     "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "jose": "catalog:",
     "uuid": "catalog:",
     "zod": "catalog:"
   },

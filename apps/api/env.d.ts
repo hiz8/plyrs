@@ -4,6 +4,11 @@
 // 中間インターフェースを挟む。
 interface EnvBindings {
   TENANT_DO: DurableObjectNamespace<import("./src/tenant-do").TenantDO>;
+  DB: D1Database;
+  BLOCKLIST: KVNamespace;
+  JWT_SECRET: string;
+  // テスト専用: vitest.config の miniflare.bindings が注入する（本番には存在しない）
+  TEST_MIGRATIONS: import("cloudflare:test").D1Migration[];
 }
 
 declare namespace Cloudflare {

@@ -6,4 +6,13 @@
     "bindings": [{ "name": "TENANT_DO", "class_name": "TenantDO" }],
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TenantDO"] }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "plyrs-control-plane",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+    },
+  ],
+  "kv_namespaces": [{ "binding": "BLOCKLIST", "id": "00000000000000000000000000000000" }],
+  "vars": { "JWT_SECRET": "test-secret-do-not-use-in-prod" },
 }

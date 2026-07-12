@@ -5,9 +5,12 @@ packages:
 catalog:
   "@cloudflare/vitest-pool-workers": ^0.18.4
   "@cloudflare/workers-types": ^5.20260712.1
+  "@hono/zod-validator": ^0.8.0
   "@types/node": ^26.1.1
   drizzle-kit: ^0.31.10
   drizzle-orm: ^0.45.2
+  hono: ^4.12.29
+  jose: ^6.2.3
   typescript: ~7.0.2
   uuid: ^14.0.1
   vitest: ^4.1.10
