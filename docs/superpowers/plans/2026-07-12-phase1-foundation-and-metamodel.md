@@ -306,7 +306,7 @@ git commit -m "feat: scaffold @plyrs/metamodel with system field constants"
 - Consumes: `SYSTEM_FIELD_KEYS`（Task 2）
 - Produces: `fieldDefinitionSchema`（Zod discriminated union）、`type FieldDefinition`、`type RelationFieldDefinition`、`FIELD_KEY_PATTERN: RegExp`（Task 4 が型 key の検証に再利用）
 
-フィールド型パレット（design-spec §5）: スカラー基底 `text / number / boolean / datetime / json` + 構造型 `select / richtext / relation`。indexed / unique は宣言ベースで `config` に持つ（design-spec §5 論点J・33）。json / richtext / relation には indexed / unique を認めない（json は不透明、richtext は本文、relation は relations テーブル側の索引で解決するため）。
+フィールド型パレット（design-spec §5）: スカラー基底 `text / number / boolean / datetime / json` + 構造型 `select / richtext / relation`。indexed / unique は宣言ベースで `config` に持つ（design-spec §5 論点J・33）。`indexed` は json / richtext / relation を除く全型に許可（json は不透明、richtext は本文、relation は relations テーブル側の索引で解決するため）。`unique` は一意性が意味を持つ **text / number / datetime のみ**に許可する（boolean は高々2値で無意味、select は選択肢集合ゆえ用途が薄い — 2026-07-12 ユーザー決定）。
 
 - [ ] **Step 1: 失敗するテストを書く**
 
