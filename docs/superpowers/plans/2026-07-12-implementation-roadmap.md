@@ -75,3 +75,28 @@ Phase 2 の詳細計画で最終確定する。
 |-------|-------------|------|
 | 1 | `2026-07-12-phase1-foundation-and-metamodel.md` | 計画済み |
 | 2〜10 | 各フェーズ着手時に作成 | 未着手 |
+
+---
+
+## 4. Phase 1 完了時の申し送り（最終レビュー 2026-07-12）
+
+Phase 1 実装完了（ブランチ worktree-phase1-foundation-metamodel、41 tests green、最終レビュー「マージ可」）。
+
+**未裁定（Phase 2 着手前に確定すること）:**
+
+- **G7: `required` の意味論**。現状は「キー存在のみ」で、required text の `""` / required many-relation の `[]` が検証を通る。「存在のみ（空値許容）」を確定仕様として文書化するか、required 時に非空（text `.min(1)` 等）を強制するかのユーザー裁定が必要。Phase 6 動的フォームと unique フック（空文字 slug 衝突）に影響。
+
+**Phase 2 への技術申し送り:**
+
+- ID 検証は `uuidSchema`（小文字 UUID 強制・拒否方式）に統一済み。UUID バージョンは問わない（v7 は生成側の規約）。
+- `splitRecordInput` の refs 配列 index をそのまま `relations.ordinal` に使える（フィールド定義順・配列順保持）。
+- many-relation の重複 ref / multiple-select の重複値は現状検証を通る。relations 再投影時の dedup 方針を Phase 2 で決定。
+- `required`+`unique` の slug と空文字の相互作用は G7 の裁定に依存。
+- `key` / `name` / select option 等の長さ上限は未設定。入力ハードニングは Phase 2 の API 境界の責務。
+- `buildRecordInputSchema` / `tolerantReadData` は呼び出しごとにスキーマ再構築。`(contentType.id, version)` キーのメモ化を Phase 2/4 で検討（Phase 4 クライアントコレクションのホットパス）。
+
+**軽微（将来対応・記録のみ）:**
+
+- ルート lint スクリプトの `--no-error-on-unmatched-pattern` は lint 対象が恒常化した今は外せる。
+- CI に actions の SHA ピン / `timeout-minutes` / `concurrency` を将来追加。
+- oxfmt はスクリプト経由でのみ ignore が効く（`--ignore-path` 明示のため）。CONTRIBUTING 整備時に注記。
