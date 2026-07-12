@@ -74,7 +74,7 @@ Phase 2 の詳細計画で最終確定する。
 | Phase | 計画ファイル | 状態 |
 |-------|-------------|------|
 | 1 | `2026-07-12-phase1-foundation-and-metamodel.md` | 完了（2026-07-12 main へマージ） |
-| 2 | `2026-07-12-phase2-do-write-path.md` | 計画済み |
+| 2 | `2026-07-12-phase2-do-write-path.md` | 完了（2026-07-13 main へマージ） |
 | 3〜10 | 各フェーズ着手時に作成 | 未着手 |
 
 ---
@@ -101,3 +101,37 @@ Phase 1 実装完了（ブランチ worktree-phase1-foundation-metamodel、41 te
 - ルート lint スクリプトの `--no-error-on-unmatched-pattern` は lint 対象が恒常化した今は外せる。
 - CI に actions の SHA ピン / `timeout-minutes` / `concurrency` を将来追加。
 - oxfmt はスクリプト経由でのみ ignore が効く（`--ignore-path` 明示のため）。CONTRIBUTING 整備時に注記。
+
+---
+
+## 5. Phase 2 完了時の申し送り（最終レビュー 2026-07-13）
+
+Phase 2 実装完了（DO 書き込み経路、91 tests green、最終レビュー「マージ可」）。G7（required 非空）適用済み。
+
+**Phase 3（認可）への申し送り:**
+
+- **beforeWrite パイプラインは no-op ゲートの後にある**。no-op 書き込みはフック未実行のまま全データ入り snapshot を返すため、認可をこのパイプラインだけに載せると「現在値を正確に当てた書き込み」が内容確認オラクルになる。認可第1判定は RPC 入口（no-op 判定より前）に置くこと。
+- `deleteRecord` はフックパイプラインを通らない。beforeDelete 相当の設計が必要。
+- 2本目のフック追加時に、複数フックの短絡動作テストを必ず追加（現状1本のため未検証）。
+- `HookRejection.code` は `Extract<WriteErrorCode, ...>` に変えると WriteErrorCode との手動同期が消える。
+
+**Phase 4（同期）への申し送り:**
+
+- seq のロールバック欠番は DO 再起動後に**再利用され得る**（メモリカウンタが MAX(seq) に巻き戻る）。単調性は保たれるが「一度発番したら不使用」ではない前提で設計。
+- content_type の変更は seq を消費しない。型定義の同期は `content_types.version` を別チャネルとして扱う。
+- 型定義から削除された relation フィールドのクリーンアップ書き込みは field_versions をバンプしない（キーが定義に無いため凍結残存）。relation クリアの検知は record.seq/version 側で行う。
+- **RecordSnapshot は relations を含まない**が、書き込みは全置換（relation 省略=クリア）。getRecord → 編集 → writeRecord の read-modify-write で optional relation が無言クリアされる継ぎ目がある。Phase 4 のクライアント/同期表現では snapshot に relations を含めるか、「writeRecord 入力は relation 全量必須」を契約として明文化すること。
+- `buildRecordInputSchema` / `tolerantReadData` の `(contentType.id, version)` メモ化はクライアントコレクションのホットパスで必須級。
+- RPC 型の注意: `Record<string, unknown>` を含む戻り値は Cloudflare の `Rpc.Serializable` 検査で ok:true 側が never に潰れる。テストは `apps/api/test/rpc-unwrap.ts` の型付きアンラップを使う（@ts-expect-error 禁止）。
+
+**Phase 5（publish/投影）への申し送り:**
+
+- **動的 `g_*` generated column は Drizzle スキーマの外**にある。将来の drizzle-kit マイグレーションが records のテーブル再ビルドを行うと g_*/idx_g_* が黙って消え、content_types 由来の prev と物理スキーマが乖離する。records の再ビルド禁止を規約化するか、`applyIndexDdl` の prev を `pragma table_xinfo` から導出する防御を入れる。
+- stale relations 問題は解消済み（blanket 再投影）。relations テーブルは信頼して読める。
+
+**軽微（記録のみ）:**
+
+- unique 照会の `type = ?` バインドは部分索引（リテラル WHERE）を使えない可能性。検証済み typeKey のリテラル埋め込みで解消可（書き込み頻度が低い現状は不急）。
+- 同一定義の content_type 再登録でも version が +1 される。Phase 9 の冪等マニフェスト再配信で no-op 検出を検討。
+- `CREATE INDEX` に IF NOT EXISTS がなく DROP 側と非対称（復旧シナリオの保険として将来揃える）。
+- `actor` / key・name 長さ上限等の入力ハードニングは HTTP API フェーズ（Phase 3 以降）の責務のまま未消化。
