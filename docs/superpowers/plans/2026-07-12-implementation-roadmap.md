@@ -82,9 +82,9 @@ Phase 2 の詳細計画で最終確定する。
 
 Phase 1 実装完了（ブランチ worktree-phase1-foundation-metamodel、41 tests green、最終レビュー「マージ可」）。
 
-**未裁定（Phase 2 着手前に確定すること）:**
+**G7: `required` の意味論 — 裁定済み（2026-07-12 ユーザー決定）:**
 
-- **G7: `required` の意味論**。現状は「キー存在のみ」で、required text の `""` / required many-relation の `[]` が検証を通る。「存在のみ（空値許容）」を確定仕様として文書化するか、required 時に非空（text `.min(1)` 等）を強制するかのユーザー裁定が必要。Phase 6 動的フォームと unique フック（空文字 slug 衝突）に影響。
+- 決定: **required は非空を強制する**。required text は `.min(1)`、required の many-relation / multiple-select は要素≥1。空値許容の現行挙動（キー存在のみ）は Phase 1 時点の暫定であり、**Phase 2 冒頭の小修正として metamodel に適用する**（対象: `buildRecordInputSchema` の required 分岐 + テスト）。背景: Phase 6 動的フォームの直感と一致し、`required`+`unique` slug の空文字衝突も構造的に防ぐ。
 
 **Phase 2 への技術申し送り:**
 
