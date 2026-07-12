@@ -52,4 +52,10 @@ describe("tolerantReadData", () => {
     // authors は定義済みフィールドなので unknown ではないが、data には本来存在しない
     expect(result.unknownKeys).toEqual([]);
   });
+
+  it("reports an empty required text value as invalid (G7 semantics)", () => {
+    const result = tolerantReadData(articleType, { title: "" });
+    expect(result.values).toEqual({});
+    expect(result.invalidKeys).toEqual(["title"]);
+  });
 });

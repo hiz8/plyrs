@@ -40,7 +40,12 @@ export function buildFieldValueSchema(field: FieldDefinition): z.ZodType<unknown
   switch (field.type) {
     case "text": {
       const maxLength = field.config?.maxLength;
-      return maxLength === undefined ? z.string() : z.string().max(maxLength);
+      // G7 (2026-07-12 決定): required の text は空文字を拒否する
+      let schema = field.required ? z.string().min(1) : z.string();
+      if (maxLength !== undefined) {
+        schema = schema.max(maxLength);
+      }
+      return schema;
     }
     case "number":
       return field.config?.integer ? z.number().int() : z.number();
@@ -54,7 +59,9 @@ export function buildFieldValueSchema(field: FieldDefinition): z.ZodType<unknown
     case "select": {
       const values = field.config.options.map((option) => option.value);
       const single = z.enum(values as [string, ...string[]]);
-      return field.config.multiple ? z.array(single) : single;
+      const multi = z.array(single);
+      // G7: required の multiple-select は空配列を拒否する
+      return field.config.multiple ? (field.required ? multi.min(1) : multi) : single;
     }
     case "richtext":
       return richTextEnvelopeSchema;
@@ -63,7 +70,9 @@ export function buildFieldValueSchema(field: FieldDefinition): z.ZodType<unknown
         (value) => field.config.allowedTypes.includes(value.type),
         { message: `relation target type must be one of: ${field.config.allowedTypes.join(", ")}` },
       );
-      return field.config.cardinality === "many" ? z.array(ref) : ref;
+      const many = z.array(ref);
+      // G7: required の many-relation は空配列を拒否する
+      return field.config.cardinality === "many" ? (field.required ? many.min(1) : many) : ref;
     }
   }
 }

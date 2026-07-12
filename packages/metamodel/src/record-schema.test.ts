@@ -12,6 +12,7 @@ const articleType: ContentTypeDefinition = {
   version: 1,
   fields: [
     { key: "title", type: "text", required: true, config: { maxLength: 200 } },
+    { key: "subtitle", type: "text" },
     { key: "published_at", type: "datetime", config: { indexed: true } },
     {
       key: "category",
@@ -115,6 +116,50 @@ describe("buildRecordInputSchema", () => {
       hero: { type: "asset", id: UUID(4).toUpperCase() },
     });
     expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty string for a required text field (G7)", () => {
+    const result = buildRecordInputSchema(articleType).safeParse({
+      ...validInput,
+      title: "",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts an empty string for an optional text field", () => {
+    const result = buildRecordInputSchema(articleType).safeParse({
+      ...validInput,
+      subtitle: "",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an empty array for a required many-relation (G7)", () => {
+    const result = buildRecordInputSchema(articleType).safeParse({
+      ...validInput,
+      authors: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty array for a required multiple-select (G7)", () => {
+    const surveyType: ContentTypeDefinition = {
+      id: "018f2b6a-7a0a-7000-8000-000000000009",
+      key: "survey",
+      name: "調査",
+      source: "user",
+      version: 1,
+      fields: [
+        {
+          key: "topics",
+          type: "select",
+          required: true,
+          config: { options: [{ value: "a", label: "A" }], multiple: true },
+        },
+      ],
+    };
+    expect(buildRecordInputSchema(surveyType).safeParse({ topics: [] }).success).toBe(false);
+    expect(buildRecordInputSchema(surveyType).safeParse({ topics: ["a"] }).success).toBe(true);
   });
 });
 
