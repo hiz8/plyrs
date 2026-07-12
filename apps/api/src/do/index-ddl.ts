@@ -77,7 +77,9 @@ export function computeIndexDdlDiff(
   return { add, drop };
 }
 
-// key / typeKey は metamodel 検証済み（/^[a-z][a-z0-9_.]*$/）のため、識別子・リテラル埋め込みが安全。
+// key / typeKey は metamodel 検証済み: field key は /^[a-z][a-z0-9_]*$/（ドット無し）、
+// type key はプラグイン型（pluginId.name の位置にドット1個のみ）を除きドット無し。
+// いずれも識別子・リテラル埋め込みが安全な厳格な部分集合。
 export function applyIndexDdl(
   sql: SqlStorage,
   typeKey: string,

@@ -72,6 +72,16 @@ describe("content type registration", () => {
     expect(result).toMatchObject({ ok: false, code: "validation_failed" });
   });
 
+  it("rejects re-registering the same id under a different key without throwing", async () => {
+    const stub = freshStub();
+    await stub.registerContentType(articleType());
+    const renamed = { ...articleType(), key: "post" };
+    const result = await stub.registerContentType(renamed);
+    expect(result).toMatchObject({ ok: false, code: "key_mismatch" });
+    expect(await stub.getContentType("article")).not.toBeNull();
+    expect(await stub.getContentType("post")).toBeNull();
+  });
+
   it("accepts a namespaced plugin type and returns null for unknown keys", async () => {
     const stub = freshStub();
     const pluginType = {

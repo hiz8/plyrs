@@ -20,7 +20,7 @@ export interface ContentTypeRow {
 
 export type RegisterContentTypeResult =
   | { ok: true; contentType: ContentTypeRow }
-  | { ok: false; code: "validation_failed" | "id_mismatch"; message: string };
+  | { ok: false; code: "validation_failed" | "id_mismatch" | "key_mismatch"; message: string };
 
 interface RawContentTypeRow extends Record<string, SqlStorageValue> {
   id: string;
@@ -86,6 +86,16 @@ export function registerContentTypeCore(
       ok: false,
       code: "id_mismatch",
       message: `type key '${def.key}' is already registered with a different id`,
+    };
+  }
+  const existingKeyForId = sql
+    .exec<{ key: string }>("SELECT key FROM content_types WHERE id = ?", def.id)
+    .toArray()[0];
+  if (existingKeyForId !== undefined && existingKeyForId.key !== def.key) {
+    return {
+      ok: false,
+      code: "key_mismatch",
+      message: `type id '${def.id}' is already registered under key '${existingKeyForId.key}' (renaming type keys is not supported)`,
     };
   }
   // version はサーバー管理（入力の version は無視する）

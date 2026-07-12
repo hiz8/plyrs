@@ -1,5 +1,6 @@
 import {
   buildRecordInputSchema,
+  uuidSchema,
   WORKFLOW_STATUSES,
   type RelationRef,
   type WorkflowStatus,
@@ -77,6 +78,14 @@ export function writeRecordCore(
   contentType: ContentTypeRow,
   params: WriteRecordParams,
 ): WriteRecordResult {
+  if (!uuidSchema.safeParse(params.recordId).success) {
+    return {
+      ok: false,
+      code: "validation_failed",
+      message: `recordId must be a lowercase uuid: ${params.recordId}`,
+    };
+  }
+
   if (
     params.status !== undefined &&
     !(WORKFLOW_STATUSES as readonly string[]).includes(params.status)
@@ -113,8 +122,19 @@ export function writeRecordCore(
 
   const nextStatus: WorkflowStatus = params.status ?? prev?.status ?? "draft";
   const statusChanged = prev !== null && nextStatus !== prev.status;
+  // computeChangeSet は現行定義の relation フィールドしか見ないため、型定義から外れた
+  // フィールドの残存 relation は changedFields に現れない。それを見逃すと「無変更」判定のまま
+  // 早期returnし、下の再投影（blanket delete）に到達できず relations が残留し続ける。
+  const currentRelationFieldKeys = new Set(change.relationWrites.map((write) => write.fieldKey));
+  const staleRelationFieldRemoved = Array.from(prevRelations.entries()).some(
+    ([key, refs]) => refs.length > 0 && !currentRelationFieldKeys.has(key),
+  );
   const applied =
-    prev === null || change.dataChanged || change.changedFields.length > 0 || statusChanged;
+    prev === null ||
+    change.dataChanged ||
+    change.changedFields.length > 0 ||
+    statusChanged ||
+    staleRelationFieldRemoved;
   if (!applied && prev !== null) {
     return { ok: true, record: prev, changedFields: [], applied: false };
   }
@@ -169,13 +189,10 @@ export function writeRecordCore(
     );
   }
 
-  // relations は派生データ: 全 relation フィールドを削除→再挿入で再投影（design-spec §6）
+  // relations は派生データ: この record の field 由来行を全消しして張り直す（design-spec §6）。
+  // 型定義から外れた旧フィールドの残骸もここで一掃される。origin='body' は Phase 7 の領分なので触れない。
+  deps.sql.exec("DELETE FROM relations WHERE source_id = ? AND origin = 'field'", params.recordId);
   for (const write of change.relationWrites) {
-    deps.sql.exec(
-      "DELETE FROM relations WHERE source_id = ? AND source_field = ?",
-      params.recordId,
-      write.fieldKey,
-    );
     write.refs.forEach((ref, ordinal) => {
       deps.sql.exec(
         "INSERT INTO relations (id, source_id, source_field, target_type, target_id, ordinal, origin) VALUES (?, ?, ?, ?, ?, ?, 'field')",

@@ -208,6 +208,46 @@ describe("writeRecord", () => {
     expect(result.changedFields).toEqual([]);
   });
 
+  it("rejects a non-lowercase-uuid recordId", async () => {
+    for (const badId of ["not-a-uuid", "018F2B6A-7A0A-7000-8000-000000000001"]) {
+      const result = asWriteResult(
+        await stub.writeRecord("article", {
+          recordId: badId,
+          input: validArticleInput(),
+          actor: "a",
+        }),
+      );
+      expect(result).toMatchObject({ ok: false, code: "validation_failed" });
+    }
+  });
+
+  it("clears relations of fields removed from the type definition", async () => {
+    await stub.writeRecord("article", {
+      recordId: uuid(50),
+      input: validArticleInput(),
+      actor: "a",
+    });
+    const withoutHero = articleType();
+    withoutHero.fields = withoutHero.fields.filter((field) => field.key !== "hero");
+    const rereg = await stub.registerContentType(withoutHero);
+    expect(rereg.ok).toBe(true);
+    const { hero: _hero, ...input } = validArticleInput();
+    const result = asWriteResult(
+      await stub.writeRecord("article", { recordId: uuid(50), input, actor: "a" }),
+    );
+    expect(result.ok).toBe(true);
+    await runInDurableObject(stub, async (_instance, state) => {
+      const fields = state.storage.sql
+        .exec<{ source_field: string }>(
+          "SELECT DISTINCT source_field FROM relations WHERE source_id = ?",
+          uuid(50),
+        )
+        .toArray()
+        .map((row) => row.source_field);
+      expect(fields).toEqual(["authors"]);
+    });
+  });
+
   it("exposes the stored record via getRecord", async () => {
     await stub.writeRecord("article", {
       recordId: uuid(19),
