@@ -2,6 +2,7 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { articleType, uuid, validArticleInput } from "./fixtures";
+import { asRecordSnapshot, asWriteResult } from "./rpc-unwrap";
 
 function freshStub() {
   return env.TENANT_DO.get(env.TENANT_DO.idFromName(crypto.randomUUID()));
@@ -17,25 +18,21 @@ describe("writeRecord", () => {
   });
 
   it("creates a record with bookkeeping columns and reprojected relations", async () => {
-    const result = await stub.writeRecord("article", {
-      recordId: uuid(10),
-      input: validArticleInput(),
-      actor: "user-a",
-    });
+    const result = asWriteResult(
+      await stub.writeRecord("article", {
+        recordId: uuid(10),
+        input: validArticleInput(),
+        actor: "user-a",
+      }),
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.applied).toBe(true);
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.version).toBe(1);
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.seq).toBe(1);
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.status).toBe("draft");
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.fieldVersions).toMatchObject({ title: 1, slug: 1, authors: 1, hero: 1 });
     // data には relation フィールドが入らない
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.data["authors"]).toBeUndefined();
 
     await runInDurableObject(stub, async (_instance, state) => {
@@ -59,29 +56,35 @@ describe("writeRecord", () => {
 
   it("rejects input that fails validate-on-write (missing required title)", async () => {
     const { title: _t, ...rest } = validArticleInput();
-    const result = await stub.writeRecord("article", {
-      recordId: uuid(11),
-      input: rest,
-      actor: "user-a",
-    });
+    const result = asWriteResult(
+      await stub.writeRecord("article", {
+        recordId: uuid(11),
+        input: rest,
+        actor: "user-a",
+      }),
+    );
     expect(result).toMatchObject({ ok: false, code: "validation_failed" });
   });
 
   it("rejects an empty required text through the whole stack (G7)", async () => {
-    const result = await stub.writeRecord("article", {
-      recordId: uuid(12),
-      input: { ...validArticleInput(), title: "" },
-      actor: "user-a",
-    });
+    const result = asWriteResult(
+      await stub.writeRecord("article", {
+        recordId: uuid(12),
+        input: { ...validArticleInput(), title: "" },
+        actor: "user-a",
+      }),
+    );
     expect(result).toMatchObject({ ok: false, code: "validation_failed" });
   });
 
   it("returns unknown_type for an unregistered type", async () => {
-    const result = await stub.writeRecord("nope", {
-      recordId: uuid(13),
-      input: validArticleInput(),
-      actor: "user-a",
-    });
+    const result = asWriteResult(
+      await stub.writeRecord("nope", {
+        recordId: uuid(13),
+        input: validArticleInput(),
+        actor: "user-a",
+      }),
+    );
     expect(result).toMatchObject({ ok: false, code: "unknown_type" });
   });
 
@@ -91,26 +94,21 @@ describe("writeRecord", () => {
       input: validArticleInput(),
       actor: "a",
     });
-    const result = await stub.writeRecord("article", {
-      recordId: uuid(14),
-      input: { ...validArticleInput(), title: "改題" },
-      actor: "b",
-    });
+    const result = asWriteResult(
+      await stub.writeRecord("article", {
+        recordId: uuid(14),
+        input: { ...validArticleInput(), title: "改題" },
+        actor: "b",
+      }),
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.applied).toBe(true);
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.version).toBe(2);
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.seq).toBe(2);
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.fieldVersions["title"]).toBe(2);
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.fieldVersions["slug"]).toBe(1);
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.updatedBy).toBe("b");
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.changedFields).toEqual(["title"]);
   });
 
@@ -120,16 +118,16 @@ describe("writeRecord", () => {
       input: validArticleInput(),
       actor: "a",
     });
-    const result = await stub.writeRecord("article", {
-      recordId: uuid(15),
-      input: validArticleInput(),
-      actor: "a",
-    });
+    const result = asWriteResult(
+      await stub.writeRecord("article", {
+        recordId: uuid(15),
+        input: validArticleInput(),
+        actor: "a",
+      }),
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.applied).toBe(false);
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.version).toBe(1);
   });
 
@@ -139,18 +137,17 @@ describe("writeRecord", () => {
       input: validArticleInput(),
       actor: "a",
     });
-    const result = await stub.writeRecord("article", {
-      recordId: uuid(16),
-      input: { ...validArticleInput(), legacy_field: "kept" },
-      actor: "a",
-    });
+    const result = asWriteResult(
+      await stub.writeRecord("article", {
+        recordId: uuid(16),
+        input: { ...validArticleInput(), legacy_field: "kept" },
+        actor: "a",
+      }),
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.applied).toBe(true);
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.data["legacy_field"]).toBe("kept");
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.changedFields).toEqual([]);
   });
 
@@ -165,14 +162,15 @@ describe("writeRecord", () => {
       ],
     };
     const { hero: _hero, ...withoutHero } = reordered;
-    const result = await stub.writeRecord("article", {
-      recordId: uuid(17),
-      input: withoutHero,
-      actor: "a",
-    });
+    const result = asWriteResult(
+      await stub.writeRecord("article", {
+        recordId: uuid(17),
+        input: withoutHero,
+        actor: "a",
+      }),
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.changedFields.sort()).toEqual(["authors", "hero"]);
     await runInDurableObject(stub, async (_instance, state) => {
       const rels = state.storage.sql
@@ -194,21 +192,19 @@ describe("writeRecord", () => {
       input: validArticleInput(),
       actor: "a",
     });
-    const result = await stub.writeRecord("article", {
-      recordId: uuid(18),
-      input: validArticleInput(),
-      status: "in_review",
-      actor: "a",
-    });
+    const result = asWriteResult(
+      await stub.writeRecord("article", {
+        recordId: uuid(18),
+        input: validArticleInput(),
+        status: "in_review",
+        actor: "a",
+      }),
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.applied).toBe(true);
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.status).toBe("in_review");
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.record.version).toBe(2);
-    // @ts-expect-error: Cloudflare RPC type narrowing limitation
     expect(result.changedFields).toEqual([]);
   });
 
@@ -218,13 +214,9 @@ describe("writeRecord", () => {
       input: validArticleInput(),
       actor: "a",
     });
-    const record = await stub.getRecord(uuid(19));
-    if (record !== null) {
-      // @ts-expect-error: Cloudflare RPC type narrowing limitation
-      expect(record.type).toBe("article");
-      // @ts-expect-error: Cloudflare RPC type narrowing limitation
-      expect(record.data["title"]).toBe("こんにちは");
-    }
-    expect(await stub.getRecord(uuid(99))).toBeNull();
+    const record = asRecordSnapshot(await stub.getRecord(uuid(19)));
+    expect(record?.type).toBe("article");
+    expect(record?.data["title"]).toBe("こんにちは");
+    expect(asRecordSnapshot(await stub.getRecord(uuid(99)))).toBeNull();
   });
 });
