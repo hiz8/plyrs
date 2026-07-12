@@ -3,8 +3,8 @@
   "private": true,
   "scripts": {
     "lint": "oxlint . --no-error-on-unmatched-pattern",
-    "format": "oxfmt .",
-    "format:check": "oxfmt --check .",
+    "format": "oxfmt --ignore-path=.gitignore --ignore-path=.oxfmtignore .",
+    "format:check": "oxfmt --check --ignore-path=.gitignore --ignore-path=.oxfmtignore .",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test"
   },

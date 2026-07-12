@@ -7,6 +7,6 @@ coverage/
 .env.*
 !.env.example
 .DS_Store
-.claude/
 .superpowers/
-.mcp.json
+.claude/worktrees/
+.claude/settings.local.json

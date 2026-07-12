@@ -3,5 +3,5 @@
     "correctness": "error",
     "suspicious": "warn"
   },
-  "ignorePatterns": ["dist", "node_modules", ".wrangler", "coverage"]
+  "ignorePatterns": ["dist", "node_modules", ".wrangler", "coverage", ".claude", ".superpowers"]
 }

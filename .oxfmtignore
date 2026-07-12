@@ -1,0 +1,7 @@
+# Tool-scan exclusions for oxfmt only (not VCS policy — see .gitignore).
+# These paths contain Claude Code runtime files that surface as unreadable
+# character-device nodes under this environment's sandboxing, which makes
+# oxfmt fail with "Failed to read file" errors if it attempts to scan them.
+.claude
+.superpowers
+.mcp.json
