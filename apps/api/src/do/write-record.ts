@@ -6,6 +6,8 @@ import {
 } from "@plyrs/metamodel";
 import { issuesToMessage, rowToDefinition, type ContentTypeRow } from "./content-types";
 import { computeChangeSet } from "./diff";
+import { runBeforeWriteHooks, type BeforeWriteHook } from "./hooks";
+import { uniqueCheckHook } from "./unique-check";
 import type { RecordSnapshot, WriteRecordParams, WriteRecordResult } from "./types";
 
 interface RawRecordRow extends Record<string, SqlStorageValue> {
@@ -68,6 +70,8 @@ export interface WriteDeps {
   newRelationId: () => string;
 }
 
+const systemBeforeWriteHooks: readonly BeforeWriteHook[] = [uniqueCheckHook];
+
 export function writeRecordCore(
   deps: WriteDeps,
   contentType: ContentTypeRow,
@@ -113,6 +117,17 @@ export function writeRecordCore(
     prev === null || change.dataChanged || change.changedFields.length > 0 || statusChanged;
   if (!applied && prev !== null) {
     return { ok: true, record: prev, changedFields: [], applied: false };
+  }
+
+  const rejection = runBeforeWriteHooks(systemBeforeWriteHooks, {
+    contentType,
+    recordId: params.recordId,
+    data: change.data,
+    prev,
+    sql: deps.sql,
+  });
+  if (rejection !== null) {
+    return { ok: false, code: rejection.code, message: rejection.message };
   }
 
   const now = deps.now();
