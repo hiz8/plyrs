@@ -22,6 +22,12 @@ describe("fieldDefinitionSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects reserved keys that are otherwise valid snake_case", () => {
+    for (const key of ["id", "status", "version"]) {
+      expect(fieldDefinitionSchema.safeParse({ key, type: "text" }).success).toBe(false);
+    }
+  });
+
   it("rejects a key that is not snake_case", () => {
     for (const key of ["Title", "1title", "my-field", "my.field"]) {
       expect(fieldDefinitionSchema.safeParse({ key, type: "text" }).success).toBe(false);
@@ -44,6 +50,23 @@ describe("fieldDefinitionSchema", () => {
       config: { indexed: true },
     });
     expect(result.success).toBe(false);
+  });
+
+  it("rejects unique on boolean and select fields (unique is text/number/datetime only)", () => {
+    expect(
+      fieldDefinitionSchema.safeParse({
+        key: "flag",
+        type: "boolean",
+        config: { unique: true },
+      }).success,
+    ).toBe(false);
+    expect(
+      fieldDefinitionSchema.safeParse({
+        key: "category",
+        type: "select",
+        config: { options: [{ value: "a", label: "A" }], unique: true },
+      }).success,
+    ).toBe(false);
   });
 
   it("accepts a select field and rejects duplicate option values", () => {
