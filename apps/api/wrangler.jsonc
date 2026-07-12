@@ -14,5 +14,4 @@
     },
   ],
   "kv_namespaces": [{ "binding": "BLOCKLIST", "id": "00000000000000000000000000000000" }],
-  "vars": { "JWT_SECRET": "test-secret-do-not-use-in-prod" },
 }

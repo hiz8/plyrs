@@ -173,4 +173,18 @@ describe("tenant gate + gated DO routes (end to end)", () => {
     );
     expect(denied.status).toBe(403);
   });
+
+  it("returns 400 for malformed JSON on content-type registration", async () => {
+    const { tenantId, bearer } = await bootstrapTenant();
+    const res = await app.request(
+      `/v1/t/${tenantId}/content-types`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json", authorization: bearer },
+        body: "{not json",
+      },
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
 });

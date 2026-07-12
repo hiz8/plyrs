@@ -2,7 +2,8 @@ import type { ContentTypeRow } from "./content-types";
 import type { RecordSnapshot, WriteErrorCode } from "./types";
 
 // design-spec §9.3: DO 内同期バリデーションフック。書き込みを拒否できる。
-// 認可第2段（Phase 3）・モジュールフック（Phase 9）も同じパイプラインに乗る。
+// モジュールフック（Phase 9）はこのパイプラインに乗る。認可第2段は RPC 入口（authorize.ts）
+// — no-op 判定より前に走らせるため、このパイプラインには乗せない（Phase 2 申し送り）。
 export interface BeforeWriteContext {
   contentType: ContentTypeRow;
   recordId: string;

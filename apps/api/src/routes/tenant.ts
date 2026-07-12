@@ -43,9 +43,13 @@ function stubFor(c: { env: Env; req: { param: (key: "tenantId") => string } }) {
 export const tenantRoutes = new Hono<GateEnv>()
   .use("/:tenantId/*", tenantGate)
   .put("/:tenantId/content-types", async (c) => {
-    const result = asRegisterResult(
-      await stubFor(c).registerContentType(await c.req.json(), c.get("auth")),
-    );
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid_json" }, 400);
+    }
+    const result = asRegisterResult(await stubFor(c).registerContentType(body, c.get("auth")));
     return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
   })
   .get("/:tenantId/content-types/:key", async (c) => {
