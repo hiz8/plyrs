@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.wrangler/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+.claude/
+.superpowers/
+.mcp.json
