@@ -39,10 +39,12 @@ export const tenantAdminRoutes = new Hono<{ Bindings: Env }>().post(
     }
     const now = new Date().toISOString();
     const tenantId = uuidv7();
-    await db.insert(tenants).values({ id: tenantId, slug, name, createdAt: now });
-    await db
-      .insert(memberships)
-      .values({ userId: session.userId, tenantId, role: "owner", createdAt: now });
+    await db.batch([
+      db.insert(tenants).values({ id: tenantId, slug, name, createdAt: now }),
+      db
+        .insert(memberships)
+        .values({ userId: session.userId, tenantId, role: "owner", createdAt: now }),
+    ]);
     return c.json({ tenantId }, 201);
   },
 );
