@@ -4,6 +4,12 @@ import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import * as schema from "@plyrs/db";
 import migrations from "@plyrs/db/migrations";
 import { contentTypeDefinitionSchema } from "@plyrs/metamodel";
+import {
+  loadContentTypeByKey,
+  registerContentTypeCore,
+  type ContentTypeRow,
+  type RegisterContentTypeResult,
+} from "./do/content-types";
 
 export class TenantDO extends DurableObject<Env> {
   private readonly db: DrizzleSqliteDODatabase<typeof schema>;
@@ -29,5 +35,16 @@ export class TenantDO extends DurableObject<Env> {
   // モノレポの .ts 直接 exports が workerd バンドルを通ることの早期検証を兼ねる
   validateContentTypeInput(input: unknown): { valid: boolean } {
     return { valid: contentTypeDefinitionSchema.safeParse(input).success };
+  }
+
+  registerContentType(input: unknown): RegisterContentTypeResult {
+    const now = new Date().toISOString();
+    return this.ctx.storage.transactionSync(() =>
+      registerContentTypeCore(this.ctx.storage.sql, input, now),
+    );
+  }
+
+  getContentType(key: string): ContentTypeRow | null {
+    return loadContentTypeByKey(this.ctx.storage.sql, key);
   }
 }
