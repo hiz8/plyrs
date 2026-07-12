@@ -3,7 +3,7 @@ import { loadRecord } from "./write-record";
 
 export type DeleteRecordResult =
   | { ok: true; record: RecordSnapshot }
-  | { ok: false; code: "not_found" | "already_deleted"; message: string };
+  | { ok: false; code: "not_found" | "already_deleted" | "forbidden"; message: string };
 
 // G2: 削除はトゥームストーン。row は同期の削除伝搬（Phase 4）のために残す。
 export function deleteRecordCore(

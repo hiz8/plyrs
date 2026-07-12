@@ -20,7 +20,11 @@ export interface ContentTypeRow {
 
 export type RegisterContentTypeResult =
   | { ok: true; contentType: ContentTypeRow }
-  | { ok: false; code: "validation_failed" | "id_mismatch" | "key_mismatch"; message: string };
+  | {
+      ok: false;
+      code: "validation_failed" | "id_mismatch" | "key_mismatch" | "forbidden";
+      message: string;
+    };
 
 interface RawContentTypeRow extends Record<string, SqlStorageValue> {
   id: string;

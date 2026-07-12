@@ -1,4 +1,10 @@
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
+import type { AuthContext } from "../src/do/authorize";
+import type { Role } from "../src/auth/permissions";
+
+export function auth(userId: string, role: Role = "owner"): AuthContext {
+  return { userId, role };
+}
 
 // 16進数字のみで構成される決定的な小文字 UUID（v7 形式）
 export function uuid(n: number): string {

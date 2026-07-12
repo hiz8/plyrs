@@ -1,7 +1,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { articleType, uuid, validArticleInput } from "./fixtures";
+import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import { asRecordSnapshot, asWriteResult } from "./rpc-unwrap";
 
 function freshStub() {
@@ -13,17 +13,20 @@ describe("writeRecord", () => {
 
   beforeEach(async () => {
     stub = freshStub();
-    const registered = await stub.registerContentType(articleType());
+    const registered = await stub.registerContentType(articleType(), auth("admin"));
     expect(registered.ok).toBe(true);
   });
 
   it("creates a record with bookkeeping columns and reprojected relations", async () => {
     const result = asWriteResult(
-      await stub.writeRecord("article", {
-        recordId: uuid(10),
-        input: validArticleInput(),
-        actor: "user-a",
-      }),
+      await stub.writeRecord(
+        "article",
+        {
+          recordId: uuid(10),
+          input: validArticleInput(),
+        },
+        auth("user-a"),
+      ),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -57,49 +60,58 @@ describe("writeRecord", () => {
   it("rejects input that fails validate-on-write (missing required title)", async () => {
     const { title: _t, ...rest } = validArticleInput();
     const result = asWriteResult(
-      await stub.writeRecord("article", {
-        recordId: uuid(11),
-        input: rest,
-        actor: "user-a",
-      }),
+      await stub.writeRecord(
+        "article",
+        {
+          recordId: uuid(11),
+          input: rest,
+        },
+        auth("user-a"),
+      ),
     );
     expect(result).toMatchObject({ ok: false, code: "validation_failed" });
   });
 
   it("rejects an empty required text through the whole stack (G7)", async () => {
     const result = asWriteResult(
-      await stub.writeRecord("article", {
-        recordId: uuid(12),
-        input: { ...validArticleInput(), title: "" },
-        actor: "user-a",
-      }),
+      await stub.writeRecord(
+        "article",
+        { recordId: uuid(12), input: { ...validArticleInput(), title: "" } },
+        auth("user-a"),
+      ),
     );
     expect(result).toMatchObject({ ok: false, code: "validation_failed" });
   });
 
   it("returns unknown_type for an unregistered type", async () => {
     const result = asWriteResult(
-      await stub.writeRecord("nope", {
-        recordId: uuid(13),
-        input: validArticleInput(),
-        actor: "user-a",
-      }),
+      await stub.writeRecord(
+        "nope",
+        {
+          recordId: uuid(13),
+          input: validArticleInput(),
+        },
+        auth("user-a"),
+      ),
     );
     expect(result).toMatchObject({ ok: false, code: "unknown_type" });
   });
 
   it("bumps only the changed field's counter on update", async () => {
-    await stub.writeRecord("article", {
-      recordId: uuid(14),
-      input: validArticleInput(),
-      actor: "a",
-    });
-    const result = asWriteResult(
-      await stub.writeRecord("article", {
+    await stub.writeRecord(
+      "article",
+      {
         recordId: uuid(14),
-        input: { ...validArticleInput(), title: "改題" },
-        actor: "b",
-      }),
+        input: validArticleInput(),
+      },
+      auth("a"),
+    );
+    const result = asWriteResult(
+      await stub.writeRecord(
+        "article",
+        { recordId: uuid(14), input: { ...validArticleInput(), title: "改題" } },
+        auth("b"),
+      ),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -113,17 +125,23 @@ describe("writeRecord", () => {
   });
 
   it("treats an identical write as a no-op (no version/seq bump)", async () => {
-    await stub.writeRecord("article", {
-      recordId: uuid(15),
-      input: validArticleInput(),
-      actor: "a",
-    });
-    const result = asWriteResult(
-      await stub.writeRecord("article", {
+    await stub.writeRecord(
+      "article",
+      {
         recordId: uuid(15),
         input: validArticleInput(),
-        actor: "a",
-      }),
+      },
+      auth("a"),
+    );
+    const result = asWriteResult(
+      await stub.writeRecord(
+        "article",
+        {
+          recordId: uuid(15),
+          input: validArticleInput(),
+        },
+        auth("a"),
+      ),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -132,17 +150,20 @@ describe("writeRecord", () => {
   });
 
   it("applies unknown-key-only edits (lazy conformance carries them)", async () => {
-    await stub.writeRecord("article", {
-      recordId: uuid(16),
-      input: validArticleInput(),
-      actor: "a",
-    });
-    const result = asWriteResult(
-      await stub.writeRecord("article", {
+    await stub.writeRecord(
+      "article",
+      {
         recordId: uuid(16),
-        input: { ...validArticleInput(), legacy_field: "kept" },
-        actor: "a",
-      }),
+        input: validArticleInput(),
+      },
+      auth("a"),
+    );
+    const result = asWriteResult(
+      await stub.writeRecord(
+        "article",
+        { recordId: uuid(16), input: { ...validArticleInput(), legacy_field: "kept" } },
+        auth("a"),
+      ),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -153,7 +174,7 @@ describe("writeRecord", () => {
 
   it("reprojects relations on reorder and clears omitted optional relations", async () => {
     const input = validArticleInput();
-    await stub.writeRecord("article", { recordId: uuid(17), input, actor: "a" });
+    await stub.writeRecord("article", { recordId: uuid(17), input }, auth("a"));
     const reordered: Record<string, unknown> = {
       ...input,
       authors: [
@@ -163,11 +184,14 @@ describe("writeRecord", () => {
     };
     const { hero: _hero, ...withoutHero } = reordered;
     const result = asWriteResult(
-      await stub.writeRecord("article", {
-        recordId: uuid(17),
-        input: withoutHero,
-        actor: "a",
-      }),
+      await stub.writeRecord(
+        "article",
+        {
+          recordId: uuid(17),
+          input: withoutHero,
+        },
+        auth("a"),
+      ),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -187,18 +211,24 @@ describe("writeRecord", () => {
   });
 
   it("changes workflow status alone (version bump, no field version change)", async () => {
-    await stub.writeRecord("article", {
-      recordId: uuid(18),
-      input: validArticleInput(),
-      actor: "a",
-    });
-    const result = asWriteResult(
-      await stub.writeRecord("article", {
+    await stub.writeRecord(
+      "article",
+      {
         recordId: uuid(18),
         input: validArticleInput(),
-        status: "in_review",
-        actor: "a",
-      }),
+      },
+      auth("a"),
+    );
+    const result = asWriteResult(
+      await stub.writeRecord(
+        "article",
+        {
+          recordId: uuid(18),
+          input: validArticleInput(),
+          status: "in_review",
+        },
+        auth("a"),
+      ),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -211,29 +241,35 @@ describe("writeRecord", () => {
   it("rejects a non-lowercase-uuid recordId", async () => {
     for (const badId of ["not-a-uuid", "018F2B6A-7A0A-7000-8000-000000000001"]) {
       const result = asWriteResult(
-        await stub.writeRecord("article", {
-          recordId: badId,
-          input: validArticleInput(),
-          actor: "a",
-        }),
+        await stub.writeRecord(
+          "article",
+          {
+            recordId: badId,
+            input: validArticleInput(),
+          },
+          auth("a"),
+        ),
       );
       expect(result).toMatchObject({ ok: false, code: "validation_failed" });
     }
   });
 
   it("clears relations of fields removed from the type definition", async () => {
-    await stub.writeRecord("article", {
-      recordId: uuid(50),
-      input: validArticleInput(),
-      actor: "a",
-    });
+    await stub.writeRecord(
+      "article",
+      {
+        recordId: uuid(50),
+        input: validArticleInput(),
+      },
+      auth("a"),
+    );
     const withoutHero = articleType();
     withoutHero.fields = withoutHero.fields.filter((field) => field.key !== "hero");
-    const rereg = await stub.registerContentType(withoutHero);
+    const rereg = await stub.registerContentType(withoutHero, auth("admin"));
     expect(rereg.ok).toBe(true);
     const { hero: _hero, ...input } = validArticleInput();
     const result = asWriteResult(
-      await stub.writeRecord("article", { recordId: uuid(50), input, actor: "a" }),
+      await stub.writeRecord("article", { recordId: uuid(50), input }, auth("a")),
     );
     expect(result.ok).toBe(true);
     await runInDurableObject(stub, async (_instance, state) => {
@@ -249,11 +285,14 @@ describe("writeRecord", () => {
   });
 
   it("exposes the stored record via getRecord", async () => {
-    await stub.writeRecord("article", {
-      recordId: uuid(19),
-      input: validArticleInput(),
-      actor: "a",
-    });
+    await stub.writeRecord(
+      "article",
+      {
+        recordId: uuid(19),
+        input: validArticleInput(),
+      },
+      auth("a"),
+    );
     const record = asRecordSnapshot(await stub.getRecord(uuid(19)));
     expect(record?.type).toBe("article");
     expect(record?.data["title"]).toBe("こんにちは");

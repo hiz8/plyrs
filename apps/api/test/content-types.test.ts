@@ -1,7 +1,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { articleType, uuid } from "./fixtures";
+import { articleType, auth, uuid } from "./fixtures";
 
 function freshStub() {
   return env.TENANT_DO.get(env.TENANT_DO.idFromName(crypto.randomUUID()));
@@ -10,7 +10,7 @@ function freshStub() {
 describe("content type registration", () => {
   it("registers a valid user type with server-managed version 1", async () => {
     const stub = freshStub();
-    const result = await stub.registerContentType(articleType());
+    const result = await stub.registerContentType(articleType(), auth("admin"));
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.contentType.version).toBe(1);
@@ -20,7 +20,7 @@ describe("content type registration", () => {
 
   it("persists the row and returns parsed fields via getContentType", async () => {
     const stub = freshStub();
-    await stub.registerContentType(articleType());
+    await stub.registerContentType(articleType(), auth("admin"));
     const row = await stub.getContentType("article");
     expect(row?.name).toBe("記事");
     expect(row?.fields.map((f) => f.key)).toContain("slug");
@@ -34,10 +34,10 @@ describe("content type registration", () => {
 
   it("bumps the version when re-registering the same type (same id)", async () => {
     const stub = freshStub();
-    await stub.registerContentType(articleType());
+    await stub.registerContentType(articleType(), auth("admin"));
     const next = articleType();
     next.name = "記事（改）";
-    const result = await stub.registerContentType(next);
+    const result = await stub.registerContentType(next, auth("admin"));
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.contentType.version).toBe(2);
@@ -55,9 +55,9 @@ describe("content type registration", () => {
 
   it("rejects a re-register under the same key with a different id", async () => {
     const stub = freshStub();
-    await stub.registerContentType(articleType());
+    await stub.registerContentType(articleType(), auth("admin"));
     const impostor = { ...articleType(), id: uuid(99) };
-    const result = await stub.registerContentType(impostor);
+    const result = await stub.registerContentType(impostor, auth("admin"));
     expect(result).toMatchObject({ ok: false, code: "id_mismatch" });
   });
 
@@ -68,15 +68,15 @@ describe("content type registration", () => {
       { key: "title", type: "text" },
       { key: "title", type: "number" },
     ];
-    const result = await stub.registerContentType(bad);
+    const result = await stub.registerContentType(bad, auth("admin"));
     expect(result).toMatchObject({ ok: false, code: "validation_failed" });
   });
 
   it("rejects re-registering the same id under a different key without throwing", async () => {
     const stub = freshStub();
-    await stub.registerContentType(articleType());
+    await stub.registerContentType(articleType(), auth("admin"));
     const renamed = { ...articleType(), key: "post" };
-    const result = await stub.registerContentType(renamed);
+    const result = await stub.registerContentType(renamed, auth("admin"));
     expect(result).toMatchObject({ ok: false, code: "key_mismatch" });
     expect(await stub.getContentType("article")).not.toBeNull();
     expect(await stub.getContentType("post")).toBeNull();
@@ -91,7 +91,7 @@ describe("content type registration", () => {
       source: "plugin" as const,
       pluginId: "booking",
     };
-    const result = await stub.registerContentType(pluginType);
+    const result = await stub.registerContentType(pluginType, auth("admin"));
     expect(result.ok).toBe(true);
     expect(await stub.getContentType("no_such_type")).toBeNull();
   });

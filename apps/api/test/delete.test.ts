@@ -1,7 +1,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { articleType, uuid, validArticleInput } from "./fixtures";
+import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import { asDeleteResult, asRecordSnapshot, asWriteResult } from "./rpc-unwrap";
 
 function freshStub() {
@@ -13,16 +13,16 @@ describe("deleteRecord (tombstone)", () => {
 
   beforeEach(async () => {
     stub = freshStub();
-    await stub.registerContentType(articleType());
-    await stub.writeRecord("article", {
-      recordId: uuid(40),
-      input: validArticleInput(),
-      actor: "a",
-    });
+    await stub.registerContentType(articleType(), auth("admin"));
+    await stub.writeRecord(
+      "article",
+      { recordId: uuid(40), input: validArticleInput() },
+      auth("a"),
+    );
   });
 
   it("sets the tombstone and removes outgoing relations", async () => {
-    const result = asDeleteResult(await stub.deleteRecord(uuid(40), "b"));
+    const result = asDeleteResult(await stub.deleteRecord(uuid(40), auth("b")));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.record.deletedAt).not.toBeNull();
@@ -45,43 +45,49 @@ describe("deleteRecord (tombstone)", () => {
   });
 
   it("keeps the tombstone visible via getRecord", async () => {
-    asDeleteResult(await stub.deleteRecord(uuid(40), "b"));
+    asDeleteResult(await stub.deleteRecord(uuid(40), auth("b")));
     const record = asRecordSnapshot(await stub.getRecord(uuid(40)));
     expect(record?.deletedAt).not.toBeNull();
   });
 
   it("rejects writes to a deleted record", async () => {
-    asDeleteResult(await stub.deleteRecord(uuid(40), "b"));
+    asDeleteResult(await stub.deleteRecord(uuid(40), auth("b")));
     const result = asWriteResult(
-      await stub.writeRecord("article", {
-        recordId: uuid(40),
-        input: validArticleInput(),
-        actor: "a",
-      }),
+      await stub.writeRecord(
+        "article",
+        {
+          recordId: uuid(40),
+          input: validArticleInput(),
+        },
+        auth("a"),
+      ),
     );
     expect(result).toMatchObject({ ok: false, code: "record_deleted" });
   });
 
   it("rejects double deletion and unknown ids distinctly", async () => {
-    asDeleteResult(await stub.deleteRecord(uuid(40), "b"));
-    expect(asDeleteResult(await stub.deleteRecord(uuid(40), "b"))).toMatchObject({
+    asDeleteResult(await stub.deleteRecord(uuid(40), auth("b")));
+    expect(asDeleteResult(await stub.deleteRecord(uuid(40), auth("b")))).toMatchObject({
       ok: false,
       code: "already_deleted",
     });
-    expect(asDeleteResult(await stub.deleteRecord(uuid(41), "b"))).toMatchObject({
+    expect(asDeleteResult(await stub.deleteRecord(uuid(41), auth("b")))).toMatchObject({
       ok: false,
       code: "not_found",
     });
   });
 
   it("frees unique values for new records (unique ignores tombstones)", async () => {
-    asDeleteResult(await stub.deleteRecord(uuid(40), "b"));
+    asDeleteResult(await stub.deleteRecord(uuid(40), auth("b")));
     const result = asWriteResult(
-      await stub.writeRecord("article", {
-        recordId: uuid(42),
-        input: validArticleInput(),
-        actor: "a",
-      }),
+      await stub.writeRecord(
+        "article",
+        {
+          recordId: uuid(42),
+          input: validArticleInput(),
+        },
+        auth("a"),
+      ),
     );
     expect(result.ok).toBe(true);
   });

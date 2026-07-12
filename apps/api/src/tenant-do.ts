@@ -5,6 +5,7 @@ import * as schema from "@plyrs/db";
 import migrations from "@plyrs/db/migrations";
 import { contentTypeDefinitionSchema } from "@plyrs/metamodel";
 import { v7 as uuidv7 } from "uuid";
+import { requireOperation, type AuthContext } from "./do/authorize";
 import {
   loadContentTypeByKey,
   registerContentTypeCore,
@@ -13,7 +14,7 @@ import {
 } from "./do/content-types";
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
 import { loadRecord, writeRecordCore } from "./do/write-record";
-import type { RecordSnapshot, WriteRecordParams, WriteRecordResult } from "./do/types";
+import type { RecordSnapshot, WriteRecordInput, WriteRecordResult } from "./do/types";
 
 export class TenantDO extends DurableObject<Env> {
   private readonly db: DrizzleSqliteDODatabase<typeof schema>;
@@ -41,7 +42,11 @@ export class TenantDO extends DurableObject<Env> {
     return { valid: contentTypeDefinitionSchema.safeParse(input).success };
   }
 
-  registerContentType(input: unknown): RegisterContentTypeResult {
+  registerContentType(input: unknown, auth: AuthContext): RegisterContentTypeResult {
+    const denial = requireOperation(auth, "type:manage");
+    if (denial !== null) {
+      return denial;
+    }
     const now = new Date().toISOString();
     return this.ctx.storage.transactionSync(() =>
       registerContentTypeCore(this.ctx.storage.sql, input, now),
@@ -52,7 +57,11 @@ export class TenantDO extends DurableObject<Env> {
     return loadContentTypeByKey(this.ctx.storage.sql, key);
   }
 
-  writeRecord(typeKey: string, params: WriteRecordParams): WriteRecordResult {
+  writeRecord(typeKey: string, params: WriteRecordInput, auth: AuthContext): WriteRecordResult {
+    const denial = requireOperation(auth, "record:write");
+    if (denial !== null) {
+      return denial;
+    }
     const contentType = loadContentTypeByKey(this.ctx.storage.sql, typeKey);
     if (contentType === null) {
       return { ok: false, code: "unknown_type", message: `unknown content type: ${typeKey}` };
@@ -66,7 +75,7 @@ export class TenantDO extends DurableObject<Env> {
           newRelationId: () => uuidv7(),
         },
         contentType,
-        params,
+        { ...params, actor: auth.userId },
       ),
     );
   }
@@ -75,7 +84,11 @@ export class TenantDO extends DurableObject<Env> {
     return loadRecord(this.ctx.storage.sql, id);
   }
 
-  deleteRecord(recordId: string, actor: string): DeleteRecordResult {
+  deleteRecord(recordId: string, auth: AuthContext): DeleteRecordResult {
+    const denial = requireOperation(auth, "record:delete");
+    if (denial !== null) {
+      return denial;
+    }
     return this.ctx.storage.transactionSync(() =>
       deleteRecordCore(
         {
@@ -84,7 +97,7 @@ export class TenantDO extends DurableObject<Env> {
           now: () => new Date().toISOString(),
         },
         recordId,
-        actor,
+        auth.userId,
       ),
     );
   }

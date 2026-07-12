@@ -3,7 +3,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import type { FieldDefinition } from "@plyrs/metamodel";
 import { computeIndexDdlDiff, generatedColumnName, indexedColumns } from "../src/do/index-ddl";
-import { articleType } from "./fixtures";
+import { articleType, auth } from "./fixtures";
 
 function freshStub() {
   return env.TENANT_DO.get(env.TENANT_DO.idFromName(crypto.randomUUID()));
@@ -67,7 +67,7 @@ describe("indexedColumns / computeIndexDdlDiff (pure)", () => {
 describe("applyIndexDdl (integration via registerContentType)", () => {
   it("adds generated columns and partial indexes for indexed fields", async () => {
     const stub = freshStub();
-    await stub.registerContentType(articleType());
+    await stub.registerContentType(articleType(), auth("admin"));
     await runInDurableObject(stub, async (_instance, state) => {
       const tableDdl = state.storage.sql
         .exec<{ sql: string }>(
@@ -88,12 +88,12 @@ describe("applyIndexDdl (integration via registerContentType)", () => {
 
   it("drops the column and index when the indexed declaration is removed", async () => {
     const stub = freshStub();
-    await stub.registerContentType(articleType());
+    await stub.registerContentType(articleType(), auth("admin"));
     const next = articleType();
     next.fields = next.fields.map((field) =>
       field.key === "published_at" && field.type === "datetime" ? { ...field, config: {} } : field,
     );
-    const result = await stub.registerContentType(next);
+    const result = await stub.registerContentType(next, auth("admin"));
     expect(result.ok).toBe(true);
     await runInDurableObject(stub, async (_instance, state) => {
       const tableDdl = state.storage.sql

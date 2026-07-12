@@ -27,7 +27,11 @@ export type WriteErrorCode =
   | "validation_failed"
   | "invalid_status"
   | "record_deleted"
-  | "unique_violation";
+  | "unique_violation"
+  | "forbidden";
+
+// RPC 契約: actor はクライアント申告ではなく auth.userId 由来（サーバー側で合成）
+export type WriteRecordInput = Omit<WriteRecordParams, "actor">;
 
 export type WriteRecordResult =
   | { ok: true; record: RecordSnapshot; changedFields: string[]; applied: boolean }
