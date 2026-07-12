@@ -4,6 +4,7 @@ export {
   type SystemFieldKey,
   type WorkflowStatus,
 } from "./system-fields";
+export { uuidSchema } from "./ids";
 export {
   FIELD_KEY_PATTERN,
   fieldDefinitionSchema,

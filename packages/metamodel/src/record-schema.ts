@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ContentTypeDefinition } from "./content-type";
 import type { FieldDefinition, RelationFieldDefinition } from "./field-types";
+import { uuidSchema } from "./ids";
 
 export type JsonValue =
   | string
@@ -30,7 +31,7 @@ export const richTextEnvelopeSchema = z.strictObject({
 
 export const relationRefSchema = z.strictObject({
   type: z.string().min(1),
-  id: z.uuid(),
+  id: uuidSchema,
 });
 
 export type RelationRef = z.infer<typeof relationRefSchema>;

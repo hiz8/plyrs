@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { FIELD_KEY_PATTERN, fieldDefinitionSchema } from "./field-types";
+import { uuidSchema } from "./ids";
 
 export const PLUGIN_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
 export const PLUGIN_TYPE_KEY_PATTERN = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
 
 export const contentTypeDefinitionSchema = z
   .strictObject({
-    id: z.uuid(),
+    id: uuidSchema,
     key: z.string().min(1),
     name: z.string().min(1),
     fields: z.array(fieldDefinitionSchema),

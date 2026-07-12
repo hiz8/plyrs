@@ -76,4 +76,12 @@ describe("contentTypeDefinitionSchema", () => {
     );
     expect(contentTypeDefinitionSchema.safeParse({ ...baseType, version: 0 }).success).toBe(false);
   });
+
+  it("rejects an uppercase UUID id (ids are stored lowercase)", () => {
+    const result = contentTypeDefinitionSchema.safeParse({
+      ...baseType,
+      id: UUID.toUpperCase(),
+    });
+    expect(result.success).toBe(false);
+  });
 });

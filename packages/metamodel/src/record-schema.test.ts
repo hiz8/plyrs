@@ -108,6 +108,14 @@ describe("buildRecordInputSchema", () => {
       expect(result.data["legacy_field"]).toBe("old value");
     }
   });
+
+  it("rejects an uppercase UUID in a relation ref", () => {
+    const result = buildRecordInputSchema(articleType).safeParse({
+      ...validInput,
+      hero: { type: "asset", id: UUID(4).toUpperCase() },
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("splitRecordInput", () => {
