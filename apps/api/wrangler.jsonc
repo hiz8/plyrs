@@ -1,0 +1,9 @@
+{
+  "name": "plyrs-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-12",
+  "durable_objects": {
+    "bindings": [{ "name": "TENANT_DO", "class_name": "TenantDO" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TenantDO"] }],
+}
