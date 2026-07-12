@@ -2,7 +2,18 @@ import { describe, expect, it } from "vitest";
 import type { RelationRef } from "@plyrs/metamodel";
 import { splitRecordInput } from "@plyrs/metamodel";
 import { computeChangeSet, jsonDeepEqual } from "./diff";
-import { articleType, uuid, validArticleInput } from "../../test/fixtures";
+import { articleType, validArticleInput } from "../../test/fixtures";
+
+function prevRelationsOf(refsSource: Record<string, unknown>): Map<string, RelationRef[]> {
+  const map = new Map<string, RelationRef[]>();
+  map.set("authors", refsSource["authors"] as RelationRef[]);
+  map.set("hero", [refsSource["hero"] as RelationRef]);
+  return map;
+}
+
+function splitPrev(record: Record<string, unknown>) {
+  return splitRecordInput(articleType(), record);
+}
 
 describe("jsonDeepEqual", () => {
   it("compares primitives, arrays and objects structurally", () => {
@@ -21,21 +32,10 @@ describe("computeChangeSet", () => {
   const type = articleType();
   const input = validArticleInput();
 
-  function prevRelationsOf(refsInput: Record<string, unknown>): Map<string, RelationRef[]> {
-    const map = new Map<string, RelationRef[]>();
-    map.set("authors", refsInput["authors"] as RelationRef[]);
-    map.set("hero", [refsInput["hero"] as RelationRef]);
-    return map;
-  }
-
-  function splitPrev(input: Record<string, unknown>) {
-    return splitRecordInput(articleType(), input);
-  }
-
   it("marks every provided field as changed for a new record", () => {
     const change = computeChangeSet(type, input, null, new Map());
-    expect(change.changedFields.sort()).toEqual(
-      ["authors", "body", "hero", "published_at", "slug", "tags", "title"].sort(),
+    expect(change.changedFields.toSorted()).toEqual(
+      ["authors", "body", "hero", "published_at", "slug", "tags", "title"].toSorted(),
     );
     expect(change.dataChanged).toBe(true);
     expect(change.data["authors"]).toBeUndefined();
@@ -55,7 +55,7 @@ describe("computeChangeSet", () => {
   it("detects relation reorder as a change to that field only", () => {
     const { data: prevData } = splitPrev(input);
     const authors = input["authors"] as RelationRef[];
-    const reversed = [...authors].reverse();
+    const reversed = authors.toReversed();
     const change = computeChangeSet(
       type,
       { ...input, authors: reversed },

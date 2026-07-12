@@ -131,7 +131,7 @@ export function writeRecordCore(
   }
 
   const now = deps.now();
-  const fieldVersions: Record<string, number> = { ...(prev?.fieldVersions ?? {}) };
+  const fieldVersions: Record<string, number> = { ...prev?.fieldVersions };
   for (const key of change.changedFields) {
     fieldVersions[key] = (fieldVersions[key] ?? 0) + 1;
   }

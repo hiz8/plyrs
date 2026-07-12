@@ -171,7 +171,7 @@ describe("writeRecord", () => {
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.changedFields.sort()).toEqual(["authors", "hero"]);
+    expect(result.changedFields.toSorted()).toEqual(["authors", "hero"]);
     await runInDurableObject(stub, async (_instance, state) => {
       const rels = state.storage.sql
         .exec<{ source_field: string; target_id: string; ordinal: number }>(
