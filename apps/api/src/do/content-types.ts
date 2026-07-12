@@ -4,6 +4,7 @@ import {
   type FieldDefinition,
 } from "@plyrs/metamodel";
 import type { z } from "zod";
+import { applyIndexDdl } from "./index-ddl";
 
 export interface ContentTypeRow {
   id: string;
@@ -115,6 +116,7 @@ export function registerContentTypeCore(
       def.id,
     );
   }
+  applyIndexDdl(sql, def.key, prev?.fields ?? null, def.fields);
   return {
     ok: true,
     contentType: {
