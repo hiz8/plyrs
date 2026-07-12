@@ -71,7 +71,9 @@ describe("contentTypeDefinitionSchema", () => {
   });
 
   it("rejects a non-uuid id and a non-positive version", () => {
-    expect(contentTypeDefinitionSchema.safeParse({ ...baseType, id: "not-a-uuid" }).success).toBe(false);
+    expect(contentTypeDefinitionSchema.safeParse({ ...baseType, id: "not-a-uuid" }).success).toBe(
+      false,
+    );
     expect(contentTypeDefinitionSchema.safeParse({ ...baseType, version: 0 }).success).toBe(false);
   });
 });

@@ -31,9 +31,7 @@ export const textFieldSchema = z.strictObject({
 export const numberFieldSchema = z.strictObject({
   ...baseFieldShape,
   type: z.literal("number"),
-  config: z
-    .strictObject({ ...indexableConfig, integer: z.boolean().optional() })
-    .optional(),
+  config: z.strictObject({ ...indexableConfig, integer: z.boolean().optional() }).optional(),
 });
 
 export const booleanFieldSchema = z.strictObject({

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  SYSTEM_FIELD_KEYS,
-  WORKFLOW_STATUSES,
-} from "./system-fields";
+import { SYSTEM_FIELD_KEYS, WORKFLOW_STATUSES } from "./system-fields";
 
 describe("system fields", () => {
   it("defines the seven system field keys from design-spec §5", () => {
