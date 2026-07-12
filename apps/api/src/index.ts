@@ -1,7 +1,12 @@
+import { Hono } from "hono";
+import { authRoutes } from "./routes/auth";
+import { tenantAdminRoutes } from "./routes/tenants";
+
 export { TenantDO } from "./tenant-do";
 
-export default {
-  async fetch(): Promise<Response> {
-    return new Response("plyrs api: not yet implemented", { status: 501 });
-  },
-} satisfies ExportedHandler<Env>;
+const app = new Hono<{ Bindings: Env }>();
+app.route("/auth", authRoutes);
+app.route("/v1/tenants", tenantAdminRoutes);
+app.notFound((c) => c.json({ error: "not_found" }, 404));
+
+export default app satisfies ExportedHandler<Env>;
