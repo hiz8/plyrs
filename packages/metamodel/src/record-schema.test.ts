@@ -13,10 +13,29 @@ const articleType: ContentTypeDefinition = {
   fields: [
     { key: "title", type: "text", required: true, config: { maxLength: 200 } },
     { key: "published_at", type: "datetime", config: { indexed: true } },
-    { key: "category", type: "select", config: { options: [{ value: "tech", label: "Tech" }, { value: "life", label: "Life" }], multiple: true } },
+    {
+      key: "category",
+      type: "select",
+      config: {
+        options: [
+          { value: "tech", label: "Tech" },
+          { value: "life", label: "Life" },
+        ],
+        multiple: true,
+      },
+    },
     { key: "body", type: "richtext" },
-    { key: "authors", type: "relation", required: true, config: { allowedTypes: ["author"], cardinality: "many", ordered: true } },
-    { key: "hero", type: "relation", config: { allowedTypes: ["asset"], cardinality: "one", snapshotEmbed: "value" } },
+    {
+      key: "authors",
+      type: "relation",
+      required: true,
+      config: { allowedTypes: ["author"], cardinality: "many", ordered: true },
+    },
+    {
+      key: "hero",
+      type: "relation",
+      config: { allowedTypes: ["asset"], cardinality: "one", snapshotEmbed: "value" },
+    },
   ],
 };
 
@@ -98,9 +117,13 @@ describe("splitRecordInput", () => {
       legacy_field: "old value",
     });
 
-    expect(Object.keys(data).sort()).toEqual(
-      ["body", "category", "legacy_field", "published_at", "title"],
-    );
+    expect(Object.keys(data).toSorted()).toEqual([
+      "body",
+      "category",
+      "legacy_field",
+      "published_at",
+      "title",
+    ]);
     expect(relations).toEqual([
       {
         fieldKey: "authors",

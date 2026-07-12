@@ -32,7 +32,7 @@ describe("tolerantReadData", () => {
   it("treats values that no longer match the current definition as absent, reporting them", () => {
     const result = tolerantReadData(articleType, { title: 123, view_count: "many" });
     expect(result.values).toEqual({});
-    expect(result.invalidKeys.sort()).toEqual(["title", "view_count"]);
+    expect(result.invalidKeys.toSorted()).toEqual(["title", "view_count"]);
   });
 
   it("reports unknown keys without dropping them from the caller's raw data", () => {
