@@ -91,7 +91,7 @@ describe("applyIndexDdl (integration via registerContentType)", () => {
     await stub.registerContentType(articleType());
     const next = articleType();
     next.fields = next.fields.map((field) =>
-      field.key === "published_at" ? { ...field, config: {} } : field,
+      field.key === "published_at" && field.type === "datetime" ? { ...field, config: {} } : field,
     );
     const result = await stub.registerContentType(next);
     expect(result.ok).toBe(true);
