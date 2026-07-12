@@ -11,6 +11,7 @@ import {
   type ContentTypeRow,
   type RegisterContentTypeResult,
 } from "./do/content-types";
+import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
 import { loadRecord, writeRecordCore } from "./do/write-record";
 import type { RecordSnapshot, WriteRecordParams, WriteRecordResult } from "./do/types";
 
@@ -72,5 +73,19 @@ export class TenantDO extends DurableObject<Env> {
 
   getRecord(id: string): RecordSnapshot | null {
     return loadRecord(this.ctx.storage.sql, id);
+  }
+
+  deleteRecord(recordId: string, actor: string): DeleteRecordResult {
+    return this.ctx.storage.transactionSync(() =>
+      deleteRecordCore(
+        {
+          sql: this.ctx.storage.sql,
+          nextSeq: () => ++this.seq,
+          now: () => new Date().toISOString(),
+        },
+        recordId,
+        actor,
+      ),
+    );
   }
 }

@@ -1,3 +1,4 @@
+import type { DeleteRecordResult } from "../src/do/delete-record";
 import type { RecordSnapshot, WriteRecordResult } from "../src/do/types";
 
 // Cloudflare の Rpc.Result 型は Record<string, unknown>（RecordSnapshot.data）を
@@ -9,4 +10,8 @@ export function asWriteResult(value: unknown): WriteRecordResult {
 
 export function asRecordSnapshot(value: unknown): RecordSnapshot | null {
   return value as RecordSnapshot | null;
+}
+
+export function asDeleteResult(value: unknown): DeleteRecordResult {
+  return value as DeleteRecordResult;
 }
