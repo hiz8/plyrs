@@ -68,6 +68,9 @@ importers:
       '@plyrs/metamodel':
         specifier: workspace:*
         version: link:../../packages/metamodel
+      '@plyrs/sync-protocol':
+        specifier: workspace:*
+        version: link:../../packages/sync-protocol
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@cloudflare/workers-types@5.20260712.1)

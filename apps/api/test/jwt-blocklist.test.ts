@@ -14,7 +14,9 @@ describe("tenant JWT (HS256, 15min)", () => {
   it("round-trips claims", async () => {
     const token = await signTenantToken(env.JWT_SECRET, CLAIMS);
     expect(TOKEN_TTL).toBe(900);
-    expect(await verifyTenantToken(env.JWT_SECRET, token)).toEqual(CLAIMS);
+    const verified = await verifyTenantToken(env.JWT_SECRET, token);
+    expect(verified).toMatchObject(CLAIMS);
+    expect(verified?.exp).toBeGreaterThan(Math.floor(Date.now() / 1000));
   });
 
   it("rejects a wrong secret and a tampered token", async () => {

@@ -11,13 +11,17 @@ export interface TenantClaims {
   userId: string;
   tenantId: string;
   role: Role;
+  exp: number;
 }
 
 function secretKey(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-export async function signTenantToken(secret: string, claims: TenantClaims): Promise<string> {
+export async function signTenantToken(
+  secret: string,
+  claims: Omit<TenantClaims, "exp">,
+): Promise<string> {
   return new SignJWT({ tid: claims.tenantId, role: claims.role })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(claims.userId)
@@ -31,14 +35,23 @@ export async function verifyTenantToken(
   token: string,
 ): Promise<TenantClaims | null> {
   try {
-    const { payload } = await jwtVerify(token, secretKey(secret), { clockTolerance: 5 });
+    const { payload } = await jwtVerify(token, secretKey(secret), {
+      clockTolerance: 5,
+      algorithms: ["HS256"],
+    });
     const sub = payload.sub;
     const tid = payload["tid"];
     const role = payload["role"];
-    if (typeof sub !== "string" || typeof tid !== "string" || !isRole(role)) {
+    const exp = payload.exp;
+    if (
+      typeof sub !== "string" ||
+      typeof tid !== "string" ||
+      !isRole(role) ||
+      typeof exp !== "number"
+    ) {
       return null;
     }
-    return { userId: sub, tenantId: tid, role };
+    return { userId: sub, tenantId: tid, role, exp };
   } catch {
     return null;
   }

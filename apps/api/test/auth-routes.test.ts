@@ -106,11 +106,13 @@ describe("auth routes", () => {
     expect(issued.status).toBe(200);
     const { token, expiresIn } = (await issued.json()) as { token: string; expiresIn: number };
     expect(expiresIn).toBe(900);
-    expect(await verifyTenantToken(env.JWT_SECRET, token)).toEqual({
+    const verified = await verifyTenantToken(env.JWT_SECRET, token);
+    expect(verified).toMatchObject({
       userId,
       tenantId,
       role: "owner",
     });
+    expect(verified?.exp).toBeGreaterThan(Math.floor(Date.now() / 1000));
 
     const outsider = await signupAndLogin();
     const denied = await app.request("/auth/token", json({ tenantId }, outsider.cookie), env);

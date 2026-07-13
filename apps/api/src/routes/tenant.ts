@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import { WORKFLOW_STATUSES } from "@plyrs/metamodel";
-import { tenantGate, type GateVariables } from "../middleware/tenant-gate";
+import { authenticateTenantToken, tenantGate, type GateVariables } from "../middleware/tenant-gate";
 import {
   asContentTypeRow,
   asDeleteResult,
@@ -11,6 +11,7 @@ import {
   asRegisterResult,
   asWriteResult,
 } from "../rpc-unwrap";
+import { AUTH_HEADER, extractTokenProtocol } from "../sync/session";
 
 const ERROR_STATUS: Record<string, ContentfulStatusCode> = {
   forbidden: 403,
@@ -41,6 +42,24 @@ function stubFor(c: { env: Env; req: { param: (key: "tenantId") => string } }) {
 }
 
 export const tenantRoutes = new Hono<GateEnv>()
+  // WS upgrade は Authorization ヘッダを持てないため tenantGate の外に置き、
+  // 同じ検証コア（authenticateTenantToken）を subprotocol のトークンで呼ぶ。
+  .get("/:tenantId/sync", async (c) => {
+    if (c.req.header("upgrade")?.toLowerCase() !== "websocket") {
+      return c.json({ error: "expected_websocket" }, 426);
+    }
+    const token = extractTokenProtocol(c.req.header("sec-websocket-protocol"));
+    if (token === null) {
+      return c.json({ error: "unauthenticated" }, 401);
+    }
+    const result = await authenticateTenantToken(c.env, c.req.param("tenantId"), token);
+    if (!result.ok) {
+      return c.json({ error: result.failure.code }, result.failure.status);
+    }
+    const forwarded = new Request(c.req.raw, { headers: new Headers(c.req.raw.headers) });
+    forwarded.headers.set(AUTH_HEADER, JSON.stringify(result.auth));
+    return stubFor(c).fetch(forwarded);
+  })
   .use("/:tenantId/*", tenantGate)
   .put("/:tenantId/content-types", async (c) => {
     let body: unknown;
