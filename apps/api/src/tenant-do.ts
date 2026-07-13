@@ -6,7 +6,7 @@ import migrations from "@plyrs/db/migrations";
 import { contentTypeDefinitionSchema } from "@plyrs/metamodel";
 import { v7 as uuidv7 } from "uuid";
 import {
-  clearAlarm,
+  clearServicedAlarm,
   dueKinds,
   effectiveNow,
   minDueAt,
@@ -184,7 +184,9 @@ export class TenantDO extends DurableObject<Env> {
         recordId,
         auth.userId,
       );
-      if (inner.ok) {
+      // MINOR fix（レビュー指摘）: 未公開レコードの削除は cascadeUnpublish が outbox に
+      // 何も積まない。実際に outbox 行が積まれた時だけ sweep を張り、無駄な DO 起床を避ける。
+      if (inner.ok && countUnsent(this.ctx.storage.sql) > 0) {
         armed = this.armSweep(Date.now() + SWEEP_DELAY_MS);
       }
       return inner;
@@ -358,7 +360,7 @@ export class TenantDO extends DurableObject<Env> {
     const now = effectiveNow(this.ctx.storage.sql);
     for (const kind of dueKinds(this.ctx.storage.sql, now)) {
       if (kind === OUTBOX_SWEEP) {
-        await this.sweepOutbox();
+        await this.sweepOutbox(now);
       }
     }
     const min = minDueAt(this.ctx.storage.sql);
@@ -367,11 +369,22 @@ export class TenantDO extends DurableObject<Env> {
     }
   }
 
-  private async sweepOutbox(): Promise<void> {
+  // MINOR fix（レビュー指摘）: drainOutbox() の await 中は input gate が保持されないため、
+  // publish 等が割り込んで「この sweep より後の」新しい登録を張れてしまう。sweep が「サービス
+  // 済み」とみなしてよい境界には、sweepOutbox 内で新たに取った Date.now() ではなく、alarm() が
+  // 既に計算した effectiveNow（= このアラーム起床の根拠になった登録の due_at 以上であることが
+  // 保証された時刻）を使う。生の Date.now() だと、素の待機ではなく即時発火するテスト用ユーティリ
+  // ティ（runDurableObjectAlarm 等）や、わずかな時計の遅れによって「起床の根拠になった登録自身の
+  // due_at より前」になり得てしまい、サービスしたはずの登録を「まだ未来の割り込み」と誤認して
+  // 消し漏らし、無限に生き残らせてしまう。
+  private async sweepOutbox(startedAt: number): Promise<void> {
     await this.drainOutbox();
-    // MIN() 意味論の登録では過去の due を前倒しのまま残してしまうので、消してから登録し直す
-    clearAlarm(this.ctx.storage.sql, OUTBOX_SWEEP);
+    // MIN() 意味論の登録では過去の due を前倒しのまま残してしまうので、消してから登録し直す。
+    // ただし割り込みが張った新しい登録（due_at > startedAt）は消さない。
+    clearServicedAlarm(this.ctx.storage.sql, OUTBOX_SWEEP, startedAt);
     if (countUnsent(this.ctx.storage.sql) > 0) {
+      // 割り込みの登録が生き残っていれば ON CONFLICT の MIN(due_at, excluded.due_at) が
+      // その早い方を保つ（両者の意味を素直に足し合わせるだけで、明示の分岐は要らない）。
       registerAlarm(this.ctx.storage.sql, OUTBOX_SWEEP, Date.now() + SWEEP_RETRY_MS);
       return;
     }

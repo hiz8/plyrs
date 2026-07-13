@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import {
   clearAlarm,
+  clearServicedAlarm,
   dueKinds,
   minDueAt,
   OUTBOX_SWEEP,
@@ -84,6 +85,45 @@ describe("alarm registry helpers", () => {
     await stub.ping();
     await runInDurableObject(stub, async (_instance, state) => {
       expect(minDueAt(state.storage.sql)).toBeNull();
+    });
+  });
+
+  // MINOR fix（レビュー指摘）: sweepOutbox() は drainOutbox() の await 中に割り込んだ
+  // 別の publish/unpublish/delete/push が張った「sweep 開始より後の」新しい登録を
+  // 巻き添えで消してはならない。clearServicedAlarm はその境界（startedAt）を明示的に
+  // 受け取ることでこれを実現する ―― clearAlarm と違い、kind 全体を無条件に消さない。
+  it("clearServicedAlarm removes only registrations at or before the given time, sparing later ones", async () => {
+    const stub = freshStub();
+    await stub.ping();
+    await runInDurableObject(stub, async (_instance, state) => {
+      const sql = state.storage.sql;
+      const startedAt = 5_000;
+      // sweep 開始時点で既にあった登録（サービス対象）
+      registerAlarm(sql, OUTBOX_SWEEP, startedAt - 1_000);
+      clearServicedAlarm(sql, OUTBOX_SWEEP, startedAt);
+      expect(minDueAt(sql)).toBeNull();
+
+      // ちょうど startedAt な登録も「サービス対象」に含む（<=）
+      registerAlarm(sql, OUTBOX_SWEEP, startedAt);
+      clearServicedAlarm(sql, OUTBOX_SWEEP, startedAt);
+      expect(minDueAt(sql)).toBeNull();
+
+      // sweep 開始「後」に割り込みが張った登録は消さない
+      registerAlarm(sql, OUTBOX_SWEEP, startedAt + 1_000);
+      clearServicedAlarm(sql, OUTBOX_SWEEP, startedAt);
+      expect(minDueAt(sql)).toBe(startedAt + 1_000);
+    });
+  });
+
+  it("clearServicedAlarm removes only its own kind, leaving other kinds intact regardless of due_at", async () => {
+    const stub = freshStub();
+    await stub.ping();
+    await runInDurableObject(stub, async (_instance, state) => {
+      const sql = state.storage.sql;
+      registerAlarm(sql, OUTBOX_SWEEP, 1_000);
+      registerAlarm(sql, "other_kind", 1_000);
+      clearServicedAlarm(sql, OUTBOX_SWEEP, 10_000);
+      expect(dueKinds(sql, 10_000)).toEqual(["other_kind"]);
     });
   });
 });

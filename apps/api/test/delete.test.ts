@@ -91,4 +91,17 @@ describe("deleteRecord (tombstone)", () => {
     );
     expect(result.ok).toBe(true);
   });
+
+  // MINOR fix（レビュー指摘）: 未公開レコードの削除は cascadeUnpublish が outbox に何も積まない
+  // （unpublishRecordCore が「not_published」で早期リターンする）。それでも無条件に +5s の
+  // sweep を張ってしまうと、無駄な DO 起床（アラーム発火）を招く。outbox に実際に行が積まれた
+  // 時だけアラームを張るべきで、ここでは never-published レコードの削除でアラームが張られない
+  // ことを固定する。
+  it("does not arm the outbox sweep when deleting a record that was never published", async () => {
+    const result = asDeleteResult(await stub.deleteRecord(uuid(40), auth("b")));
+    expect(result.ok).toBe(true);
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+  });
 });
