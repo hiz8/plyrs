@@ -59,10 +59,12 @@ describe("sync lifecycle", () => {
       key: "note",
       fields: [{ key: "title", type: "text" as const, required: true }],
     };
+    // リスナーを先に張る: RPC を await している間に届くメッセージを取りこぼさない
+    const received = nextMessage(socket);
     const registered = await stub.registerContentType(noteType, auth("admin"));
     expect(registered.ok).toBe(true);
 
-    const message = await nextMessage(socket);
+    const message = await received;
     expect(message.type).toBe("content-types");
     if (message.type === "content-types") {
       expect(message.contentTypes.map((type) => type.key).toSorted()).toEqual(["article", "note"]);

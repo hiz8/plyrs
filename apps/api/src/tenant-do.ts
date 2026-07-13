@@ -64,11 +64,9 @@ export class TenantDO extends DurableObject<Env> {
     );
     if (result.ok) {
       // G1: content_types は seq を消費しない別チャネル。変更をコミット後に全接続へ配る。
-      setImmediate(() => {
-        this.broadcastAll({
-          type: "content-types",
-          contentTypes: loadAllContentTypes(this.ctx.storage.sql),
-        });
+      this.broadcastAll({
+        type: "content-types",
+        contentTypes: loadAllContentTypes(this.ctx.storage.sql),
       });
     }
     return result;
