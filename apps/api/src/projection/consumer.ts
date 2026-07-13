@@ -1,5 +1,10 @@
 import { asProjectionPayload, asPublishedPage } from "../rpc-unwrap";
-import { REPROJECT_PAGE_SIZE, type ProjectionJob, type ReprojectJob } from "./jobs";
+import {
+  REPROJECT_PAGE_SIZE,
+  SWEEP_SKEW_MARGIN_MS,
+  type ProjectionJob,
+  type ReprojectJob,
+} from "./jobs";
 import type { ProjectionPayload } from "./payload";
 
 // 順序ガードの要（CRITICAL fix: publish_seq を使う。source_version は publish/unpublish で
@@ -210,10 +215,23 @@ async function handleReprojectJob(env: Env, job: ReprojectJob, nowMs: number): P
     });
     return;
   }
+  // レビュー指摘（重大）: job.epoch は DO のアイソレートで刻んだ Date.now()、projected_at は
+  // この consumer のアイソレートで刻んだ Date.now() ―― 別アイソレートの別時計であり、
+  // 単純な大小比較で「歩きより前」を判定できる関係にない（他の GC を epoch ベースで比較する
+  // 手を退けた理由と同種の話。上の Task 7 コメント参照）。歩きの開始直後に publish された
+  // 行が、わずかに遅れた consumer の時計で job.epoch より前の projected_at を刻んでしまうと
+  // （歩きのページ読み取りには載らないので通常の張り替えでは救われない）、この sweep が
+  // 現に公開中の行を誤って消してしまう。
+  // SWEEP_SKEW_MARGIN_MS だけ境界を過去へずらす（= より新しいものまで「まだ歩きの前」と
+  // 許容する）方向だけが安全である: 境界を甘くし過ぎて本来消すべき幽霊行を見逃しても、
+  // その行は次にどの書き込みからも触られないため projected_at が古いまま残り、次回の
+  // 再投影ウォークの sweep が同じ境界で確実に掃く（1 ウォーク分だけ延命する無害な遅延）。
+  // 逆に境界を厳しくする方向の間違いは、生きている公開行を削除するという取り返しのつかない
+  // 事故になる（消えた行を復活させるのは手動の再投影しかない）。
   await env.PROJECTION_DB.batch([
     env.PROJECTION_DB.prepare(
       "DELETE FROM projected_records WHERE tenant_id = ?1 AND projected_at < ?2",
-    ).bind(job.tenantId, job.epoch),
+    ).bind(job.tenantId, job.epoch - SWEEP_SKEW_MARGIN_MS),
     env.PROJECTION_DB.prepare(
       `DELETE FROM projected_relations
        WHERE tenant_id = ?1

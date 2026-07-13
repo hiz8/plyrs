@@ -29,3 +29,11 @@ export type ProjectionJob = UpsertJob | DeleteJob | ReprojectJob;
 
 // 共有 D1 への書き込み集中を避けるため小さめに刻む（§12.3b の運用注記）
 export const REPROJECT_PAGE_SIZE = 50;
+
+// レビュー指摘（重大）: epoch は DO のアイソレートで刻んだ Date.now()、projected_at は
+// キュー consumer のアイソレートで刻んだ Date.now() ―― 別アイソレートの別時計であり、
+// 単純に比較してよい関係にない（歩き終わりの sweep がまさにこの比較をしている）。歩きの
+// 開始直後に publish された行が、わずかに遅れた consumer の時計で epoch より前の
+// projected_at を持ってしまうと、歩きに載らなかったその行を sweep が誤って消してしまう。
+// consumer.ts の handleReprojectJob 冒頭コメント参照。
+export const SWEEP_SKEW_MARGIN_MS = 60_000;

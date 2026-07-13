@@ -3,7 +3,11 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import worker from "../src/index";
 import { handleProjectionJob } from "../src/projection/consumer";
-import { REPROJECT_PAGE_SIZE, type ProjectionJob } from "../src/projection/jobs";
+import {
+  REPROJECT_PAGE_SIZE,
+  SWEEP_SKEW_MARGIN_MS,
+  type ProjectionJob,
+} from "../src/projection/jobs";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import { asPublishResult, asReprojectResult, asWriteResult } from "./rpc-unwrap";
 
@@ -260,23 +264,23 @@ describe("reprojection self-chains across pages (design-spec §12.3b)", () => {
   }, 30_000);
 });
 
-// CRITICAL fix 検証の一環: sweep の DELETE ... WHERE projected_at < epoch は「この歩きより前に
-// 投影された行」だけを掃く。歩きの最中に走った通常の publish は projected_at >= epoch になり、
-// 巻き込まれてはならない（consumer.ts の handleReprojectJob 冒頭コメント参照）。
+// CRITICAL fix 検証の一環: sweep の DELETE ... WHERE projected_at < epoch - margin は「この歩きより
+// 十分前に投影された行」だけを掃く。歩きの最中に走った通常の publish は projected_at >= epoch に
+// なり、巻き込まれてはならない（consumer.ts の handleReprojectJob 冒頭コメント参照）。
 describe("reprojection sweep spares in-flight publishes (design-spec §12.3b)", () => {
   it("[race f] a publish landing during the walk (projected_at >= epoch) survives the sweep", async () => {
     const tenantId = crypto.randomUUID();
     const epoch = 5_000;
 
-    // 歩きより前からあった、掃除対象の投影行（projected_at < epoch）
+    // 歩きより十分前からあった、掃除対象の投影行（skew margin を超えて古い projected_at）
     await env.PROJECTION_DB.prepare(
       "INSERT INTO projected_records (tenant_id, record_id, type, slug, published_at, data, source_version, projected_at) VALUES (?, ?, 'article', 'stale-ghost', '2020-01-01T00:00:00.000Z', '{}', 1, ?)",
     )
-      .bind(tenantId, uuid(1500), epoch - 1_000)
+      .bind(tenantId, uuid(1500), epoch - SWEEP_SKEW_MARGIN_MS - 1_000)
       .run();
 
     // 歩きの最中に着地した通常 publish（projected_at >= epoch）。snapshot には存在しないので
-    // 歩きのページには載らないが、sweep の WHERE projected_at < epoch はこの行を巻き込まない。
+    // 歩きのページには載らないが、sweep はこの行を巻き込まない。
     await env.PROJECTION_DB.prepare(
       "INSERT INTO projected_records (tenant_id, record_id, type, slug, published_at, data, source_version, projected_at) VALUES (?, ?, 'article', 'in-flight', '2026-01-01T00:00:00.000Z', '{}', 1, ?)",
     )
@@ -302,6 +306,38 @@ describe("reprojection sweep spares in-flight publishes (design-spec §12.3b)", 
         "SELECT COUNT(*) AS n FROM projected_records WHERE tenant_id = ? AND record_id = ?",
       )
         .bind(tenantId, uuid(1501))
+        .first<{ n: number }>(),
+    ).toMatchObject({ n: 1 });
+  });
+
+  // IMPORTANT fix（レビュー指摘）: epoch は DO のアイソレート、projected_at はキュー consumer の
+  // アイソレートで刻んだ別々の Date.now() であり、単純比較では区別できない程度のクロック誤差が
+  // 起こりうる。歩きの開始直後に publish された行を、わずかに遅れた consumer の時計が
+  // projected_at = epoch - 18ms のように「歩きより前」に見せてしまうケースを直接再現する
+  // ―― margin が無ければこの行は sweep で誤って消えていた。
+  it("[race f skew] a publish whose consumer clock lags slightly behind the DO's epoch survives the sweep", async () => {
+    const tenantId = crypto.randomUUID();
+    const epoch = 5_000;
+
+    // 歩きの開始直後に publish されたが、consumer の時計がわずかに遅れているせいで
+    // epoch よりわずかに小さい projected_at を刻んでしまった行（クロックスキュー）。
+    await env.PROJECTION_DB.prepare(
+      "INSERT INTO projected_records (tenant_id, record_id, type, slug, published_at, data, source_version, projected_at) VALUES (?, ?, 'article', 'skewed-in-flight', '2026-01-01T00:00:00.000Z', '{}', 1, ?)",
+    )
+      .bind(tenantId, uuid(1502), epoch - 18)
+      .run();
+
+    await handleProjectionJob(
+      env,
+      { jobType: "reproject", tenantId, cursor: null, epoch },
+      epoch + 2_000,
+    );
+
+    expect(
+      await env.PROJECTION_DB.prepare(
+        "SELECT COUNT(*) AS n FROM projected_records WHERE tenant_id = ? AND record_id = ?",
+      )
+        .bind(tenantId, uuid(1502))
         .first<{ n: number }>(),
     ).toMatchObject({ n: 1 });
   });
