@@ -3,7 +3,6 @@ import type { SyncRecord } from "@plyrs/sync-protocol";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SyncEngine } from "./engine";
 import { MemorySyncStorage } from "./storage";
-import type { StoreChange } from "./store";
 import { CollectionRegistry } from "./tanstack";
 import type { WebSocketLike } from "./transport";
 
@@ -220,17 +219,13 @@ describe("CollectionRegistry", () => {
 describe("CollectionRegistry wired to the engine", () => {
   it("merges a confirmed mutation exactly once and keeps it after the handler resolves", async () => {
     const socket = new SilentSocket();
-    const writes: StoreChange[] = [];
     let registry!: CollectionRegistry;
     const engine = new SyncEngine({
       connect: async () => socket,
       storage: new MemorySyncStorage(),
       onContentTypes: (types) => registry.sync(types),
       onReady: () => registry.markReady(),
-      onStoreChange: (change) => {
-        writes.push(change);
-        registry.applyStoreChange(change);
-      },
+      onStoreChange: (change) => registry.applyStoreChange(change),
     });
     registry = new CollectionRegistry(engine);
     await engine.start();
@@ -248,6 +243,7 @@ describe("CollectionRegistry wired to the engine", () => {
     });
     await vi.waitFor(() => expect(engine.status).toBe("ready"));
 
+    const applySpy = vi.spyOn(registry, "applyStoreChange");
     const collection = registry.get("article");
     const tx = collection?.insert(record({ id: "new", input: { title: "draft" } }));
     await vi.waitFor(() => expect(socket.sent.some((raw) => raw.includes('"push"'))).toBe(true));
@@ -267,10 +263,12 @@ describe("CollectionRegistry wired to the engine", () => {
 
     await tx?.isPersisted.promise;
     expect(collection?.get("new")?.input["title"]).toBe("confirmed");
-    // 確定レコードのマージは1回だけ（engine 経由。アダプタ側の二重書き込みが無いこと）
-    expect(
-      writes.filter((change) => change.kind === "upsert" && change.record.id === "new"),
-    ).toHaveLength(1);
+    // 確定レコードのマージは1回だけ（アダプタ境界で数える。engine 境界で数えると
+    // アダプタ内の二重書き込みを検出できない）
+    const mergesForNew = applySpy.mock.calls.filter(([change]) =>
+      change.kind === "upsert" ? change.record.id === "new" : change.recordId === "new",
+    );
+    expect(mergesForNew).toHaveLength(1);
   });
 
   it("drops records the server no longer has after a reset", async () => {
