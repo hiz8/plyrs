@@ -15,8 +15,14 @@ import {
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
 import { loadRecord, writeRecordCore } from "./do/write-record";
 import type { RecordSnapshot, WriteRecordInput, WriteRecordResult } from "./do/types";
-import { CLOSE_CODES, SYNC_SUBPROTOCOL } from "@plyrs/sync-protocol";
-import { AUTH_HEADER, type SocketAuth } from "./sync/session";
+import {
+  CLOSE_CODES,
+  parseClientMessage,
+  SYNC_SUBPROTOCOL,
+  type ServerMessage,
+} from "@plyrs/sync-protocol";
+import { handleHello } from "./sync/handlers";
+import { AUTH_HEADER, isTokenExpired, readSocketAuth, type SocketAuth } from "./sync/session";
 
 export class TenantDO extends DurableObject<Env> {
   private readonly db: DrizzleSqliteDODatabase<typeof schema>;
@@ -134,6 +140,38 @@ export class TenantDO extends DurableObject<Env> {
       // 提示された値のいずれかを必ずエコーする（さもないとブラウザが接続を失敗させる）
       headers: { "sec-websocket-protocol": SYNC_SUBPROTOCOL },
     });
+  }
+
+  private send(ws: WebSocket, message: ServerMessage): void {
+    ws.send(JSON.stringify(message));
+  }
+
+  override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    await Promise.resolve();
+    const auth = readSocketAuth(ws);
+    if (auth === null) {
+      ws.close(CLOSE_CODES.protocolError, "no_session");
+      return;
+    }
+    // Phase 3 申し送り: 15分 JWT はソケット確立後に切れる。メッセージ処理の入口で検査する。
+    if (isTokenExpired(auth, Date.now())) {
+      ws.close(CLOSE_CODES.tokenExpired, "token_expired");
+      return;
+    }
+    if (typeof message !== "string") {
+      ws.close(CLOSE_CODES.protocolError, "binary_unsupported");
+      return;
+    }
+    const parsed = parseClientMessage(message);
+    if (parsed === null) {
+      ws.close(CLOSE_CODES.protocolError, "malformed_message");
+      return;
+    }
+    if (parsed.type === "hello") {
+      for (const outgoing of handleHello(this.ctx.storage.sql, parsed.checkpoint)) {
+        this.send(ws, outgoing);
+      }
+    }
   }
 
   override async webSocketClose(ws: WebSocket): Promise<void> {

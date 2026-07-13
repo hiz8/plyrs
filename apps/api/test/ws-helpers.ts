@@ -41,6 +41,10 @@ export function nextMessage(socket: WebSocket, timeoutMs = 5000): Promise<Server
   });
 }
 
+// count: 2 のオーバーロードは noUncheckedIndexedAccess 下でのタプル分割代入
+// （`const [welcome, sync] = await nextMessages(...)`）を undefined チェックなしに許す。
+export function nextMessages(socket: WebSocket, count: 2): Promise<[ServerMessage, ServerMessage]>;
+export function nextMessages(socket: WebSocket, count: number): Promise<ServerMessage[]>;
 export async function nextMessages(socket: WebSocket, count: number): Promise<ServerMessage[]> {
   const messages: ServerMessage[] = [];
   for (let i = 0; i < count; i += 1) {
