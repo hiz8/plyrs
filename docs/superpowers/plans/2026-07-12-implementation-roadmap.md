@@ -76,7 +76,7 @@ Phase 2 の詳細計画で最終確定する。
 | 1 | `2026-07-12-phase1-foundation-and-metamodel.md` | 完了（2026-07-12 main へマージ） |
 | 2 | `2026-07-12-phase2-do-write-path.md` | 完了（2026-07-13 main へマージ） |
 | 3 | `2026-07-13-phase3-control-plane-auth.md` | 完了（2026-07-13 main へマージ） |
-| 4a | `2026-07-13-phase4a-sync-server.md` | 計画済み（同期サーバー: sync-protocol + DO WS） |
+| 4a | `2026-07-13-phase4a-sync-server.md` | 完了（2026-07-13 main へマージ） |
 | 4b | 4a 完了後に作成 | 未着手（クライアント同期エンジン: partysocket + tanstack-db） |
 | 5〜10 | 各フェーズ着手時に作成 | 未着手 |
 
@@ -167,3 +167,32 @@ Phase 3 実装完了（コントロールプレーン + 認証、128 tests green
 - signup / tenant 作成の SELECT→INSERT は同時競合時に一意制約違反の素の 500（一意索引が整合性は保証）。onError ハンドラは未整備。
 - viewer-403 e2e は status のみアサート。GET content-types/:key・DELETE records の HTTP 経路は e2e 未走行（DO 層では担保済み）。
 - PBKDF2 は workerd 上限 100k iterations（OWASP 600k 未達のプラットフォーム天井、passkey 格上げで解消予定）。
+
+---
+
+## 7. Phase 4a 完了時の申し送り（最終レビュー 2026-07-13）
+
+Phase 4a（同期サーバー）完了。168 tests green、最終レビュー「マージ可」。WS 認証 upgrade → ブートストラップ（seq チェックポイント差分・トゥームストーン・content_types）→ push（フィールド単位裁定・ack・ブロードキャスト）→ ライフサイクル（失効切断・BAN 切断・型再配信・ハイバネーション生存）が workerd 上で実証済み。
+
+**Phase 4b（クライアントエンジン）が守るべきワイヤ契約:**
+
+- **重複配信あり → record 単位で冪等適用せよ**。upgrade 受理〜hello の間に他クライアントの push があると `change` が `welcome` より先に届き、同じ record が bootstrap の sync ページにも再登場する。record は全状態なので「id ごとに `record.seq` が大きい方を採用」で収束する。
+- **checkpoint 前進規則**: `sync` の `complete: true` を受けてから `serverSeq` へ前進。`welcome.serverSeq < 手元 checkpoint` はサーバーリセットの兆候 → 全再同期にフォールバック（サーバーは検知手段を提供しない）。
+- **ソケット内のトークン更新は無い**（設計持ち越し）。4001 close を受けたら新トークンを `/auth/token` で取り、checkpoint 付き hello で再接続する。exp 前の先回り再接続を推奨。
+- **失効ソケットは配信対象外**（read 側にも ≤15分の失効が効く）。keepalive の `ping`/`pong` は `KEEPALIVE_PING` / `KEEPALIVE_PONG` 定数を使う（DO 側は auto-response で起きない）。
+- **conflict ack にサーバー現在値は入らない**（`conflicts` のフィールド一覧のみ）。手動解決 UI は手元の最新 record と突き合わせる。将来 `current: SyncRecord` を同梱する拡張を検討。
+- **delete は裁定を通らない**（常に勝つ。richtext 編集中でも競合検知しない — 記録すべき意味論決定）。トゥームストーンへの upsert は `record_deleted` ack（復活不可）→ クライアントはローカル record を破棄。
+- **ack の失敗コード語彙**は `ACK_ERROR_CODES`（sync-protocol）に列挙。`AckResult.code` の型は Phase 9 のモジュール拡張のため `string` のまま。
+- **空の many-relation はキーごと省略**（`[]` ではない）。`status` は裁定外（到着順 LWW）。
+- push は1バッチ最大100件（`MAX_CHANGES_PER_PUSH`）。sync ページも100件単位（ちょうど100件のとき空の complete ページが1つ余分に来る）。
+
+**Phase 10（BAN 実装）への申し送り:**
+
+- `blockUser`（KV）と同時に、該当テナント DO の `disconnectUser(userId)` を必ず呼ぶこと（確立済みソケットは KV だけでは切れない）。現状の呼び出し元はテストのみ。
+
+**軽微（記録のみ）:**
+
+- `loadSyncRecordsSince` は record ごとに content_type を引き直す N+1（DO 内 SQLite なので現状許容。大規模テナントでカタログのキャッシュを検討）。
+- `handleHello` は全バックログをメモリに実体化してから送る。リッチテキスト肥大時は WS メッセージ上限に当たりうる → 将来バイト量ベースのページングへ。
+- DO の `fetch()` は upgrade ヘッダのみ検査しパスを見ない（現状 Worker からの唯一の呼び出しが `/sync` のため安全）。
+- 内部ヘッダ `x-plyrs-auth` の実行時形状検証は無し（呼び出し元が1箇所で信頼できるため。増えるなら zod 検証を入れる）。
