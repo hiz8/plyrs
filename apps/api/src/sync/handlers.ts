@@ -93,8 +93,9 @@ export function handlePush(
     }
 
     if (change.op === "delete") {
+      // outbox 行の id 空間は relations と同じでよい（どちらも新規 uuidv7 の払い出しに過ぎない）
       const deleted = deleteRecordCore(
-        { sql: deps.sql, nextSeq: deps.nextSeq, now: deps.now },
+        { sql: deps.sql, nextSeq: deps.nextSeq, now: deps.now, newId: deps.newRelationId },
         change.recordId,
         auth.userId,
       );

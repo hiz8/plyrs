@@ -7,8 +7,10 @@ import { authenticateTenantToken, tenantGate, type GateVariables } from "../midd
 import {
   asContentTypeRow,
   asDeleteResult,
+  asPublishResult,
   asRecordSnapshot,
   asRegisterResult,
+  asUnpublishResult,
   asWriteResult,
 } from "../rpc-unwrap";
 import { AUTH_HEADER, extractTokenProtocol } from "../sync/session";
@@ -22,6 +24,7 @@ const ERROR_STATUS: Record<string, ContentfulStatusCode> = {
   key_mismatch: 409,
   record_deleted: 410,
   already_deleted: 410,
+  not_published: 409,
 };
 
 function statusFor(code: string): ContentfulStatusCode {
@@ -93,6 +96,26 @@ export const tenantRoutes = new Hono<GateEnv>()
   .delete("/:tenantId/records/:recordId", async (c) => {
     const result = asDeleteResult(
       await stubFor(c).deleteRecord(c.req.param("recordId"), c.get("auth")),
+    );
+    return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
+  })
+  .post("/:tenantId/records/:recordId/publish", async (c) => {
+    const result = asPublishResult(
+      await stubFor(c).publishRecord(
+        c.req.param("tenantId"),
+        c.req.param("recordId"),
+        c.get("auth"),
+      ),
+    );
+    return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
+  })
+  .post("/:tenantId/records/:recordId/unpublish", async (c) => {
+    const result = asUnpublishResult(
+      await stubFor(c).unpublishRecord(
+        c.req.param("tenantId"),
+        c.req.param("recordId"),
+        c.get("auth"),
+      ),
     );
     return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
   });

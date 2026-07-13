@@ -19,4 +19,15 @@ describe("default role permissions (design-spec §11.3/§11.5)", () => {
     expect(isRole("admin")).toBe(false);
     expect(isRole(42)).toBe(false);
   });
+
+  it("lets owners rebuild the projection but not editors", () => {
+    expect(can("owner", "projection:rebuild")).toBe(true);
+    expect(can("editor", "projection:rebuild")).toBe(false);
+  });
+
+  it("lets owners and editors publish, but not viewers", () => {
+    expect(can("owner", "record:publish")).toBe(true);
+    expect(can("editor", "record:publish")).toBe(true);
+    expect(can("viewer", "record:publish")).toBe(false);
+  });
 });

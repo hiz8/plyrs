@@ -1,3 +1,4 @@
+import { cascadeUnpublish } from "./publish";
 import type { RecordSnapshot } from "./types";
 import { loadRecord } from "./write-record";
 
@@ -5,9 +6,16 @@ export type DeleteRecordResult =
   | { ok: true; record: RecordSnapshot }
   | { ok: false; code: "not_found" | "already_deleted" | "forbidden"; message: string };
 
+export interface DeleteDeps {
+  sql: SqlStorage;
+  nextSeq: () => number;
+  now: () => string;
+  newId: () => string;
+}
+
 // G2: 削除はトゥームストーン。row は同期の削除伝搬（Phase 4）のために残す。
 export function deleteRecordCore(
-  deps: { sql: SqlStorage; nextSeq: () => number; now: () => string },
+  deps: DeleteDeps,
   recordId: string,
   actor: string,
 ): DeleteRecordResult {
@@ -31,6 +39,9 @@ export function deleteRecordCore(
     recordId,
   );
   deps.sql.exec("DELETE FROM relations WHERE source_id = ?", recordId);
+  // 裁定（2026-07-13）: 削除された実体が公開され続ける事故を構造的に防ぐ。
+  // archive（ワークフロー軸）は仕様どおり強制 unpublish しない — delete だけが強制する。
+  cascadeUnpublish({ sql: deps.sql, now: () => now, newId: deps.newId }, recordId);
   return {
     ok: true,
     record: { ...prev, deletedAt: now, updatedAt: now, updatedBy: actor, seq, version },

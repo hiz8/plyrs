@@ -13,8 +13,17 @@ import {
   type RegisterContentTypeResult,
 } from "./do/content-types";
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
+import {
+  loadProjectionPayload,
+  loadPublishedPage,
+  publishRecordCore,
+  unpublishRecordCore,
+  type PublishResult,
+  type UnpublishResult,
+} from "./do/publish";
 import { loadRecord, writeRecordCore } from "./do/write-record";
 import type { RecordSnapshot, WriteRecordInput, WriteRecordResult } from "./do/types";
+import type { ProjectionPayload } from "./projection/payload";
 import {
   CLOSE_CODES,
   KEEPALIVE_PING,
@@ -123,6 +132,7 @@ export class TenantDO extends DurableObject<Env> {
           sql: this.ctx.storage.sql,
           nextSeq: () => ++this.seq,
           now: () => new Date().toISOString(),
+          newId: () => uuidv7(),
         },
         recordId,
         auth.userId,
@@ -135,6 +145,63 @@ export class TenantDO extends DurableObject<Env> {
       }
     }
     return result;
+  }
+
+  // DO は自分が idFromName のどの名前で起きたかを知らない。投影ジョブの宛先に必要なので永続化する。
+  private rememberTenant(tenantId: string): void {
+    this.ctx.storage.sql.exec(
+      "INSERT OR REPLACE INTO do_config (key, value) VALUES ('tenant_id', ?)",
+      tenantId,
+    );
+  }
+
+  publishRecord(tenantId: string, recordId: string, auth: AuthContext): PublishResult {
+    const denial = requireOperation(auth, "record:publish");
+    if (denial !== null) {
+      return denial;
+    }
+    return this.ctx.storage.transactionSync(() => {
+      this.rememberTenant(tenantId);
+      return publishRecordCore(
+        {
+          sql: this.ctx.storage.sql,
+          now: () => new Date().toISOString(),
+          newId: () => uuidv7(),
+        },
+        recordId,
+        auth.userId,
+      );
+    });
+  }
+
+  unpublishRecord(tenantId: string, recordId: string, auth: AuthContext): UnpublishResult {
+    const denial = requireOperation(auth, "record:publish");
+    if (denial !== null) {
+      return denial;
+    }
+    return this.ctx.storage.transactionSync(() => {
+      this.rememberTenant(tenantId);
+      return unpublishRecordCore(
+        {
+          sql: this.ctx.storage.sql,
+          now: () => new Date().toISOString(),
+          newId: () => uuidv7(),
+        },
+        recordId,
+      );
+    });
+  }
+
+  // Queues consumer が投影ペイロードを取りに来る経路（メッセージ本体にデータを載せない）
+  getProjectionPayload(recordId: string): ProjectionPayload | null {
+    return loadProjectionPayload(this.ctx.storage.sql, recordId);
+  }
+
+  getPublishedPage(
+    cursor: string | null,
+    limit: number,
+  ): { payloads: ProjectionPayload[]; nextCursor: string | null } {
+    return loadPublishedPage(this.ctx.storage.sql, cursor, limit);
   }
 
   override async fetch(request: Request): Promise<Response> {
