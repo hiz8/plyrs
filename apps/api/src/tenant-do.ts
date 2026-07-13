@@ -5,6 +5,15 @@ import * as schema from "@plyrs/db";
 import migrations from "@plyrs/db/migrations";
 import { contentTypeDefinitionSchema } from "@plyrs/metamodel";
 import { v7 as uuidv7 } from "uuid";
+import {
+  clearAlarm,
+  dueKinds,
+  minDueAt,
+  OUTBOX_SWEEP,
+  registerAlarm,
+  SWEEP_DELAY_MS,
+  SWEEP_RETRY_MS,
+} from "./do/alarms";
 import { requireOperation, type AuthContext } from "./do/authorize";
 import {
   loadContentTypeByKey,
@@ -13,6 +22,7 @@ import {
   type RegisterContentTypeResult,
 } from "./do/content-types";
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
+import { countUnsent, markOutboxSent, purgeSent, unsentOutbox } from "./do/outbox";
 import {
   loadProjectionPayload,
   loadPublishedPage,
@@ -23,6 +33,7 @@ import {
 } from "./do/publish";
 import { loadRecord, writeRecordCore } from "./do/write-record";
 import type { RecordSnapshot, WriteRecordInput, WriteRecordResult } from "./do/types";
+import type { ProjectionJob } from "./projection/jobs";
 import type { ProjectionPayload } from "./projection/payload";
 import {
   CLOSE_CODES,
@@ -75,6 +86,12 @@ export class TenantDO extends DurableObject<Env> {
         .exec<{ max_seq: number | null }>("SELECT MAX(publish_seq) AS max_seq FROM outbox")
         .one().max_seq;
       this.publishSeq = Math.max(storedSeq, snapshotMax ?? 0, outboxMax ?? 0, 0);
+      // 保険: アラームを失っても（sweeper のバグ・リトライ枯渇）、次に DO が起きた時に張り直す。
+      // outbox 行とアラームは同一トランザクションで書くため通常は失われない。
+      const due = minDueAt(ctx.storage.sql);
+      if (due !== null && (await ctx.storage.getAlarm()) === null) {
+        await ctx.storage.setAlarm(due);
+      }
     });
     // ping/pong を DO を起こさずに返す（design-spec §3 のハイバネーション前提）
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(KEEPALIVE_PING, KEEPALIVE_PONG));
@@ -146,13 +163,16 @@ export class TenantDO extends DurableObject<Env> {
     return loadRecord(this.ctx.storage.sql, id);
   }
 
-  deleteRecord(recordId: string, auth: AuthContext): DeleteRecordResult {
+  async deleteRecord(recordId: string, auth: AuthContext): Promise<DeleteRecordResult> {
     const denial = requireOperation(auth, "record:delete");
     if (denial !== null) {
       return denial;
     }
-    const result = this.ctx.storage.transactionSync(() =>
-      deleteRecordCore(
+    // setAlarm は transactionSync に参加し、ロールバックで巻き戻る（実証済み）。
+    // クロージャ内では await できないので promise を掴み、トランザクションを出てから待つ。
+    let armed: Promise<void> | null = null;
+    const result = this.ctx.storage.transactionSync(() => {
+      const inner = deleteRecordCore(
         {
           sql: this.ctx.storage.sql,
           nextSeq: () => ++this.seq,
@@ -162,13 +182,21 @@ export class TenantDO extends DurableObject<Env> {
         },
         recordId,
         auth.userId,
-      ),
-    );
+      );
+      if (inner.ok) {
+        armed = this.armSweep(Date.now() + SWEEP_DELAY_MS);
+      }
+      return inner;
+    });
+    if (armed !== null) {
+      await armed;
+    }
     if (result.ok) {
       const tombstone = loadSyncRecord(this.ctx.storage.sql, recordId);
       if (tombstone !== null) {
         this.broadcastAll({ type: "change", record: tombstone });
       }
+      await this.drainOutbox();
     }
     return result;
   }
@@ -194,14 +222,21 @@ export class TenantDO extends DurableObject<Env> {
     return this.publishSeq;
   }
 
-  publishRecord(tenantId: string, recordId: string, auth: AuthContext): PublishResult {
+  async publishRecord(
+    tenantId: string,
+    recordId: string,
+    auth: AuthContext,
+  ): Promise<PublishResult> {
     const denial = requireOperation(auth, "record:publish");
     if (denial !== null) {
       return denial;
     }
-    return this.ctx.storage.transactionSync(() => {
+    // setAlarm は transactionSync に参加し、ロールバックで巻き戻る（実証済み）。
+    // クロージャ内では await できないので promise を掴み、トランザクションを出てから待つ。
+    let armed: Promise<void> | null = null;
+    const result = this.ctx.storage.transactionSync(() => {
       this.rememberTenant(tenantId);
-      return publishRecordCore(
+      const inner = publishRecordCore(
         {
           sql: this.ctx.storage.sql,
           now: () => new Date().toISOString(),
@@ -211,17 +246,33 @@ export class TenantDO extends DurableObject<Env> {
         recordId,
         auth.userId,
       );
+      if (inner.ok) {
+        armed = this.armSweep(Date.now() + SWEEP_DELAY_MS);
+      }
+      return inner;
     });
+    if (armed !== null) {
+      await armed;
+    }
+    if (result.ok) {
+      await this.drainOutbox();
+    }
+    return result;
   }
 
-  unpublishRecord(tenantId: string, recordId: string, auth: AuthContext): UnpublishResult {
+  async unpublishRecord(
+    tenantId: string,
+    recordId: string,
+    auth: AuthContext,
+  ): Promise<UnpublishResult> {
     const denial = requireOperation(auth, "record:publish");
     if (denial !== null) {
       return denial;
     }
-    return this.ctx.storage.transactionSync(() => {
+    let armed: Promise<void> | null = null;
+    const result = this.ctx.storage.transactionSync(() => {
       this.rememberTenant(tenantId);
-      return unpublishRecordCore(
+      const inner = unpublishRecordCore(
         {
           sql: this.ctx.storage.sql,
           now: () => new Date().toISOString(),
@@ -230,7 +281,103 @@ export class TenantDO extends DurableObject<Env> {
         },
         recordId,
       );
+      if (inner.ok) {
+        armed = this.armSweep(Date.now() + SWEEP_DELAY_MS);
+      }
+      return inner;
     });
+    if (armed !== null) {
+      await armed;
+    }
+    if (result.ok) {
+      await this.drainOutbox();
+    }
+    return result;
+  }
+
+  // 登録して物理アラームを最小 due に張り直す（§9.6 の多重化）
+  private armSweep(dueAt: number): Promise<void> {
+    const min = registerAlarm(this.ctx.storage.sql, OUTBOX_SWEEP, dueAt);
+    return this.ctx.storage.setAlarm(min);
+  }
+
+  private tenantId(): string | null {
+    const row = this.ctx.storage.sql
+      .exec<{ value: string }>("SELECT value FROM do_config WHERE key = 'tenant_id'")
+      .toArray()[0];
+    return row?.value ?? null;
+  }
+
+  // アウトボックスの排出。正常系は publish 直後に呼ぶ。失敗しても例外を投げない
+  // （コミットは済んでいる。拾い直すのは sweeper の仕事 = §12.3 の「コミットの事実」に依存する保証）。
+  private async drainOutbox(): Promise<void> {
+    const tenantId = this.tenantId();
+    if (tenantId === null) {
+      console.error("outbox drain skipped: tenant id is unknown");
+      return;
+    }
+    for (const row of unsentOutbox(this.ctx.storage.sql, 50)) {
+      const job: ProjectionJob =
+        row.jobType === "delete"
+          ? {
+              jobType: "delete",
+              tenantId,
+              recordId: row.recordId,
+              sourceVersion: row.sourceVersion,
+              publishSeq: row.publishSeq,
+            }
+          : {
+              jobType: "upsert",
+              tenantId,
+              recordId: row.recordId,
+              sourceVersion: row.sourceVersion,
+              publishSeq: row.publishSeq,
+            };
+      try {
+        // 送出してからマークする。逆順にするとメッセージを失う（重複は consumer が冪等に吸収する）。
+        await this.env.PROJECTION_QUEUE.send(job);
+        markOutboxSent(this.ctx.storage.sql, row.id);
+      } catch (error) {
+        console.error("outbox send failed", row.id, error);
+        return; // 残りは sweeper に任せる
+      }
+    }
+  }
+
+  // テスト用: 未送出件数
+  pendingOutbox(): number {
+    return countUnsent(this.ctx.storage.sql);
+  }
+
+  override async alarm(): Promise<void> {
+    // runDurableObjectAlarm() 経由では alarmInfo が undefined で渡るため引数は使わない。
+    // 物理アラームは常にレジストリの最早 due_at で張るため、alarm() が呼ばれたという事実自体が
+    // 「その due は到来した」ことの証明になる（cloudflare:test の runDurableObjectAlarm は実時間を
+    // 早送りせず due_at 未到来でも即座に起こすため、Date.now() 単独では取りこぼす）。本番では
+    // 実際に到来した他の kind も併せて拾えるよう、実時計と最早 due の遅い方を「今」とみなす。
+    const earliestDue = minDueAt(this.ctx.storage.sql);
+    const now = earliestDue === null ? Date.now() : Math.max(Date.now(), earliestDue);
+    for (const kind of dueKinds(this.ctx.storage.sql, now)) {
+      if (kind === OUTBOX_SWEEP) {
+        await this.sweepOutbox();
+      }
+    }
+    const min = minDueAt(this.ctx.storage.sql);
+    if (min !== null) {
+      await this.ctx.storage.setAlarm(min);
+    }
+  }
+
+  private async sweepOutbox(): Promise<void> {
+    await this.drainOutbox();
+    // MIN() 意味論の登録では過去の due を前倒しのまま残してしまうので、消してから登録し直す
+    clearAlarm(this.ctx.storage.sql, OUTBOX_SWEEP);
+    if (countUnsent(this.ctx.storage.sql) > 0) {
+      registerAlarm(this.ctx.storage.sql, OUTBOX_SWEEP, Date.now() + SWEEP_RETRY_MS);
+      return;
+    }
+    // 全行送出済み → 登録を消して no-op で終わる（§12.3）
+    purgeSent(this.ctx.storage.sql);
   }
 
   // Queues consumer が投影ペイロードを取りに来る経路（メッセージ本体にデータを載せない）

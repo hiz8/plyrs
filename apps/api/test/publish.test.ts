@@ -148,7 +148,9 @@ describe("outbox rows (design-spec §12.3)", () => {
     expect(written.ok).toBe(true);
   });
 
-  it("queues exactly one unsent upsert row on publish", async () => {
+  // Task 6: DO は publish のコミット直後に producer としてアウトボックスを排出する。
+  // 行自体は sweeper の purgeSent() が掃くまで残るが、sent は 1 になっている。
+  it("queues exactly one upsert row on publish and the producer drains it immediately", async () => {
     const published = asPublishResult(await stub.publishRecord(TENANT, uuid(100), auth("owner1")));
     expect(published.ok).toBe(true);
     await runInDurableObject(stub, async (_instance, state) => {
@@ -162,12 +164,12 @@ describe("outbox rows (design-spec §12.3)", () => {
         job_type: "upsert",
         record_id: uuid(100),
         source_version: 1,
-        sent: 0,
+        sent: 1,
       });
     });
   });
 
-  it("queues a delete row carrying the previously published version on unpublish", async () => {
+  it("queues a delete row carrying the previously published version on unpublish, both drained", async () => {
     await stub.publishRecord(TENANT, uuid(100), auth("owner1"));
     const unpublished = asUnpublishResult(
       await stub.unpublishRecord(TENANT, uuid(100), auth("owner1")),
@@ -175,16 +177,19 @@ describe("outbox rows (design-spec §12.3)", () => {
     expect(unpublished).toMatchObject({ ok: true, sourceVersion: 1 });
     await runInDurableObject(stub, async (_instance, state) => {
       const rows = state.storage.sql
-        .exec<{ job_type: string; record_id: string; source_version: number }>(
-          "SELECT job_type, record_id, source_version FROM outbox WHERE sent = 0 ORDER BY rowid",
+        .exec<{ job_type: string; record_id: string; source_version: number; sent: number }>(
+          "SELECT job_type, record_id, source_version, sent FROM outbox ORDER BY rowid",
         )
         .toArray();
       // publish が積んだ upsert 行 + unpublish が積んだ delete 行の 2 件が残る
+      // （producer が両方とも即時排出するので sent = 1。行自体は sweeper の purgeSent() 待ち）
       expect(rows).toHaveLength(2);
+      expect(rows[0]).toMatchObject({ job_type: "upsert", sent: 1 });
       expect(rows[1]).toMatchObject({
         job_type: "delete",
         record_id: uuid(100),
         source_version: 1,
+        sent: 1,
       });
     });
   });
