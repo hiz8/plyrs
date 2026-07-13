@@ -175,6 +175,24 @@ describe("sync push", () => {
     watcher.socket.close(1000, "done");
   });
 
+  it("does not echo the broadcast back to the sender", async () => {
+    const writer = await openSyncSocket(stub, socketAuth("editor-1"));
+    const watcher = await openSyncSocket(stub, socketAuth("editor-2"));
+    await hello(writer.socket);
+    await hello(watcher.socket);
+
+    writer.socket.send(JSON.stringify({ type: "push", changes: [change()] }));
+    const ack = await nextMessage(writer.socket);
+    expect(ack.type).toBe("ack");
+    // watcher は change を受け取る
+    expect((await nextMessage(watcher.socket)).type).toBe("change");
+    // sender には change が来ない（次のメッセージを待って落ちることを確認）
+    await expect(nextMessage(writer.socket, 300)).rejects.toThrow();
+
+    writer.socket.close(1000, "done");
+    watcher.socket.close(1000, "done");
+  });
+
   it("denies a viewer's push with forbidden and writes nothing", async () => {
     const { socket } = await openSyncSocket(stub, socketAuth("mallory", "viewer"));
     await hello(socket);

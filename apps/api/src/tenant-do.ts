@@ -21,7 +21,7 @@ import {
   SYNC_SUBPROTOCOL,
   type ServerMessage,
 } from "@plyrs/sync-protocol";
-import { handleHello, handlePush } from "./sync/handlers";
+import { handleHello, handlePush, type PushOutcome } from "./sync/handlers";
 import { AUTH_HEADER, isTokenExpired, readSocketAuth, type SocketAuth } from "./sync/session";
 
 export class TenantDO extends DurableObject<Env> {
@@ -187,21 +187,35 @@ export class TenantDO extends DurableObject<Env> {
       }
     }
     if (parsed.type === "push") {
-      // 変異はトランザクション内。ブロードキャストはコミット後（未コミットの seq を見せない）。
-      const outcome = this.ctx.storage.transactionSync(() =>
-        handlePush(
-          {
-            sql: this.ctx.storage.sql,
-            nextSeq: () => ++this.seq,
-            now: () => new Date().toISOString(),
-            newRelationId: () => uuidv7(),
-          },
-          parsed.changes,
-          { userId: auth.userId, role: auth.role },
-        ),
-      );
-      for (const ack of outcome.acks) {
-        this.send(ws, ack);
+      let outcome: PushOutcome;
+      try {
+        // 変異はトランザクション内。ブロードキャストはコミット後（未コミットの seq を見せない）。
+        outcome = this.ctx.storage.transactionSync(() =>
+          handlePush(
+            {
+              sql: this.ctx.storage.sql,
+              nextSeq: () => ++this.seq,
+              now: () => new Date().toISOString(),
+              newRelationId: () => uuidv7(),
+            },
+            parsed.changes,
+            { userId: auth.userId, role: auth.role },
+          ),
+        );
+      } catch (error) {
+        // トランザクションはロールバック済み。ack 無しでクライアントを宙吊りにしない。
+        const failure = error instanceof Error ? error.message : "push failed";
+        for (const change of parsed.changes) {
+          this.send(ws, {
+            type: "ack",
+            changeId: change.changeId,
+            result: { ok: false, code: "internal_error", message: failure },
+          });
+        }
+        return;
+      }
+      for (const ackMessage of outcome.acks) {
+        this.send(ws, ackMessage);
       }
       for (const broadcastMessage of outcome.broadcasts) {
         this.broadcast(ws, broadcastMessage);
