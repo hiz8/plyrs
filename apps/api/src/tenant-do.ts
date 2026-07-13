@@ -21,7 +21,7 @@ import {
   SYNC_SUBPROTOCOL,
   type ServerMessage,
 } from "@plyrs/sync-protocol";
-import { handleHello } from "./sync/handlers";
+import { handleHello, handlePush } from "./sync/handlers";
 import { AUTH_HEADER, isTokenExpired, readSocketAuth, type SocketAuth } from "./sync/session";
 
 export class TenantDO extends DurableObject<Env> {
@@ -146,6 +146,20 @@ export class TenantDO extends DurableObject<Env> {
     ws.send(JSON.stringify(message));
   }
 
+  private broadcast(exclude: WebSocket, message: ServerMessage): void {
+    const payload = JSON.stringify(message);
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socket === exclude) {
+        continue;
+      }
+      // クローズ進行中のソケットに送ると例外になりうるため防御的に読み飛ばす
+      if (socket.readyState !== WebSocket.OPEN) {
+        continue;
+      }
+      socket.send(payload);
+    }
+  }
+
   override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     await Promise.resolve();
     const auth = readSocketAuth(ws);
@@ -170,6 +184,27 @@ export class TenantDO extends DurableObject<Env> {
     if (parsed.type === "hello") {
       for (const outgoing of handleHello(this.ctx.storage.sql, parsed.checkpoint)) {
         this.send(ws, outgoing);
+      }
+    }
+    if (parsed.type === "push") {
+      // 変異はトランザクション内。ブロードキャストはコミット後（未コミットの seq を見せない）。
+      const outcome = this.ctx.storage.transactionSync(() =>
+        handlePush(
+          {
+            sql: this.ctx.storage.sql,
+            nextSeq: () => ++this.seq,
+            now: () => new Date().toISOString(),
+            newRelationId: () => uuidv7(),
+          },
+          parsed.changes,
+          { userId: auth.userId, role: auth.role },
+        ),
+      );
+      for (const ack of outcome.acks) {
+        this.send(ws, ack);
+      }
+      for (const broadcastMessage of outcome.broadcasts) {
+        this.broadcast(ws, broadcastMessage);
       }
     }
   }
