@@ -7,3 +7,4 @@ export {
   type ConnectFn,
   type WebSocketLike,
 } from "./transport";
+export { RecordStore, type StoreChange } from "./store";
