@@ -6,10 +6,12 @@ import app from "../src/index";
 import { blockUser } from "../src/auth/blocklist";
 import { articleType, uuid, validArticleInput } from "./fixtures";
 
+// 共有ストレージ（--no-isolate）ではファイル間でも衝突しないよう、実行ごとのランダム接頭辞を混ぜる
+const RUN_ID = crypto.randomUUID().slice(0, 8);
 let n = 0;
 function unique(prefix: string): string {
   n += 1;
-  return `${prefix}${n}`;
+  return `${prefix}${RUN_ID}-${n}`;
 }
 
 function json(body: unknown, headers: Record<string, string> = {}): RequestInit {
