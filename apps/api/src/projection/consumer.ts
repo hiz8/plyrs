@@ -237,11 +237,20 @@ async function handleReprojectJob(env: Env, job: ReprojectJob, nowMs: number): P
   // 歩きの sweep にも掃かれない — レビューが再現した実際の障害）。epoch と tombstoned_at は
   // そもそも別のアイソレートが別のタイミングで刻む別の時計であり、時刻を比較して安全に GC
   // できる関係にない。
-  // 墓標の GC が無くても安全かつ有界である: 墓標は「次の勝った書き込み」が自分で消す
-  // （upsertStatements の `DELETE FROM projection_tombstones WHERE ... publish_seq <= ours`）。
-  // つまり墓標が残り続けるのは「一度は公開されて、今は非公開のレコード」だけであり、行数は
-  // 操作回数ではなくその集合の大きさに有界。tombstoned_at 列は捨てない
-  // （Phase 10 の運用 GC がいずれ使う。今回は対象外）。
+  // 墓標の GC が無くても安全かつ有界である: 墓標は基本的には「次の勝った書き込み」が自分で消す
+  // （upsertStatements の `DELETE FROM projection_tombstones WHERE ... publish_seq <= ours`）ため、
+  // 定常状態で墓標が残っているのは「一度は公開されて、今は非公開のレコード」に対応する。
+  // ただし Queues は at-least-once なので常にそうとは限らない: publish(seq1) →
+  // unpublish(seq2, 墓標が立って配信済み) → republish(seq3, 墓標は消えて行は生きている) の後に
+  // seq2 の delete ジョブが再配信されると、deleteStatements の INSERT ... ON CONFLICT DO UPDATE は
+  // 無条件なので、現に公開中（seq3）のレコードに対して古い世代（seq2）の墓標が孤児として
+  // 再び立つことがある。これは無害である: 墓標が弾くのは「自分より新しい publish_seq を運ぶ
+  // 書き込み」だけ（upsertStatements の `publish_seq > ?8` ガード）なので、この孤児墓標が
+  // 弾けるのは seq2 以下の書き込みに限られ、それは定義上すでに stale であり seq3 以降の
+  // 正当な書き込みを妨げたり行を復活させたりはできない。かつ主キーが (tenant_id, record_id)
+  // なので、1 レコードにつき最大 1 行にしか増えない。
+  // したがって墓標テーブルの行数は「操作回数」ではなく「レコード数」に有界であり、定期的な
+  // 運用 GC は Phase 10 の関心事とする（tombstoned_at 列はそのために残してある。今回は対象外）。
 }
 
 export async function handleProjectionJob(

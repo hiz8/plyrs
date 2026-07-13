@@ -756,3 +756,76 @@ describe("overlapping reprojection walks cannot resurrect a record (Task 7 fix)"
     expect(await countRows("projection_index", tenantId, recordId)).toBe(0);
   });
 });
+
+// projection D1 は全テナント共有なので、墓標の NOT EXISTS ガードは必ず tenant_id で絞る
+// 必要がある。これまでこの絞り込みが壊れても検出できていたのは reproject.test.ts の
+// 100件2ページ自己連鎖テストで record_id がたまたま衝突したときの、原因の分かりにくい
+// 件数不一致だけだった。ここに狙い撃ちのテストを置く。
+describe("tombstone guard scoping — tenant_id must gate the NOT EXISTS subquery", () => {
+  it("does not let tenant A's tombstone block tenant B's upsert of the same record id", async () => {
+    const recordId = uuid(1200);
+    const tenantA = crypto.randomUUID();
+    const tenantB = crypto.randomUUID();
+    const stubA = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantA));
+    const stubB = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantB));
+
+    await stubA.registerContentType(articleType(), auth("owner1"));
+    const writtenA = asWriteResult(
+      await stubA.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
+    );
+    expect(writtenA.ok).toBe(true);
+    const publishedA = asPublishResult(
+      await stubA.publishRecord(tenantA, recordId, auth("owner1")),
+    );
+    expect(publishedA.ok).toBe(true);
+
+    await stubB.registerContentType(articleType(), auth("owner1"));
+    const writtenB = asWriteResult(
+      await stubB.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
+    );
+    expect(writtenB.ok).toBe(true);
+    const publishedB = asPublishResult(
+      await stubB.publishRecord(tenantB, recordId, auth("owner1")),
+    );
+    expect(publishedB.ok).toBe(true);
+
+    // テナント A だけ unpublish し、その delete ジョブを実配信して墓標を立てる
+    // （publish_seq=1 → unpublish で publish_seq=2 の墓標）
+    const unpublishedA = asUnpublishResult(
+      await stubA.unpublishRecord(tenantA, recordId, auth("owner1")),
+    );
+    expect(unpublishedA.ok).toBe(true);
+    const deleteRowA = await lastOutboxRow(stubA);
+    await deliver([
+      {
+        jobType: "delete",
+        tenantId: tenantA,
+        recordId,
+        sourceVersion: deleteRowA.source_version,
+        publishSeq: deleteRowA.publish_seq,
+      },
+    ]);
+    expect(await projected(tenantA, recordId)).toBeNull();
+    expect(await countRows("projection_tombstones", tenantA, recordId)).toBe(1);
+
+    // テナント B は公開したまま無関係。その upsert ジョブ（publish_seq=1）を配信する。
+    // tenant_id が NOT EXISTS から抜けていると、テナント A の墓標（publish_seq=2 > 1）が
+    // 誤ってこの書き込みを弾く。
+    const upsertRowB = await lastOutboxRow(stubB);
+    await deliver([
+      {
+        jobType: "upsert",
+        tenantId: tenantB,
+        recordId,
+        sourceVersion: upsertRowB.source_version,
+        publishSeq: upsertRowB.publish_seq,
+      },
+    ]);
+
+    // 同じ record_id を持つだけの無関係なテナント A の墓標が、テナント B の正当な書き込みを
+    // 弾いてはならない
+    expect(await projected(tenantB, recordId)).not.toBeNull();
+    // テナント A 側は unpublish 済みのまま
+    expect(await projected(tenantA, recordId)).toBeNull();
+  });
+});
