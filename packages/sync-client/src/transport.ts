@@ -1,19 +1,28 @@
 // エンジンは partysocket にも workerd の WebSocket にも依存しない。
-// イベント型を unknown にして両方を構造的に受け入れ、必要な値は下のヘルパで取り出す
-// （workers-types の addEventListener は WebSocketEventMap 上のジェネリックであり、
-//  optional のみの独自イベント型では代入不能になるため）。
+// イベント型を unknown にすることで、DOM lib の有無に関わらず両方の WebSocket を
+// 構造的に受け入れられる（独自のイベント型を使う版は、DOM lib が暗黙に有効で
+// その非ジェネリックな addEventListener オーバーロードに一致することに依存していた）。
+// イベントから必要な値は下のナローイングヘルパで取り出す。
 export const SOCKET_OPEN = 1;
 
 export interface WebSocketLike {
   readonly readyState: number;
   send(data: string): void;
   close(code?: number, reason?: string): void;
-  addEventListener(type: string, listener: (event: unknown) => void): void;
-  removeEventListener(type: string, listener: (event: unknown) => void): void;
+  addEventListener(
+    type: "message" | "open" | "close" | "error",
+    listener: (event: unknown) => void,
+  ): void;
+  removeEventListener(
+    type: "message" | "open" | "close" | "error",
+    listener: (event: unknown) => void,
+  ): void;
 }
 
 export type ConnectFn = () => Promise<WebSocketLike>;
 
+// data が無い場合に加えて、バイナリフレーム（ArrayBuffer など）でも null を返す。
+// 本プロトコルは JSON テキストのみなのでバイナリは想定外。
 export function socketMessageData(event: unknown): string | null {
   if (typeof event !== "object" || event === null || !("data" in event)) {
     return null;
