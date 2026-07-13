@@ -278,7 +278,7 @@ describe("SyncEngine", () => {
     await vi.waitFor(() => expect(next.parsed()[0]).toEqual({ type: "hello", checkpoint: 3 }));
   });
 
-  it("terminates without reconnecting when blocked (4003)", async () => {
+  it("terminates without reconnecting when blocked (4003), draining the outbox", async () => {
     const target = engine();
     await bootstrap(target);
     const pushed = target.push(change("c4"));
@@ -290,6 +290,9 @@ describe("SyncEngine", () => {
 
     await vi.waitFor(() => expect(target.status).toBe("closed"));
     await rejected;
+    // サーバーに確定的に拒否された場合は、接続できないだけの場合と違って
+    // 永続化済みアウトボックスも空にする（意図した非対称性）。
+    expect(await storage.loadOutbox()).toHaveLength(0);
   });
 
   it("ignores keepalive pongs", async () => {
@@ -299,7 +302,7 @@ describe("SyncEngine", () => {
     expect(target.status).toBe("ready");
   });
 
-  it("retries the reconnect with backoff and terminates when the delays run out", async () => {
+  it("retries the reconnect with backoff and goes offline (status closed, outbox intact) when the delays run out", async () => {
     let attempts = 0;
     const failing = new SyncEngine({
       connect: async () => {
@@ -319,6 +322,9 @@ describe("SyncEngine", () => {
     // 使い切ってなお失敗し、delays[2] が undefined になった時点で打ち切る。
     // つまり reconnect 内の connect 呼び出しは 3 回、合計で 1 + 3 = 4 回。
     expect(attempts).toBe(4);
+    // 接続できないだけ（サーバーからの拒否ではない）なので、アウトボックスは
+    // 空のまま失敗させたりしない（この時点では何も enqueue していないので空が期待値）。
+    expect(await storage.loadOutbox()).toHaveLength(0);
   });
 
   it("closes a socket that opens after stop() instead of orphaning it, and stays closed", async () => {
@@ -346,7 +352,7 @@ describe("SyncEngine", () => {
     expect(target.status).toBe("closed");
   });
 
-  it("retries a first connect that always fails with backoff and ends closed, failing pending outbox entries", async () => {
+  it("retries a first connect that always fails with backoff and ends closed, keeping the pending push unresolved and persisted", async () => {
     let attempts = 0;
     const target = new SyncEngine({
       connect: async () => {
@@ -359,8 +365,17 @@ describe("SyncEngine", () => {
 
     const startPromise = target.start();
     const pushed = target.push(change("c9"));
-    // close は非同期に発火する既存テストと同様、拒否ハンドラを先に張っておく
-    const rejected = expect(pushed).rejects.toThrow(/offline/);
+    // 新しい意味論では「接続できない」は「拒否された」ではないので、push() の
+    // Promise は解決も棄却もされず保留のまま残る（楽観的な表示を維持するため）。
+    let settled = false;
+    void pushed.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      },
+    );
 
     // start() は接続失敗時にも reject しない。status/outbox が失敗のシグナルになる。
     await expect(startPromise).resolves.toBeUndefined();
@@ -368,7 +383,95 @@ describe("SyncEngine", () => {
     // delays[0]・delays[1] を使い切ってなお失敗し、delays[2] が undefined になった
     // 時点で打ち切る。つまり connect 呼び出しは 3 回。
     expect(attempts).toBe(3);
-    await rejected;
+    // マイクロタスクを一巡させても push() は未解決のまま（= unhandled rejection も出ない）
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(settled).toBe(false);
+    expect(await storage.loadOutbox()).toHaveLength(1);
+  });
+
+  it("keeps the persisted outbox through an offline cold start and re-sends it once connect succeeds (data-loss regression guard)", async () => {
+    // リロード前の engine が enqueue した想定で、未送信の変更を先に永続化しておく。
+    await storage.saveOutbox([change("c-cold")]);
+
+    let shouldFail = true;
+    const target = new SyncEngine({
+      connect: async () => {
+        if (shouldFail) {
+          throw new Error("offline");
+        }
+        return socket;
+      },
+      storage,
+      reconnectDelaysMs: [0, 0],
+    });
+
+    await target.start();
+    expect(target.status).toBe("closed");
+    // データ消失の回帰ガード: バックオフを使い切ってもアウトボックスは残る
+    expect(await storage.loadOutbox()).toHaveLength(1);
+
+    // 接続できるようになったら、次の start() で永続化済みの変更を再送する
+    shouldFail = false;
+    await target.start();
+    socket.deliver({
+      type: "welcome",
+      protocolVersion: 1,
+      contentTypes: [articleType],
+      serverSeq: 0,
+    });
+    socket.deliver({ type: "sync", records: [], serverSeq: 0, complete: true });
+    await vi.waitFor(() => expect(target.status).toBe("ready"));
+
+    await vi.waitFor(() =>
+      expect(socket.parsed()).toContainEqual({
+        type: "push",
+        changes: [change("c-cold")],
+      }),
+    );
+  });
+
+  it("closes the previously connected socket when start() is called again while connected", async () => {
+    const target = engine();
+    await bootstrap(target);
+    expect(socket.readyState).toBe(1);
+
+    const next = new FakeSocket();
+    (target as unknown as { options: { connect: () => Promise<WebSocketLike> } }).options.connect =
+      async () => next;
+
+    await target.start();
+
+    // 孤児にせず前のソケットを明示的に閉じている
+    expect(socket.readyState).toBe(3);
+  });
+
+  it("falls back to closed (keeping the outbox) without an unhandled rejection when refreshToken rejects", async () => {
+    const refreshToken = vi.fn(async () => {
+      throw new Error("refresh failed");
+    });
+    const target = engine({ refreshToken });
+    await bootstrap(target);
+    const pushed = target.push(change("c5"));
+    await vi.waitFor(() => expect(socket.sent.length).toBeGreaterThan(1));
+
+    socket.close(CLOSE_CODES.tokenExpired, "token_expired");
+
+    await vi.waitFor(() => expect(target.status).toBe("closed"));
+    expect(refreshToken).toHaveBeenCalledTimes(1);
+    expect(await storage.loadOutbox()).toHaveLength(1);
+
+    // push() の Promise は保留のまま（棄却されない）= unhandled rejection が出ない
+    let settled = false;
+    void pushed.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(settled).toBe(false);
   });
 });
 

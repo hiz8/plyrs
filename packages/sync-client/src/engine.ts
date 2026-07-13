@@ -60,14 +60,20 @@ export class SyncEngine {
 
   async start(): Promise<void> {
     this.generation += 1;
+    // 接続済みのソケットが残っていれば孤児にせず閉じる（再接続ボタンやテナント切替で
+    // start() が接続中に再度呼ばれるケースに備える）。ブラウザ実装のキープアライブ
+    // タイマーは close イベントでのみ止まるため、開いたまま放置すると ping を送り続ける。
+    this.socket?.close(1000, "client_restart");
+    this.socket = null;
+    this.stopped = false;
     // このメソッド呼び出しの間に stop()/start() が割り込んでも巻き込まれないよう、
     // 世代はここで一度だけ確定させて以降 this.generation を読み直さない。
     const generation = this.generation;
-    this.stopped = false;
     this.currentCheckpoint = await this.storage.loadCheckpoint();
     await this.outbox.hydrate();
     // 初回接続もバックオフの対象にする。ここで失敗しても start() 自体は reject しない。
-    // 失敗のシグナルは status "closed" と outbox.failAll 経由の push() 拒否になる。
+    // 失敗のシグナルは status "closed" になる（サーバーに到達できないだけなら
+    // アウトボックスは温存される。詳しくは setOffline/terminate を参照）。
     await this.connectWithBackoff(generation);
   }
 
@@ -204,6 +210,13 @@ export class SyncEngine {
     void this.reconnect(code);
   }
 
+  // 接続できないだけ（オフライン等）ではアウトボックスを捨てない。
+  // 未送信の変更は永続化したまま保持し、次の start() で再送する。
+  private setOffline(): void {
+    this.setStatus("closed");
+  }
+
+  // サーバーが当該クライアントを確定的に拒否した場合のみ、保留中の変更を棄却する。
   private async terminate(error: Error): Promise<void> {
     this.setStatus("closed");
     await this.outbox.failAll(error);
@@ -215,7 +228,13 @@ export class SyncEngine {
     const generation = this.generation;
     if (code === CLOSE_CODES.tokenExpired) {
       // ソケット内のトークン更新は無い。新トークンを取ってから張り直す。
-      await this.options.refreshToken?.();
+      try {
+        await this.options.refreshToken?.();
+      } catch {
+        // トークン再取得に失敗した = 今は接続できない。アウトボックスは保持したまま offline に落とす。
+        this.setOffline();
+        return;
+      }
     }
     await this.connectWithBackoff(generation);
   }
@@ -231,10 +250,12 @@ export class SyncEngine {
       try {
         await this.open();
         return;
-      } catch (error) {
+      } catch {
         const delay = delays[attempt];
         if (delay === undefined) {
-          await this.terminate(error instanceof Error ? error : new Error("connect failed"));
+          // 全ての再試行を使い切ってもサーバーに到達できない = オフライン扱い。
+          // これは「拒否された」わけではないので、アウトボックスは温存する。
+          this.setOffline();
           return;
         }
         await new Promise((resolve) => setTimeout(resolve, delay));
