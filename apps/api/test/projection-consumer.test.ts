@@ -665,3 +665,94 @@ describe("resurrection race — a stale write must not undo a delete (CRITICAL f
     expect(await countRows("projection_tombstones", tenantId, recordId)).toBe(0);
   });
 });
+
+// Task 7（レビュー指摘、probe で決定的に再現済み）: TenantDO.startReprojection にロックが無いため、
+// オーナーが「再構築」を連打するだけで独立した epoch を持つ 2 つの歩きが同時に走りうる。歩き終わりの
+// sweep が「epoch より前の墓標」を GC していると、後発の歩きの sweep が「先発の、まだ着地していない
+// 歩き」が依存している墓標を消してしまう。すると先発の歩きが遅れて発行する stale な書き込みが
+// 無防備になり、消えたはずのレコードを平文 INSERT で復活させる（しかも projected_at はどちらの
+// epoch より新しくなるため、以後どちらの歩きの sweep にも掃かれない）。
+describe("overlapping reprojection walks cannot resurrect a record (Task 7 fix)", () => {
+  it("a stale upsertStatements() call from an earlier, still in-flight walk stays blocked after a later, unrelated walk's terminal sweep runs", async () => {
+    const tenantId = crypto.randomUUID();
+    const recordId = uuid(1100);
+    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    await stub.registerContentType(articleType(), auth("owner1"));
+    const written = asWriteResult(
+      await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
+    );
+    expect(written.ok).toBe(true);
+    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    expect(published.ok).toBe(true);
+
+    const v1 = await lastOutboxRow(stub);
+    await deliver([
+      {
+        jobType: "upsert",
+        tenantId,
+        recordId,
+        sourceVersion: v1.source_version,
+        publishSeq: v1.publish_seq,
+      },
+    ]);
+    expect(await projected(tenantId, recordId)).not.toBeNull();
+
+    // 「先発の歩き」がこのレコードのページを読んだ瞬間を模す。この時点ではまだ公開中
+    // （unpublish はこの後起きる）。stalePayload はそれを知らないまま止め置かれる。
+    const stalePayload = asProjectionPayload(await stub.getProjectionPayload(recordId));
+    if (stalePayload === null) {
+      throw new Error("test setup invariant: record must be projectable right after publish");
+    }
+
+    // 編集者が unpublish → delete ジョブが墓標を立てる
+    const unpublished = asUnpublishResult(
+      await stub.unpublishRecord(tenantId, recordId, auth("owner1")),
+    );
+    expect(unpublished.ok).toBe(true);
+    const deleteRow = await lastOutboxRow(stub);
+    await deliver([
+      {
+        jobType: "delete",
+        tenantId,
+        recordId,
+        sourceVersion: deleteRow.source_version,
+        publishSeq: deleteRow.publish_seq,
+      },
+    ]);
+    expect(await projected(tenantId, recordId)).toBeNull();
+    expect(await countRows("projection_tombstones", tenantId, recordId)).toBe(1);
+
+    const tombstoneRow = await env.PROJECTION_DB.prepare(
+      "SELECT tombstoned_at FROM projection_tombstones WHERE tenant_id = ? AND record_id = ?",
+    )
+      .bind(tenantId, recordId)
+      .first<{ tombstoned_at: number }>();
+    if (tombstoneRow === null) {
+      throw new Error("test setup invariant: the delete job must plant a tombstone");
+    }
+
+    // 「後発の、無関係な歩き」が別の epoch で独立に走る。この時点でこのテナントに公開中のレコードは
+    // 0 件なので、1 回の handleProjectionJob 呼び出しで終端 sweep まで完了する（空ページ即 sweep）。
+    // epoch は上の墓標より確実に後の値にする（旧コードの GC 条件 tombstoned_at < epoch を確実に
+    // 踏ませて、バグを再現できるようにするため）。
+    await handleProjectionJob(
+      env,
+      { jobType: "reproject", tenantId, cursor: null, epoch: tombstoneRow.tombstoned_at + 1_000 },
+      tombstoneRow.tombstoned_at + 2_000,
+    );
+
+    // 先発の歩きがまだ依存している墓標は、後発の歩きの終端 sweep を生き延びなければならない
+    expect(await countRows("projection_tombstones", tenantId, recordId)).toBe(1);
+
+    // 先発の歩きの遅延した stale write（unpublish 前の publish_seq を運ぶ）が今ごろ届く。
+    // handleReprojectJob のページ読み取りループが実際に呼ぶのと同じ upsertStatements() を直接叩く。
+    await env.PROJECTION_DB.batch(
+      upsertStatements(env.PROJECTION_DB, tenantId, stalePayload, Date.now()),
+    );
+
+    // 消えたレコードが復活していてはならない（relations/index も同様）
+    expect(await projected(tenantId, recordId)).toBeNull();
+    expect(await countRows("projected_relations", tenantId, recordId)).toBe(0);
+    expect(await countRows("projection_index", tenantId, recordId)).toBe(0);
+  });
+});

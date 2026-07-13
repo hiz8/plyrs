@@ -307,23 +307,28 @@ describe("reprojection sweep spares in-flight publishes (design-spec §12.3b)", 
   });
 });
 
-// CRITICAL fix の Step 3: 歩き終わりの sweep は墓標も GC する。epoch より前に立てられた墓標は
-// この歩きが発行するどの書き込みも守る必要が無い。epoch 以降（歩きの最中）に立てられた墓標
-// （本物の unpublish）は残さなければならない。
-describe("reprojection sweep GCs stale tombstones (CRITICAL fix)", () => {
-  it("removes a tombstone older than the epoch but keeps one created during the walk", async () => {
+// Task 7（レビュー指摘、probe で決定的に再現済み）: 歩き終わりの sweep は墓標を GC しては
+// ならない。startReprojection にロックが無いため 2 つの歩きが独立した epoch で同時に走りうる。
+// epoch ベースの GC だと、後発の歩きの sweep が「先発の、まだ着地していない歩き」が依存している
+// 墓標を消してしまい、先発が遅れて発行する stale な書き込みが無防備になって消えたはずのレコードを
+// 復活させる（apps/api/test/projection-consumer.test.ts の
+// "overlapping reprojection walks cannot resurrect a record" が実際の復活まで再現する）。
+// 墓標は次の勝った書き込み（upsertStatements の publish_seq <= ours な墓標の DELETE）だけが
+// 消してよい。ここでは epoch との新旧に関わらず、どんな墓標も sweep を生き延びることを固定する。
+describe("reprojection sweep does not GC tombstones (Task 7 fix)", () => {
+  it("keeps tombstones regardless of age relative to the walk's epoch", async () => {
     const tenantId = crypto.randomUUID();
     const epoch = 5_000;
 
-    const staleTombstoneId = uuid(1510);
-    const freshTombstoneId = uuid(1511);
+    const olderTombstoneId = uuid(1510);
+    const newerTombstoneId = uuid(1511);
     await env.PROJECTION_DB.batch([
       env.PROJECTION_DB.prepare(
         "INSERT INTO projection_tombstones (tenant_id, record_id, publish_seq, tombstoned_at) VALUES (?, ?, 1, ?)",
-      ).bind(tenantId, staleTombstoneId, epoch - 1_000),
+      ).bind(tenantId, olderTombstoneId, epoch - 1_000),
       env.PROJECTION_DB.prepare(
         "INSERT INTO projection_tombstones (tenant_id, record_id, publish_seq, tombstoned_at) VALUES (?, ?, 1, ?)",
-      ).bind(tenantId, freshTombstoneId, epoch + 1_000),
+      ).bind(tenantId, newerTombstoneId, epoch + 1_000),
     ]);
 
     await handleProjectionJob(
@@ -337,6 +342,11 @@ describe("reprojection sweep GCs stale tombstones (CRITICAL fix)", () => {
     )
       .bind(tenantId)
       .all<{ record_id: string }>();
-    expect(remaining.results.map((row) => row.record_id)).toStrictEqual([freshTombstoneId]);
+    // 歩きより前に立った墓標も、歩きの最中に立った墓標も、sweep を無傷で生き延びる
+    // （record_id 昇順: uuid(1510) は uuid(1511) より辞書順で小さい）
+    expect(remaining.results.map((row) => row.record_id)).toStrictEqual([
+      olderTombstoneId,
+      newerTombstoneId,
+    ]);
   });
 });

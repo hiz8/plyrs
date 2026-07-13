@@ -226,14 +226,22 @@ async function handleReprojectJob(env: Env, job: ReprojectJob, nowMs: number): P
          AND NOT EXISTS (SELECT 1 FROM projected_records
                          WHERE tenant_id = ?1 AND record_id = projection_index.record_id)`,
     ).bind(job.tenantId),
-    // CRITICAL fix: 墓標も歩き終わりで GC する。epoch より前に立てられた墓標は、この歩きが
-    // 発行するどの書き込みも守る必要がない（この歩きが読んだページはすべて epoch 以降に走った
-    // ので、それより古い墓標が対象にしていた delete はもう反映済みか無関係）。epoch 以降に
-    // 立てられた墓標（歩きの最中に起きた本物の unpublish）は消さずに残す。
-    env.PROJECTION_DB.prepare(
-      "DELETE FROM projection_tombstones WHERE tenant_id = ?1 AND tombstoned_at < ?2",
-    ).bind(job.tenantId, job.epoch),
   ]);
+  // Task 7（レビュー指摘、probe で決定的に再現済み）: ここで墓標を GC してはならない。
+  // startReprojection にロックが無いため、2 つの歩きが独立した epoch を持って同時に走りうる
+  // （オーナーが「再構築」を連打するだけで起きる）。時刻ベースの GC（epoch より前の墓標を消す、
+  // 猶予時間を延ばす、等）はどう変えても同じ穴が開き直す: 後発の歩きの epoch は先発の歩きが
+  // まだ守り続けたい墓標の tombstoned_at より新しくなり得るため、後発の sweep が先発のために
+  // 立っている墓標を消し、先発が遅れて発行する stale な書き込みが無防備になって消えたはずの
+  // レコードを復活させる（しかも projected_at はどちらの epoch より新しくなるため、以後どちらの
+  // 歩きの sweep にも掃かれない — レビューが再現した実際の障害）。epoch と tombstoned_at は
+  // そもそも別のアイソレートが別のタイミングで刻む別の時計であり、時刻を比較して安全に GC
+  // できる関係にない。
+  // 墓標の GC が無くても安全かつ有界である: 墓標は「次の勝った書き込み」が自分で消す
+  // （upsertStatements の `DELETE FROM projection_tombstones WHERE ... publish_seq <= ours`）。
+  // つまり墓標が残り続けるのは「一度は公開されて、今は非公開のレコード」だけであり、行数は
+  // 操作回数ではなくその集合の大きさに有界。tombstoned_at 列は捨てない
+  // （Phase 10 の運用 GC がいずれ使う。今回は対象外）。
 }
 
 export async function handleProjectionJob(
