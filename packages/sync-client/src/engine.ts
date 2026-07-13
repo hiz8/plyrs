@@ -14,6 +14,8 @@ import {
 
 export type SyncStatus = "idle" | "connecting" | "syncing" | "ready" | "closed";
 
+const DEFAULT_RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10_000, 30_000];
+
 export interface SyncEngineOptions {
   connect: ConnectFn;
   storage?: SyncStorage;
@@ -23,6 +25,8 @@ export interface SyncEngineOptions {
   onStatus?: (status: SyncStatus) => void;
   onReset?: () => void;
   refreshToken?: () => Promise<void>;
+  // 再接続の待ち時間（ms）。使い切ると接続を終端する。テストは [0,0] のように短縮できる。
+  reconnectDelaysMs?: number[];
 }
 
 export class SyncEngine {
@@ -182,13 +186,22 @@ export class SyncEngine {
       // ソケット内のトークン更新は無い。新トークンを取ってから張り直す。
       await this.options.refreshToken?.();
     }
-    if (this.stopped) {
-      return;
-    }
-    try {
-      await this.open();
-    } catch (error) {
-      await this.terminate(error instanceof Error ? error : new Error("reconnect failed"));
+    const delays = this.options.reconnectDelaysMs ?? DEFAULT_RECONNECT_DELAYS_MS;
+    for (let attempt = 0; ; attempt += 1) {
+      if (this.stopped) {
+        return;
+      }
+      try {
+        await this.open();
+        return;
+      } catch (error) {
+        const delay = delays[attempt];
+        if (delay === undefined) {
+          await this.terminate(error instanceof Error ? error : new Error("reconnect failed"));
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
     }
   }
 

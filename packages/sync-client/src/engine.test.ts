@@ -298,6 +298,28 @@ describe("SyncEngine", () => {
     expect(() => socket.emit("message", { data: KEEPALIVE_PONG })).not.toThrow();
     expect(target.status).toBe("ready");
   });
+
+  it("retries the reconnect with backoff and terminates when the delays run out", async () => {
+    let attempts = 0;
+    const failing = new SyncEngine({
+      connect: async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          return socket;
+        }
+        throw new Error("connect failed");
+      },
+      storage,
+      reconnectDelaysMs: [0, 0],
+    });
+    await failing.start();
+    socket.close(1006, "network");
+    await vi.waitFor(() => expect(failing.status).toBe("closed"));
+    // 初回 connect（start）で 1 回、reconnect ループが delays[0]・delays[1] を
+    // 使い切ってなお失敗し、delays[2] が undefined になった時点で打ち切る。
+    // つまり reconnect 内の connect 呼び出しは 3 回、合計で 1 + 3 = 4 回。
+    expect(attempts).toBe(4);
+  });
 });
 
 describe("engine core independence", () => {
