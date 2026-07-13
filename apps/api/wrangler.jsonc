@@ -29,7 +29,12 @@
         // 0 にしないとテストが 1 メッセージあたり約 1 秒待たされる（実測）
         "max_batch_timeout": 0,
         "max_batch_size": 10,
-        "max_retries": 3,
+        "max_retries": 5,
+        // outbox 行は enqueue 成功で sent=1 になる（projection 成功ではない）ため、リトライを
+        // 使い切って drop されたジョブは outbox 側からは既に消えており何も再送しない。
+        // DLQ に park させ、運用者が手動で確認・再投入できるようにする。意図的に consumer は
+        // 付けない（付けるとメッセージが黙って ack されてしまい park の意味が無くなる）。
+        "dead_letter_queue": "plyrs-projection-dlq",
       },
     ],
   },
