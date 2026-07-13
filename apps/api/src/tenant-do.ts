@@ -23,6 +23,7 @@ import {
 } from "@plyrs/sync-protocol";
 import { handleHello, handlePush, type PushOutcome } from "./sync/handlers";
 import { AUTH_HEADER, isTokenExpired, readSocketAuth, type SocketAuth } from "./sync/session";
+import { loadAllContentTypes } from "./sync/records";
 
 export class TenantDO extends DurableObject<Env> {
   private readonly db: DrizzleSqliteDODatabase<typeof schema>;
@@ -58,9 +59,19 @@ export class TenantDO extends DurableObject<Env> {
       return denial;
     }
     const now = new Date().toISOString();
-    return this.ctx.storage.transactionSync(() =>
+    const result = this.ctx.storage.transactionSync(() =>
       registerContentTypeCore(this.ctx.storage.sql, input, now),
     );
+    if (result.ok) {
+      // G1: content_types は seq を消費しない別チャネル。変更をコミット後に全接続へ配る。
+      setImmediate(() => {
+        this.broadcastAll({
+          type: "content-types",
+          contentTypes: loadAllContentTypes(this.ctx.storage.sql),
+        });
+      });
+    }
+    return result;
   }
 
   getContentType(key: string): ContentTypeRow | null {
@@ -153,6 +164,16 @@ export class TenantDO extends DurableObject<Env> {
         continue;
       }
       // クローズ進行中のソケットに送ると例外になりうるため防御的に読み飛ばす
+      if (socket.readyState !== WebSocket.OPEN) {
+        continue;
+      }
+      socket.send(payload);
+    }
+  }
+
+  private broadcastAll(message: ServerMessage): void {
+    const payload = JSON.stringify(message);
+    for (const socket of this.ctx.getWebSockets()) {
       if (socket.readyState !== WebSocket.OPEN) {
         continue;
       }
