@@ -301,15 +301,27 @@ describe("SyncEngine", () => {
 });
 
 describe("engine core independence", () => {
-  it("does not import @tanstack/db or partysocket", async () => {
+  it("does not import @tanstack/db or partysocket (including subpaths)", async () => {
     const { readFile } = await import("node:fs/promises");
-    // 生の部分文字列ではなく import 文だけを見る（コメント内の言及で誤検知しないため）
-    const importPattern = /(?:^|\n)\s*import[^;]*?from\s*["']([^"']+)["']/g;
+    const forbidden = ["@tanstack/db", "partysocket"];
+    // static import / side-effect import / re-export / dynamic import をすべて拾う。
+    // コメント内の言及では誤検知しない（specifier のクォートを伴う形だけを見る）。
+    const specifierPattern = /(?:from\s*|import\s*|import\(\s*)["']([^"']+)["']/g;
+    // transport.ts は import を1つも持たない（型と定数のみ）ので、パーサ生存確認からは除外する
+    const filesWithoutImports = new Set(["transport.ts"]);
+
     for (const file of ["engine.ts", "store.ts", "outbox.ts", "storage.ts", "transport.ts"]) {
       const source = await readFile(new URL(file, import.meta.url), "utf8");
-      const specifiers = [...source.matchAll(importPattern)].map((match) => match[1]);
-      expect(specifiers).not.toContain("@tanstack/db");
-      expect(specifiers).not.toContain("partysocket");
+      const specifiers = [...source.matchAll(specifierPattern)].map((match) => match[1]);
+      // パーサが生きていること自体を確認する（空振り合格を防ぐ）
+      if (!filesWithoutImports.has(file)) {
+        expect(specifiers.length).toBeGreaterThan(0);
+      }
+      for (const specifier of specifiers) {
+        for (const pkg of forbidden) {
+          expect(specifier === pkg || specifier?.startsWith(`${pkg}/`)).toBe(false);
+        }
+      }
     }
   });
 });
