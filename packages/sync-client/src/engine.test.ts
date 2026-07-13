@@ -320,6 +320,56 @@ describe("SyncEngine", () => {
     // つまり reconnect 内の connect 呼び出しは 3 回、合計で 1 + 3 = 4 回。
     expect(attempts).toBe(4);
   });
+
+  it("closes a socket that opens after stop() instead of orphaning it, and stays closed", async () => {
+    let resolveConnect!: (socket: WebSocketLike) => void;
+    const pendingConnect = new Promise<WebSocketLike>((resolve) => {
+      resolveConnect = resolve;
+    });
+    const target = new SyncEngine({
+      connect: () => pendingConnect,
+      storage,
+    });
+
+    const startPromise = target.start();
+    // open() は connect() の gate を await 中。ここで stop() を割り込ませる。
+    await vi.waitFor(() => expect(target.status).toBe("connecting"));
+    await target.stop();
+    expect(target.status).toBe("closed");
+
+    // gate がここで解決する = stop() の後に遅れて開いたソケット
+    resolveConnect(socket);
+    await startPromise;
+
+    // 孤児にせず閉じて捨てている（世代が古いので this.socket には代入されない）
+    expect(socket.readyState).toBe(3);
+    expect(target.status).toBe("closed");
+  });
+
+  it("retries a first connect that always fails with backoff and ends closed, failing pending outbox entries", async () => {
+    let attempts = 0;
+    const target = new SyncEngine({
+      connect: async () => {
+        attempts += 1;
+        throw new Error("offline");
+      },
+      storage,
+      reconnectDelaysMs: [0, 0],
+    });
+
+    const startPromise = target.start();
+    const pushed = target.push(change("c9"));
+    // close は非同期に発火する既存テストと同様、拒否ハンドラを先に張っておく
+    const rejected = expect(pushed).rejects.toThrow(/offline/);
+
+    // start() は接続失敗時にも reject しない。status/outbox が失敗のシグナルになる。
+    await expect(startPromise).resolves.toBeUndefined();
+    expect(target.status).toBe("closed");
+    // delays[0]・delays[1] を使い切ってなお失敗し、delays[2] が undefined になった
+    // 時点で打ち切る。つまり connect 呼び出しは 3 回。
+    expect(attempts).toBe(3);
+    await rejected;
+  });
 });
 
 describe("engine core independence", () => {

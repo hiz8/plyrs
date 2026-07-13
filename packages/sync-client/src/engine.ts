@@ -40,6 +40,9 @@ export class SyncEngine {
   private currentCheckpoint = 0;
   private readySent = false;
   private stopped = false;
+  // start()/stop() のたびに進む世代カウンタ。connect() の await 中に stop()/start() が
+  // 割り込んでも、古い世代のソケットを孤児にせず閉じて捨てるための目印。
+  private generation = 0;
 
   constructor(options: SyncEngineOptions) {
     this.options = options;
@@ -56,13 +59,20 @@ export class SyncEngine {
   }
 
   async start(): Promise<void> {
+    this.generation += 1;
+    // このメソッド呼び出しの間に stop()/start() が割り込んでも巻き込まれないよう、
+    // 世代はここで一度だけ確定させて以降 this.generation を読み直さない。
+    const generation = this.generation;
     this.stopped = false;
     this.currentCheckpoint = await this.storage.loadCheckpoint();
     await this.outbox.hydrate();
-    await this.open();
+    // 初回接続もバックオフの対象にする。ここで失敗しても start() 自体は reject しない。
+    // 失敗のシグナルは status "closed" と outbox.failAll 経由の push() 拒否になる。
+    await this.connectWithBackoff(generation);
   }
 
   async stop(): Promise<void> {
+    this.generation += 1;
     this.stopped = true;
     this.socket?.close(1000, "client_stop");
     this.socket = null;
@@ -76,12 +86,18 @@ export class SyncEngine {
   }
 
   private async open(): Promise<void> {
+    const generation = this.generation;
     this.setStatus("connecting");
     this.readySent = false;
     const socket = await this.options.connect();
+    // await 中に stop()/start() が走っていたら、このソケットは孤児にせず閉じて捨てる
+    if (this.stopped || generation !== this.generation) {
+      socket.close(1000, "client_stop");
+      return;
+    }
     this.socket = socket;
-    socket.addEventListener("message", this.onMessage);
-    socket.addEventListener("close", this.onClose);
+    socket.addEventListener("message", (event) => this.handleMessage(event, socket, generation));
+    socket.addEventListener("close", (event) => this.handleClose(event, socket, generation));
     this.setStatus("syncing");
     this.sendHello();
   }
@@ -90,7 +106,13 @@ export class SyncEngine {
     this.send({ type: "hello", checkpoint: this.currentCheckpoint });
   }
 
-  private readonly onMessage = (event: unknown): void => {
+  // socket/generation を閉じ込めているのは、世代交代後もこの listener 自体は古い
+  // ソケットに付いたまま残るため（addEventListener の解除はしていない）。遅れて発火
+  // しても現行世代の状態を書き換えないようにする。
+  private handleMessage(event: unknown, socket: WebSocketLike, generation: number): void {
+    if (this.socket !== socket || generation !== this.generation) {
+      return;
+    }
     const raw = socketMessageData(event);
     if (raw === null || raw === KEEPALIVE_PONG) {
       return;
@@ -102,7 +124,7 @@ export class SyncEngine {
       return;
     }
     void this.handle(message);
-  };
+  }
 
   private async handle(message: ServerMessage): Promise<void> {
     switch (message.type) {
@@ -163,7 +185,13 @@ export class SyncEngine {
     }
   }
 
-  private readonly onClose = (event: unknown): void => {
+  // 世代交代後に古いソケットが遅れて close を発火しても、現行ソケット/状態を
+  // 巻き込まない（this.socket を誤って null にしたり、現行世代に無関係な
+  // reconnect を起動したりしない）。
+  private handleClose(event: unknown, socket: WebSocketLike, generation: number): void {
+    if (this.socket !== socket || generation !== this.generation) {
+      return;
+    }
     this.socket = null;
     if (this.stopped) {
       return;
@@ -174,7 +202,7 @@ export class SyncEngine {
       return;
     }
     void this.reconnect(code);
-  };
+  }
 
   private async terminate(error: Error): Promise<void> {
     this.setStatus("closed");
@@ -182,13 +210,22 @@ export class SyncEngine {
   }
 
   private async reconnect(code: number): Promise<void> {
+    // refreshToken() の await 中に stop()/start() が割り込むケースに備えて、
+    // この reconnect 呼び出しが属する世代を最初に確定させる。
+    const generation = this.generation;
     if (code === CLOSE_CODES.tokenExpired) {
       // ソケット内のトークン更新は無い。新トークンを取ってから張り直す。
       await this.options.refreshToken?.();
     }
+    await this.connectWithBackoff(generation);
+  }
+
+  // start()（初回接続）と reconnect()（切断後の再接続）が共有するバックオフループ。
+  // 呼び出し元が確定させた世代を渡してもらい、それが古くなっていれば何もしない。
+  private async connectWithBackoff(generation: number): Promise<void> {
     const delays = this.options.reconnectDelaysMs ?? DEFAULT_RECONNECT_DELAYS_MS;
     for (let attempt = 0; ; attempt += 1) {
-      if (this.stopped) {
+      if (this.stopped || generation !== this.generation) {
         return;
       }
       try {
@@ -197,7 +234,7 @@ export class SyncEngine {
       } catch (error) {
         const delay = delays[attempt];
         if (delay === undefined) {
-          await this.terminate(error instanceof Error ? error : new Error("reconnect failed"));
+          await this.terminate(error instanceof Error ? error : new Error("connect failed"));
           return;
         }
         await new Promise((resolve) => setTimeout(resolve, delay));
