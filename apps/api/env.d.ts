@@ -5,12 +5,15 @@
 interface EnvBindings {
   TENANT_DO: DurableObjectNamespace<import("./src/tenant-do").TenantDO>;
   DB: D1Database;
+  // design-spec §12.2: 共有投影 D1（publish 派生の公開読み取りモデル）
+  PROJECTION_DB: D1Database;
   BLOCKLIST: KVNamespace;
   // 本番: `wrangler secret put JWT_SECRET`。ローカル dev: .dev.vars。テスト: vitest.config の miniflare.bindings。
   // wrangler.jsonc の vars には置かない（公知値が本番デフォルトになる事故を防ぐ）。
   JWT_SECRET: string;
   // テスト専用: vitest.config の miniflare.bindings が注入する（本番には存在しない）
   TEST_MIGRATIONS: import("cloudflare:test").D1Migration[];
+  TEST_PROJECTION_MIGRATIONS: import("cloudflare:test").D1Migration[];
 }
 
 declare namespace Cloudflare {

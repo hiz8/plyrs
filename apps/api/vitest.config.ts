@@ -7,6 +7,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(async () => {
   const migrations = await readD1Migrations(path.join(here, "../../packages/db/drizzle-d1"));
+  const projectionMigrations = await readD1Migrations(
+    path.join(here, "../../packages/db/drizzle-projection"),
+  );
   return {
     plugins: [
       cloudflareTest({
@@ -14,6 +17,7 @@ export default defineConfig(async () => {
         miniflare: {
           bindings: {
             TEST_MIGRATIONS: migrations,
+            TEST_PROJECTION_MIGRATIONS: projectionMigrations,
             JWT_SECRET: "test-secret-do-not-use-in-prod",
           },
         },
