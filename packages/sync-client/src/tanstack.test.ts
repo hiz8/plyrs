@@ -214,6 +214,43 @@ describe("CollectionRegistry", () => {
     ).not.toThrow();
     expect(registry.get("article")?.get("r1")?.input["title"]).toBe("v2");
   });
+
+  it("omits status from the pushed change when it did not change (§7: status is LWW-arbitrated)", async () => {
+    registry.sync([articleType]);
+    registry.markReady();
+    // toChange() の previous は engine.store（コレクションの同期状態ではない）から
+    // 引くので、両方に同じレコードを入れておく。
+    engine.store.apply(record({ status: "draft" }));
+    registry.applyStoreChange({ kind: "upsert", record: record({ status: "draft" }) });
+    const pushSpy = vi.spyOn(engine, "push");
+
+    const collection = registry.get("article");
+    collection?.update("r1", (draft) => {
+      draft.input["title"] = "updated";
+    });
+
+    await vi.waitFor(() => expect(pushSpy).toHaveBeenCalledTimes(1));
+    const pushed = pushSpy.mock.calls[0]?.[0];
+    expect(pushed).toBeDefined();
+    expect(pushed !== undefined && "status" in pushed).toBe(false);
+  });
+
+  it("includes status in the pushed change when it changed", async () => {
+    registry.sync([articleType]);
+    registry.markReady();
+    engine.store.apply(record({ status: "draft" }));
+    registry.applyStoreChange({ kind: "upsert", record: record({ status: "draft" }) });
+    const pushSpy = vi.spyOn(engine, "push");
+
+    const collection = registry.get("article");
+    collection?.update("r1", (draft) => {
+      draft.status = "ready";
+    });
+
+    await vi.waitFor(() => expect(pushSpy).toHaveBeenCalledTimes(1));
+    const pushed = pushSpy.mock.calls[0]?.[0];
+    expect(pushed?.status).toBe("ready");
+  });
 });
 
 describe("CollectionRegistry wired to the engine", () => {

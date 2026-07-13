@@ -118,7 +118,7 @@ describe("sync client against the real DO", () => {
     await engine.stop();
   });
 
-  it("resumes from its checkpoint on reconnect and only receives the delta", async () => {
+  it("resumes from its checkpoint when the same engine (and store) reconnects, receiving only the delta", async () => {
     const storage = new MemorySyncStorage();
     const first = new SyncEngine({
       connect: async () => (await openSyncSocket(stub, socketAuth("editor-1"))).socket,
@@ -143,6 +143,43 @@ describe("sync client against the real DO", () => {
       auth("editor-2"),
     );
 
+    // 同一 engine（store を保持したまま）で再接続する。checkpoint 以降だけが届く
+    // （切断中の変更は入り、既に持っている record は再送されない）。
+    await first.start();
+    await vi.waitFor(() => expect(first.status).toBe("ready"), { timeout: 5000 });
+
+    expect(first.checkpoint).toBeGreaterThan(checkpoint);
+    expect(first.store.get(uuid(65))).toBeDefined();
+    expect(first.store.get(uuid(64))?.input["title"]).toBe("こんにちは");
+    await first.stop();
+  });
+
+  it("does a full resync instead of trusting a persisted checkpoint when a fresh engine has no records (record persistence gap guard)", async () => {
+    // MemorySyncStorage は checkpoint とアウトボックスしか永続化しない（record は持たない）。
+    // ページ再読み込み相当の新しい SyncEngine インスタンスは store が空なので、checkpoint
+    // だけ引き継いでも Fix 4 のガードにより信用されず、hello checkpoint:0 で全レコードを
+    // 取り直す。持ち越した checkpoint を信用して差分だけ受け取ると、以前の record が
+    // 二度と届かず UI から消えたままになる。
+    const storage = new MemorySyncStorage();
+    const first = new SyncEngine({
+      connect: async () => (await openSyncSocket(stub, socketAuth("editor-1"))).socket,
+      storage,
+    });
+    await first.start();
+    await vi.waitFor(() => expect(first.status).toBe("ready"), { timeout: 5000 });
+    await first.push(change(uuid(64)));
+    await first.stop();
+    await first.start();
+    await vi.waitFor(() => expect(first.status).toBe("ready"), { timeout: 5000 });
+    const checkpoint = first.checkpoint;
+    await first.stop();
+
+    await stub.writeRecord(
+      "article",
+      { recordId: uuid(65), input: { ...validArticleInput(), slug: "while-away" } },
+      auth("editor-2"),
+    );
+
     const resumed = new SyncEngine({
       connect: async () => (await openSyncSocket(stub, socketAuth("editor-1"))).socket,
       storage,
@@ -150,10 +187,10 @@ describe("sync client against the real DO", () => {
     await resumed.start();
     await vi.waitFor(() => expect(resumed.status).toBe("ready"), { timeout: 5000 });
 
-    // checkpoint 以降だけが届く（切断中の変更は入り、以前の record は届かない）
     expect(resumed.checkpoint).toBeGreaterThan(checkpoint);
     expect(resumed.store.get(uuid(65))).toBeDefined();
-    expect(resumed.store.get(uuid(64))).toBeUndefined();
+    // store が空だったので全再同期になり、以前の record も欠落せずに戻ってくる
+    expect(resumed.store.get(uuid(64))).toBeDefined();
     await resumed.stop();
   });
 });

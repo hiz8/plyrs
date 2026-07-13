@@ -47,6 +47,11 @@ export class RecordStore {
     return this.seqs.get(recordId) ?? 0;
   }
 
+  // 生きているレコードを1件も保持していないか（トゥームストーンのみ、または完全に空）。
+  isEmpty(): boolean {
+    return this.records.size === 0;
+  }
+
   clear(): void {
     this.records.clear();
     this.seqs.clear();

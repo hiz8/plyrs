@@ -61,6 +61,17 @@ describe("RecordStore", () => {
     expect(store.get("r1")).toBeUndefined();
   });
 
+  it("reports empty when it holds no live records, including after a tombstone", () => {
+    const store = new RecordStore();
+    expect(store.isEmpty()).toBe(true);
+
+    store.apply(record({ seq: 1 }));
+    expect(store.isEmpty()).toBe(false);
+
+    store.apply(record({ seq: 2, deletedAt: "2026-07-13T01:00:00Z", input: {} }));
+    expect(store.isEmpty()).toBe(true);
+  });
+
   it("lists by type in seq order and clears everything", () => {
     const store = new RecordStore();
     store.apply(record({ id: "b", seq: 9 }));

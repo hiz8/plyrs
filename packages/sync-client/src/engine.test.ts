@@ -119,6 +119,9 @@ describe("SyncEngine", () => {
     const onContentTypes = vi.fn();
     const onReady = vi.fn();
     const target = engine({ onContentTypes, onReady });
+    // checkpoint だけ残っていてもストアが空だと信用されない（Fix 4）ので、耐久実装なら
+    // 前回起動から生き残っているはずのレコードを、start() の前に入れておく。
+    target.store.apply(record({ id: "prior", seq: 1 }));
 
     await target.start();
     expect(socket.parsed()[0]).toEqual({ type: "hello", checkpoint: 2 });
@@ -137,6 +140,16 @@ describe("SyncEngine", () => {
     expect(target.store.get("r1")?.input["title"]).toBe("hello");
     expect(target.checkpoint).toBe(3);
     expect(await storage.loadCheckpoint()).toBe(3);
+  });
+
+  it("ignores a stored checkpoint and bootstraps from 0 when the store holds no records (no record persistence)", async () => {
+    await storage.saveCheckpoint(50);
+    const target = engine();
+
+    await target.start();
+
+    expect(socket.parsed()[0]).toEqual({ type: "hello", checkpoint: 0 });
+    expect(target.checkpoint).toBe(0);
   });
 
   it("does not advance the checkpoint until complete is true", async () => {
@@ -163,8 +176,10 @@ describe("SyncEngine", () => {
   it("resets to a full resync when the server's seq is behind the checkpoint", async () => {
     await storage.saveCheckpoint(50);
     const target = engine();
-    await target.start();
+    // checkpoint だけ残っていてもストアが空だと信用されない（Fix 4）ので、start() の
+    // 前にレコードを入れて checkpoint 50 が生き残るようにしておく。
     target.store.apply(record({ seq: 40 }));
+    await target.start();
 
     socket.deliver({
       type: "welcome",
@@ -178,6 +193,43 @@ describe("SyncEngine", () => {
     );
     expect(target.store.get("r1")).toBeUndefined();
     expect(target.checkpoint).toBe(0);
+  });
+
+  it("is not poisoned by the previous round's sync when the server resets", async () => {
+    await storage.saveCheckpoint(50);
+    const target = engine();
+    // checkpoint だけ残っていてもストアが空だと信用されない（Fix 4）ので、start() の
+    // 前にレコードを入れて checkpoint 50 が生き残るようにしておく。
+    target.store.apply(record({ seq: 40 }));
+    await target.start();
+
+    // reset を告げる welcome と、旧ラウンドの sync{complete} を同一ティックで配信する
+    socket.deliver({
+      type: "welcome",
+      protocolVersion: 1,
+      contentTypes: [articleType],
+      serverSeq: 5,
+    });
+    socket.deliver({ type: "sync", records: [], serverSeq: 5, complete: true });
+
+    await vi.waitFor(() =>
+      expect(socket.parsed()).toContainEqual({ type: "hello", checkpoint: 0 }),
+    );
+    // 旧ラウンドの sync に checkpoint を巻き戻されていない
+    expect(target.checkpoint).toBe(0);
+    expect(await storage.loadCheckpoint()).toBe(0);
+    expect(target.store.get("r1")).toBeUndefined();
+
+    // リセット後の welcome + sync で正しく再同期できる
+    socket.deliver({
+      type: "welcome",
+      protocolVersion: 1,
+      contentTypes: [articleType],
+      serverSeq: 5,
+    });
+    socket.deliver({ type: "sync", records: [record({ seq: 3 })], serverSeq: 5, complete: true });
+    await vi.waitFor(() => expect(target.checkpoint).toBe(5));
+    expect(target.store.get("r1")?.seq).toBe(3);
   });
 
   it("applies broadcast changes idempotently", async () => {
@@ -262,6 +314,52 @@ describe("SyncEngine", () => {
       result: { ok: true, record: record({ seq: 12 }) },
     });
     await expect(pushed).resolves.toMatchObject({ seq: 12 });
+  });
+
+  it("does not resend an in-flight change on every push, and resends all pending after a reconnect", async () => {
+    const target = engine();
+    await bootstrap(target);
+
+    void target.push(change("c1"));
+    await vi.waitFor(() =>
+      expect(socket.parsed()).toContainEqual({ type: "push", changes: [change("c1")] }),
+    );
+    void target.push(change("c2"));
+    await vi.waitFor(() =>
+      expect(socket.parsed()).toContainEqual({ type: "push", changes: [change("c2")] }),
+    );
+
+    const pushMessages = socket
+      .parsed()
+      .filter((message) => (message as { type: string }).type === "push");
+    // c1 は一度しか送られない（[c1] の次が [c1, c2] のような累積再送にならない）
+    expect(pushMessages).toEqual([
+      { type: "push", changes: [change("c1")] },
+      { type: "push", changes: [change("c2")] },
+    ]);
+
+    // どちらも ack が届かないまま切断・再接続する
+    const next = new FakeSocket();
+    socket.close(1006, "network");
+    (target as unknown as { options: { connect: () => Promise<WebSocketLike> } }).options.connect =
+      async () => next;
+
+    await vi.waitFor(() => expect(next.parsed()[0]).toEqual({ type: "hello", checkpoint: 3 }));
+    next.deliver({
+      type: "welcome",
+      protocolVersion: 1,
+      contentTypes: [articleType],
+      serverSeq: 3,
+    });
+    next.deliver({ type: "sync", records: [], serverSeq: 3, complete: true });
+
+    // 新しいソケットでは inFlight がリセットされ、未 ack の両方が再送される
+    await vi.waitFor(() =>
+      expect(next.parsed()).toContainEqual({
+        type: "push",
+        changes: [change("c1"), change("c2")],
+      }),
+    );
   });
 
   it("refreshes the token and reconnects on close 4001", async () => {
