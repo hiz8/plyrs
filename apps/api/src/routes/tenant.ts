@@ -10,6 +10,7 @@ import {
   asPublishResult,
   asRecordSnapshot,
   asRegisterResult,
+  asReprojectResult,
   asUnpublishResult,
   asWriteResult,
 } from "../rpc-unwrap";
@@ -116,6 +117,12 @@ export const tenantRoutes = new Hono<GateEnv>()
         c.req.param("recordId"),
         c.get("auth"),
       ),
+    );
+    return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
+  })
+  .post("/:tenantId/reproject", async (c) => {
+    const result = asReprojectResult(
+      await stubFor(c).startReprojection(c.req.param("tenantId"), c.get("auth")),
     );
     return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
   });

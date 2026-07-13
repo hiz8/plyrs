@@ -1,5 +1,5 @@
-import { asProjectionPayload } from "../rpc-unwrap";
-import type { ProjectionJob } from "./jobs";
+import { asProjectionPayload, asPublishedPage } from "../rpc-unwrap";
+import { REPROJECT_PAGE_SIZE, type ProjectionJob, type ReprojectJob } from "./jobs";
 import type { ProjectionPayload } from "./payload";
 
 // 順序ガードの要（CRITICAL fix: publish_seq を使う。source_version は publish/unpublish で
@@ -149,6 +149,52 @@ function stubFor(env: Env, tenantId: string) {
   return env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
 }
 
+// §12.3b: 投影は snapshot から決定的に再構築できる派生物。
+// mark-and-sweep: このジョブが投影した行は projected_at >= epoch になる。全ページを投影し終えたら
+// projected_at < epoch の行（= snapshot に無い / 別テナント時代の残骸）を掃く。
+// 再投影の最中に走った通常の publish も projected_at >= epoch になるので巻き込まれない。
+async function handleReprojectJob(env: Env, job: ReprojectJob, nowMs: number): Promise<void> {
+  const page = asPublishedPage(
+    await stubFor(env, job.tenantId).getPublishedPage(job.cursor, REPROJECT_PAGE_SIZE),
+  );
+  for (const payload of page.payloads) {
+    await env.PROJECTION_DB.batch(
+      upsertStatements(env.PROJECTION_DB, job.tenantId, payload, nowMs),
+    );
+  }
+  if (page.nextCursor !== null) {
+    // 共有 D1 への書き込み集中を避けるため 1 ページずつ自己連鎖する（§12.3b の運用注記）。
+    // nextCursor は payloads.length === limit のときに非 null になる（loadPublishedPage の
+    // 仕様）ため、ちょうど limit 件で終わる場合は「もう次が無い」空ページを取りに行く
+    // 追加の 1 往復が発生する。その空ページは payloads.length(0) !== limit なので
+    // nextCursor が null になり、下の sweep 分岐に落ちて掃除で終わる（無限連鎖しない）。
+    await env.PROJECTION_QUEUE.send({
+      jobType: "reproject",
+      tenantId: job.tenantId,
+      cursor: page.nextCursor,
+      epoch: job.epoch,
+    });
+    return;
+  }
+  await env.PROJECTION_DB.batch([
+    env.PROJECTION_DB.prepare(
+      "DELETE FROM projected_records WHERE tenant_id = ?1 AND projected_at < ?2",
+    ).bind(job.tenantId, job.epoch),
+    env.PROJECTION_DB.prepare(
+      `DELETE FROM projected_relations
+       WHERE tenant_id = ?1
+         AND NOT EXISTS (SELECT 1 FROM projected_records
+                         WHERE tenant_id = ?1 AND record_id = projected_relations.source_id)`,
+    ).bind(job.tenantId),
+    env.PROJECTION_DB.prepare(
+      `DELETE FROM projection_index
+       WHERE tenant_id = ?1
+         AND NOT EXISTS (SELECT 1 FROM projected_records
+                         WHERE tenant_id = ?1 AND record_id = projection_index.record_id)`,
+    ).bind(job.tenantId),
+  ]);
+}
+
 export async function handleProjectionJob(
   env: Env,
   job: ProjectionJob,
@@ -176,8 +222,9 @@ export async function handleProjectionJob(
       return;
     }
     case "reproject": {
-      // 再投影は Task 7 で実装する。それまでは未実装として retry に落とす。
-      throw new Error("reprojection is not implemented yet");
+      // 判別可能ユニオンで job は ReprojectJob に絞られる
+      await handleReprojectJob(env, job, nowMs);
+      return;
     }
     default: {
       // 未知のジョブは retry させる（観測点）

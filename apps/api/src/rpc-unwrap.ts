@@ -45,3 +45,9 @@ export function asPublishedPage(value: unknown): {
 } {
   return value as { payloads: ProjectionPayload[]; nextCursor: string | null };
 }
+
+export function asReprojectResult(
+  value: unknown,
+): { ok: true; epoch: number } | { ok: false; code: "forbidden"; message: string } {
+  return value as { ok: true; epoch: number } | { ok: false; code: "forbidden"; message: string };
+}

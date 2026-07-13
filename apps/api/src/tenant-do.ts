@@ -391,6 +391,25 @@ export class TenantDO extends DurableObject<Env> {
     return loadPublishedPage(this.ctx.storage.sql, cursor, limit);
   }
 
+  // §12.3b: テナント単位の再投影を開始する（owner 限定）。epoch を刻んで最初の reproject
+  // ジョブ（cursor: null）を 1 件送出するだけ — ページングと mark-and-sweep は consumer 側。
+  async startReprojection(
+    tenantId: string,
+    auth: AuthContext,
+  ): Promise<{ ok: true; epoch: number } | { ok: false; code: "forbidden"; message: string }> {
+    const denial = requireOperation(auth, "projection:rebuild");
+    if (denial !== null) {
+      return denial;
+    }
+    this.ctx.storage.transactionSync(() => {
+      this.rememberTenant(tenantId);
+    });
+    const epoch = Date.now();
+    // 再投影は outbox を経由しない（publish のような原子性要求が無く、失敗しても再実行すれば足りる）
+    await this.env.PROJECTION_QUEUE.send({ jobType: "reproject", tenantId, cursor: null, epoch });
+    return { ok: true, epoch };
+  }
+
   override async fetch(request: Request): Promise<Response> {
     if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") {
       return new Response("expected websocket upgrade", { status: 426 });
