@@ -77,7 +77,7 @@ Phase 2 の詳細計画で最終確定する。
 | 2 | `2026-07-12-phase2-do-write-path.md` | 完了（2026-07-13 main へマージ） |
 | 3 | `2026-07-13-phase3-control-plane-auth.md` | 完了（2026-07-13 main へマージ） |
 | 4a | `2026-07-13-phase4a-sync-server.md` | 完了（2026-07-13 main へマージ） |
-| 4b | 4a 完了後に作成 | 未着手（クライアント同期エンジン: partysocket + tanstack-db） |
+| 4b | `2026-07-13-phase4b-sync-client.md` | 計画済み（クライアント同期エンジン: コア + tanstack-db アダプタ） |
 | 5〜10 | 各フェーズ着手時に作成 | 未着手 |
 
 ---
