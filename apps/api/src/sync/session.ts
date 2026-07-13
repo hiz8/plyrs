@@ -32,5 +32,9 @@ export function readSocketAuth(ws: WebSocket): SocketAuth | null {
 }
 
 export function isTokenExpired(auth: SocketAuth, nowMs: number): boolean {
+  // exp が壊れている attachment は失効扱い（NaN 比較で恒偽になり「永久に失効しない」を防ぐ）
+  if (!Number.isFinite(auth.exp)) {
+    return true;
+  }
   return auth.exp * 1000 <= nowMs;
 }

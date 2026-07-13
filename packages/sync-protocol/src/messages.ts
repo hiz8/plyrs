@@ -22,6 +22,26 @@ export const CLOSE_CODES = {
 
 export const MAX_CHANGES_PER_PUSH = 100;
 
+// keepalive: DO を起こさない auto-response のペア（サーバーは setWebSocketAutoResponse に使う）
+export const KEEPALIVE_PING = "ping";
+export const KEEPALIVE_PONG = "pong";
+
+// ack の失敗コード語彙（クライアントの分岐実装用。モジュール拡張のため型は string のまま）
+export const ACK_ERROR_CODES = [
+  "forbidden",
+  "unknown_type",
+  "conflict",
+  "validation_failed",
+  "invalid_status",
+  "record_deleted",
+  "not_found",
+  "already_deleted",
+  "unique_violation",
+  "internal_error",
+] as const;
+
+export type AckErrorCode = (typeof ACK_ERROR_CODES)[number];
+
 // 同期の record 表現: relations を統合した「writeRecord の input 形式」を運ぶ。
 // deletedAt !== null はトゥームストーン（input は {}）。
 export interface SyncRecord {

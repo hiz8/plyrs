@@ -17,13 +17,15 @@ import { loadRecord, writeRecordCore } from "./do/write-record";
 import type { RecordSnapshot, WriteRecordInput, WriteRecordResult } from "./do/types";
 import {
   CLOSE_CODES,
+  KEEPALIVE_PING,
+  KEEPALIVE_PONG,
   parseClientMessage,
   SYNC_SUBPROTOCOL,
   type ServerMessage,
 } from "@plyrs/sync-protocol";
 import { handleHello, handlePush, type PushOutcome } from "./sync/handlers";
 import { AUTH_HEADER, isTokenExpired, readSocketAuth, type SocketAuth } from "./sync/session";
-import { loadAllContentTypes } from "./sync/records";
+import { loadAllContentTypes, loadSyncRecord } from "./sync/records";
 
 export class TenantDO extends DurableObject<Env> {
   private readonly db: DrizzleSqliteDODatabase<typeof schema>;
@@ -41,7 +43,7 @@ export class TenantDO extends DurableObject<Env> {
       this.seq = row.max_seq ?? 0;
     });
     // ping/pong を DO を起こさずに返す（design-spec §3 のハイバネーション前提）
-    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(KEEPALIVE_PING, KEEPALIVE_PONG));
   }
 
   ping(): string {
@@ -85,7 +87,7 @@ export class TenantDO extends DurableObject<Env> {
     if (contentType === null) {
       return { ok: false, code: "unknown_type", message: `unknown content type: ${typeKey}` };
     }
-    return this.ctx.storage.transactionSync(() =>
+    const result = this.ctx.storage.transactionSync(() =>
       writeRecordCore(
         {
           sql: this.ctx.storage.sql,
@@ -97,6 +99,13 @@ export class TenantDO extends DurableObject<Env> {
         { ...params, actor: auth.userId },
       ),
     );
+    if (result.ok && result.applied) {
+      const stored = loadSyncRecord(this.ctx.storage.sql, params.recordId);
+      if (stored !== null) {
+        this.broadcastAll({ type: "change", record: stored });
+      }
+    }
+    return result;
   }
 
   getRecord(id: string): RecordSnapshot | null {
@@ -108,7 +117,7 @@ export class TenantDO extends DurableObject<Env> {
     if (denial !== null) {
       return denial;
     }
-    return this.ctx.storage.transactionSync(() =>
+    const result = this.ctx.storage.transactionSync(() =>
       deleteRecordCore(
         {
           sql: this.ctx.storage.sql,
@@ -119,6 +128,13 @@ export class TenantDO extends DurableObject<Env> {
         auth.userId,
       ),
     );
+    if (result.ok) {
+      const tombstone = loadSyncRecord(this.ctx.storage.sql, recordId);
+      if (tombstone !== null) {
+        this.broadcastAll({ type: "change", record: tombstone });
+      }
+    }
+    return result;
   }
 
   override async fetch(request: Request): Promise<Response> {
@@ -155,14 +171,28 @@ export class TenantDO extends DurableObject<Env> {
     ws.send(JSON.stringify(message));
   }
 
+  // 失効したソケットへは配信しない（読み取り側にも ≤15分の失効を効かせる）。
+  // DO が既に起きている時にしか走らないためハイバネーションコストは変わらない。
+  private isSocketLive(socket: WebSocket, nowMs: number): boolean {
+    if (socket.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+    const auth = readSocketAuth(socket);
+    if (auth === null || isTokenExpired(auth, nowMs)) {
+      socket.close(CLOSE_CODES.tokenExpired, "token_expired");
+      return false;
+    }
+    return true;
+  }
+
   private broadcast(exclude: WebSocket, message: ServerMessage): void {
     const payload = JSON.stringify(message);
+    const nowMs = Date.now();
     for (const socket of this.ctx.getWebSockets()) {
       if (socket === exclude) {
         continue;
       }
-      // クローズ進行中のソケットに送ると例外になりうるため防御的に読み飛ばす
-      if (socket.readyState !== WebSocket.OPEN) {
+      if (!this.isSocketLive(socket, nowMs)) {
         continue;
       }
       socket.send(payload);
@@ -171,8 +201,9 @@ export class TenantDO extends DurableObject<Env> {
 
   private broadcastAll(message: ServerMessage): void {
     const payload = JSON.stringify(message);
+    const nowMs = Date.now();
     for (const socket of this.ctx.getWebSockets()) {
-      if (socket.readyState !== WebSocket.OPEN) {
+      if (!this.isSocketLive(socket, nowMs)) {
         continue;
       }
       socket.send(payload);
@@ -223,12 +254,13 @@ export class TenantDO extends DurableObject<Env> {
         );
       } catch (error) {
         // トランザクションはロールバック済み。ack 無しでクライアントを宙吊りにしない。
-        const failure = error instanceof Error ? error.message : "push failed";
+        // 内部エラーの詳細はクライアントに返さない（ログにのみ残す）。
+        console.error("push failed", error);
         for (const change of parsed.changes) {
           this.send(ws, {
             type: "ack",
             changeId: change.changeId,
-            result: { ok: false, code: "internal_error", message: failure },
+            result: { ok: false, code: "internal_error", message: "push failed" },
           });
         }
         return;
