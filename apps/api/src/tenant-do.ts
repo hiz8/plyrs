@@ -55,9 +55,17 @@ export class TenantDO extends DurableObject<Env> {
         .exec<{ max_seq: number | null }>("SELECT MAX(seq) AS max_seq FROM records")
         .one();
       this.seq = row.max_seq ?? 0;
-      // published_snapshots と outbox の双方の MAX を取る: unpublish は snapshot 行を消すが
-      // その delete の outbox 行は残る（sent=1 でも purge されるまでは残る）ため、snapshot 側
-      // だけを見ると番号を巻き戻して再発行し、このバグを再び開けてしまう。
+      // CRITICAL fix（レビュー指摘）: do_config.publish_seq が復元の一次情報。published_snapshots
+      // は unpublish で行が消え、outbox も purgeSent()（sent=1 の掃除。Task 6 のスイーパーが定期的に
+      // 呼ぶ）で行が消えるため、どちらのテーブルも「これまで発行した最大値」を恒久的には保持しない
+      // ―― publish→unpublish→purge→evict→republish で番号が巻き戻り、旧世代の delete ジョブが
+      // republish 後の投影行を消す事故を再び開けてしまう。do_config は publish/unpublish と同じ
+      // トランザクションで書くため、テーブル側の行が消えても残る。以下の MAX スキャンは do_config の
+      // 行が無かった古い DO のための床（belt and braces）に過ぎない。
+      const storedRaw = ctx.storage.sql
+        .exec<{ value: string }>("SELECT value FROM do_config WHERE key = 'publish_seq'")
+        .toArray()[0]?.value;
+      const storedSeq = storedRaw === undefined ? 0 : Number(storedRaw);
       const snapshotMax = ctx.storage.sql
         .exec<{ max_seq: number | null }>(
           "SELECT MAX(publish_seq) AS max_seq FROM published_snapshots",
@@ -66,7 +74,7 @@ export class TenantDO extends DurableObject<Env> {
       const outboxMax = ctx.storage.sql
         .exec<{ max_seq: number | null }>("SELECT MAX(publish_seq) AS max_seq FROM outbox")
         .one().max_seq;
-      this.publishSeq = Math.max(snapshotMax ?? 0, outboxMax ?? 0);
+      this.publishSeq = Math.max(storedSeq, snapshotMax ?? 0, outboxMax ?? 0, 0);
     });
     // ping/pong を DO を起こさずに返す（design-spec §3 のハイバネーション前提）
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(KEEPALIVE_PING, KEEPALIVE_PONG));
@@ -150,7 +158,7 @@ export class TenantDO extends DurableObject<Env> {
           nextSeq: () => ++this.seq,
           now: () => new Date().toISOString(),
           newId: () => uuidv7(),
-          nextPublishSeq: () => ++this.publishSeq,
+          nextPublishSeq: () => this.nextPublishSeq(),
         },
         recordId,
         auth.userId,
@@ -173,6 +181,19 @@ export class TenantDO extends DurableObject<Env> {
     );
   }
 
+  // CRITICAL fix（レビュー指摘）: 発番のたびに do_config へ永続化する。呼び出し元は必ず
+  // transactionSync の中からこれを呼ぶ（publish/unpublish/delete の各パス） —— 永続化はメモリ更新と
+  // 同じトランザクションでコミット/ロールバックされる。ロールバックでメモリ側のカウンタだけが先に
+  // 進んだ状態になるのは許容する（欠番は許すが、再利用は許さない、という設計どおり）。
+  private nextPublishSeq(): number {
+    this.publishSeq += 1;
+    this.ctx.storage.sql.exec(
+      "INSERT OR REPLACE INTO do_config (key, value) VALUES ('publish_seq', ?)",
+      String(this.publishSeq),
+    );
+    return this.publishSeq;
+  }
+
   publishRecord(tenantId: string, recordId: string, auth: AuthContext): PublishResult {
     const denial = requireOperation(auth, "record:publish");
     if (denial !== null) {
@@ -185,7 +206,7 @@ export class TenantDO extends DurableObject<Env> {
           sql: this.ctx.storage.sql,
           now: () => new Date().toISOString(),
           newId: () => uuidv7(),
-          nextPublishSeq: () => ++this.publishSeq,
+          nextPublishSeq: () => this.nextPublishSeq(),
         },
         recordId,
         auth.userId,
@@ -205,7 +226,7 @@ export class TenantDO extends DurableObject<Env> {
           sql: this.ctx.storage.sql,
           now: () => new Date().toISOString(),
           newId: () => uuidv7(),
-          nextPublishSeq: () => ++this.publishSeq,
+          nextPublishSeq: () => this.nextPublishSeq(),
         },
         recordId,
       );
@@ -334,7 +355,7 @@ export class TenantDO extends DurableObject<Env> {
               nextSeq: () => ++this.seq,
               now: () => new Date().toISOString(),
               newRelationId: () => uuidv7(),
-              nextPublishSeq: () => ++this.publishSeq,
+              nextPublishSeq: () => this.nextPublishSeq(),
             },
             parsed.changes,
             { userId: auth.userId, role: auth.role },

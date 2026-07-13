@@ -1,6 +1,7 @@
 import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
+import { purgeSent } from "../src/do/outbox";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import {
   asDeleteResult,
@@ -231,6 +232,58 @@ describe("outbox rows (design-spec §12.3)", () => {
       // 巻き戻っていれば republish は publish_seq=1 を再び採り、送出済みの upsert(v1) と同じ番号の
       // delete(v1) を消せなくする順序ガードが機能しなくなる
       expect(republished.snapshot.publishSeq).toBeGreaterThan(2);
+    }
+  });
+
+  // CRITICAL fix（レビュー指摘・再現済み）: published_snapshots と outbox の MAX に頼る復元は、
+  // 両方の行が消えた後では床にすらならない。unpublish で snapshot 行は消え、purgeSent()
+  // （Task 6 のスイーパーが sent=1 の outbox 行を定期的に掃除する経路）で outbox 行も消えたら、
+  // 起動時 MAX スキャンは両方とも 0 を返し番号が巻き戻る。do_config に永続化した値だけがこの穴を塞ぐ。
+  it("does not let publish_seq rewind after unpublish, an outbox purge, and eviction", async () => {
+    const published = asPublishResult(await stub.publishRecord(TENANT, uuid(100), auth("owner1")));
+    expect(published.ok).toBe(true);
+    const unpublished = asUnpublishResult(
+      await stub.unpublishRecord(TENANT, uuid(100), auth("owner1")),
+    );
+    expect(unpublished.ok).toBe(true);
+
+    // purge する前に、これまで発行済みの世代番号の上限を記録しておく（upsert(1) + delete(2)）。
+    const maxIssuedBeforePurge = await runInDurableObject(stub, async (_instance, state) => {
+      return state.storage.sql
+        .exec<{ max_seq: number | null }>("SELECT MAX(publish_seq) AS max_seq FROM outbox")
+        .one().max_seq;
+    });
+    expect(maxIssuedBeforePurge).toBe(2);
+
+    // 実運用の掃除経路を辿る: 配信済みに印を付けてから purgeSent() で sent=1 の行を消す
+    // （outbox.ts の purgeSent。Task 6 のスイーパーが routinely 呼ぶ経路そのもの）。
+    await runInDurableObject(stub, async (_instance, state) => {
+      state.storage.sql.exec("UPDATE outbox SET sent = 1");
+      purgeSent(state.storage.sql);
+    });
+
+    // この時点で published_snapshots も outbox も空。MAX スキャンだけに頼る復元は 0 に巻き戻る。
+    await runInDurableObject(stub, async (_instance, state) => {
+      const snapshotCount = state.storage.sql
+        .exec<{ n: number }>("SELECT COUNT(*) AS n FROM published_snapshots")
+        .one().n;
+      expect(snapshotCount).toBe(0);
+      const outboxCount = state.storage.sql
+        .exec<{ n: number }>("SELECT COUNT(*) AS n FROM outbox")
+        .one().n;
+      expect(outboxCount).toBe(0);
+    });
+
+    await evictDurableObject(stub, { webSockets: "hibernate" });
+
+    const republished = asPublishResult(
+      await stub.publishRecord(TENANT, uuid(100), auth("owner1")),
+    );
+    expect(republished.ok).toBe(true);
+    if (republished.ok) {
+      // 巻き戻っていれば republish は publish_seq=1 を再び採ってしまう。過去に発行した最大値
+      // （upsert=1, delete=2）より必ず大きくなければならない。
+      expect(republished.snapshot.publishSeq).toBeGreaterThan(maxIssuedBeforePurge ?? 0);
     }
   });
 });
