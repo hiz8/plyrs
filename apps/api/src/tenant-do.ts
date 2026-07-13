@@ -511,10 +511,20 @@ export class TenantDO extends DurableObject<Env> {
     }
     if (parsed.type === "push") {
       let outcome: PushOutcome;
+      // CRITICAL fix（レビュー指摘）: push 経路の delete は deleteRecordCore → cascadeUnpublish
+      // 経由で outbox に delete 行を積みうる（裁定 2026-07-13）。deleteRecord/publishRecord/
+      // unpublishRecord の各 RPC 経路はコミット直後に sweep を張って outbox を排出するが、
+      // この経路だけそれを欠いていた ―― レジストリが空のままだと constructor の再アーム保険も
+      // 効かず、以後このテナントで publish/unpublish/HTTP delete が一度も呼ばれなければ、
+      // コミット済みの unpublish が outbox に永遠に取り残される（公開停止したはずのレコードが
+      // 投影に残り続ける）。setAlarm は transactionSync に参加し、ロールバックで巻き戻る
+      // （実証済み）。クロージャ内では await できないので promise を掴み、トランザクションを
+      // 出てから待つ。
+      let armed: Promise<void> | null = null;
       try {
         // 変異はトランザクション内。ブロードキャストはコミット後（未コミットの seq を見せない）。
-        outcome = this.ctx.storage.transactionSync(() =>
-          handlePush(
+        outcome = this.ctx.storage.transactionSync(() => {
+          const inner = handlePush(
             {
               sql: this.ctx.storage.sql,
               nextSeq: () => ++this.seq,
@@ -524,8 +534,13 @@ export class TenantDO extends DurableObject<Env> {
             },
             parsed.changes,
             { userId: auth.userId, role: auth.role },
-          ),
-        );
+          );
+          // 実際に outbox 行が積まれた時だけ張る（大半の push は upsert のみで outbox に触れない）。
+          if (countUnsent(this.ctx.storage.sql) > 0) {
+            armed = this.armSweep(Date.now() + SWEEP_DELAY_MS);
+          }
+          return inner;
+        });
       } catch (error) {
         // トランザクションはロールバック済み。ack 無しでクライアントを宙吊りにしない。
         // 内部エラーの詳細はクライアントに返さない（ログにのみ残す）。
@@ -539,12 +554,18 @@ export class TenantDO extends DurableObject<Env> {
         }
         return;
       }
+      if (armed !== null) {
+        await armed;
+      }
       for (const ackMessage of outcome.acks) {
         this.send(ws, ackMessage);
       }
       for (const broadcastMessage of outcome.broadcasts) {
         this.broadcast(ws, broadcastMessage);
       }
+      // drainOutbox はコミット後のベストエフォート排出。ack/broadcast は既に送信済みなので、
+      // 失敗しても例外を投げず、拾い直しは sweeper に任せる（drainOutbox 自身の契約）。
+      await this.drainOutbox();
     }
   }
 

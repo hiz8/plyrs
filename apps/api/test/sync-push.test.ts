@@ -185,10 +185,15 @@ describe("sync push", () => {
     expect(result?.ok).toBe(true);
 
     expect(asProjectionPayload(await stub.getProjectionPayload(recordId))).toBeNull();
+    // CRITICAL fix（レビュー指摘）: push 経路の delete も他の RPC 経路と同じく sweep を張って
+    // outbox を排出しなければならない。「sent = 0 のまま残る」を正としていた旧アサーションは
+    // バグ（排出されない）を固定してしまっていた ―― 実際に送出済み（sent = 1）で、未送出が
+    // 0 件であることを固定する。
+    expect(await stub.pendingOutbox()).toBe(0);
     await runInDurableObject(stub, async (_instance, state) => {
       const rows = state.storage.sql
         .exec<{ job_type: string; record_id: string }>(
-          "SELECT job_type, record_id FROM outbox WHERE sent = 0 AND job_type = 'delete'",
+          "SELECT job_type, record_id FROM outbox WHERE sent = 1 AND job_type = 'delete'",
         )
         .toArray();
       expect(rows).toHaveLength(1);
