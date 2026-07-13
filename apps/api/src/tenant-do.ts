@@ -6,7 +6,7 @@ import migrations from "@plyrs/db/migrations";
 import { contentTypeDefinitionSchema } from "@plyrs/metamodel";
 import { v7 as uuidv7 } from "uuid";
 import {
-  clearServicedAlarm,
+  clearAlarm,
   dueKinds,
   effectiveNow,
   minDueAt,
@@ -360,7 +360,7 @@ export class TenantDO extends DurableObject<Env> {
     const now = effectiveNow(this.ctx.storage.sql);
     for (const kind of dueKinds(this.ctx.storage.sql, now)) {
       if (kind === OUTBOX_SWEEP) {
-        await this.sweepOutbox(now);
+        await this.sweepOutbox();
       }
     }
     const min = minDueAt(this.ctx.storage.sql);
@@ -369,22 +369,19 @@ export class TenantDO extends DurableObject<Env> {
     }
   }
 
-  // MINOR fix（レビュー指摘）: drainOutbox() の await 中は input gate が保持されないため、
-  // publish 等が割り込んで「この sweep より後の」新しい登録を張れてしまう。sweep が「サービス
-  // 済み」とみなしてよい境界には、sweepOutbox 内で新たに取った Date.now() ではなく、alarm() が
-  // 既に計算した effectiveNow（= このアラーム起床の根拠になった登録の due_at 以上であることが
-  // 保証された時刻）を使う。生の Date.now() だと、素の待機ではなく即時発火するテスト用ユーティリ
-  // ティ（runDurableObjectAlarm 等）や、わずかな時計の遅れによって「起床の根拠になった登録自身の
-  // due_at より前」になり得てしまい、サービスしたはずの登録を「まだ未来の割り込み」と誤認して
-  // 消し漏らし、無限に生き残らせてしまう。
-  private async sweepOutbox(startedAt: number): Promise<void> {
+  // sweep は kind 全体を無条件に消してから、未送出が残っていれば SWEEP_RETRY_MS 後に登録し直す
+  // （MIN() 意味論の登録では過去の due をそのまま残してしまうため、消してからでないと前倒しできない）。
+  // drainOutbox() の await 中は DO の input gate が保持されないため、この消去は「sweep が始まった
+  // 後に別の publish/unpublish/delete/push が張った新しい登録」も巻き添えで消しうる。ただし、その
+  // 割り込んだ操作自身も自分の transactionSync 直後に armSweep + drainOutbox（速い経路）で自分の
+  // outbox 行を排出済みなので、実害が出るのは「その割り込んだ操作自身の drain も失敗していた」
+  // 場合に限られる ―― そのときは次のアラームが SWEEP_DELAY_MS(5s) ではなく SWEEP_RETRY_MS(30s)
+  // 後になるだけで、正しさ（§12.3: いずれ拾われる）は損なわれない。これを許容される最悪ケースとして
+  // 明示的に受け入れる。
+  private async sweepOutbox(): Promise<void> {
     await this.drainOutbox();
-    // MIN() 意味論の登録では過去の due を前倒しのまま残してしまうので、消してから登録し直す。
-    // ただし割り込みが張った新しい登録（due_at > startedAt）は消さない。
-    clearServicedAlarm(this.ctx.storage.sql, OUTBOX_SWEEP, startedAt);
+    clearAlarm(this.ctx.storage.sql, OUTBOX_SWEEP);
     if (countUnsent(this.ctx.storage.sql) > 0) {
-      // 割り込みの登録が生き残っていれば ON CONFLICT の MIN(due_at, excluded.due_at) が
-      // その早い方を保つ（両者の意味を素直に足し合わせるだけで、明示の分岐は要らない）。
       registerAlarm(this.ctx.storage.sql, OUTBOX_SWEEP, Date.now() + SWEEP_RETRY_MS);
       return;
     }
@@ -576,9 +573,17 @@ export class TenantDO extends DurableObject<Env> {
       for (const broadcastMessage of outcome.broadcasts) {
         this.broadcast(ws, broadcastMessage);
       }
-      // drainOutbox はコミット後のベストエフォート排出。ack/broadcast は既に送信済みなので、
-      // 失敗しても例外を投げず、拾い直しは sweeper に任せる（drainOutbox 自身の契約）。
-      await this.drainOutbox();
+      // MINOR fix（レビュー指摘）: rememberTenant は publish/unpublish/startReprojection でしか
+      // 呼ばれないため、型登録とレコード書き込みしかしていないテナントには do_config に
+      // tenant_id が無い。drainOutbox() を毎 push 無条件に呼ぶと、そのテナントの push（同期の
+      // 最も高頻度な経路）が毎回 tenant id 不明のエラーログを吐く。outbox に実際に行が積まれて
+      // sweep を張った時（armed !== null）だけ排出を試みる ―― drainOutbox 自身の
+      // 「tenant unknown → ログして return」はそれでも保険として残す。
+      if (armed !== null) {
+        // drainOutbox はコミット後のベストエフォート排出。ack/broadcast は既に送信済みなので、
+        // 失敗しても例外を投げず、拾い直しは sweeper に任せる（drainOutbox 自身の契約）。
+        await this.drainOutbox();
+      }
     }
   }
 

@@ -1,7 +1,9 @@
-import { runInDurableObject } from "cloudflare:test";
+import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { ClientChange, ServerMessage } from "@plyrs/sync-protocol";
+import { OUTBOX_SWEEP } from "../src/do/alarms";
+import type { ProjectionJob } from "../src/projection/jobs";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import {
   asProjectionPayload,
@@ -10,6 +12,21 @@ import {
   asWriteResult,
 } from "./rpc-unwrap";
 import { nextMessage, nextMessages, openSyncSocket } from "./ws-helpers";
+
+// Finding B（レビュー指摘・MINOR）: push 経路の armSweep が未検証だった。drainOutbox の
+// PROJECTION_QUEUE.send() を確実に失敗させる偽の Queue で、送出が失敗しても outbox 行と
+// アラーム登録が生き残ること（= sweeper が拾い直せること）を固定する。
+function failingQueue(): Queue<ProjectionJob> {
+  return {
+    metrics: () => Promise.resolve({ backlogCount: 0, backlogBytes: 0 }),
+    send: async () => {
+      throw new Error("queue send failed (test double)");
+    },
+    sendBatch: async () => {
+      throw new Error("sendBatch is not used by the push path");
+    },
+  };
+}
 
 const TENANT = "018f2b6a-7a0a-7000-8000-0000000000d1";
 
@@ -198,6 +215,60 @@ describe("sync push", () => {
         .toArray();
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ job_type: "delete", record_id: recordId });
+    });
+
+    socket.close(1000, "done");
+  });
+
+  it("keeps the outbox row and the sweep registration when the push path's queue send fails (Finding B)", async () => {
+    const recordId = uuid(651);
+    const written = asWriteResult(
+      await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("admin")),
+    );
+    expect(written.ok).toBe(true);
+    const published = asPublishResult(await stub.publishRecord(TENANT, recordId, auth("admin")));
+    expect(published.ok).toBe(true);
+    // publish 自身の drain で outbox は既に空。ただし正常系でもレジストリの掃除は sweeper の
+    // 仕事なので、この時点ではまだ publish が張った登録が残っている（他のテストと同じ前提）。
+    // ここを空にしておかないと、後で見る registry の行が push 由来なのか publish の残骸なのか
+    // 区別できず、armSweep を呼ばなくても偶然パスしてしまう（Finding A と同じ穴）。
+    expect(await stub.pendingOutbox()).toBe(0);
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+
+    // env は protected フィールドなので型だけ絞ったキャストでアクセスする
+    // （@ts-expect-error や any は使わない）。以後この DO インスタンスの send は必ず失敗する。
+    await runInDurableObject(stub, async (instance, _state) => {
+      const priv = instance as unknown as { env: Env };
+      priv.env = { ...priv.env, PROJECTION_QUEUE: failingQueue() };
+    });
+
+    const { socket } = await openSyncSocket(stub, socketAuth("editor-1"));
+    await hello(socket);
+
+    const removal = change({
+      recordId,
+      op: "delete",
+      input: {},
+      changedFields: [],
+      baseFieldVersions: {},
+    });
+    socket.send(JSON.stringify({ type: "push", changes: [removal] }));
+    const result = ackOf(await nextMessage(socket));
+    // コミット自体は成功している（送出の失敗は ack に影響しない契約）
+    expect(result?.ok).toBe(true);
+
+    // (a) 送出に失敗した outbox 行は未送出のまま残る
+    expect(await stub.pendingOutbox()).toBe(1);
+    // (b) push 経路の armSweep が張った登録が生き残っている
+    //     （これが無いと constructor の再アーム保険も見つけるものがなく、行が永遠に取り残される）
+    await runInDurableObject(stub, async (_instance, state) => {
+      const registry = state.storage.sql
+        .exec<{ kind: string }>("SELECT kind FROM alarm_registry WHERE kind = ?", OUTBOX_SWEEP)
+        .toArray();
+      expect(registry).toHaveLength(1);
     });
 
     socket.close(1000, "done");

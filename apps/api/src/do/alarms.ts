@@ -31,19 +31,6 @@ export function clearAlarm(sql: SqlStorage, kind: string): void {
   sql.exec("DELETE FROM alarm_registry WHERE kind = ?", kind);
 }
 
-// レビュー指摘（MINOR）: drainOutbox() は PROJECTION_QUEUE.send() を await するため、その最中は
-// DO の input gate が保持されない ―― 別の publish/unpublish/delete/push がこの sweep の途中に
-// 割り込んで新しい登録（この sweep が始まった後の due_at）を armSweep() できてしまう。
-// sweepOutbox() が無条件に clearAlarm(kind) すると、割り込みが張ったばかりの新しい登録まで
-// 巻き添えで消してしまい、その publish の sweep が SWEEP_DELAY_MS(5s) 後ではなく次の
-// SWEEP_RETRY_MS(30s) 後まで遅延する。sweep の開始時刻（startedAt）以前に存在していた登録
-// だけを消せば、割り込みが張った新しい登録（due_at > startedAt。armSweep は必ず
-// 現在時刻より後の due_at しか登録しないため、割り込みの発生が sweep 開始後である以上これは
-// 恒真）は生き残る。
-export function clearServicedAlarm(sql: SqlStorage, kind: string, startedAt: number): void {
-  sql.exec("DELETE FROM alarm_registry WHERE kind = ? AND due_at <= ?", kind, startedAt);
-}
-
 export function dueKinds(sql: SqlStorage, nowMs: number): string[] {
   return sql
     .exec<{ kind: string }>(
