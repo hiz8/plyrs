@@ -3,6 +3,7 @@ import type { SyncRecord } from "@plyrs/sync-protocol";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SyncEngine } from "./engine";
 import { MemorySyncStorage } from "./storage";
+import type { StoreChange } from "./store";
 import { CollectionRegistry } from "./tanstack";
 import type { WebSocketLike } from "./transport";
 
@@ -71,7 +72,14 @@ describe("CollectionRegistry", () => {
 
   beforeEach(async () => {
     socket = new SilentSocket();
-    engine = new SyncEngine({ connect: async () => socket, storage: new MemorySyncStorage() });
+    // onStoreChange を registry.applyStoreChange に配線する（ドキュメント化された契約）。
+    // registry はこの直後に代入されるが、コールバックは実際にストア変更が起きるまで
+    // 呼ばれないため、クロージャ経由の前方参照で問題ない。
+    engine = new SyncEngine({
+      connect: async () => socket,
+      storage: new MemorySyncStorage(),
+      onStoreChange: (change) => registry.applyStoreChange(change),
+    });
     registry = new CollectionRegistry(engine);
     await engine.start();
   });
@@ -206,5 +214,111 @@ describe("CollectionRegistry", () => {
       }),
     ).not.toThrow();
     expect(registry.get("article")?.get("r1")?.input["title"]).toBe("v2");
+  });
+});
+
+describe("CollectionRegistry wired to the engine", () => {
+  it("merges a confirmed mutation exactly once and keeps it after the handler resolves", async () => {
+    const socket = new SilentSocket();
+    const writes: StoreChange[] = [];
+    let registry!: CollectionRegistry;
+    const engine = new SyncEngine({
+      connect: async () => socket,
+      storage: new MemorySyncStorage(),
+      onContentTypes: (types) => registry.sync(types),
+      onReady: () => registry.markReady(),
+      onStoreChange: (change) => {
+        writes.push(change);
+        registry.applyStoreChange(change);
+      },
+    });
+    registry = new CollectionRegistry(engine);
+    await engine.start();
+
+    socket.emit("message", {
+      data: JSON.stringify({
+        type: "welcome",
+        protocolVersion: 1,
+        contentTypes: [articleType],
+        serverSeq: 0,
+      }),
+    });
+    socket.emit("message", {
+      data: JSON.stringify({ type: "sync", records: [], serverSeq: 0, complete: true }),
+    });
+    await vi.waitFor(() => expect(engine.status).toBe("ready"));
+
+    const collection = registry.get("article");
+    const tx = collection?.insert(record({ id: "new", input: { title: "draft" } }));
+    await vi.waitFor(() => expect(socket.sent.some((raw) => raw.includes('"push"'))).toBe(true));
+
+    const pushed = JSON.parse(socket.sent.find((raw) => raw.includes('"push"')) as string) as {
+      changes: { changeId: string }[];
+    };
+    const changeId = pushed.changes[0]?.changeId;
+
+    socket.emit("message", {
+      data: JSON.stringify({
+        type: "ack",
+        changeId,
+        result: { ok: true, record: record({ id: "new", seq: 7, input: { title: "confirmed" } }) },
+      }),
+    });
+
+    await tx?.isPersisted.promise;
+    expect(collection?.get("new")?.input["title"]).toBe("confirmed");
+    // 確定レコードのマージは1回だけ（engine 経由。アダプタ側の二重書き込みが無いこと）
+    expect(
+      writes.filter((change) => change.kind === "upsert" && change.record.id === "new"),
+    ).toHaveLength(1);
+  });
+
+  it("drops records the server no longer has after a reset", async () => {
+    const socket = new SilentSocket();
+    let registry!: CollectionRegistry;
+    const storage = new MemorySyncStorage();
+    await storage.saveCheckpoint(50);
+    const engine = new SyncEngine({
+      connect: async () => socket,
+      storage,
+      onContentTypes: (types) => registry.sync(types),
+      onReady: () => registry.markReady(),
+      onStoreChange: (change) => registry.applyStoreChange(change),
+      onReset: () => registry.reset(),
+    });
+    registry = new CollectionRegistry(engine);
+    await engine.start();
+
+    // 通常のブートストラップで1件入る
+    socket.emit("message", {
+      data: JSON.stringify({
+        type: "welcome",
+        protocolVersion: 1,
+        contentTypes: [articleType],
+        serverSeq: 60,
+      }),
+    });
+    socket.emit("message", {
+      data: JSON.stringify({
+        type: "sync",
+        records: [record({ id: "ghost", seq: 55 })],
+        serverSeq: 60,
+        complete: true,
+      }),
+    });
+    await vi.waitFor(() => expect(registry.get("article")?.get("ghost")).toBeDefined());
+
+    // サーバーリセット（serverSeq が手元 checkpoint より小さい）
+    socket.emit("message", {
+      data: JSON.stringify({
+        type: "welcome",
+        protocolVersion: 1,
+        contentTypes: [articleType],
+        serverSeq: 1,
+      }),
+    });
+
+    // リセットで同期状態が空になり、ゴーストが残らない
+    await vi.waitFor(() => expect(registry.get("article")?.get("ghost")).toBeUndefined());
   });
 });

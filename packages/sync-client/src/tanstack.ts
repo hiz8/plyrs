@@ -17,6 +17,9 @@ interface SyncHandles {
   ) => void;
   commit: () => void;
   markReady: () => void;
+  // begin() で開いた進行中のトランザクションが無いと NoPendingSyncTransactionWriteError を
+  // 投げる（@tanstack/db 0.6.14, collection/sync.ts の実装）。begin → truncate → commit の順で呼ぶ。
+  truncate: () => void;
 }
 
 interface Entry {
@@ -88,6 +91,20 @@ export class CollectionRegistry {
     }
   }
 
+  // サーバーリセット（全再同期）時: 同期状態を空にしてから作り直す。
+  // これをしないと、リセット前に存在しサーバーから消えたレコードが永久に残る。
+  reset(): void {
+    for (const entry of this.entries.values()) {
+      const handles = entry.handles;
+      if (handles !== null) {
+        handles.begin();
+        handles.truncate();
+        handles.commit();
+      }
+      entry.syncedKeys.clear();
+    }
+  }
+
   applyStoreChange(change: StoreChange): void {
     const typeKey = change.kind === "upsert" ? change.record.type : change.typeKey;
     const entry = this.entries.get(typeKey);
@@ -118,15 +135,12 @@ export class CollectionRegistry {
     const push = async (record: SyncRecord, op: ClientChange["op"]): Promise<void> => {
       const previous = this.engine.store.get(record.id);
       const change = toChange(typeKey, record, op, previous);
-      // 楽観的オーバーレイはハンドラの解決で落ちるため、確定レコードを
-      // 同期状態にマージしてから resolve する（ちらつき防止）。
-      // ack が {ok:false} なら SyncRejectedError が throw され、tanstack-db が自動ロールバックする。
-      const confirmed = await this.engine.push(change);
-      this.applyStoreChange(
-        confirmed.deletedAt === null
-          ? { kind: "upsert", record: confirmed }
-          : { kind: "delete", recordId: confirmed.id, typeKey },
-      );
+      // ack が返るまで待つ（tanstack-db は楽観的オーバーレイをハンドラの解決で落とすため）。
+      // 確定レコードの同期状態へのマージは engine 側が担う: engine は ack 受信時に
+      // applyRecord → onStoreChange を呼んでから push の Promise を解決するので、
+      // ここで resolve した時点で既にマージ済み（二重書き込みを避ける）。
+      // 失敗 ack は SyncRejectedError として throw され、tanstack-db が自動ロールバックする。
+      await this.engine.push(change);
     };
 
     entry.collection = createCollection<SyncRecord, string>({

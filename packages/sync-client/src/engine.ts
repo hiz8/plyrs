@@ -21,6 +21,7 @@ export interface SyncEngineOptions {
   onContentTypes?: (types: ContentTypeDefinition[]) => void;
   onReady?: () => void;
   onStatus?: (status: SyncStatus) => void;
+  onReset?: () => void;
   refreshToken?: () => Promise<void>;
 }
 
@@ -106,6 +107,7 @@ export class SyncEngine {
         // ロードマップ §7: serverSeq が手元 checkpoint より小さい = サーバーリセット
         if (message.serverSeq < this.currentCheckpoint) {
           this.store.clear();
+          this.options.onReset?.();
           this.currentCheckpoint = 0;
           await this.storage.saveCheckpoint(0);
           this.sendHello();
