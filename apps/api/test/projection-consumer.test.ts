@@ -1,10 +1,18 @@
-import { createExecutionContext, createMessageBatch, getQueueResult } from "cloudflare:test";
+import {
+  createExecutionContext,
+  createMessageBatch,
+  getQueueResult,
+  runInDurableObject,
+} from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import worker from "../src/index";
+import { handleProjectionJob, upsertStatements } from "../src/projection/consumer";
 import type { ProjectionJob } from "../src/projection/jobs";
+import type { ProjectionPayload } from "../src/projection/payload";
+import type { TenantDO } from "../src/tenant-do";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
-import { asPublishResult, asWriteResult } from "./rpc-unwrap";
+import { asPublishResult, asUnpublishResult, asWriteResult } from "./rpc-unwrap";
 
 const QUEUE_NAME = "plyrs-projection";
 
@@ -34,11 +42,13 @@ interface ProjectedRow {
   slug: string | null;
   data: string;
   source_version: number;
+  publish_seq: number;
+  projected_at: number;
 }
 
 async function projected(tenantId: string, recordId: string): Promise<ProjectedRow | null> {
   return env.PROJECTION_DB.prepare(
-    "SELECT type, slug, data, source_version FROM projected_records WHERE tenant_id = ? AND record_id = ?",
+    "SELECT type, slug, data, source_version, publish_seq, projected_at FROM projected_records WHERE tenant_id = ? AND record_id = ?",
   )
     .bind(tenantId, recordId)
     .first<ProjectedRow>();
@@ -54,9 +64,33 @@ async function countRows(table: string, tenantId: string, recordId: string): Pro
   return row?.n ?? 0;
 }
 
+interface OutboxRow extends Record<string, SqlStorageValue> {
+  job_type: string;
+  source_version: number;
+  publish_seq: number;
+}
+
+// CRITICAL fix: 実際に DO が発行した publish_seq / source_version をテストが手組みせず読み出す。
+// 世代番号の割り当ては DO のコンストラクタ復元込みの内部状態に依存するため、ハードコードした
+// 番号は容易に嘘の前提になる（そしてこのバグ自体がまさにその手の思い込みで見逃されていた）。
+async function lastOutboxRow(stub: DurableObjectStub<TenantDO>): Promise<OutboxRow> {
+  return runInDurableObject(stub, async (_instance, state) => {
+    const rows = state.storage.sql
+      .exec<OutboxRow>(
+        "SELECT job_type, source_version, publish_seq FROM outbox ORDER BY rowid DESC LIMIT 1",
+      )
+      .toArray();
+    const row = rows[0];
+    if (row === undefined) {
+      throw new Error("no outbox row");
+    }
+    return row;
+  });
+}
+
 describe("projection consumer (design-spec §12.3)", () => {
   let tenantId: string;
-  let stub: DurableObjectStub<import("../src/tenant-do").TenantDO>;
+  let stub: DurableObjectStub<TenantDO>;
   const recordId = uuid(200);
 
   beforeEach(async () => {
@@ -72,7 +106,16 @@ describe("projection consumer (design-spec §12.3)", () => {
   });
 
   it("upserts the record, its relations, and its index rows, then acks", async () => {
-    const result = await deliver([{ jobType: "upsert", tenantId, recordId, sourceVersion: 1 }]);
+    const outboxRow = await lastOutboxRow(stub);
+    const result = await deliver([
+      {
+        jobType: "upsert",
+        tenantId,
+        recordId,
+        sourceVersion: outboxRow.source_version,
+        publishSeq: outboxRow.publish_seq,
+      },
+    ]);
     expect(result.explicitAcks).toStrictEqual(["m0"]);
     expect(result.retryMessages).toStrictEqual([]);
 
@@ -86,7 +129,14 @@ describe("projection consumer (design-spec §12.3)", () => {
   });
 
   it("is idempotent under redelivery (at-least-once)", async () => {
-    const job: ProjectionJob = { jobType: "upsert", tenantId, recordId, sourceVersion: 1 };
+    const outboxRow = await lastOutboxRow(stub);
+    const job: ProjectionJob = {
+      jobType: "upsert",
+      tenantId,
+      recordId,
+      sourceVersion: outboxRow.source_version,
+      publishSeq: outboxRow.publish_seq,
+    };
     await deliver([job]);
     await deliver([job]);
 
@@ -95,42 +145,107 @@ describe("projection consumer (design-spec §12.3)", () => {
   });
 
   it("ignores an upsert older than what is already projected (order guard)", async () => {
+    const v1 = await lastOutboxRow(stub);
     await stub.writeRecord(
       "article",
       { recordId, input: { ...validArticleInput(), title: "第2版" } },
       auth("owner1"),
     );
     await stub.publishRecord(tenantId, recordId, auth("owner1"));
+    const v2 = await lastOutboxRow(stub);
+    expect(v2.publish_seq).toBeGreaterThan(v1.publish_seq);
     // 新しい版（v2）が先に着き、古い版（v1）のジョブが遅れて届く
-    await deliver([{ jobType: "upsert", tenantId, recordId, sourceVersion: 2 }]);
-    await deliver([{ jobType: "upsert", tenantId, recordId, sourceVersion: 1 }]);
+    await deliver([
+      {
+        jobType: "upsert",
+        tenantId,
+        recordId,
+        sourceVersion: v2.source_version,
+        publishSeq: v2.publish_seq,
+      },
+    ]);
+    await deliver([
+      {
+        jobType: "upsert",
+        tenantId,
+        recordId,
+        sourceVersion: v1.source_version,
+        publishSeq: v1.publish_seq,
+      },
+    ]);
 
     const row = await projected(tenantId, recordId);
     expect(row?.source_version).toBe(2);
+    expect(row?.publish_seq).toBe(v2.publish_seq);
     expect(JSON.parse(row?.data ?? "{}")).toMatchObject({ title: "第2版" });
   });
 
   it("deletes the record and its side tables on an unpublish job", async () => {
-    await deliver([{ jobType: "upsert", tenantId, recordId, sourceVersion: 1 }]);
+    const upsertRow = await lastOutboxRow(stub);
+    await deliver([
+      {
+        jobType: "upsert",
+        tenantId,
+        recordId,
+        sourceVersion: upsertRow.source_version,
+        publishSeq: upsertRow.publish_seq,
+      },
+    ]);
     await stub.unpublishRecord(tenantId, recordId, auth("owner1"));
-    await deliver([{ jobType: "delete", tenantId, recordId, sourceVersion: 1 }]);
+    const deleteRow = await lastOutboxRow(stub);
+    await deliver([
+      {
+        jobType: "delete",
+        tenantId,
+        recordId,
+        sourceVersion: deleteRow.source_version,
+        publishSeq: deleteRow.publish_seq,
+      },
+    ]);
 
     expect(await projected(tenantId, recordId)).toBeNull();
     expect(await countRows("projected_relations", tenantId, recordId)).toBe(0);
     expect(await countRows("projection_index", tenantId, recordId)).toBe(0);
   });
 
-  it("ignores a delete whose version is older than the projection (republish won)", async () => {
-    await deliver([{ jobType: "upsert", tenantId, recordId, sourceVersion: 1 }]);
+  it("ignores a delete whose publish generation is older than the projection (republish won)", async () => {
+    const v1 = await lastOutboxRow(stub);
+    await deliver([
+      {
+        jobType: "upsert",
+        tenantId,
+        recordId,
+        sourceVersion: v1.source_version,
+        publishSeq: v1.publish_seq,
+      },
+    ]);
     await stub.writeRecord(
       "article",
       { recordId, input: { ...validArticleInput(), title: "第2版" } },
       auth("owner1"),
     );
     await stub.publishRecord(tenantId, recordId, auth("owner1"));
-    await deliver([{ jobType: "upsert", tenantId, recordId, sourceVersion: 2 }]);
-    // unpublish(v1) が遅れて届く — 既に republish(v2) が載っているので無視されなければならない
-    await deliver([{ jobType: "delete", tenantId, recordId, sourceVersion: 1 }]);
+    const v2 = await lastOutboxRow(stub);
+    await deliver([
+      {
+        jobType: "upsert",
+        tenantId,
+        recordId,
+        sourceVersion: v2.source_version,
+        publishSeq: v2.publish_seq,
+      },
+    ]);
+    // v1 相当の delete（unpublish → republish のレースを想定）が遅れて届く —
+    // 既に republish(v2) が載っているので無視されなければならない
+    await deliver([
+      {
+        jobType: "delete",
+        tenantId,
+        recordId,
+        sourceVersion: v1.source_version,
+        publishSeq: v1.publish_seq,
+      },
+    ]);
 
     expect(await projected(tenantId, recordId)).not.toBeNull();
   });
@@ -142,9 +257,223 @@ describe("projection consumer (design-spec §12.3)", () => {
       tenantId,
       recordId,
       sourceVersion: 1,
+      publishSeq: 1,
     } as unknown as ProjectionJob;
     const result = await deliver([bogus]);
     expect(result.explicitAcks).toStrictEqual([]);
     expect(result.retryMessages).toStrictEqual([{ msgId: "m0" }]);
+  });
+});
+
+describe("publish generation ordering — CRITICAL fix (レビュー指摘)", () => {
+  let tenantId: string;
+  let stub: DurableObjectStub<TenantDO>;
+  const recordId = uuid(201);
+
+  beforeEach(async () => {
+    tenantId = crypto.randomUUID();
+    stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    await stub.registerContentType(articleType(), auth("owner1"));
+    const written = asWriteResult(
+      await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
+    );
+    expect(written.ok).toBe(true);
+    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    expect(published.ok).toBe(true);
+  });
+
+  // records.version は publish/unpublish で変化しない。unpublish → 無編集で republish すると
+  // 同じ source_version の upsert/delete が 2 世代分アウトボックスに積まれ、Queues は配信順序を
+  // 保証しないため、遅れて届いた古い delete が現に公開中の republish 後の行を消してしまいうる
+  // （旧 source_version ガードに対しては FAIL することを修正前に確認済み — レポート参照）。
+  it("survives a stale unpublish-delete that arrives after a same-source-version republish", async () => {
+    const v1 = await lastOutboxRow(stub);
+    await deliver([
+      {
+        jobType: "upsert",
+        tenantId,
+        recordId,
+        sourceVersion: v1.source_version,
+        publishSeq: v1.publish_seq,
+      },
+    ]);
+    expect(await projected(tenantId, recordId)).not.toBeNull();
+
+    // unpublish → delete が積まれる。source_version は変わらないが、世代番号は新しく採られる。
+    const unpublished = asUnpublishResult(
+      await stub.unpublishRecord(tenantId, recordId, auth("owner1")),
+    );
+    expect(unpublished).toMatchObject({ ok: true, sourceVersion: v1.source_version });
+    const staleDelete = await lastOutboxRow(stub);
+    expect(staleDelete.source_version).toBe(v1.source_version);
+    expect(staleDelete.publish_seq).toBeGreaterThan(v1.publish_seq);
+
+    // 編集せずに republish → records.version（source_version）は変わらないが世代番号はさらに進む
+    const republished = asPublishResult(
+      await stub.publishRecord(tenantId, recordId, auth("owner1")),
+    );
+    expect(republished.ok).toBe(true);
+    if (republished.ok) {
+      // 曖昧さの核心: republish の source_version は unpublish 時点の delete と同じ番号
+      expect(republished.snapshot.sourceVersion).toBe(v1.source_version);
+    }
+    const republishRow = await lastOutboxRow(stub);
+    expect(republishRow.publish_seq).toBeGreaterThan(staleDelete.publish_seq);
+
+    // Cloudflare Queues は配信順序を保証しない: republish の upsert が先に届く
+    await deliver([
+      {
+        jobType: "upsert",
+        tenantId,
+        recordId,
+        sourceVersion: republishRow.source_version,
+        publishSeq: republishRow.publish_seq,
+      },
+    ]);
+    expect(await projected(tenantId, recordId)).not.toBeNull();
+
+    // ...そして unpublish 時点の delete が遅れて届く。source_version は republish 後の行と同じだが、
+    // 世代番号（publish_seq）は古い。
+    await deliver([
+      {
+        jobType: "delete",
+        tenantId,
+        recordId,
+        sourceVersion: staleDelete.source_version,
+        publishSeq: staleDelete.publish_seq,
+      },
+    ]);
+
+    // 現に公開中の行は生き残らなければならない
+    expect(await projected(tenantId, recordId)).not.toBeNull();
+  });
+});
+
+describe("upsertStatements — direct-call staleness guard (handleProjectionJob 越しでは検証できない)", () => {
+  // handleProjectionJob は常に DO から「生きた」ペイロードを取り直すため、古い世代のペイロードを
+  // 人為的に作って渡すことができない。ガードの本体（source_version/relations/index の張替え条件）を
+  // 直接検証するには upsertStatements() を単体で呼ぶしかない。
+  it("leaves a newer generation's data, relations, and index rows untouched when given a stale payload", async () => {
+    const liveTenantId = crypto.randomUUID();
+    const liveRecordId = uuid(300);
+
+    // 現行世代（publish_seq = 9）を直接 D1 に仕込む
+    await env.PROJECTION_DB.batch([
+      env.PROJECTION_DB.prepare(
+        `INSERT INTO projected_records
+           (tenant_id, record_id, type, slug, published_at, data, source_version, publish_seq, projected_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        liveTenantId,
+        liveRecordId,
+        "article",
+        "current-slug",
+        "2026-07-01T00:00:00.000Z",
+        JSON.stringify({ title: "現行版" }),
+        9,
+        9,
+        5_000,
+      ),
+      env.PROJECTION_DB.prepare(
+        `INSERT INTO projected_relations
+           (tenant_id, source_id, source_field, target_type, target_id, ordinal, origin)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(liveTenantId, liveRecordId, "authors", "author", "author-current", 0, "field"),
+      env.PROJECTION_DB.prepare(
+        `INSERT INTO projection_index
+           (tenant_id, type, field_key, value_text, value_num, value_date, record_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(liveTenantId, "article", "slug", "current-slug", null, null, liveRecordId),
+    ]);
+
+    // 古い世代（publish_seq = 3）のペイロードを手組みし、直接 upsertStatements() へ渡す
+    const stalePayload: ProjectionPayload = {
+      recordId: liveRecordId,
+      type: "article",
+      slug: "stale-slug",
+      publishedAt: "2020-01-01T00:00:00.000Z",
+      data: { title: "古い版" },
+      sourceVersion: 1,
+      publishSeq: 3,
+      relations: [
+        {
+          sourceField: "authors",
+          targetType: "author",
+          targetId: "author-stale",
+          ordinal: 0,
+          origin: "field",
+        },
+      ],
+      index: [{ fieldKey: "slug", valueText: "stale-slug", valueNum: null, valueDate: null }],
+    };
+
+    await env.PROJECTION_DB.batch(
+      upsertStatements(env.PROJECTION_DB, liveTenantId, stalePayload, 6_000),
+    );
+
+    const row = await projected(liveTenantId, liveRecordId);
+    expect(row).toMatchObject({
+      type: "article",
+      slug: "current-slug",
+      source_version: 9,
+      publish_seq: 9,
+      projected_at: 5_000,
+    });
+    expect(JSON.parse(row?.data ?? "{}")).toMatchObject({ title: "現行版" });
+
+    const relRows = await env.PROJECTION_DB.prepare(
+      "SELECT target_id FROM projected_relations WHERE tenant_id = ? AND source_id = ?",
+    )
+      .bind(liveTenantId, liveRecordId)
+      .all<{ target_id: string }>();
+    expect(relRows.results.map((r) => r.target_id)).toStrictEqual(["author-current"]);
+
+    const idxRows = await env.PROJECTION_DB.prepare(
+      "SELECT value_text FROM projection_index WHERE tenant_id = ? AND record_id = ?",
+    )
+      .bind(liveTenantId, liveRecordId)
+      .all<{ value_text: string | null }>();
+    expect(idxRows.results.map((r) => r.value_text)).toStrictEqual(["current-slug"]);
+  });
+});
+
+describe("projected_at refresh on redelivery — pins the >= guard (not >)", () => {
+  let tenantId: string;
+  let stub: DurableObjectStub<TenantDO>;
+  const recordId = uuid(202);
+
+  beforeEach(async () => {
+    tenantId = crypto.randomUUID();
+    stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    await stub.registerContentType(articleType(), auth("owner1"));
+    const written = asWriteResult(
+      await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
+    );
+    expect(written.ok).toBe(true);
+    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    expect(published.ok).toBe(true);
+  });
+
+  // 同一世代（同じ publish_seq）の再配信は at-least-once の下で普通に起こる。ガードが > だと
+  // 2 回目の配信が弾かれ projected_at が最初の配信時刻のまま古くなる。Task 7 の再投影
+  // mark-and-sweep は projected_at >= epoch を生存判定に使うため、それは生きている行を
+  // 誤って掃く事故になる。>= であることをここで直接固定する。
+  it("bumps projected_at when the same publish generation is redelivered", async () => {
+    const v1 = await lastOutboxRow(stub);
+    const job: ProjectionJob = {
+      jobType: "upsert",
+      tenantId,
+      recordId,
+      sourceVersion: v1.source_version,
+      publishSeq: v1.publish_seq,
+    };
+
+    await handleProjectionJob(env, job, 1_000);
+    const first = await projected(tenantId, recordId);
+    expect(first?.projected_at).toBe(1_000);
+
+    await handleProjectionJob(env, job, 2_000);
+    const second = await projected(tenantId, recordId);
+    expect(second?.projected_at).toBe(2_000);
   });
 });

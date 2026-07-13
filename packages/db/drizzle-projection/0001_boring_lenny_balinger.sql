@@ -1,0 +1,1 @@
+ALTER TABLE `projected_records` ADD `publish_seq` integer DEFAULT 0 NOT NULL;

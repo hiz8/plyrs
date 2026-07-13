@@ -2,11 +2,15 @@ import { asProjectionPayload } from "../rpc-unwrap";
 import type { ProjectionJob } from "./jobs";
 import type { ProjectionPayload } from "./payload";
 
-// version ガードの要:
-// 1) projected_records を「自分の version が現行以上のときだけ」条件付き upsert する。
-// 2) relations / index は「upsert 後に自分の version が現に載っているときだけ」張り替える。
+// 順序ガードの要（CRITICAL fix: publish_seq を使う。source_version は publish/unpublish で
+// 変化しないため順序トークンになれない — unpublish→無編集republish が同じ source_version の
+// upsert/delete を生み、Queues の配信順序非保証と組み合わさると新しい世代を古いジョブが消しうる）:
+// 1) projected_records を「自分の publish_seq が現行以上のときだけ」条件付き upsert する。
+// 2) relations / index は「upsert 後に自分の publish_seq が現に載っているときだけ」張り替える。
 // これで古いジョブは 1) で弾かれ、2) も EXISTS が偽になるため新しい投影を壊せない。
-// 再配信（同一 version）は 1) が >= で通り、2) も真になるので同じ内容を冪等に書き直す。
+// 再配信（同一 publish_seq）は 1) が >= で通り、2) も真になるので同じ内容を冪等に書き直す。
+// >= であって > ではない: 同一世代の再配信でも projected_at を更新する必要がある
+// （再投影の mark-and-sweep が projected_at >= epoch を生存判定に使うため。Task 7）。
 export function upsertStatements(
   db: D1Database,
   tenantId: string,
@@ -17,16 +21,17 @@ export function upsertStatements(
     db
       .prepare(
         `INSERT INTO projected_records
-           (tenant_id, record_id, type, slug, published_at, data, source_version, projected_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+           (tenant_id, record_id, type, slug, published_at, data, source_version, publish_seq, projected_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
          ON CONFLICT(tenant_id, record_id) DO UPDATE SET
            type = excluded.type,
            slug = excluded.slug,
            published_at = excluded.published_at,
            data = excluded.data,
            source_version = excluded.source_version,
+           publish_seq = excluded.publish_seq,
            projected_at = excluded.projected_at
-         WHERE excluded.source_version >= projected_records.source_version`,
+         WHERE excluded.publish_seq >= projected_records.publish_seq`,
       )
       .bind(
         tenantId,
@@ -36,6 +41,7 @@ export function upsertStatements(
         payload.publishedAt,
         JSON.stringify(payload.data),
         payload.sourceVersion,
+        payload.publishSeq,
         projectedAt,
       ),
     db
@@ -43,17 +49,17 @@ export function upsertStatements(
         `DELETE FROM projected_relations
          WHERE tenant_id = ?1 AND source_id = ?2
            AND EXISTS (SELECT 1 FROM projected_records
-                       WHERE tenant_id = ?1 AND record_id = ?2 AND source_version = ?3)`,
+                       WHERE tenant_id = ?1 AND record_id = ?2 AND publish_seq = ?3)`,
       )
-      .bind(tenantId, payload.recordId, payload.sourceVersion),
+      .bind(tenantId, payload.recordId, payload.publishSeq),
     db
       .prepare(
         `DELETE FROM projection_index
          WHERE tenant_id = ?1 AND record_id = ?2
            AND EXISTS (SELECT 1 FROM projected_records
-                       WHERE tenant_id = ?1 AND record_id = ?2 AND source_version = ?3)`,
+                       WHERE tenant_id = ?1 AND record_id = ?2 AND publish_seq = ?3)`,
       )
-      .bind(tenantId, payload.recordId, payload.sourceVersion),
+      .bind(tenantId, payload.recordId, payload.publishSeq),
   ];
 
   for (const relation of payload.relations) {
@@ -64,7 +70,7 @@ export function upsertStatements(
              (tenant_id, source_id, source_field, target_type, target_id, ordinal, origin)
            SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
            WHERE EXISTS (SELECT 1 FROM projected_records
-                         WHERE tenant_id = ?1 AND record_id = ?2 AND source_version = ?8)`,
+                         WHERE tenant_id = ?1 AND record_id = ?2 AND publish_seq = ?8)`,
         )
         .bind(
           tenantId,
@@ -74,7 +80,7 @@ export function upsertStatements(
           relation.targetId,
           relation.ordinal,
           relation.origin,
-          payload.sourceVersion,
+          payload.publishSeq,
         ),
     );
   }
@@ -87,7 +93,7 @@ export function upsertStatements(
              (tenant_id, type, field_key, value_text, value_num, value_date, record_id)
            SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
            WHERE EXISTS (SELECT 1 FROM projected_records
-                         WHERE tenant_id = ?1 AND record_id = ?7 AND source_version = ?8)`,
+                         WHERE tenant_id = ?1 AND record_id = ?7 AND publish_seq = ?8)`,
         )
         .bind(
           tenantId,
@@ -97,27 +103,29 @@ export function upsertStatements(
           indexRow.valueNum,
           indexRow.valueDate,
           payload.recordId,
-          payload.sourceVersion,
+          payload.publishSeq,
         ),
     );
   }
   return statements;
 }
 
-// §12.3: delete も version ガードする（unpublish 発行後に republish が先着した場合に消さない）
+// §12.3: delete も publish_seq でガードする（unpublish 発行後に republish が先着した場合に消さない。
+// CRITICAL fix: 以前は source_version でガードしていたが、それは publish/unpublish で変化しないため
+// 同一世代を装った古い delete が新しい世代を消せてしまっていた）
 export function deleteStatements(
   db: D1Database,
   tenantId: string,
   recordId: string,
-  sourceVersion: number,
+  publishSeq: number,
 ): D1PreparedStatement[] {
   return [
     db
       .prepare(
         `DELETE FROM projected_records
-         WHERE tenant_id = ?1 AND record_id = ?2 AND source_version <= ?3`,
+         WHERE tenant_id = ?1 AND record_id = ?2 AND publish_seq <= ?3`,
       )
-      .bind(tenantId, recordId, sourceVersion),
+      .bind(tenantId, recordId, publishSeq),
     db
       .prepare(
         `DELETE FROM projected_relations
@@ -163,7 +171,7 @@ export async function handleProjectionJob(
     }
     case "delete": {
       await env.PROJECTION_DB.batch(
-        deleteStatements(env.PROJECTION_DB, job.tenantId, job.recordId, job.sourceVersion),
+        deleteStatements(env.PROJECTION_DB, job.tenantId, job.recordId, job.publishSeq),
       );
       return;
     }

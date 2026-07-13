@@ -50,6 +50,7 @@ export interface PushDeps {
   nextSeq: () => number;
   now: () => string;
   newRelationId: () => string;
+  nextPublishSeq: () => number;
 }
 
 export interface PushOutcome {
@@ -95,7 +96,13 @@ export function handlePush(
     if (change.op === "delete") {
       // outbox 行の id 空間は relations と同じでよい（どちらも新規 uuidv7 の払い出しに過ぎない）
       const deleted = deleteRecordCore(
-        { sql: deps.sql, nextSeq: deps.nextSeq, now: deps.now, newId: deps.newRelationId },
+        {
+          sql: deps.sql,
+          nextSeq: deps.nextSeq,
+          now: deps.now,
+          newId: deps.newRelationId,
+          nextPublishSeq: deps.nextPublishSeq,
+        },
         change.recordId,
         auth.userId,
       );

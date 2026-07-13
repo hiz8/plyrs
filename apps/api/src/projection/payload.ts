@@ -23,7 +23,8 @@ export interface PublishedSnapshot {
   relations: ProjectionRelationRow[];
   publishedAt: string;
   publishedBy: string;
-  sourceVersion: number;
+  sourceVersion: number; // どの records.version を publish したか（参考情報。順序トークンではない）
+  publishSeq: number; // CRITICAL fix: 投影ジョブの順序ガード本体（DO 全体で単調な publish 世代番号）
 }
 
 // 投影 D1 の 3 テーブルへ書き込む全量（consumer はこれを D1 batch に落とすだけ）
@@ -33,7 +34,8 @@ export interface ProjectionPayload {
   slug: string | null;
   publishedAt: string;
   data: Record<string, unknown>;
-  sourceVersion: number;
+  sourceVersion: number; // 参考情報として projected_records に書く（順序ガードには使わない）
+  publishSeq: number; // CRITICAL fix: 投影ジョブの順序ガード本体
   relations: ProjectionRelationRow[];
   index: ProjectionIndexRow[];
 }
@@ -116,6 +118,7 @@ export function buildProjectionPayload(
     publishedAt: snapshot.publishedAt,
     data: snapshot.data,
     sourceVersion: snapshot.sourceVersion,
+    publishSeq: snapshot.publishSeq,
     relations: snapshot.relations,
     index: fields.flatMap((field) => indexRowsForField(field, snapshot.data)),
   };

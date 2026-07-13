@@ -14,7 +14,10 @@ export const projectedRecords = sqliteTable(
     slug: text("slug"),
     publishedAt: text("published_at").notNull(),
     data: text("data").notNull(), // JSON: 型固有フィールドは実カラムに昇格しない
-    sourceVersion: integer("source_version").notNull(), // 順序逆転ガード（§12.3）
+    sourceVersion: integer("source_version").notNull(), // どの records.version の投影か（参考情報）
+    // CRITICAL fix（レビュー指摘）: 順序逆転ガード本体（§12.3）。source_version は publish/unpublish で
+    // 変化しないため順序トークンになれない。DO 発行の単調な publish 世代番号をここに使う。
+    publishSeq: integer("publish_seq").notNull().default(0),
     projectedAt: integer("projected_at").notNull(), // epoch ms。再投影の mark-and-sweep 用
   },
   (table) => [

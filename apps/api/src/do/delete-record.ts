@@ -11,6 +11,7 @@ export interface DeleteDeps {
   nextSeq: () => number;
   now: () => string;
   newId: () => string;
+  nextPublishSeq: () => number;
 }
 
 // G2: 削除はトゥームストーン。row は同期の削除伝搬（Phase 4）のために残す。
@@ -41,7 +42,10 @@ export function deleteRecordCore(
   deps.sql.exec("DELETE FROM relations WHERE source_id = ?", recordId);
   // 裁定（2026-07-13）: 削除された実体が公開され続ける事故を構造的に防ぐ。
   // archive（ワークフロー軸）は仕様どおり強制 unpublish しない — delete だけが強制する。
-  cascadeUnpublish({ sql: deps.sql, now: () => now, newId: deps.newId }, recordId);
+  cascadeUnpublish(
+    { sql: deps.sql, now: () => now, newId: deps.newId, nextPublishSeq: deps.nextPublishSeq },
+    recordId,
+  );
   return {
     ok: true,
     record: { ...prev, deletedAt: now, updatedAt: now, updatedBy: actor, seq, version },

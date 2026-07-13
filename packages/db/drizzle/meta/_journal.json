@@ -15,6 +15,13 @@
       "when": 1783951375836,
       "tag": "0001_aromatic_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783955702785,
+      "tag": "0002_glorious_lightspeed",
+      "breakpoints": true
     }
   ]
 }

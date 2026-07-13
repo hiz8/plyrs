@@ -12,6 +12,10 @@ export interface PublishDeps {
   sql: SqlStorage;
   now: () => string;
   newId: () => string;
+  // CRITICAL fix（レビュー指摘）: records.version は publish/unpublish で変化しないため投影ジョブの
+  // 順序トークンになれない（unpublish→無編集republish が同じ version の upsert/delete を生む）。
+  // publish・unpublish は必ずこれで新しい世代番号を採る。
+  nextPublishSeq: () => number;
 }
 
 export type PublishResult =
@@ -30,6 +34,7 @@ interface RawSnapshotRow extends Record<string, SqlStorageValue> {
   published_at: string;
   published_by: string;
   source_version: number;
+  publish_seq: number;
 }
 
 function rowToSnapshot(row: RawSnapshotRow): PublishedSnapshot {
@@ -41,6 +46,7 @@ function rowToSnapshot(row: RawSnapshotRow): PublishedSnapshot {
     publishedAt: row.published_at,
     publishedBy: row.published_by,
     sourceVersion: row.source_version,
+    publishSeq: row.publish_seq,
   };
 }
 
@@ -80,6 +86,7 @@ export function publishRecordCore(
     return { ok: false, code: "record_deleted", message: `record is deleted: ${recordId}` };
   }
   const now = deps.now();
+  const publishSeq = deps.nextPublishSeq();
   const snapshot: PublishedSnapshot = {
     recordId,
     type: record.type,
@@ -88,9 +95,10 @@ export function publishRecordCore(
     publishedAt: now,
     publishedBy: actor,
     sourceVersion: record.version,
+    publishSeq,
   };
   deps.sql.exec(
-    "INSERT OR REPLACE INTO published_snapshots (record_id, type, data, relations, published_at, published_by, source_version) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    "INSERT OR REPLACE INTO published_snapshots (record_id, type, data, relations, published_at, published_by, source_version, publish_seq) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     snapshot.recordId,
     snapshot.type,
     JSON.stringify(snapshot.data),
@@ -98,8 +106,17 @@ export function publishRecordCore(
     snapshot.publishedAt,
     snapshot.publishedBy,
     snapshot.sourceVersion,
+    snapshot.publishSeq,
   );
-  enqueueOutbox(deps.sql, deps.newId(), "upsert", recordId, snapshot.sourceVersion, now);
+  enqueueOutbox(
+    deps.sql,
+    deps.newId(),
+    "upsert",
+    recordId,
+    snapshot.sourceVersion,
+    snapshot.publishSeq,
+    now,
+  );
   return { ok: true, snapshot };
 }
 
@@ -113,8 +130,19 @@ export function unpublishRecordCore(deps: PublishDeps, recordId: string): Unpubl
     return { ok: false, code: "not_published", message: `record is not published: ${recordId}` };
   }
   deps.sql.exec("DELETE FROM published_snapshots WHERE record_id = ?", recordId);
-  // §12.3: delete ジョブにも発行時点の version を載せる（遅れて届いた delete が republish を消さないため）
-  enqueueOutbox(deps.sql, deps.newId(), "delete", recordId, row.source_version, deps.now());
+  // CRITICAL fix: delete ジョブには snapshot の publish_seq を使い回さず、必ず新しい世代番号を採る。
+  // これにより「後から republish された upsert」は常にこの delete より新しい番号を持ち、
+  // 遅れて届いた delete が republish 後の投影行を消せなくなる（§12.3）。
+  const publishSeq = deps.nextPublishSeq();
+  enqueueOutbox(
+    deps.sql,
+    deps.newId(),
+    "delete",
+    recordId,
+    row.source_version,
+    publishSeq,
+    deps.now(),
+  );
   return { ok: true, recordId, sourceVersion: row.source_version };
 }
 

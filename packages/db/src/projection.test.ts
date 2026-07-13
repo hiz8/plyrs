@@ -20,4 +20,11 @@ describe("@plyrs/db projection schema", () => {
     expect(projectionIndex.valueNum).toBeDefined();
     expect(projectionIndex.valueDate).toBeDefined();
   });
+
+  // CRITICAL fix（レビュー指摘）: source_version は publish/unpublish で変化しないため投影の
+  // 順序ガードに使えない。DO 発行の単調な publish 世代番号を別カラムで持つ。
+  it("gives projected_records a monotonic publish generation, separate from source_version", () => {
+    expect(projectedRecords.sourceVersion).toBeDefined();
+    expect(projectedRecords.publishSeq).toBeDefined();
+  });
 });

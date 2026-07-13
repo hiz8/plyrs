@@ -68,7 +68,11 @@ export const publishedSnapshots = sqliteTable("published_snapshots", {
   relations: text("relations").notNull(), // publish 時点の関係の凍結投影（JSON）
   publishedAt: text("published_at").notNull(),
   publishedBy: text("published_by").notNull(),
-  sourceVersion: integer("source_version").notNull(), // どの records.version を publish したか
+  sourceVersion: integer("source_version").notNull(), // どの records.version を publish したか（参考情報。順序トークンではない）
+  // CRITICAL fix（レビュー指摘）: records.version は publish/unpublish で変化しないため順序トークンに
+  // なれない（unpublish→無編集republish が同じ version の upsert/delete を生む）。DO 全体で単調な
+  // 世代カウンタを別途持ち、投影の順序ガードはこちらを使う。
+  publishSeq: integer("publish_seq").notNull().default(0),
 });
 
 // design-spec §12.3: アウトボックス。DO コミットと投影 D1 書き込みの dual-write を分離する。
@@ -78,7 +82,8 @@ export const outbox = sqliteTable(
     id: text("id").primaryKey(), // uuidv7
     jobType: text("job_type").notNull(), // 'upsert' | 'delete'
     recordId: text("record_id").notNull(),
-    sourceVersion: integer("source_version").notNull(),
+    sourceVersion: integer("source_version").notNull(), // 参考情報。順序トークンではない（上記参照）
+    publishSeq: integer("publish_seq").notNull().default(0), // 投影ジョブの順序ガード本体
     enqueuedAt: text("enqueued_at").notNull(),
     sent: integer("sent").notNull().default(0), // 送出済みフラグ（0 | 1）
   },

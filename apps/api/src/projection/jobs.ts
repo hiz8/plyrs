@@ -4,14 +4,17 @@ export interface UpsertJob {
   jobType: "upsert";
   tenantId: string;
   recordId: string;
-  sourceVersion: number;
+  sourceVersion: number; // 参考情報（どの records.version の publish か）。順序ガードには使わない
+  // CRITICAL fix: 投影の順序ガード本体。DO 発行の単調な publish 世代番号（source_version とは別物）。
+  publishSeq: number;
 }
 
 export interface DeleteJob {
   jobType: "delete";
   tenantId: string;
   recordId: string;
-  sourceVersion: number;
+  sourceVersion: number; // 参考情報
+  publishSeq: number; // CRITICAL fix: 投影の順序ガード本体
 }
 
 // §12.3b: テナント単位の再投影。cursor で自己連鎖し、epoch より古い投影行を最後に掃く。

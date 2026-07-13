@@ -8,6 +8,13 @@
       "when": 1783950816766,
       "tag": "0000_striped_stryfe",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1783955711208,
+      "tag": "0001_boring_lenny_balinger",
+      "breakpoints": true
     }
   ]
 }

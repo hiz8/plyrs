@@ -40,6 +40,11 @@ export class TenantDO extends DurableObject<Env> {
   private readonly db: DrizzleSqliteDODatabase<typeof schema>;
   // DO 全体の単調 seq（G2）。single-writer なのでメモリ保持 + 起動時復元で十分
   private seq = 0;
+  // CRITICAL fix（レビュー指摘）: 投影ジョブの順序トークン専用の単調カウンタ。records.version は
+  // publish/unpublish で変化しないため順序トークンになれない（unpublish→無編集republish が同じ
+  // version の upsert/delete を生み、Queues の配信順序非保証と組み合わさると事故る）。
+  // publish・unpublish（cascade 含む）は必ずこれで新しい世代番号を採る。
+  private publishSeq = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -50,6 +55,18 @@ export class TenantDO extends DurableObject<Env> {
         .exec<{ max_seq: number | null }>("SELECT MAX(seq) AS max_seq FROM records")
         .one();
       this.seq = row.max_seq ?? 0;
+      // published_snapshots と outbox の双方の MAX を取る: unpublish は snapshot 行を消すが
+      // その delete の outbox 行は残る（sent=1 でも purge されるまでは残る）ため、snapshot 側
+      // だけを見ると番号を巻き戻して再発行し、このバグを再び開けてしまう。
+      const snapshotMax = ctx.storage.sql
+        .exec<{ max_seq: number | null }>(
+          "SELECT MAX(publish_seq) AS max_seq FROM published_snapshots",
+        )
+        .one().max_seq;
+      const outboxMax = ctx.storage.sql
+        .exec<{ max_seq: number | null }>("SELECT MAX(publish_seq) AS max_seq FROM outbox")
+        .one().max_seq;
+      this.publishSeq = Math.max(snapshotMax ?? 0, outboxMax ?? 0);
     });
     // ping/pong を DO を起こさずに返す（design-spec §3 のハイバネーション前提）
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(KEEPALIVE_PING, KEEPALIVE_PONG));
@@ -133,6 +150,7 @@ export class TenantDO extends DurableObject<Env> {
           nextSeq: () => ++this.seq,
           now: () => new Date().toISOString(),
           newId: () => uuidv7(),
+          nextPublishSeq: () => ++this.publishSeq,
         },
         recordId,
         auth.userId,
@@ -167,6 +185,7 @@ export class TenantDO extends DurableObject<Env> {
           sql: this.ctx.storage.sql,
           now: () => new Date().toISOString(),
           newId: () => uuidv7(),
+          nextPublishSeq: () => ++this.publishSeq,
         },
         recordId,
         auth.userId,
@@ -186,6 +205,7 @@ export class TenantDO extends DurableObject<Env> {
           sql: this.ctx.storage.sql,
           now: () => new Date().toISOString(),
           newId: () => uuidv7(),
+          nextPublishSeq: () => ++this.publishSeq,
         },
         recordId,
       );
@@ -314,6 +334,7 @@ export class TenantDO extends DurableObject<Env> {
               nextSeq: () => ++this.seq,
               now: () => new Date().toISOString(),
               newRelationId: () => uuidv7(),
+              nextPublishSeq: () => ++this.publishSeq,
             },
             parsed.changes,
             { userId: auth.userId, role: auth.role },

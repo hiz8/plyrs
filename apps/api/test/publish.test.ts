@@ -1,4 +1,4 @@
-import { runInDurableObject } from "cloudflare:test";
+import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
@@ -195,6 +195,43 @@ describe("outbox rows (design-spec §12.3)", () => {
       const n = state.storage.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM outbox").one().n;
       expect(n).toBe(0);
     });
+  });
+
+  // CRITICAL fix（レビュー指摘）: publish_seq の起動時復元は published_snapshots と outbox の
+  // 両方の MAX を取らねばならない。unpublish は snapshot 行を消すので、snapshot 側だけを見て
+  // 復元すると番号が 0 に巻き戻り、republish が既に送出済みの delete と同じ番号を再び採ってしまい
+  // このバグを再び開けてしまう。
+  it("restores publish_seq from outbox after eviction even when published_snapshots is empty", async () => {
+    const published = asPublishResult(await stub.publishRecord(TENANT, uuid(100), auth("owner1")));
+    expect(published.ok).toBe(true);
+    const unpublished = asUnpublishResult(
+      await stub.unpublishRecord(TENANT, uuid(100), auth("owner1")),
+    );
+    expect(unpublished.ok).toBe(true);
+
+    // この時点で published_snapshots は空。snapshot 側だけを見ると MAX は 0 に巻き戻る。
+    await runInDurableObject(stub, async (_instance, state) => {
+      const n = state.storage.sql
+        .exec<{ n: number }>("SELECT COUNT(*) AS n FROM published_snapshots")
+        .one().n;
+      expect(n).toBe(0);
+      const maxSeq = state.storage.sql
+        .exec<{ max_seq: number | null }>("SELECT MAX(publish_seq) AS max_seq FROM outbox")
+        .one().max_seq;
+      expect(maxSeq).toBe(2); // upsert(1) + delete(2)
+    });
+
+    await evictDurableObject(stub, { webSockets: "hibernate" });
+
+    const republished = asPublishResult(
+      await stub.publishRecord(TENANT, uuid(100), auth("owner1")),
+    );
+    expect(republished.ok).toBe(true);
+    if (republished.ok) {
+      // 巻き戻っていれば republish は publish_seq=1 を再び採り、送出済みの upsert(v1) と同じ番号の
+      // delete(v1) を消せなくする順序ガードが機能しなくなる
+      expect(republished.snapshot.publishSeq).toBeGreaterThan(2);
+    }
   });
 });
 

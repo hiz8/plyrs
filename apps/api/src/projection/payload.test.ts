@@ -39,6 +39,7 @@ function snapshot(data: Record<string, unknown>): PublishedSnapshot {
     publishedAt: "2026-07-13T00:00:00.000Z",
     publishedBy: "u1",
     sourceVersion: 3,
+    publishSeq: 5,
   };
 }
 
@@ -115,7 +116,7 @@ describe("buildProjectionPayload", () => {
     expect(payload.slug).toBeNull();
   });
 
-  it("carries the record, relations, and source version through unchanged", () => {
+  it("carries the record, relations, source version, and publish seq through unchanged", () => {
     const payload = buildProjectionPayload(fields, snapshot({ slug: "hello", title: "t" }));
     expect(payload).toMatchObject({
       recordId: "r1",
@@ -123,6 +124,7 @@ describe("buildProjectionPayload", () => {
       slug: "hello",
       publishedAt: "2026-07-13T00:00:00.000Z",
       sourceVersion: 3,
+      publishSeq: 5,
       data: { slug: "hello", title: "t" },
     });
     expect(payload.relations).toStrictEqual([
