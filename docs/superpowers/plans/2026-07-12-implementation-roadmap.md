@@ -77,7 +77,7 @@ Phase 2 の詳細計画で最終確定する。
 | 2 | `2026-07-12-phase2-do-write-path.md` | 完了（2026-07-13 main へマージ） |
 | 3 | `2026-07-13-phase3-control-plane-auth.md` | 完了（2026-07-13 main へマージ） |
 | 4a | `2026-07-13-phase4a-sync-server.md` | 完了（2026-07-13 main へマージ） |
-| 4b | `2026-07-13-phase4b-sync-client.md` | 計画済み（クライアント同期エンジン: コア + tanstack-db アダプタ） |
+| 4b | `2026-07-13-phase4b-sync-client.md` | 完了（2026-07-13 main へマージ） |
 | 5〜10 | 各フェーズ着手時に作成 | 未着手 |
 
 ---
@@ -196,3 +196,29 @@ Phase 4a（同期サーバー）完了。168 tests green、最終レビュー「
 - `handleHello` は全バックログをメモリに実体化してから送る。リッチテキスト肥大時は WS メッセージ上限に当たりうる → 将来バイト量ベースのページングへ。
 - DO の `fetch()` は upgrade ヘッダのみ検査しパスを見ない（現状 Worker からの唯一の呼び出しが `/sync` のため安全）。
 - 内部ヘッダ `x-plyrs-auth` の実行時形状検証は無し（呼び出し元が1箇所で信頼できるため。増えるなら zod 検証を入れる）。
+
+---
+
+## 8. Phase 4b 完了時の申し送り（最終レビュー 2026-07-13）
+
+Phase 4b（クライアント同期エンジン）完了。236 tests green、最終レビュー「マージ可」。`packages/sync-client` は依存フリーのコア（transport seam / 冪等ストア / アウトボックス / プロトコル状態機械）+ 隔離された tanstack-db アダプタ + partysocket ブラウザトランスポート。**実 DO との e2e（workerd 上で実エンジンを駆動）で疎通を実証済み**。
+
+**Phase 6（管理画面）が守るべき配線契約（5点・全部必須）:**
+
+1. `onContentTypes → registry.sync` / `onReady → registry.markReady`（**呼ばないと live query が永久待機**）/ `onStoreChange → registry.applyStoreChange`（**未配線だと確定レコードがコレクションに載らず、保存した編集が消えたように見える**）/ `onReset → registry.reset`（未配線だとサーバーリセット後にゴーストが残る）。engine ↔ registry の循環は `let registry!` の前方参照で解く。
+2. **ステータスの意味論**: `"closed"` は「stop() した」「オフライン（アウトボックス温存・push promise は保留）」「4003 で拒否（アウトボックス棄却・promise reject）」の3つを兼ねる。区別が必要なら push promise の reject 有無で判別するか、engine 側にステータス分離を先に入れる。
+3. **再開トリガはアプリの責務**: バックオフ枯渇後・オフライン後に自動再開はしない。`online` イベント / visibilitychange / 再試行ボタンで **`start()` を再度呼ぶ**（アウトボックスは温存されており、ready 後に自動再送される）。`start()` は "ready" 前に resolve するので UI は `onStatus` を待つこと。
+4. **耐久ストレージを実装する場合**: `SyncStorage` は checkpoint とアウトボックスのみを永続化する。**レコードも永続化するなら、`start()` の前に `engine.store.apply(record)` でシードすること**（さもないと空ストアガードが checkpoint を破棄し、毎回フル再同期になる — 安全側だが帯域を浪費）。
+5. **競合 UI**: 再送は at-least-once。conflict ack が「実は成功済みの自分の変更」に返ることがある（ack 消失後の再送）。警告を出す前に手元 store の最新 record と突き合わせること。
+
+**未解決の設計課題（Phase 6 着手前に裁定）:**
+
+- **同一レコードへの連続編集が自分自身と競合する**: ack 未着のまま同じ record を再編集すると、2回目の `baseFieldVersions` が古いままサーバーに届き、richtext は conflict 裁定でロールバック＝**直前の打鍵が UI から消える**（リッチテキストのオートセーブで常態化しうる）。対策案: レコード単位で push を直列化する、または ack の確定 `fieldVersions` で未送信 change を rebase する。
+- half-open ソケット（close も ack も来ない）を検知する仕組みが無い（keepalive のタイムアウト検知が未実装）。
+
+**@tanstack/db（BETA 0.6.14、exact pin）更新時の注意:**
+
+- `startSync: true` は**必須**（既定 false。無いと `sync()` が発火せず適用が永久 no-op になる silent failure）。
+- 楽観的更新の確定は**ハンドラの Promise 解決**で起こる（同期ストリームのエコーを待たない）。ちらつき防止はライブラリの persisting-transaction 遅延が担保しており、手動マージは不要（入れると二重書き込みになる）。
+- 削除の同期状態書き込みは `DeleteKeyMessage`（キーのみ、`value` 無し）。**`collection.get()` は楽観的オーバーレイ越しの見え方**なので「同期状態に存在するか」の判定に使ってはならない（アダプタは自前の `syncedKeys` で追跡している）。
+- アダプタは `@plyrs/sync-client/tanstack` サブパス。ルート import では BETA ライブラリを評価しない。
