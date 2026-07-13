@@ -10,7 +10,11 @@ import type { StoreChange } from "./store";
 
 interface SyncHandles {
   begin: () => void;
-  write: (message: { type: "insert" | "update" | "delete"; value: SyncRecord }) => void;
+  // 実 API（ChangeMessageOrDeleteKeyMessage<T, TKey>）は insert/update に value（key 無し、
+  // getKey から導出される）を、delete には value 抜きで key のみを要求する（DeleteKeyMessage）。
+  write: (
+    message: { type: "insert" | "update"; value: SyncRecord } | { type: "delete"; key: string },
+  ) => void;
   commit: () => void;
   markReady: () => void;
 }
@@ -18,6 +22,9 @@ interface SyncHandles {
 interface Entry {
   collection: Collection<SyncRecord, string>;
   handles: SyncHandles | null;
+  // 同期状態に書き込んだキー。collection.get() は楽観的オーバーレイ越しの見え方であり、
+  // 「同期状態に存在するか」とは別物なので、判定にはこちらを使う。
+  syncedKeys: Set<string>;
 }
 
 function toChange(
@@ -90,13 +97,13 @@ export class CollectionRegistry {
     }
     handles.begin();
     if (change.kind === "upsert") {
-      const exists = entry.collection.get(change.record.id) !== undefined;
+      const exists = entry.syncedKeys.has(change.record.id);
       handles.write({ type: exists ? "update" : "insert", value: change.record });
-    } else {
-      const existing = entry.collection.get(change.recordId);
-      if (existing !== undefined) {
-        handles.write({ type: "delete", value: existing });
-      }
+      entry.syncedKeys.add(change.record.id);
+    } else if (entry.syncedKeys.has(change.recordId)) {
+      // 削除は同期状態に書き込んだキーに対してのみ発行する
+      handles.write({ type: "delete", key: change.recordId });
+      entry.syncedKeys.delete(change.recordId);
     }
     handles.commit();
   }
@@ -105,6 +112,7 @@ export class CollectionRegistry {
     const entry: Entry = {
       collection: undefined as unknown as Collection<SyncRecord, string>,
       handles: null,
+      syncedKeys: new Set(),
     };
 
     const push = async (record: SyncRecord, op: ClientChange["op"]): Promise<void> => {

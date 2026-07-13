@@ -163,4 +163,48 @@ describe("CollectionRegistry", () => {
     await expect(tx?.isPersisted.promise).rejects.toBeDefined();
     expect(collection?.get("bad")).toBeUndefined();
   });
+
+  it("removes the record for good when a delete is pushed and acked", async () => {
+    registry.sync([articleType]);
+    registry.markReady();
+    registry.applyStoreChange({ kind: "upsert", record: record() });
+    expect(registry.get("article")?.get("r1")).toBeDefined();
+
+    const pushSpy = vi.spyOn(engine, "push");
+    const collection = registry.get("article");
+    const tx = collection?.delete("r1");
+
+    await vi.waitFor(() => expect(pushSpy).toHaveBeenCalledTimes(1));
+    const pushed = pushSpy.mock.calls[0]?.[0];
+    expect(pushed?.op).toBe("delete");
+
+    socket.emit("message", {
+      data: JSON.stringify({
+        type: "ack",
+        changeId: pushed?.changeId,
+        result: {
+          ok: true,
+          record: record({ seq: 9, deletedAt: "2026-07-13T02:00:00Z", input: {} }),
+        },
+      }),
+    });
+
+    await tx?.isPersisted.promise;
+    // 確定した削除が同期状態に反映され、レコードが復活しない
+    expect(collection?.get("r1")).toBeUndefined();
+    await vi.waitFor(() => expect(collection?.get("r1")).toBeUndefined());
+  });
+
+  it("classifies a remote upsert for an already-synced key as an update", () => {
+    registry.sync([articleType]);
+    registry.markReady();
+    registry.applyStoreChange({ kind: "upsert", record: record({ seq: 1 }) });
+    expect(() =>
+      registry.applyStoreChange({
+        kind: "upsert",
+        record: record({ seq: 2, input: { title: "v2" } }),
+      }),
+    ).not.toThrow();
+    expect(registry.get("article")?.get("r1")?.input["title"]).toBe("v2");
+  });
 });
