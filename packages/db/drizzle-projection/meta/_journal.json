@@ -15,6 +15,13 @@
       "when": 1783955711208,
       "tag": "0001_boring_lenny_balinger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783961982166,
+      "tag": "0002_slow_wasp",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,11 @@
 import { getTableName } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { projectedRecords, projectedRelations, projectionIndex } from "./projection";
+import {
+  projectedRecords,
+  projectedRelations,
+  projectionIndex,
+  projectionTombstones,
+} from "./projection";
 
 describe("@plyrs/db projection schema", () => {
   it("defines the three projection tables from design-spec §12.2", () => {
@@ -26,5 +31,17 @@ describe("@plyrs/db projection schema", () => {
   it("gives projected_records a monotonic publish generation, separate from source_version", () => {
     expect(projectedRecords.sourceVersion).toBeDefined();
     expect(projectedRecords.publishSeq).toBeDefined();
+  });
+
+  // CRITICAL fix（レビュー指摘）: projected_records の行が既に消えているとき、INSERT 側には
+  // publish_seq ガードが効かない。別テーブルの墓標で「この publish_seq 以下はもう有効な公開
+  // ではない」を保持し、INSERT 側にもガードをかける。projected_records に "unpublished" フラグを
+  // 足さない設計（公開読み取り API がフィルタし忘れると非公開データが漏れるため）。
+  it("keeps unpublish tombstones in a table of their own, separate from projected_records", () => {
+    expect(getTableName(projectionTombstones)).toBe("projection_tombstones");
+    expect(projectionTombstones.tenantId).toBeDefined();
+    expect(projectionTombstones.recordId).toBeDefined();
+    expect(projectionTombstones.publishSeq).toBeDefined();
+    expect(projectionTombstones.tombstonedAt).toBeDefined();
   });
 });

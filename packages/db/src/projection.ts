@@ -28,6 +28,27 @@ export const projectedRecords = sqliteTable(
   ],
 );
 
+// CRITICAL fix（レビュー指摘。probe で再現済み）: projected_records の upsert は ON CONFLICT の
+// UPDATE 枝でしか publish_seq ガードが効かない。行が既に消えている（unpublish 済み）ときは
+// 無条件 INSERT になるため、ページ読み取り後に unpublish が先着した再投影の書き込みが、消えた
+// はずのレコードを平文 INSERT で復活させてしまう。この墓標テーブルで「この publish_seq 以下の
+// 書き込みはもう有効な公開ではない」という事実を projected_records とは別に保持し、INSERT 側にも
+// ガードをかける。
+// あえて projected_records に「unpublished」フラグを足さない: Phase 5b の公開読み取り API は
+// projected_records を直接読む。同テーブルにフラグを足すと、どこか 1 箇所のクエリがフィルタを
+// 忘れただけで非公開データが漏れる。別テーブルなら「行が無ければ見えない」という構造そのものが
+// フェイルセーフになる。
+export const projectionTombstones = sqliteTable(
+  "projection_tombstones",
+  {
+    tenantId: text("tenant_id").notNull(),
+    recordId: text("record_id").notNull(),
+    publishSeq: integer("publish_seq").notNull(),
+    tombstonedAt: integer("tombstoned_at").notNull(), // epoch ms。再投影 sweep の GC 基準
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.recordId] })],
+);
+
 export const projectedRelations = sqliteTable(
   "projected_relations",
   {

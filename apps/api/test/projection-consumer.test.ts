@@ -12,7 +12,13 @@ import type { ProjectionJob } from "../src/projection/jobs";
 import type { ProjectionPayload } from "../src/projection/payload";
 import type { TenantDO } from "../src/tenant-do";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
-import { asPublishResult, asUnpublishResult, asWriteResult } from "./rpc-unwrap";
+import {
+  asProjectionPayload,
+  asPublishedPage,
+  asPublishResult,
+  asUnpublishResult,
+  asWriteResult,
+} from "./rpc-unwrap";
 
 const QUEUE_NAME = "plyrs-projection";
 
@@ -475,5 +481,187 @@ describe("projected_at refresh on redelivery — pins the >= guard (not >)", () 
     await handleProjectionJob(env, job, 2_000);
     const second = await projected(tenantId, recordId);
     expect(second?.projected_at).toBe(2_000);
+  });
+});
+
+// CRITICAL fix（レビュー指摘、probe で再現済み）: upsertStatements() の projected_records 書き込みは
+// ON CONFLICT の UPDATE 枝だけを publish_seq でガードしており、行が既に消えている（unpublish 済み）
+// ときは無条件 INSERT になる。再投影がページを読んだ「後」に unpublish の delete ジョブが先着すると、
+// 古い publish_seq を運ぶ再投影の書き込みが平文 INSERT として着地し、消えたはずのレコードを
+// 復活させてしまう。relations/index の EXISTS ガードは書き込み後の状態を見るため、この復活した行が
+// 存在する限り一緒に張り替わってしまう（防波堤にならない）。
+describe("resurrection race — a stale write must not undo a delete (CRITICAL fix)", () => {
+  it("[race a] blocks a stale upsertStatements() call after the delete already landed (incremental path)", async () => {
+    const tenantId = crypto.randomUUID();
+    const recordId = uuid(1000);
+    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    await stub.registerContentType(articleType(), auth("owner1"));
+    const written = asWriteResult(
+      await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
+    );
+    expect(written.ok).toBe(true);
+    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    expect(published.ok).toBe(true);
+
+    // 「再投影がページを読んだ」瞬間を模す: この時点ではまだ公開中（publish_seq 1）。
+    // stalePayload はこの後 unpublish が起きたことを知らない。
+    const stalePayload = asProjectionPayload(await stub.getProjectionPayload(recordId));
+    if (stalePayload === null) {
+      throw new Error("test setup invariant: record must be projectable right after publish");
+    }
+
+    // ここで編集者が unpublish する。delete ジョブが（再投影の書き込みより）先に届く。
+    const unpublished = asUnpublishResult(
+      await stub.unpublishRecord(tenantId, recordId, auth("owner1")),
+    );
+    expect(unpublished.ok).toBe(true);
+    const deleteRow = await lastOutboxRow(stub);
+    await deliver([
+      {
+        jobType: "delete",
+        tenantId,
+        recordId,
+        sourceVersion: deleteRow.source_version,
+        publishSeq: deleteRow.publish_seq,
+      },
+    ]);
+    expect(await projected(tenantId, recordId)).toBeNull();
+
+    // 遅れて届いた再投影由来の（stale な）書き込みを、consumer が実際に使う関数で直接再生する。
+    await env.PROJECTION_DB.batch(
+      upsertStatements(env.PROJECTION_DB, tenantId, stalePayload, Date.now()),
+    );
+
+    // 消えたレコードが復活していてはならない（relations/index も同様）
+    expect(await projected(tenantId, recordId)).toBeNull();
+    expect(await countRows("projected_relations", tenantId, recordId)).toBe(0);
+    expect(await countRows("projection_index", tenantId, recordId)).toBe(0);
+  });
+
+  it("[race b] blocks a stale reprojection page-read from resurrecting the record", async () => {
+    const tenantId = crypto.randomUUID();
+    const liveRecordId = uuid(1001);
+    const otherRecordId = uuid(1002);
+    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    await stub.registerContentType(articleType(), auth("owner1"));
+
+    for (const [n, recordId] of [
+      [1001, liveRecordId],
+      [1002, otherRecordId],
+    ] as const) {
+      const written = asWriteResult(
+        await stub.writeRecord(
+          "article",
+          { recordId, input: { ...validArticleInput(), slug: `s-${n}` } },
+          auth("owner1"),
+        ),
+      );
+      expect(written.ok).toBe(true);
+      const published = asPublishResult(
+        await stub.publishRecord(tenantId, recordId, auth("owner1")),
+      );
+      expect(published.ok).toBe(true);
+    }
+
+    // handleReprojectJob が内部で行う「ページ読み取り」そのものを再現する
+    // （getPublishedPage は reproject 経路専用の DO RPC）。この時点では両方とも公開中。
+    const page = asPublishedPage(await stub.getPublishedPage(null, 50));
+    expect(new Set(page.payloads.map((p) => p.recordId))).toStrictEqual(
+      new Set([liveRecordId, otherRecordId]),
+    );
+
+    // 実際の unpublish が先に走り、delete ジョブが（reproject の書き込みより）先に届く。
+    const unpublished = asUnpublishResult(
+      await stub.unpublishRecord(tenantId, liveRecordId, auth("owner1")),
+    );
+    expect(unpublished.ok).toBe(true);
+    const deleteRow = await lastOutboxRow(stub);
+    await deliver([
+      {
+        jobType: "delete",
+        tenantId,
+        recordId: liveRecordId,
+        sourceVersion: deleteRow.source_version,
+        publishSeq: deleteRow.publish_seq,
+      },
+    ]);
+    expect(await projected(tenantId, liveRecordId)).toBeNull();
+
+    // handleReprojectJob の書き込みループそのもの（ページの各 payload に upsertStatements を掛けて
+    // batch する）を、キャプチャした stale なページに対して再生する。
+    for (const payload of page.payloads) {
+      await env.PROJECTION_DB.batch(
+        upsertStatements(env.PROJECTION_DB, tenantId, payload, Date.now()),
+      );
+    }
+
+    // unpublish 済みの方は復活していない
+    expect(await projected(tenantId, liveRecordId)).toBeNull();
+    expect(await countRows("projected_relations", tenantId, liveRecordId)).toBe(0);
+    expect(await countRows("projection_index", tenantId, liveRecordId)).toBe(0);
+    // レースに無関係だったもう片方は普通に投影される
+    expect(await projected(tenantId, otherRecordId)).not.toBeNull();
+  });
+
+  it("[race c] a republish (higher publish_seq) clears the tombstone left by the preceding unpublish", async () => {
+    const tenantId = crypto.randomUUID();
+    const recordId = uuid(1003);
+    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    await stub.registerContentType(articleType(), auth("owner1"));
+    const written = asWriteResult(
+      await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
+    );
+    expect(written.ok).toBe(true);
+    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    expect(published.ok).toBe(true);
+    const v1 = await lastOutboxRow(stub);
+    await deliver([
+      {
+        jobType: "upsert",
+        tenantId,
+        recordId,
+        sourceVersion: v1.source_version,
+        publishSeq: v1.publish_seq,
+      },
+    ]);
+    expect(await projected(tenantId, recordId)).not.toBeNull();
+
+    // unpublish → delete ジョブ（墓標が立つ）
+    const unpublished = asUnpublishResult(
+      await stub.unpublishRecord(tenantId, recordId, auth("owner1")),
+    );
+    expect(unpublished.ok).toBe(true);
+    const deleteRow = await lastOutboxRow(stub);
+    await deliver([
+      {
+        jobType: "delete",
+        tenantId,
+        recordId,
+        sourceVersion: deleteRow.source_version,
+        publishSeq: deleteRow.publish_seq,
+      },
+    ]);
+    expect(await projected(tenantId, recordId)).toBeNull();
+    expect(await countRows("projection_tombstones", tenantId, recordId)).toBe(1);
+
+    // republish（世代番号は unpublish より真に大きい）→ upsert ジョブ
+    const republished = asPublishResult(
+      await stub.publishRecord(tenantId, recordId, auth("owner1")),
+    );
+    expect(republished.ok).toBe(true);
+    const v2 = await lastOutboxRow(stub);
+    expect(v2.publish_seq).toBeGreaterThan(deleteRow.publish_seq);
+    await deliver([
+      {
+        jobType: "upsert",
+        tenantId,
+        recordId,
+        sourceVersion: v2.source_version,
+        publishSeq: v2.publish_seq,
+      },
+    ]);
+
+    expect(await projected(tenantId, recordId)).not.toBeNull();
+    expect(await countRows("projection_tombstones", tenantId, recordId)).toBe(0);
   });
 });
