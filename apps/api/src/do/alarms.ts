@@ -40,3 +40,13 @@ export function dueKinds(sql: SqlStorage, nowMs: number): string[] {
     .toArray()
     .map((row) => row.kind);
 }
+
+// alarm() が呼ばれたという事実自体が「レジストリの最早 due_at が到来した」ことの証明になる
+// （物理アラームは常にその最早 due_at に合わせて張るため）。実時計がそれよりわずかに早く
+// 見えても（早期起床やクロック誤差）到来したものとして扱う ―― さもないと dueKinds が何も
+// 返さず、同じ時刻へ張り直すだけの起床ループに陥る。この繰り上げはレジストリ自身の最早値が
+// 上限であり、それより遅い他の kind を前倒しする効果はない。
+export function effectiveNow(sql: SqlStorage): number {
+  const earliestDue = minDueAt(sql);
+  return earliestDue === null ? Date.now() : Math.max(Date.now(), earliestDue);
+}

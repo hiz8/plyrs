@@ -8,6 +8,7 @@ import { v7 as uuidv7 } from "uuid";
 import {
   clearAlarm,
   dueKinds,
+  effectiveNow,
   minDueAt,
   OUTBOX_SWEEP,
   registerAlarm,
@@ -350,13 +351,11 @@ export class TenantDO extends DurableObject<Env> {
   }
 
   override async alarm(): Promise<void> {
-    // runDurableObjectAlarm() 経由では alarmInfo が undefined で渡るため引数は使わない。
-    // 物理アラームは常にレジストリの最早 due_at で張るため、alarm() が呼ばれたという事実自体が
-    // 「その due は到来した」ことの証明になる（cloudflare:test の runDurableObjectAlarm は実時間を
-    // 早送りせず due_at 未到来でも即座に起こすため、Date.now() 単独では取りこぼす）。本番では
-    // 実際に到来した他の kind も併せて拾えるよう、実時計と最早 due の遅い方を「今」とみなす。
-    const earliestDue = minDueAt(this.ctx.storage.sql);
-    const now = earliestDue === null ? Date.now() : Math.max(Date.now(), earliestDue);
+    // 物理アラームは複数の論理タイマーを多重化しているため、alarmInfo を見ても「どの kind が
+    // 起きたか」は分からない ―― 到来した kind の判定は常にレジストリ（due_at）を見て行うので
+    // 引数は使わない。effectiveNow は「alarm() が呼ばれたこと自体がレジストリの最早 due_at の
+    // 到来を証明する」という前提のもと、早期起床やクロック誤差を吸収する（詳細は alarms.ts）。
+    const now = effectiveNow(this.ctx.storage.sql);
     for (const kind of dueKinds(this.ctx.storage.sql, now)) {
       if (kind === OUTBOX_SWEEP) {
         await this.sweepOutbox();
