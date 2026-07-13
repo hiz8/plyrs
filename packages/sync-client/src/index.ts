@@ -8,3 +8,4 @@ export {
   type WebSocketLike,
 } from "./transport";
 export { RecordStore, type StoreChange } from "./store";
+export { Outbox } from "./outbox";
