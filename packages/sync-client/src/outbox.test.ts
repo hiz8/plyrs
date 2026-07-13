@@ -34,7 +34,7 @@ function record(): SyncRecord {
 describe("Outbox", () => {
   it("resolves the pending promise with the acked record", async () => {
     const outbox = new Outbox(new MemorySyncStorage());
-    const acked = await outbox.enqueue(change("c1"));
+    const { acked } = await outbox.enqueue(change("c1"));
     expect(outbox.pending().map((entry) => entry.changeId)).toEqual(["c1"]);
 
     await outbox.settle("c1", { ok: true, record: record() });
@@ -44,7 +44,7 @@ describe("Outbox", () => {
 
   it("rejects with SyncRejectedError carrying the conflicts", async () => {
     const outbox = new Outbox(new MemorySyncStorage());
-    const acked = await outbox.enqueue(change("c2"));
+    const { acked } = await outbox.enqueue(change("c2"));
     await outbox.settle("c2", {
       ok: false,
       code: "conflict",
@@ -76,8 +76,8 @@ describe("Outbox", () => {
 
   it("fails every pending change when the connection is terminated", async () => {
     const outbox = new Outbox(new MemorySyncStorage());
-    const first = await outbox.enqueue(change("c4"));
-    const second = await outbox.enqueue(change("c5"));
+    const { acked: first } = await outbox.enqueue(change("c4"));
+    const { acked: second } = await outbox.enqueue(change("c5"));
 
     await outbox.failAll(new Error("blocked"));
     await expect(first).rejects.toThrow("blocked");

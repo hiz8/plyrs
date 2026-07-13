@@ -30,19 +30,21 @@ export class Outbox {
     return restored;
   }
 
-  async enqueue(change: ClientChange): Promise<Promise<SyncRecord>> {
+  // Promise を直接返すと async 関数の戻り値が採用（adopt）されて入れ子が潰れるため、
+  // ack 待ちの Promise はオブジェクトに包んで返す。
+  async enqueue(change: ClientChange): Promise<{ acked: Promise<SyncRecord> }> {
     let resolve!: (record: SyncRecord) => void;
     let reject!: (error: Error) => void;
     const acked = new Promise<SyncRecord>((res, rej) => {
       resolve = res;
       reject = rej;
     });
-    // 未処理の rejection で落ちないよう、待ち手が付くまでの間を無害化する
+    // 待ち手が付くまでの間の未処理 rejection を無害化する
     acked.catch(() => undefined);
 
     this.entries.set(change.changeId, { change, resolve, reject });
     await this.persist();
-    return acked;
+    return { acked };
   }
 
   async settle(changeId: string, result: AckResult): Promise<void> {
