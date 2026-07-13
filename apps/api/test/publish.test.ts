@@ -1,9 +1,11 @@
+import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import {
   asDeleteResult,
   asProjectionPayload,
+  asPublishedPage,
   asPublishResult,
   asUnpublishResult,
   asWriteResult,
@@ -126,6 +128,120 @@ describe("publish / unpublish (design-spec §7)", () => {
       await stub.publishRecord(TENANT, uuid(100), auth("eve", "editor")),
     );
     expect(allowed.ok).toBe(true);
+  });
+});
+
+describe("outbox rows (design-spec §12.3)", () => {
+  let stub: ReturnType<typeof freshStub>;
+
+  beforeEach(async () => {
+    stub = freshStub();
+    await stub.registerContentType(articleType(), auth("owner1"));
+    const written = asWriteResult(
+      await stub.writeRecord(
+        "article",
+        { recordId: uuid(100), input: validArticleInput() },
+        auth("owner1"),
+      ),
+    );
+    expect(written.ok).toBe(true);
+  });
+
+  it("queues exactly one unsent upsert row on publish", async () => {
+    const published = asPublishResult(await stub.publishRecord(TENANT, uuid(100), auth("owner1")));
+    expect(published.ok).toBe(true);
+    await runInDurableObject(stub, async (_instance, state) => {
+      const rows = state.storage.sql
+        .exec<{ job_type: string; record_id: string; source_version: number; sent: number }>(
+          "SELECT job_type, record_id, source_version, sent FROM outbox",
+        )
+        .toArray();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        job_type: "upsert",
+        record_id: uuid(100),
+        source_version: 1,
+        sent: 0,
+      });
+    });
+  });
+
+  it("queues a delete row carrying the previously published version on unpublish", async () => {
+    await stub.publishRecord(TENANT, uuid(100), auth("owner1"));
+    const unpublished = asUnpublishResult(
+      await stub.unpublishRecord(TENANT, uuid(100), auth("owner1")),
+    );
+    expect(unpublished).toMatchObject({ ok: true, sourceVersion: 1 });
+    await runInDurableObject(stub, async (_instance, state) => {
+      const rows = state.storage.sql
+        .exec<{ job_type: string; record_id: string; source_version: number }>(
+          "SELECT job_type, record_id, source_version FROM outbox WHERE sent = 0 ORDER BY rowid",
+        )
+        .toArray();
+      // publish が積んだ upsert 行 + unpublish が積んだ delete 行の 2 件が残る
+      expect(rows).toHaveLength(2);
+      expect(rows[1]).toMatchObject({
+        job_type: "delete",
+        record_id: uuid(100),
+        source_version: 1,
+      });
+    });
+  });
+
+  it("adds no outbox row when deleting a record that was never published", async () => {
+    const deleted = asDeleteResult(await stub.deleteRecord(uuid(100), auth("owner1")));
+    expect(deleted.ok).toBe(true);
+    await runInDurableObject(stub, async (_instance, state) => {
+      const n = state.storage.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM outbox").one().n;
+      expect(n).toBe(0);
+    });
+  });
+});
+
+describe("getPublishedPage keyset pagination (Task 7 dependency)", () => {
+  let stub: ReturnType<typeof freshStub>;
+  const COUNT = 5;
+  const ids = Array.from({ length: COUNT }, (_, i) => uuid(600 + i));
+
+  beforeEach(async () => {
+    stub = freshStub();
+    await stub.registerContentType(articleType(), auth("owner1"));
+    for (const [i, id] of ids.entries()) {
+      const written = asWriteResult(
+        await stub.writeRecord(
+          "article",
+          { recordId: id, input: { ...validArticleInput(), slug: `page-${i}` } },
+          auth("owner1"),
+        ),
+      );
+      expect(written.ok).toBe(true);
+      const published = asPublishResult(await stub.publishRecord(TENANT, id, auth("owner1")));
+      expect(published.ok).toBe(true);
+    }
+  });
+
+  it("returns every published record exactly once, in record_id order", async () => {
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (let guard = 0; guard < COUNT + 1; guard += 1) {
+      const page = asPublishedPage(await stub.getPublishedPage(cursor, 2));
+      seen.push(...page.payloads.map((payload) => payload.recordId));
+      if (page.nextCursor === null) {
+        break;
+      }
+      cursor = page.nextCursor;
+    }
+    expect(seen).toEqual(ids.toSorted());
+  });
+
+  it("returns an empty page with nextCursor null once a full page exhausts the rows", async () => {
+    // limit を件数ぴったりに合わせる: payloads.length === limit だが後続行は無い境界ケース
+    const full = asPublishedPage(await stub.getPublishedPage(null, COUNT));
+    expect(full.payloads).toHaveLength(COUNT);
+    expect(full.nextCursor).toBe(ids[COUNT - 1]);
+
+    const after = asPublishedPage(await stub.getPublishedPage(full.nextCursor, COUNT));
+    expect(after).toEqual({ payloads: [], nextCursor: null });
   });
 });
 

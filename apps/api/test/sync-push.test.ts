@@ -1,8 +1,14 @@
+import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { ClientChange, ServerMessage } from "@plyrs/sync-protocol";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
-import { asRecordSnapshot } from "./rpc-unwrap";
+import {
+  asProjectionPayload,
+  asPublishResult,
+  asRecordSnapshot,
+  asWriteResult,
+} from "./rpc-unwrap";
 import { nextMessage, nextMessages, openSyncSocket } from "./ws-helpers";
 
 const TENANT = "018f2b6a-7a0a-7000-8000-0000000000d1";
@@ -153,6 +159,43 @@ describe("sync push", () => {
     }
     writer.socket.close(1000, "done");
     watcher.socket.close(1000, "done");
+  });
+
+  it("cascades unpublish when a published record is deleted over the sync socket (裁定 2026-07-13)", async () => {
+    const recordId = uuid(650);
+    const written = asWriteResult(
+      await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("admin")),
+    );
+    expect(written.ok).toBe(true);
+    const published = asPublishResult(await stub.publishRecord(TENANT, recordId, auth("admin")));
+    expect(published.ok).toBe(true);
+
+    const { socket } = await openSyncSocket(stub, socketAuth("editor-1"));
+    await hello(socket);
+
+    const removal = change({
+      recordId,
+      op: "delete",
+      input: {},
+      changedFields: [],
+      baseFieldVersions: {},
+    });
+    socket.send(JSON.stringify({ type: "push", changes: [removal] }));
+    const result = ackOf(await nextMessage(socket));
+    expect(result?.ok).toBe(true);
+
+    expect(asProjectionPayload(await stub.getProjectionPayload(recordId))).toBeNull();
+    await runInDurableObject(stub, async (_instance, state) => {
+      const rows = state.storage.sql
+        .exec<{ job_type: string; record_id: string }>(
+          "SELECT job_type, record_id FROM outbox WHERE sent = 0 AND job_type = 'delete'",
+        )
+        .toArray();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ job_type: "delete", record_id: recordId });
+    });
+
+    socket.close(1000, "done");
   });
 
   it("broadcasts an applied change to other sockets but not the sender", async () => {
