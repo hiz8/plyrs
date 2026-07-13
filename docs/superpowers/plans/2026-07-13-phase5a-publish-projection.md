@@ -1747,16 +1747,15 @@ describe("projection consumer (design-spec §12.3)", () => {
     expect(await projected(tenantId, recordId)).not.toBeNull();
   });
 
-  it("retries the message when the job throws", async () => {
-    const result = await deliver([
-      { jobType: "upsert", tenantId: "", recordId: "", sourceVersion: 1 },
-    ]);
+  it("retries the message when the job cannot be handled", async () => {
+    // 未知のジョブ種別（将来のジョブが古い Worker に届いた場合）は ack せず retry させる
+    const bogus = { jobType: "bogus", tenantId, recordId, sourceVersion: 1 } as unknown as ProjectionJob;
+    const result = await deliver([bogus]);
+    expect(result.explicitAcks).toStrictEqual([]);
     expect(result.retryMessages).toStrictEqual([{ msgId: "m0" }]);
   });
 });
 ```
-
-（最後のケースは `idFromName("")` が例外を投げることを利用する。もし例外にならない場合は、テストを「未知のジョブ種別を投げると retry される」形に置き換えること — `jobType` に `"bogus"` を渡す。ジョブ種別の網羅は `handleProjectionJob` の default 分岐で `throw new Error(...)` すること。）
 
 - [ ] **Step 2: テストが落ちることを確認**
 
@@ -1973,25 +1972,18 @@ export async function handleProjectionJob(
       return;
     }
     case "reproject": {
-      await handleReprojectJob(env, job, nowMs);
-      return;
+      // 再投影は Task 7 で実装する。それまでは未実装として retry に落とす。
+      throw new Error("reprojection is not implemented yet");
     }
     default: {
-      // 未知のジョブは retry させる（DLQ 相当の観測点）
+      // 未知のジョブは retry させる（観測点）
       throw new Error(`unknown projection job: ${JSON.stringify(job)}`);
     }
   }
 }
-
-// Task 7 で実装する。ここでは分岐だけ用意する。
-async function handleReprojectJob(_env: Env, _job: ProjectionJob, _nowMs: number): Promise<void> {
-  throw new Error("reprojection is not implemented yet");
-}
-
-export { REPROJECT_PAGE_SIZE, asPublishedPage };
 ```
 
-**注意（Task 7 の実装者へ）**: `handleReprojectJob` の本体と、末尾の暫定 `export { REPROJECT_PAGE_SIZE, asPublishedPage }` は Task 7 で正しい実装に置き換えること（暫定 export は re-export の当て木であり、Task 7 完了時に削除する）。
+この時点では `REPROJECT_PAGE_SIZE` と `asPublishedPage` は未使用なので import しないこと（未使用 import は lint が落とす）。Task 7 で追加する。
 
 - [ ] **Step 5: Queue バインディングと consumer を配線**
 
