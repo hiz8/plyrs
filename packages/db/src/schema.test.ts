@@ -1,6 +1,14 @@
 import { getTableName } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { contentTypes, records, relations } from "./schema";
+import {
+  alarmRegistry,
+  contentTypes,
+  doConfig,
+  outbox,
+  publishedSnapshots,
+  records,
+  relations,
+} from "./schema";
 
 describe("@plyrs/db schema", () => {
   it("defines the three DO core tables from design-spec §6", () => {
@@ -13,5 +21,18 @@ describe("@plyrs/db schema", () => {
     expect(records.seq).toBeDefined();
     expect(records.fieldVersions).toBeDefined();
     expect(records.deletedAt).toBeDefined();
+  });
+
+  it("defines the publish / outbox / alarm operational tables (design-spec §7 / §9.6 / §12.3)", () => {
+    expect(getTableName(publishedSnapshots)).toBe("published_snapshots");
+    expect(getTableName(outbox)).toBe("outbox");
+    expect(getTableName(alarmRegistry)).toBe("alarm_registry");
+    expect(getTableName(doConfig)).toBe("do_config");
+  });
+
+  it("gives the outbox its ordering and delivery bookkeeping", () => {
+    expect(outbox.jobType).toBeDefined();
+    expect(outbox.sourceVersion).toBeDefined();
+    expect(outbox.sent).toBeDefined();
   });
 });
