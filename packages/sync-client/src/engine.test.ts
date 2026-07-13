@@ -15,9 +15,11 @@ class FakeSocket implements WebSocketLike {
     this.sent.push(data);
   }
 
+  // 実物の WebSocket は close/message/error をタスクとしてキューイングし、close() の
+  // 同期コンテキスト内では発火させない（WHATWG）。フェイクもその挙動に合わせる。
   close(code = 1000, reason = ""): void {
     this.readyState = 3;
-    this.emit("close", { code, reason });
+    queueMicrotask(() => this.emit("close", { code, reason }));
   }
 
   addEventListener(type: string, listener: (event: unknown) => void): void {
@@ -280,11 +282,14 @@ describe("SyncEngine", () => {
     const target = engine();
     await bootstrap(target);
     const pushed = target.push(change("c4"));
+    // close は（実物同様）非同期に発火するため、棄却ハンドラを先に張っておく。
+    // 後から張ると failAll の棄却が一瞬ハンドラ不在になり unhandled rejection として報告される。
+    const rejected = expect(pushed).rejects.toThrow(/blocked/);
 
     socket.close(CLOSE_CODES.blocked, "blocked");
 
     await vi.waitFor(() => expect(target.status).toBe("closed"));
-    await expect(pushed).rejects.toThrow(/blocked/);
+    await rejected;
   });
 
   it("ignores keepalive pongs", async () => {
@@ -298,10 +303,13 @@ describe("SyncEngine", () => {
 describe("engine core independence", () => {
   it("does not import @tanstack/db or partysocket", async () => {
     const { readFile } = await import("node:fs/promises");
+    // 生の部分文字列ではなく import 文だけを見る（コメント内の言及で誤検知しないため）
+    const importPattern = /(?:^|\n)\s*import[^;]*?from\s*["']([^"']+)["']/g;
     for (const file of ["engine.ts", "store.ts", "outbox.ts", "storage.ts", "transport.ts"]) {
       const source = await readFile(new URL(file, import.meta.url), "utf8");
-      expect(source).not.toContain("@tanstack/db");
-      expect(source).not.toContain("partysocket");
+      const specifiers = [...source.matchAll(importPattern)].map((match) => match[1]);
+      expect(specifiers).not.toContain("@tanstack/db");
+      expect(specifiers).not.toContain("partysocket");
     }
   });
 });

@@ -22,7 +22,6 @@ export interface SyncEngineOptions {
   onReady?: () => void;
   onStatus?: (status: SyncStatus) => void;
   refreshToken?: () => Promise<void>;
-  now?: () => number;
 }
 
 export class SyncEngine {
@@ -177,10 +176,6 @@ export class SyncEngine {
   }
 
   private async reconnect(code: number): Promise<void> {
-    // close イベントは同期発火しうる（実ソケットでも起こりうる再入を避けるため）。
-    // 呼び出し元の同期処理（例: 再接続先の connect 差し替え）が先に完了してから
-    // connect を読み出せるよう、必ず1マイクロタスク遅らせる。
-    await Promise.resolve();
     if (code === CLOSE_CODES.tokenExpired) {
       // ソケット内のトークン更新は無い。新トークンを取ってから張り直す。
       await this.options.refreshToken?.();

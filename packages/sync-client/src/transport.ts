@@ -1,4 +1,4 @@
-// エンジンはブラウザ向け再接続ラッパーライブラリにも workerd の WebSocket にも依存しない。
+// エンジンは partysocket にも workerd の WebSocket にも依存しない。
 // イベント型を unknown にすることで、DOM lib の有無に関わらず両方の WebSocket を
 // 構造的に受け入れられる（独自のイベント型を使う版は、DOM lib が暗黙に有効で
 // その非ジェネリックな addEventListener オーバーロードに一致することに依存していた）。
