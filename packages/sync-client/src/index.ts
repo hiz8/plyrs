@@ -9,3 +9,4 @@ export {
 } from "./transport";
 export { RecordStore, type StoreChange } from "./store";
 export { Outbox } from "./outbox";
+export { SyncEngine, type SyncEngineOptions, type SyncStatus } from "./engine";
