@@ -78,7 +78,8 @@ Phase 2 の詳細計画で最終確定する。
 | 3 | `2026-07-13-phase3-control-plane-auth.md` | 完了（2026-07-13 main へマージ） |
 | 4a | `2026-07-13-phase4a-sync-server.md` | 完了（2026-07-13 main へマージ） |
 | 4b | `2026-07-13-phase4b-sync-client.md` | 完了（2026-07-13 main へマージ） |
-| 5〜10 | 各フェーズ着手時に作成 | 未着手 |
+| 5a | `2026-07-13-phase5a-publish-projection.md` | 完了（2026-07-14 main へマージ） |
+| 5b〜10 | 各フェーズ着手時に作成 | 未着手 |
 
 ---
 
@@ -222,3 +223,91 @@ Phase 4b（クライアント同期エンジン）完了。236 tests green、最
 - 楽観的更新の確定は**ハンドラの Promise 解決**で起こる（同期ストリームのエコーを待たない）。ちらつき防止はライブラリの persisting-transaction 遅延が担保しており、手動マージは不要（入れると二重書き込みになる）。
 - 削除の同期状態書き込みは `DeleteKeyMessage`（キーのみ、`value` 無し）。**`collection.get()` は楽観的オーバーレイ越しの見え方**なので「同期状態に存在するか」の判定に使ってはならない（アダプタは自前の `syncedKeys` で追跡している）。
 - アダプタは `@plyrs/sync-client/tanstack` サブパス。ルート import では BETA ライブラリを評価しない。
+
+---
+
+## 9. Phase 5a 完了時の申し送り（最終レビュー 2026-07-14）
+
+Phase 5a（publish → アウトボックス → Queues → 共有投影 D1）完了。Task 8 で `apps/api/test/projection-e2e.test.ts`
+を追加し、`worker.queue()` を一切呼ばずに DO スタブ経由の publish/unpublish/delete だけを叩き、実 miniflare
+キューブローカ経由で投影 D1 にデータが着地することをポーリングで確認した（3 tests green）。これにより
+producer バインディング名・キュー名・consumer 登録の配線が初めて実証された（Task 1〜7 のユニットテストは
+すべて `worker.queue(...)` を直接呼んでおり、ブローカを経由していなかった）。
+
+**順序トークンは `publishSeq` であって `source_version` ではない（レビューで再現済みの重大論点）:**
+
+`records.version`（= snapshot の `source_version`）は publish / unpublish では変化しない。そのため
+「unpublish → 無編集で republish」を行うと、異なる publish 世代が同じ `source_version` を運んでしまい、
+遅れて届いた stale な delete ジョブが republish 後の生きた行を消しうる（`source_version` だけをガードに
+使う実装で実際に FAIL することを修正前に確認済み）。順序ガードは DO 全体で単調増加する **`publishSeq`**
+で行う。この値は `do_config` テーブルに **`nextPublishSeq()` が発番のたびに永続化**しており、
+`published_snapshots` や `outbox` の行の MAX から復元してはならない ―― この2テーブルの行は
+unpublish やスイーパーの `purgeSent()` で消えるため、MAX 復元は起動直後にカウンタを 0 へ巻き戻し、
+republish が既に送出済みの世代番号を再び採ってしまう事故を再現済み（`apps/api/test/publish.test.ts`
+の `restores publish_seq...` / `does not let publish_seq rewind...` の2テストがこの穴を固定している）。
+
+**`projection_tombstones` は復活防止のために存在する（GC は意図的に無い）:**
+
+再投影のページ読み取りは公開中スナップショットの「ある時点のスナップショット」であり、その読み取り後に
+unpublish の delete ジョブが先着すると、遅れて届く再投影由来の stale な書き込みが `upsertStatements()` の
+無条件 INSERT 経路を通って、削除済みのはずのレコードを公開テーブルへ復活させてしまう（実際に再現し、
+`projection-consumer.test.ts` の「resurrection race」3テストで固定済み）。対策として delete ジョブは
+`projection_tombstones` に墓標を立て、`upsertStatements()` の INSERT/UPDATE 双方を「同じ
+`(tenant_id, record_id)` の墓標が存在しない」`NOT EXISTS` でガードし、より新しい世代の書き込みが勝った
+時点で墓標をクリアする。**周期的な GC は意図的に実装していない**: 時刻ベースの GC を入れたところ、
+2つの再投影ウォークが重なった場合に、後発ウォークの終端 sweep が先発ウォークがまだ依存している墓標を
+消してしまい、先発ウォークの遅延した stale write が無防備になって復活事故を再現した
+（`projection-consumer.test.ts` の「overlapping reprojection walks」テストで固定済み）。周期 GC は
+Phase 10 の運用整備に持ち越す。
+
+**Phase 5b（公開 read API）への申し送り:**
+
+- 公開 read API は `projected_records` を直接読み、「unpublish 済みか」を確認するフィルタは**不要**
+  （墓標は `projection_tombstones` という別テーブルに意図的に隔離してあり、`projected_records` に
+  マージしてはならない）。
+- クエリ面: 単体/一覧取得は `(tenant_id, record_id)` PK と `(tenant_id, type, published_at)` /
+  `(tenant_id, type, slug)` の索引で引く。
+- `projection_index` は「フィルタ/ソートで record_id を絞り込む」用途に限る（レコード本体の復元には
+  使わない ―― 復元は必ず `projected_records.data` への join に戻る）。
+- 索引済み複数値フィールド（multiple-select 等）の select は行分割で持つため、フィルタは any-of 意味論
+  になる。**ソートは単一値フィールドに対してのみ定義される**（複数値フィールドでソートすると行が
+  重複するため未定義）。
+- 関係解決は `projected_relations` に対してのみ行い、参照先が未公開（= 投影に存在しない）なら
+  単純に**不在**として扱う（ソフト参照。エラーにしない）。
+- 公開パスは **`/public/v1/:tenantSlug/...`**（2026-07-13 裁定。ロードマップ§1 の G3 default 案
+  `/v1/t/{tenantSlug}/...` から変更）。`tenantSlug → tenantId` はコントロールプレーン D1 + KV キャッシュ
+  で解決し、DO は経由しない。
+
+**G3 / G4 の確定内容（本フェーズの裁定表を転記）:**
+
+- **G3（公開 API のテナント解決）**: 公開パスは `/public/v1/:tenantSlug/...`。5a では公開 read
+  エンドポイントを作らない（Phase 5b のスコープ）。
+- **G4（slug の実カラム昇格規約）**: フィールド key が `slug` かつ `type: "text"` かつ
+  `config.unique === true` のフィールドの値だけを投影の `slug` 実カラムへ昇格する。該当フィールドが
+  無ければ `slug = NULL`。
+
+**裁定（2026-07-13）:**
+
+- 公開中レコードの削除は **unpublish を強制する**（`deleteRecord` は snapshot を消し、outbox に
+  delete ジョブを積む）。**archive は仕様どおり強制 unpublish しない**（archive ≠ delete）。
+- `snapshotEmbed: "value"` は **Phase 5a では未実装**（id のみを解決する参照のまま）。埋め込み対象
+  フィールドの語彙はアセット型と一緒に Phase 8 で決める。
+
+**Phase 9（モジュール）への申し送り:**
+
+- alarm レジストリ（`alarm_registry(kind, due_at)`）は design-spec §9.6 が求める多重化のコア実装として
+  既に一般化された形で入っている。`kind` を `module_id` に読み替えるだけで転用でき、システム固有なのは
+  `TenantDO.alarm()` のディスパッチ分岐（`kind === OUTBOX_SWEEP` の分岐）だけである。
+- `effectiveNow()`（`apps/api/src/do/alarms.ts`）は「`alarm()` が呼ばれたこと自体がレジストリの最早
+  `due_at` の到来を証明する」という前提で、早期起床やクロック誤差を `Math.max(Date.now(), earliestDue)`
+  で吸収する。同じ前提はモジュール向け汎用化後も成立する。
+
+**未解決 / 将来対応:**
+
+- DLQ 未設定。`wrangler.jsonc` の consumer は `max_retries: 3` のみで、超過したメッセージは単純に
+  drop される。Phase 10 の運用整備で DLQ + 監視を追加する。
+- 再投影ウォークは直列化されていない（オーナーが連打すると複数の epoch が同時に走る）。今は上記の
+  墓標ガードにより安全だが、それぞれが投影全件のフルパスを消費する。
+- 墓標行は GC されない（record 数に比例して増え続ける有界リーク。at-least-once 再配信された stale な
+  delete が着地した場合、record 1 件につき最大 1 個の無害な孤児墓標が残りうる）。
+- 再投影はオーナー操作のみで cron 起動は無い（乖離が起きても自動回復しない）。
