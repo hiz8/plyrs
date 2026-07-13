@@ -21,6 +21,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "catalog:",
+    "@plyrs/sync-client": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"

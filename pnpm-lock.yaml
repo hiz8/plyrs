@@ -99,6 +99,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
         version: 5.20260712.1
+      '@plyrs/sync-client':
+        specifier: workspace:*
+        version: link:../../packages/sync-client
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
