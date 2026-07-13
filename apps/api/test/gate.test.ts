@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { drizzle } from "drizzle-orm/d1";
 import { memberships } from "@plyrs/db/control-plane";
-import app from "../src/index";
+import { app } from "../src/index";
 import { blockUser } from "../src/auth/blocklist";
 import { articleType, uuid, validArticleInput } from "./fixtures";
 

@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { SYNC_SUBPROTOCOL } from "@plyrs/sync-protocol";
-import app from "../src/index";
+import { app } from "../src/index";
 import { signTenantToken } from "../src/auth/jwt";
 import { blockUser } from "../src/auth/blocklist";
 import { openSyncSocket } from "./ws-helpers";

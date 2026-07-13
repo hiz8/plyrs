@@ -245,7 +245,7 @@ describe("getPublishedPage keyset pagination (Task 7 dependency)", () => {
   });
 });
 
-import app from "../src/index";
+import { app } from "../src/index";
 
 const RUN_ID = crypto.randomUUID().slice(0, 8);
 let n = 0;

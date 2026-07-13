@@ -21,4 +21,16 @@
     },
   ],
   "kv_namespaces": [{ "binding": "BLOCKLIST", "id": "00000000000000000000000000000000" }],
+  "queues": {
+    "producers": [{ "binding": "PROJECTION_QUEUE", "queue": "plyrs-projection" }],
+    "consumers": [
+      {
+        "queue": "plyrs-projection",
+        // 0 にしないとテストが 1 メッセージあたり約 1 秒待たされる（実測）
+        "max_batch_timeout": 0,
+        "max_batch_size": 10,
+        "max_retries": 3,
+      },
+    ],
+  },
 }
