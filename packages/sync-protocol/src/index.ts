@@ -13,3 +13,4 @@ export {
   type ServerMessage,
   type SyncRecord,
 } from "./messages";
+export { resolveSyncWrite, type SyncResolution } from "./resolve";
