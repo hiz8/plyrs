@@ -134,6 +134,12 @@ describe("public single fetch (§12.4)", () => {
     expect(response.status).toBe(404);
   });
 
+  // キャッシュキー URL のドットセグメント正規化の残余を閉じる回帰: value が "." / ".." は 404
+  it("404s for a '.' or '..' id/slug value", async () => {
+    const response = await app.request(`/public/v1/${tenantSlug}/records/post/..`, {}, env);
+    expect(response.status).toBe(404);
+  });
+
   it("404s for an unpublished record and an unknown tenant", async () => {
     expect(
       (await app.request(`/public/v1/${tenantSlug}/records/author/${author3}`, {}, env)).status,
