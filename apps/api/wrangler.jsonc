@@ -20,7 +20,11 @@
       "migrations_dir": "../../packages/db/drizzle-projection",
     },
   ],
-  "kv_namespaces": [{ "binding": "BLOCKLIST", "id": "00000000000000000000000000000000" }],
+  "kv_namespaces": [
+    { "binding": "BLOCKLIST", "id": "00000000000000000000000000000000" },
+    // Phase 5b (G3): 公開 read の tenantSlug→tenantId 解決キャッシュ。BLOCKLIST は認証用なので流用しない
+    { "binding": "TENANT_SLUGS", "id": "00000000000000000000000000000001" },
+  ],
   "queues": {
     "producers": [{ "binding": "PROJECTION_QUEUE", "queue": "plyrs-projection" }],
     "consumers": [

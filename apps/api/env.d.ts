@@ -10,6 +10,8 @@ interface EnvBindings {
   // design-spec §12.3: アウトボックス排出先。DO からも Worker からも送る
   PROJECTION_QUEUE: Queue<import("./src/projection/jobs").ProjectionJob>;
   BLOCKLIST: KVNamespace;
+  // Phase 5b (G3): 公開 read の tenantSlug→tenantId 解決キャッシュ（公開経路は DO を起こさない）
+  TENANT_SLUGS: KVNamespace;
   // 本番: `wrangler secret put JWT_SECRET`。ローカル dev: .dev.vars。テスト: vitest.config の miniflare.bindings。
   // wrangler.jsonc の vars には置かない（公知値が本番デフォルトになる事故を防ぐ）。
   JWT_SECRET: string;
