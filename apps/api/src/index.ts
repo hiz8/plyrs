@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { handleProjectionJob } from "./projection/consumer";
 import type { ProjectionJob } from "./projection/jobs";
 import { authRoutes } from "./routes/auth";
+import { publicRoutes } from "./routes/public";
 import { tenantRoutes } from "./routes/tenant";
 import { tenantAdminRoutes } from "./routes/tenants";
 
@@ -11,6 +12,8 @@ const app = new Hono<{ Bindings: Env }>();
 app.route("/auth", authRoutes);
 app.route("/v1/tenants", tenantAdminRoutes);
 app.route("/v1/t", tenantRoutes);
+// design-spec §12: 公開 read（認証なし・DO 非経由・投影 D1 のみ）
+app.route("/public/v1", publicRoutes);
 app.notFound((c) => c.json({ error: "not_found" }, 404));
 
 export { app };
