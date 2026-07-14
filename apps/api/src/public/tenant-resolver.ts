@@ -21,8 +21,13 @@ export async function resolveTenantId(env: Env, slug: string): Promise<string | 
     .bind(slug)
     .first<{ id: string }>();
   const id = row?.id ?? null;
-  await env.TENANT_SLUGS.put(key, JSON.stringify({ id } satisfies CacheEntry), {
-    expirationTtl: id === null ? MISS_TTL_SECONDS : HIT_TTL_SECONDS,
-  });
+  try {
+    await env.TENANT_SLUGS.put(key, JSON.stringify({ id } satisfies CacheEntry), {
+      expirationTtl: id === null ? MISS_TTL_SECONDS : HIT_TTL_SECONDS,
+    });
+  } catch {
+    // キャッシュ書き込みは best-effort。失敗しても D1 の解決結果を返す
+    // — 公開 read の可用性をキャッシュ層の故障に従属させない
+  }
   return id;
 }
