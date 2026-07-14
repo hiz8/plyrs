@@ -132,6 +132,34 @@ export function upsertStatements(
         ),
     );
   }
+
+  // Phase 5b: フィールドカタログ（型レベル情報）。publish_seq ガードは意図的に掛けない ——
+  // カタログは record の世代ではなく「payload を組み立てた時点の content_types」を写すため、
+  // stale な record ジョブが運ぶカタログも内容的には現在の宣言である（LWW で十分。型定義変更と
+  // 競合してズレても、次の publish か再投影が上書きする）。record 側のガードで弾かれたジョブが
+  // カタログだけ更新しても無害。record の EXISTS ガードにも載せない: 公開レコードが 0 件でも
+  // フィルタ検証の 400/空結果の区別はカタログに依存しないため（検証は「宣言があるか」だけを見る）。
+  for (const catalogRow of payload.catalog) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO projection_fields (tenant_id, type, field_key, kind, multi, projected_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+           ON CONFLICT(tenant_id, type, field_key) DO UPDATE SET
+             kind = excluded.kind,
+             multi = excluded.multi,
+             projected_at = excluded.projected_at`,
+        )
+        .bind(
+          tenantId,
+          payload.type,
+          catalogRow.fieldKey,
+          catalogRow.kind,
+          catalogRow.multi ? 1 : 0,
+          projectedAt,
+        ),
+    );
+  }
   return statements;
 }
 
@@ -244,6 +272,11 @@ async function handleReprojectJob(env: Env, job: ReprojectJob, nowMs: number): P
          AND NOT EXISTS (SELECT 1 FROM projected_records
                          WHERE tenant_id = ?1 AND record_id = projection_index.record_id)`,
     ).bind(job.tenantId),
+    // Phase 5b: 宣言から消えたフィールドのカタログ行を掃く。境界の向きの議論は上の
+    // projected_records と同一（甘い方向にしか間違えない）。
+    env.PROJECTION_DB.prepare(
+      "DELETE FROM projection_fields WHERE tenant_id = ?1 AND projected_at < ?2",
+    ).bind(job.tenantId, job.epoch - SWEEP_SKEW_MARGIN_MS),
   ]);
   // Task 7（レビュー指摘、probe で決定的に再現済み）: ここで墓標を GC してはならない。
   // startReprojection にロックが無いため、2 つの歩きが独立した epoch を持って同時に走りうる
