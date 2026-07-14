@@ -33,12 +33,11 @@ interface ListBody {
   nextCursor: string | null;
 }
 
-async function list(tenantSlug: string, query: string): Promise<{ status: number; body: ListBody }> {
-  const response = await app.request(
-    `/public/v1/${tenantSlug}/records/post${query}`,
-    {},
-    env,
-  );
+async function list(
+  tenantSlug: string,
+  query: string,
+): Promise<{ status: number; body: ListBody }> {
+  const response = await app.request(`/public/v1/${tenantSlug}/records/post${query}`, {}, env);
   return { status: response.status, body: (await response.json()) as ListBody };
 }
 
@@ -82,11 +81,43 @@ describe("public list (§12.4 / §12.5)", () => {
     // p3: rating無し life [z] authors[]
     // p4: rating1 tech featured [x] authors[A]
     const inputs: Record<string, unknown>[] = [
-      { title: "p0", slug: "s0", rating: 5, category: "tech", tags: ["x"], authors: [{ type: "author", id: authorA }] },
-      { title: "p1", slug: "s1", rating: 5, category: "life", tags: ["y"], authors: [{ type: "author", id: authorA }, { type: "author", id: authorB }] },
-      { title: "p2", slug: "s2", rating: 3, category: "tech", tags: ["x", "y"], authors: [{ type: "author", id: authorB }] },
+      {
+        title: "p0",
+        slug: "s0",
+        rating: 5,
+        category: "tech",
+        tags: ["x"],
+        authors: [{ type: "author", id: authorA }],
+      },
+      {
+        title: "p1",
+        slug: "s1",
+        rating: 5,
+        category: "life",
+        tags: ["y"],
+        authors: [
+          { type: "author", id: authorA },
+          { type: "author", id: authorB },
+        ],
+      },
+      {
+        title: "p2",
+        slug: "s2",
+        rating: 3,
+        category: "tech",
+        tags: ["x", "y"],
+        authors: [{ type: "author", id: authorB }],
+      },
       { title: "p3", slug: "s3", category: "life", tags: ["z"], authors: [] },
-      { title: "p4", slug: "s4", rating: 1, category: "tech", featured: true, tags: ["x"], authors: [{ type: "author", id: authorA }] },
+      {
+        title: "p4",
+        slug: "s4",
+        rating: 1,
+        category: "tech",
+        featured: true,
+        tags: ["x"],
+        authors: [{ type: "author", id: authorA }],
+      },
     ];
     for (const [i, input] of inputs.entries()) {
       const id = posts[i];

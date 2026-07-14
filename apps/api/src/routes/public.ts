@@ -157,7 +157,7 @@ async function serveSingle(
       ...record,
       fields: {
         ...record.fields,
-        ...(relationIds.get(row.record_id) ?? {}),
+        ...relationIds.get(row.record_id),
       },
     };
     const body =
@@ -235,7 +235,7 @@ export const publicRoutes = new Hono<PublicEnv>()
           ...record,
           fields: {
             ...record.fields,
-            ...(relationIds.get(row.record_id) ?? {}),
+            ...relationIds.get(row.record_id),
           },
         };
       });

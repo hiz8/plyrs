@@ -577,11 +577,12 @@ single-writer の DO が競合を裁定する。分散マージの難問が「DO
 
 **成長路線**: 単一共有 D1 は 1DB 10GB 上限とクエリ集中がいずれ効く。規模が育ったら**固定 N 本のシャード D1**（静的バインド可能な本数）に tenant をハッシュ配置する。共有案の自然な発展形で、10GB 上限とロード分散の双方に効く。per-tenant の完全分離が本当に要るなら Workers for Platforms での User Worker 個別バインドは可能だが、9.1 で WfP 相当を不採用としており投影のためだけの導入は過剰。
 
-**投影の物理設計（3テーブル）**: 共有 D1 では全テナント・全型が一枚の records 投影を共有するため、**per-tenant 時代の「宣言フィールドを実カラムに昇格」戦略は成立しない**（(テナント × 型) ごとに異なる昇格カラムが一枚に載らず、カラムが際限なく増え名前も衝突する）。代わりに2段構えで索引を効かせる。
+**投影の物理設計（3テーブル＋カタログ）**: 共有 D1 では全テナント・全型が一枚の records 投影を共有するため、**per-tenant 時代の「宣言フィールドを実カラムに昇格」戦略は成立しない**（(テナント × 型) ごとに異なる昇格カラムが一枚に載らず、カラムが際限なく増え名前も衝突する）。代わりに2段構えで索引を効かせる。
 
 - **records 投影**: `(tenant_id, record_id, type, slug, published_at, data, source_version)`。**システム共通フィールドのみ実カラム**（どのテナントでも意味が同じもの）。複合索引 `(tenant_id, type, published_at)`・`(tenant_id, type, slug)` を張り、**一覧クエリの大半（最新N件・slug 単体取得）はこれで完結**。型固有フィールドは `data` JSON に残す（実カラムに昇格しない）。
 - **relations 投影**: `(tenant_id, source_id, source_field, target_type, target_id, ordinal)`、**published なもののみ**。`(tenant_id, target_id, source_type)` 等に索引を張り、メンバーシップフィルタ（「カテゴリXの記事」）と逆引きを O(log n) で解く。
 - **projection_index（索引専用サイドテーブル）**: ユーザー宣言の `indexed` フィールドはここへ。`(tenant_id, type, field_key, value_text, value_num, value_date, record_id)` で `(tenant_id, type, field_key, value_*)` に索引。フィルタ/ソートでここが `record_id` を絞り、実体は records 投影の `data` へ**1回 join** で取る。
+- **projection_fields（フィールドカタログ。Phase 5b で追加）**: `(tenant_id, type, field_key, kind, multi)`。公開 read API が「フィルタ/ソート可能なフィールドか・値がどの型別カラムにあるか・複数値か」を **DO を起こさずに**知るための、content_types の索引宣言部分の投影。「フィールドの型は `content_types` から既知なので、クエリ層が適切な列を選べる」（上記）の公開側の実体がこの表になる。record の投影 upsert に相乗りして LWW で更新し、再投影の mark-and-sweep が宣言から消えた行を掃く。
 
 > **EAV との区別（第6章の却下理由と混同しないための一文）**: projection_index は形の上では EAV だが、第6章が EAV を退けた理由（「1レコード復元に自己 join の山」）は**当てはまらない**。この表は**レコードを復元するためではなく、フィルタ/ソートで `record_id` を絞るためだけ**に使い、実体は records 投影から1回の join で取る。relations 投影が「メンバーシップフィルタ専用の索引」であるのと同じ役割分担で、既にある投影の思想と揃う。**復元用 EAV は却下・索引用サイドテーブルは可**。
 
