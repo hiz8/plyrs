@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   projectedRecords,
   projectedRelations,
+  projectionFields,
   projectionIndex,
   projectionTombstones,
 } from "./projection";
@@ -43,5 +44,18 @@ describe("@plyrs/db projection schema", () => {
     expect(projectionTombstones.recordId).toBeDefined();
     expect(projectionTombstones.publishSeq).toBeDefined();
     expect(projectionTombstones.tombstonedAt).toBeDefined();
+  });
+
+  // Phase 5b: 公開 read API は DO を起こせないため、「どのフィールドがフィルタ/ソート可能で、
+  // 値がどの型別カラムに入っているか・複数値か」を content_types から投影しておく必要がある
+  // （§12.4「フィルタ/ソートは索引宣言済みフィールドに限る」を DO 非経由で検証するための表）。
+  it("keeps a per-type field catalog for the public read API (Phase 5b)", () => {
+    expect(getTableName(projectionFields)).toBe("projection_fields");
+    expect(projectionFields.tenantId).toBeDefined();
+    expect(projectionFields.type).toBeDefined();
+    expect(projectionFields.fieldKey).toBeDefined();
+    expect(projectionFields.kind).toBeDefined();
+    expect(projectionFields.multi).toBeDefined();
+    expect(projectionFields.projectedAt).toBeDefined();
   });
 });

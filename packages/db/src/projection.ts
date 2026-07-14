@@ -109,3 +109,23 @@ export const projectionIndex = sqliteTable(
     index("idx_projection_index_record").on(table.tenantId, table.recordId),
   ],
 );
+
+// Phase 5b: 公開 read API のためのフィールドカタログ。公開経路は DO 内の content_types を
+// 読めない（DO を起こさないことがコスト設計の前提。§12.7）ため、「どのフィールドが索引宣言
+// 済みで、値が projection_index のどの型別カラムに入っているか・複数値か」をここへ投影する。
+// kind: 'text' | 'num' | 'bool' | 'date' は projection_index の対応カラム（bool は value_num の
+// 0/1）。'relation' は projected_relations を引くフィールド。multi=1 はソート不可（行分割により
+// 順序が未定義。ロードマップ §9）。record の upsert に相乗りする LWW 更新で、再投影の
+// mark-and-sweep が宣言から消えた行を掃く（projected_at はそのための列）。
+export const projectionFields = sqliteTable(
+  "projection_fields",
+  {
+    tenantId: text("tenant_id").notNull(),
+    type: text("type").notNull(),
+    fieldKey: text("field_key").notNull(),
+    kind: text("kind").notNull(),
+    multi: integer("multi").notNull().default(0),
+    projectedAt: integer("projected_at").notNull(), // epoch ms。再投影の mark-and-sweep 用
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.type, table.fieldKey] })],
+);
