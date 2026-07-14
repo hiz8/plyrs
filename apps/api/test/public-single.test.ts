@@ -100,6 +100,35 @@ describe("public single fetch (§12.4)", () => {
     expect(body.id).toBe(post1);
   });
 
+  // # 入り slug とその前置 slug がキャッシュキー上で衝突しないことの回帰テスト。
+  it("does not collide cache keys between a slug containing '#' and its prefix slug", async () => {
+    const trickyId = uuid(414);
+    const plainId = uuid(415);
+    await deliverJobs([
+      await writeAndPublish(stub, tenantId, "post", trickyId, {
+        title: "罠あり",
+        slug: "trick#one",
+      }),
+      await writeAndPublish(stub, tenantId, "post", plainId, {
+        title: "罠なし",
+        slug: "trick",
+      }),
+    ]);
+    const tricky = await app.request(
+      `/public/v1/${tenantSlug}/records/post/slug/trick%23one`,
+      {},
+      env,
+    );
+    expect(tricky.status).toBe(200);
+    const trickyBody = (await tricky.json()) as { fields: { title: string } };
+    expect(trickyBody.fields.title).toBe("罠あり");
+    const plain = await app.request(`/public/v1/${tenantSlug}/records/post/slug/trick`, {}, env);
+    expect(plain.status).toBe(200);
+    // 先行リクエストのキャッシュ済み本文（罠あり）が返ってこないこと
+    const plainBody = (await plain.json()) as { fields: { title: string } };
+    expect(plainBody.fields.title).toBe("罠なし");
+  });
+
   it("404s when the id exists under a different type (url must tell the truth)", async () => {
     const response = await app.request(`/public/v1/${tenantSlug}/records/author/${post1}`, {}, env);
     expect(response.status).toBe(404);

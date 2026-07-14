@@ -83,7 +83,12 @@ async function serveSingle(
     }
     include = parsed.include;
   }
-  const cacheUrl = canonicalCacheUrl(tenantId, `records/${type}/${lookup}/${value}`, params);
+  // slug は任意文字を含みうるため、キャッシュキー URL のフラグメント/クエリ境界に化けないようエンコードする
+  const cacheUrl = canonicalCacheUrl(
+    tenantId,
+    `records/${type}/${lookup}/${encodeURIComponent(value)}`,
+    params,
+  );
   // Hono の Context#executionCtx は自前の簡略 ExecutionContext 型（waitUntil / passThroughOnException
   // のみ）を返し、workers-types のリッチな ExecutionContext（tracing 等を要求）とは構造的に不一致
   // なので EdgeCacheContext へそのまま渡せない。実体は同じ CF ランタイムの ExecutionContext なので、
