@@ -329,3 +329,64 @@ Phase 10 の運用整備に持ち越す。
   （`data` + `relations` + index 行）を単一の DO RPC 応答に載せており、バイト数の予算を持たない。
   richtext 等で 1 レコードが大きいテナントでは、1 ページの応答サイズが実用上問題になるほど
   膨らみうる。ページサイズをバイト予算で動的に絞る仕組みは Phase 10 の関心事とする。
+
+## 10. Phase 5b 完了時の申し送り（最終レビュー 2026-07-14）
+
+Phase 5b（公開 read API）完了。`/public/v1/:tenantSlug/records/:type[...]` の単体（id / slug）・一覧
+（filter[] / sort / keyset カーソル / include）・関係解決・Cache API 短 TTL キャッシュを実装した。
+397 tests green（Phase 5a 時点 311 → +86）。
+
+**裁定（2026-07-14）:** クエリ語彙は `filter[field]=value` ブラケット記法（同一キー繰り返し = any-of、
+フィールド間 = AND、関係メンバーシップも同形）。カーソルは keyset（ソートキー値, record_id）の
+JSON→base64url **無署名**トークン（tenant/type/フィルタは毎回リクエストから束縛するため改ざんで
+他テナントに到達できない — この構造的根拠が無署名の前提。トークンに検索条件を足すときは再考）。
+関係展開は既定 ID + `?include=` で 1 段・トップレベル `included[]` 別置き。キャッシュは
+Cache API + `s-maxage=30`・publish 時パージなし。レスポンスは内部値（source_version /
+publish_seq / projected_at）非公開・ユーザーフィールドは `fields` 入れ子（publish_seq は単体
+GET の弱い ETag `W/"<seq>"` として内部利用のみ）。
+
+**projection_fields（フィールドカタログ表）を §12.2 に追加した（本フェーズ最大の構造的追加）:**
+公開経路は DO 内 content_types を読めないため、「どのフィールドが索引宣言済みか・値が
+projection_index のどの型別カラム（kind: text/num/bool/date、relation は projected_relations）に
+あるか・複数値か（multi=1 はソート不可）」をこの表で投影する。ライフサイクルは二重:
+(1) record upsert への相乗り LWW（順序トークンなし。**後退窓は「数秒」ではなく「次の publish か
+再投影まで」** — 古い再配達がカタログを巻き戻したら次のイベントまで残る。許容済み）、
+(2) 再投影の終端ページで **DO の `getProjectionCatalog()` RPC から全型ぶんを刷新してから sweep**
+する（公開レコード 0 件の型のカタログが sweep で消えて 400 化する事故を最終レビューで検出・修正
+済み。宣言から消えた幽霊行は刷新されないため従来どおり掃かれる）。フィルタ/ソート検証の
+400/空結果の区別は**宣言（カタログ）だけに依存し、公開レコードの有無に依存しない**。
+
+**Phase 5a の教訓の再演と対策（緑のテストに隠れていた本番専用障害）:** 一覧フィルタの最大語彙
+（8 フィールド × 20 値）が D1 の**バインド上限 100/クエリ**を突破していた（最悪約 190。ローカル
+SQLite は上限が緩く 391 テストが全部緑のまま）。`MAX_TOTAL_FILTER_VALUES = 60` の総数キャップと、
+**「語彙上の最悪形クエリで `buildListQuery(...).binds.length <= 100`」を assert する回帰テスト**
+（apps/api/src/public/query.test.ts）で封じた。**クエリ語彙を広げるときは必ずこの予算計算を
+更新すること**（固定 6 + scalar フィルタ 3×本数 + 値総数）。
+
+**実装上の確定事項:**
+- 関係フィールドは records.data に入らない（design-spec §6）ため、公開レスポンスは
+  `projected_relations` から関係 ID を**常時** `fields` へマージする
+  （`loadFieldRelationIdsForRecords`。include の有無で fields の形は変わらない。未公開参照先の
+  ID も残り、included にだけ現れない — ソフト参照の裁定どおり）。
+- `sort=published_at` はカタログ優先シャドーイング: ユーザーが published_at という索引フィールドを
+  宣言していれば projection_index（value_date 等）、無ければシステム列。**既定ソート（sort 未指定）
+  は常にシステム列 -published_at**。
+- tenantSlug はコントロールプレーンの共有定数（apps/api/src/routes/tenants.ts の
+  `TENANT_SLUG_PATTERN` / `TENANT_SLUG_MAX_LENGTH`）で入口検証してから KV/D1 に触れる
+  （512B 超 slug で KV get が throw → 500 になる穴を最終レビューで検出・修正済み）。slug 規則を
+  変えるときはこの定数だけを変える。
+- キャッシュキーは解決後 tenantId + percent-encoded value で正規化（`#` 入り slug の前置衝突で
+  別レコードの本文が返る汚染経路を検出・修正済み。回帰テストあり）。KV / Cache API への書き込みは
+  すべて best-effort（キャッシュ層の故障が read の可用性を落とさない）。
+- apps/api/tsconfig.json に `"lib": ["ES2023"]` を追加済み（無指定だと DOM lib が混入し
+  `caches.default` が型エラーになる。Workers アプリに DOM 型を入れないこと）。
+- リポジトリの commit-message フックは**件名 50 字上限**（verify-commit-message.sh）。
+
+**Phase 5c / 後続への持ち越し（最終レビューで defer 裁定済みの housekeeping）:**
+`Array#sort` → `toSorted` 2 箇所（lint warning）・`chunk<T>` の重複解消（include.ts と
+routes/public.ts、共有先は sql.ts の placeholders 隣が候補）・include 経路の projected_relations
+二重読み（loadFieldRelationIdsForRecords の結果から included の対象 ID を導出できる）・
+`cache.match` をクエリ検証より前段に移す最適化（フィルタ付きヒット時のカタログ 1 クエリ節約）・
+loadCatalog の kind 無検査キャスト（未知 kind を skip する 1 行の保険）・date フィルタ値の書式
+無検証・`unknown_tenant` と `not_found` の応答統一の検討。Phase 10 へ: tenant-resolver /
+キャッシュ put 失敗の可観測性、投影 D1 の QPS 監視、公開面のレート制限。
