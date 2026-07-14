@@ -74,6 +74,13 @@ describe("public single fetch (§12.4)", () => {
       fields: { title: "最初の投稿", rating: 5, category: "tech" },
     });
     expect(typeof body["publishedAt"]).toBe("string");
+    // 裁定（2026-07-14 #3）: include なしでも関係フィールドは ID 配列として fields に現れる
+    // （書き込み順 = ordinal 順。未公開の author3 の ID も残る）
+    expect((body["fields"] as Record<string, unknown>)["authors"]).toStrictEqual([
+      author1,
+      author2,
+      author3,
+    ]);
     for (const internal of ["sourceVersion", "publishSeq", "projectedAt", "data"]) {
       expect(body).not.toHaveProperty(internal);
     }

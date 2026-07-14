@@ -5,7 +5,6 @@ import { loadCatalog } from "../public/catalog";
 import { expandIncludes } from "../public/include";
 import { parseInclude } from "../public/query";
 import { toPublicRecord, type ProjectedRecordRow } from "../public/serialize";
-import { placeholders } from "../public/sql";
 import { resolveTenantId } from "../public/tenant-resolver";
 
 // design-spec §12.4〜12.7 / G3: 公開 read API。投影 D1（+ コントロールプレーン D1 と KV の
@@ -25,23 +24,22 @@ type PublicEnv = { Bindings: Env };
 const SINGLE_COLUMNS = "record_id, type, slug, published_at, data, publish_seq";
 
 // design-spec §6: 関係は data に入らない（write-record.test.ts で確定済みの不変条件）ので
-// toPublicRecord() が返す fields には関係フィールドの値が一切現れない。include されたフィールドに
-// 限り、projected_relations から生の参照値（未公開先も含め全件・ordinal 順）を fields に足し戻す。
-// included[]（公開済みのみに絞った解決済みオブジェクト）とは別物 — §12.5 のソフト参照を両立させる。
+// toPublicRecord() が返す fields には関係フィールドの値が一切現れない。裁定（2026-07-14 #3）:
+// 既定でも関係フィールドは ID 配列として fields に現れる — include は included[] の同梱だけを
+// 制御し、fields の形を変えない。未公開参照先の ID も残る（ソフト参照で included にだけ現れない）。
+// この record の field 由来の関係を全量引く（カタログ不要: 非関係フィールドはそもそも行が無い）。
 async function loadFieldRelationIds(
   db: D1Database,
   tenantId: string,
   recordId: string,
-  fieldKeys: string[],
 ): Promise<Record<string, string[]>> {
   const { results } = await db
     .prepare(
       "SELECT source_field, target_id FROM projected_relations" +
         " WHERE tenant_id = ?1 AND source_id = ?2 AND origin = 'field'" +
-        ` AND source_field IN (${placeholders(fieldKeys.length)})` +
         " ORDER BY source_field, ordinal",
     )
-    .bind(tenantId, recordId, ...fieldKeys)
+    .bind(tenantId, recordId)
     .all<{ source_field: string; target_id: string }>();
   const byField: Record<string, string[]> = {};
   for (const row of results) {
@@ -115,22 +113,23 @@ async function serveSingle(
       return c.json({ error: "not_found" }, 404);
     }
     const record = toPublicRecord(row);
+    // 既定でも関係フィールドは ID 配列として fields に現れる（裁定: include は included[] の
+    // 同梱だけを制御し、fields の形を変えない。未公開参照先の ID も残る — ソフト参照で
+    // included にだけ現れない）。
+    const base = {
+      ...record,
+      fields: {
+        ...record.fields,
+        ...(await loadFieldRelationIds(c.env.PROJECTION_DB, tenantId, row.record_id)),
+      },
+    };
     const body =
       include.length > 0
         ? {
-            ...record,
-            fields: {
-              ...record.fields,
-              ...(await loadFieldRelationIds(
-                c.env.PROJECTION_DB,
-                tenantId,
-                row.record_id,
-                include,
-              )),
-            },
+            ...base,
             included: await expandIncludes(c.env.PROJECTION_DB, tenantId, [row.record_id], include),
           }
-        : record;
+        : base;
     const response = c.json(body);
     // 裁定: publish_seq は公開しないが ETag の弱い検証子としての内部利用は可
     response.headers.set("etag", `W/"${row.publish_seq}"`);
