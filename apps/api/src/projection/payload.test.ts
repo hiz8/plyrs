@@ -1,6 +1,11 @@
 import type { FieldDefinition } from "@plyrs/metamodel";
 import { describe, expect, it } from "vitest";
-import { buildProjectionPayload, promoteSlug, type PublishedSnapshot } from "./payload";
+import {
+  buildProjectionPayload,
+  catalogRowsForFields,
+  promoteSlug,
+  type PublishedSnapshot,
+} from "./payload";
 
 const fields: FieldDefinition[] = [
   { key: "title", type: "text", required: true },
@@ -136,5 +141,39 @@ describe("buildProjectionPayload", () => {
     const payload = buildProjectionPayload([], snapshot({ slug: "hello" }));
     expect(payload.index).toStrictEqual([]);
     expect(payload.slug).toBeNull();
+  });
+});
+
+// Phase 5b: 公開 read API が「フィルタ/ソート可能なフィールドと型別カラム」を DO 非経由で
+// 知るためのカタログ。indexed 宣言済みスカラーと関係フィールドだけが載る = 「フィルタ/ソートは
+// 索引宣言済みフィールドに限る」（§12.4）の実体。
+describe("catalogRowsForFields", () => {
+  it("lists indexed scalar fields with their typed column kind", () => {
+    const rows = catalogRowsForFields(fields);
+    expect(rows).toContainEqual({ fieldKey: "slug", kind: "text", multi: false });
+    expect(rows).toContainEqual({ fieldKey: "published_at", kind: "date", multi: false });
+    expect(rows).toContainEqual({ fieldKey: "reading_minutes", kind: "num", multi: false });
+    expect(rows).toContainEqual({ fieldKey: "featured", kind: "bool", multi: false });
+  });
+
+  it("marks an indexed multi-select as multi (sortable: no, filter: any-of)", () => {
+    const rows = catalogRowsForFields(fields);
+    expect(rows).toContainEqual({ fieldKey: "tags", kind: "text", multi: true });
+  });
+
+  it("always lists relation fields (projected_relations is projected unconditionally)", () => {
+    const rows = catalogRowsForFields(fields);
+    expect(rows).toContainEqual({ fieldKey: "authors", kind: "relation", multi: true });
+  });
+
+  it("omits fields that are not indexed and cannot be filtered", () => {
+    const keys = catalogRowsForFields(fields).map((row) => row.fieldKey);
+    expect(keys).not.toContain("title"); // indexed 宣言なし
+    expect(keys).not.toContain("body"); // richtext は indexed を持てない
+  });
+
+  it("rides on buildProjectionPayload", () => {
+    const payload = buildProjectionPayload(fields, snapshot({ slug: "hello" }));
+    expect(payload.catalog).toStrictEqual(catalogRowsForFields(fields));
   });
 });

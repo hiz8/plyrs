@@ -15,6 +15,17 @@ export interface ProjectionIndexRow {
   valueDate: string | null;
 }
 
+// Phase 5b: 公開 read API のフィールドカタログ（§12.4）。kind は projection_index の型別カラム
+// （bool は value_num の 0/1）に対応し、'relation' は projected_relations を引く。multi=true は
+// ソート不可（行分割で順序が未定義）。
+export type CatalogKind = "text" | "num" | "bool" | "date" | "relation";
+
+export interface CatalogRow {
+  fieldKey: string;
+  kind: CatalogKind;
+  multi: boolean;
+}
+
 // DO 内 published_snapshots 行のドメイン表現（design-spec §7）
 export interface PublishedSnapshot {
   recordId: string;
@@ -38,6 +49,7 @@ export interface ProjectionPayload {
   publishSeq: number; // CRITICAL fix: 投影ジョブの順序ガード本体
   relations: ProjectionRelationRow[];
   index: ProjectionIndexRow[];
+  catalog: CatalogRow[]; // Phase 5b: 公開 read API のフィルタ/ソート検証用（型レベル情報）
 }
 
 // G4: 新しい宣言語彙を増やさず「key が 'slug' の unique な text フィールド」を実カラムへ昇格する
@@ -107,6 +119,52 @@ function indexRowsForField(
   }
 }
 
+// indexed 宣言済みスカラーと関係フィールドだけが載る。関係は projected_relations が常に全量
+// 投影されるため宣言不要でフィルタ（メンバーシップ）可能。
+export function catalogRowsForFields(fields: FieldDefinition[]): CatalogRow[] {
+  const rows: CatalogRow[] = [];
+  for (const field of fields) {
+    switch (field.type) {
+      case "text":
+        if (field.config?.indexed === true) {
+          rows.push({ fieldKey: field.key, kind: "text", multi: false });
+        }
+        break;
+      case "number":
+        if (field.config?.indexed === true) {
+          rows.push({ fieldKey: field.key, kind: "num", multi: false });
+        }
+        break;
+      case "boolean":
+        if (field.config?.indexed === true) {
+          rows.push({ fieldKey: field.key, kind: "bool", multi: false });
+        }
+        break;
+      case "datetime":
+        if (field.config?.indexed === true) {
+          rows.push({ fieldKey: field.key, kind: "date", multi: false });
+        }
+        break;
+      case "select":
+        if (field.config.indexed === true) {
+          rows.push({ fieldKey: field.key, kind: "text", multi: field.config.multiple === true });
+        }
+        break;
+      case "relation":
+        rows.push({
+          fieldKey: field.key,
+          kind: "relation",
+          multi: field.config.cardinality === "many",
+        });
+        break;
+      default:
+        // json / richtext はフィルタ/ソート不可（indexed を構造的に持てない）
+        break;
+    }
+  }
+  return rows;
+}
+
 export function buildProjectionPayload(
   fields: FieldDefinition[],
   snapshot: PublishedSnapshot,
@@ -121,5 +179,6 @@ export function buildProjectionPayload(
     publishSeq: snapshot.publishSeq,
     relations: snapshot.relations,
     index: fields.flatMap((field) => indexRowsForField(field, snapshot.data)),
+    catalog: catalogRowsForFields(fields),
   };
 }

@@ -411,6 +411,7 @@ describe("upsertStatements — direct-call staleness guard (handleProjectionJob 
         },
       ],
       index: [{ fieldKey: "slug", valueText: "stale-slug", valueNum: null, valueDate: null }],
+      catalog: [],
     };
 
     await env.PROJECTION_DB.batch(
