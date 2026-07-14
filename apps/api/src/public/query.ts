@@ -49,6 +49,15 @@ export const MAX_LIMIT = 100;
 const MAX_FILTERS = 8;
 const MAX_FILTER_VALUES = 20;
 const MAX_INCLUDE_FIELDS = 5;
+// Finding 1（critical）: フィルタ値の総数上限。sql.ts の buildListQuery が単一クエリに積む
+// バインド数は「固定 6」（tenant_id/type 2 + カーソル 2 + limit 1 + 索引ソート用フィールド 1）＋
+// 「フィルタごとの定数オーバーヘッド × フィルタ数」＋「フィルタ値の総数」。scalar フィルタの方が
+// relation フィルタより重い（tenant_id/type/field_key の 3 バインド vs tenant_id/field_key の 2）ので
+// 最悪形は全フィルタが scalar のとき: 6 + 3 * MAX_FILTERS(8) + 総数 = 30 + 総数。
+// D1 の 1 クエリのバインド上限は 100 なので、60 を上限にすれば 30 + 60 = 90 に収まり、
+// 実装の細部が多少ずれても耐える 10 バインドの安全マージンを残せる（本番のみ 500 化する
+// 事故を防ぐのが目的で、ローカル SQLite は上限が緩くテストが緑のままだった）。
+const MAX_TOTAL_FILTER_VALUES = 60;
 
 const FILTER_KEY_PATTERN = /^filter\[([a-z][a-z0-9_]*)\]$/u;
 const SORT_PATTERN = /^(-?)([a-z][a-z0-9_]*)$/u;
@@ -111,6 +120,7 @@ export function parseInclude(
 
 export function parseListQuery(params: Record<string, string[]>, catalog: Catalog): ParseResult {
   const filters: ListFilter[] = [];
+  let totalFilterValues = 0;
   let sortParam: string | null = null;
   let limitParam: string | null = null;
   let cursorParam: string | null = null;
@@ -126,6 +136,10 @@ export function parseListQuery(params: Record<string, string[]>, catalog: Catalo
       }
       if (rawValues.length === 0 || rawValues.length > MAX_FILTER_VALUES) {
         return { ok: false, error: `bad filter value count: ${fieldKey}` };
+      }
+      totalFilterValues += rawValues.length;
+      if (totalFilterValues > MAX_TOTAL_FILTER_VALUES) {
+        return { ok: false, error: "too many filter values" };
       }
       if (filters.length >= MAX_FILTERS) {
         return { ok: false, error: "too many filters" };

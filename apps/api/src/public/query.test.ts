@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Catalog } from "./catalog";
 import { encodeCursor } from "./cursor";
 import { DEFAULT_LIMIT, parseInclude, parseListQuery } from "./query";
+import { buildListQuery } from "./sql";
 
 function catalog(): Catalog {
   return new Map([
@@ -18,6 +19,17 @@ function catalog(): Catalog {
 
 function emptyCatalog(): Catalog {
   return new Map();
+}
+
+// Finding 1 の bind 予算テスト専用: MAX_FILTERS(8) 個の別フィールドにフィルタを掛けるための
+// scalar フィールドが多いカタログ。
+function manyFieldCatalog(): Catalog {
+  const map: Catalog = new Map();
+  for (let i = 0; i < 8; i += 1) {
+    map.set(`f${i}`, { kind: "text", multi: false });
+  }
+  map.set("sortfield", { kind: "text", multi: false });
+  return map;
 }
 
 describe("parseListQuery (§12.4 の語彙)", () => {
@@ -152,6 +164,56 @@ describe("parseListQuery (§12.4 の語彙)", () => {
 
   it("rejects repeated reserved params", () => {
     expect(parseListQuery({ limit: ["5", "10"] }, emptyCatalog()).ok).toBe(false);
+  });
+});
+
+// Finding 1（critical）: フィルタ値の総数が D1 の 1 クエリのバインド上限（100）を突破しうる。
+// buildListQuery の最悪形は 6 固定バインド（tenant/type 2 + カーソル 2 + limit 1 + 索引ソート
+// フィールド 1）+ フィルタごとの定数 3（scalar フィルタが relation より重い）× MAX_FILTERS(8) +
+// フィルタ値の総数。旧語彙（MAX_FILTERS=8 × MAX_FILTER_VALUES=20/filter、総数無制限）だと
+// 8 filters × 20 values = 160 が素通りし、6 + 24 + 160 = 190 バインドで D1 の上限を超える。
+describe("parseListQuery: MAX_TOTAL_FILTER_VALUES（D1 バインド予算、Finding 1）", () => {
+  it("rejects when the total filter value count exceeds the D1 bind budget (60)", () => {
+    // 4 フィールド × 20 値 = 80 > 60
+    const twenty = Array.from({ length: 20 }, (_, i) => `v${i}`);
+    const parsed = parseListQuery(
+      { "filter[f0]": twenty, "filter[f1]": twenty, "filter[f2]": twenty, "filter[f3]": twenty },
+      manyFieldCatalog(),
+    );
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) {
+      expect(parsed.error).toMatch(/too many filter values/);
+    }
+  });
+
+  it("accepts exactly the total filter value budget (60)", () => {
+    const twenty = Array.from({ length: 20 }, (_, i) => `v${i}`);
+    const parsed = parseListQuery(
+      { "filter[f0]": twenty, "filter[f1]": twenty, "filter[f2]": twenty },
+      manyFieldCatalog(),
+    );
+    expect(parsed.ok).toBe(true);
+  });
+
+  it("keeps buildListQuery's bind count within D1's 100/query cap for the worst allowed query", () => {
+    // 語彙が許す最大形: フィルタ 8 個（MAX_FILTERS）× 値の総数 60（MAX_TOTAL_FILTER_VALUES）＋
+    // 索引ソート（+1 バインド）＋ カーソル（+2 バインド）。
+    const params: Record<string, string[]> = {
+      sort: ["-sortfield"],
+      cursor: [encodeCursor({ k: "cur", id: "r000" })],
+    };
+    // 60 を 8 フィルタへできるだけ均等に配る（8,8,8,8,7,7,7,7 = 60）
+    const base = Math.floor(60 / 8);
+    const remainder = 60 % 8;
+    for (let i = 0; i < 8; i += 1) {
+      const count = base + (i < remainder ? 1 : 0);
+      params[`filter[f${i}]`] = Array.from({ length: count }, (_, j) => `v${i}-${j}`);
+    }
+    const parsed = parseListQuery(params, manyFieldCatalog());
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) throw new Error(parsed.error);
+    const built = buildListQuery("tenant-1", "post", parsed.query);
+    expect(built.binds.length).toBeLessThanOrEqual(100);
   });
 });
 
