@@ -53,7 +53,9 @@ export async function withEdgeCache(
         // ExecutionContext が無い環境（app.request 直呼びのテスト等）では同期で書く
         ctx = null;
       }
-      const putPromise = cache.put(key, stored);
+      // キャッシュ書き込みは best-effort。失敗してもレスポンスは返す —— Task 4 の
+      // tenant-resolver と同じ方針。
+      const putPromise = cache.put(key, stored).catch(() => {});
       if (ctx !== null) {
         ctx.waitUntil(putPromise);
       } else {
@@ -61,10 +63,13 @@ export async function withEdgeCache(
       }
     }
   }
-  const etag = response.headers.get("etag");
-  const ifNoneMatch = context.req.raw.headers.get("if-none-match");
-  if (etag !== null && ifNoneMatch !== null && ifNoneMatch === etag) {
-    return new Response(null, { status: 304, headers: response.headers });
+  // 304 への短絡はキャッシュ可能な 200 に限る。非 200 が etag を持っていても 304 に化けさせない。
+  if (response.status === 200) {
+    const etag = response.headers.get("etag");
+    const ifNoneMatch = context.req.raw.headers.get("if-none-match");
+    if (etag !== null && ifNoneMatch !== null && ifNoneMatch === etag) {
+      return new Response(null, { status: 304, headers: response.headers });
+    }
   }
   return response;
 }

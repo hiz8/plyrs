@@ -1,6 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    // lib 未指定だと es2023.full（DOM 込み）になり、DOM の CacheStorage が
+    // workers-types の宣言（caches.default あり）と衝突する。Workers には DOM は無い。
+    "lib": ["ES2023"],
     "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"]
   },
   "include": ["src", "test", "env.d.ts", "vitest.config.ts"]
