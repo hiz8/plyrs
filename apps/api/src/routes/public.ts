@@ -8,6 +8,7 @@ import { parseInclude, parseListQuery } from "../public/query";
 import { toPublicRecord, type ProjectedRecordRow } from "../public/serialize";
 import { buildListQuery, placeholders, type ListRow } from "../public/sql";
 import { resolveTenantId } from "../public/tenant-resolver";
+import { TENANT_SLUG_MAX_LENGTH, TENANT_SLUG_PATTERN } from "./tenants";
 
 // design-spec §12.4〜12.7 / G3: 公開 read API。投影 D1（+ コントロールプレーン D1 と KV の
 // テナント解決）だけを読み、DO は絶対に起こさない。認証なし（公開経路）。
@@ -15,7 +16,22 @@ import { resolveTenantId } from "../public/tenant-resolver";
 
 // 型キーはプラグイン名前空間（blog.post）も通す。形が違うものは D1 を引かず 404
 const TYPE_KEY_PATTERN = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$/u;
+// Finding 2（important）: 正規表現自体には長さ上限が無い（`*` は際限なく伸びる）ので、
+// パターンとは別に上限を明示する。128 は実運用の型キー（プラグイン名前空間込みでも数十文字）に
+// 十分な余裕。
+const TYPE_KEY_MAX_LENGTH = 128;
 const MAX_PARAM_LENGTH = 256;
+
+function isValidTypeKey(type: string): boolean {
+  return type.length <= TYPE_KEY_MAX_LENGTH && TYPE_KEY_PATTERN.test(type);
+}
+
+// Finding 2（important）: tenantSlug は createTenantSchema（routes/tenants.ts）が受理した形にしか
+// 存在しえない。ここで同じ規則を通す前に弾けば、ゴミ slug の連打が KV get / コントロールプレーン
+// D1 に一切届かない ―― 512B 超の slug をそのまま KV get に渡すと本番の KV は throw する（500 化）。
+function isValidTenantSlug(slug: string): boolean {
+  return slug.length <= TENANT_SLUG_MAX_LENGTH && TENANT_SLUG_PATTERN.test(slug);
+}
 
 interface SingleRow extends ProjectedRecordRow {
   publish_seq: number;
@@ -93,13 +109,16 @@ async function serveSingle(
   // "." / ".." はキャッシュキー URL のドットセグメント正規化の残余を閉じる（そもそも実 record_id /
   // slug ではないが、正規化経由でキャッシュキーが化けないよう入口で明示的に弾く）
   if (
-    !TYPE_KEY_PATTERN.test(type) ||
+    !isValidTypeKey(type) ||
     value.length === 0 ||
     value.length > MAX_PARAM_LENGTH ||
     value === "." ||
     value === ".."
   ) {
     return c.json({ error: "not_found" }, 404);
+  }
+  if (!isValidTenantSlug(tenantSlug)) {
+    return c.json({ error: "unknown_tenant" }, 404);
   }
   const tenantId = await resolveTenantId(c.env, tenantSlug);
   if (tenantId === null) {
@@ -180,10 +199,14 @@ export const publicRoutes = new Hono<PublicEnv>()
   // どちらとも被らないことを明示的に保証）
   .get("/:tenantSlug/records/:type", async (c) => {
     const type = c.req.param("type") ?? "";
-    if (!TYPE_KEY_PATTERN.test(type)) {
+    if (!isValidTypeKey(type)) {
       return c.json({ error: "not_found" }, 404);
     }
-    const tenantId = await resolveTenantId(c.env, c.req.param("tenantSlug") ?? "");
+    const tenantSlug = c.req.param("tenantSlug") ?? "";
+    if (!isValidTenantSlug(tenantSlug)) {
+      return c.json({ error: "unknown_tenant" }, 404);
+    }
+    const tenantId = await resolveTenantId(c.env, tenantSlug);
     if (tenantId === null) {
       return c.json({ error: "unknown_tenant" }, 404);
     }

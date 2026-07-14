@@ -202,6 +202,14 @@ describe("public list (§12.4 / §12.5)", () => {
     );
   });
 
+  // Finding 2（important）: tenantSlug の形/長さが tenants.ts の slug 規則に不一致なら
+  // KV/D1 を引かずに即 404（512B 超の slug を KV get にそのまま渡すと本番で throw → 500 化しうる）。
+  it("404s for a malformed or overlong tenant slug, without reaching KV/D1 (Finding 2)", async () => {
+    const tooLong = "a".repeat(600);
+    expect((await list(tooLong, "")).status).toBe(404);
+    expect((await list("UPPER-CASE", "")).status).toBe(404);
+  });
+
   it("rejects bad queries with 400", async () => {
     for (const query of [
       "?filter[title]=x", // 索引宣言なし

@@ -8,12 +8,14 @@ import { z } from "zod";
 import { memberships, tenants } from "@plyrs/db/control-plane";
 import { lookupSession, SESSION_COOKIE } from "../auth/session";
 
+// Finding 2（important）: 公開 read API（routes/public.ts）が tenantSlug を KV/コントロールプレーン
+// D1 へ渡す前に同じ規則で早期検証できるよう、slug の形と長さの上限を共有定数として公開する。
+export const TENANT_SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
+export const TENANT_SLUG_MAX_LENGTH = 63;
+
 const createTenantSchema = z.object({
   name: z.string().min(1).max(100),
-  slug: z
-    .string()
-    .regex(/^[a-z][a-z0-9-]*$/)
-    .max(63),
+  slug: z.string().regex(TENANT_SLUG_PATTERN).max(TENANT_SLUG_MAX_LENGTH),
 });
 
 // 注: テナント作成の特権ゲート（design-spec §11.6）は Phase 10 の管轄。

@@ -149,6 +149,20 @@ describe("public single fetch (§12.4)", () => {
     ).toBe(404);
   });
 
+  // Finding 2（important）: tenantSlug が createTenantSchema の slug 規則に不一致（形が違う・
+  // 長すぎる）なら、KV get / コントロールプレーン D1 を一切引かずに 404 で弾く。512B 超の
+  // slug をそのまま KV get に渡すと本番の KV 実装は throw しうる（500 化）。UPPER-case など
+  // 形不一致も同様に「そもそも有効な slug たりえない」ので早期 404。
+  it("404s for a tenant slug that is too long or malformed, without reaching KV/D1 (Finding 2)", async () => {
+    const tooLong = "a".repeat(600);
+    const longRes = await app.request(`/public/v1/${tooLong}/records/post/${post1}`, {}, env);
+    expect(longRes.status).toBe(404);
+
+    const upperCase = "UPPER-CASE";
+    const upperRes = await app.request(`/public/v1/${upperCase}/records/post/${post1}`, {}, env);
+    expect(upperRes.status).toBe(404);
+  });
+
   it("expands include=authors into included[], dropping unpublished targets", async () => {
     const response = await app.request(
       `/public/v1/${tenantSlug}/records/post/${post1}?include=authors`,
