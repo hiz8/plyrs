@@ -2,7 +2,7 @@ import type { ContentTypeRow, RegisterContentTypeResult } from "./do/content-typ
 import type { DeleteRecordResult } from "./do/delete-record";
 import type { PublishResult, UnpublishResult } from "./do/publish";
 import type { RecordSnapshot, WriteRecordResult } from "./do/types";
-import type { ProjectionPayload } from "./projection/payload";
+import type { CatalogRow, ProjectionPayload } from "./projection/payload";
 
 // Cloudflare の Rpc.Result 型は Record<string, unknown>（RecordSnapshot.data）を
 // Serializable と証明できず、ok:true 側の union 枝を never に潰す（実行時の直列化は正しい）。
@@ -50,4 +50,8 @@ export function asReprojectResult(
   value: unknown,
 ): { ok: true; epoch: number } | { ok: false; code: "forbidden"; message: string } {
   return value as { ok: true; epoch: number } | { ok: false; code: "forbidden"; message: string };
+}
+
+export function asProjectionCatalog(value: unknown): { type: string; catalog: CatalogRow[] }[] {
+  return value as { type: string; catalog: CatalogRow[] }[];
 }

@@ -42,13 +42,7 @@ export function issuesToMessage(issues: z.core.$ZodIssue[]): string {
   return issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
 }
 
-export function loadContentTypeByKey(sql: SqlStorage, key: string): ContentTypeRow | null {
-  const row = sql
-    .exec<RawContentTypeRow>("SELECT * FROM content_types WHERE key = ?", key)
-    .toArray()[0];
-  if (row === undefined) {
-    return null;
-  }
+function rowToContentTypeRow(row: RawContentTypeRow): ContentTypeRow {
   return {
     id: row.id,
     key: row.key,
@@ -60,6 +54,23 @@ export function loadContentTypeByKey(sql: SqlStorage, key: string): ContentTypeR
     updatedAt: row.updated_at,
     version: row.version,
   };
+}
+
+export function loadContentTypeByKey(sql: SqlStorage, key: string): ContentTypeRow | null {
+  const row = sql
+    .exec<RawContentTypeRow>("SELECT * FROM content_types WHERE key = ?", key)
+    .toArray()[0];
+  return row === undefined ? null : rowToContentTypeRow(row);
+}
+
+// Finding 3（important）: 再投影の終端 sweep がカタログ（projection_fields）を content_types から
+// 作り直せるように、全 content_types 行をロードする。getProjectionPayload / getPublishedPage
+// （do/publish.ts）と同じ「DO の SQLite を読むだけの素朴な関数」という様式に合わせる。
+export function loadAllContentTypeRows(sql: SqlStorage): ContentTypeRow[] {
+  return sql
+    .exec<RawContentTypeRow>("SELECT * FROM content_types ORDER BY key ASC")
+    .toArray()
+    .map(rowToContentTypeRow);
 }
 
 export function rowToDefinition(row: ContentTypeRow): ContentTypeDefinition {

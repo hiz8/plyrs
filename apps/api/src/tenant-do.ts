@@ -17,6 +17,7 @@ import {
 } from "./do/alarms";
 import { requireOperation, type AuthContext } from "./do/authorize";
 import {
+  loadAllContentTypeRows,
   loadContentTypeByKey,
   registerContentTypeCore,
   type ContentTypeRow,
@@ -35,7 +36,11 @@ import {
 import { loadRecord, writeRecordCore } from "./do/write-record";
 import type { RecordSnapshot, WriteRecordInput, WriteRecordResult } from "./do/types";
 import type { ProjectionJob } from "./projection/jobs";
-import type { ProjectionPayload } from "./projection/payload";
+import {
+  catalogRowsForFields,
+  type CatalogRow,
+  type ProjectionPayload,
+} from "./projection/payload";
 import {
   CLOSE_CODES,
   KEEPALIVE_PING,
@@ -399,6 +404,19 @@ export class TenantDO extends DurableObject<Env> {
     limit: number,
   ): { payloads: ProjectionPayload[]; nextCursor: string | null } {
     return loadPublishedPage(this.ctx.storage.sql, cursor, limit);
+  }
+
+  // Finding 3（important）: 再投影の終端 sweep が使う。カタログ（projection_fields）は record の
+  // 投影 upsert への相乗りでしか更新されないため、全件 unpublish 済みの型は歩きのページ読み取りに
+  // 一度も乗らず、宣言（content_types）が生きていても sweep がカタログ行を消してしまう
+  // （projection/consumer.ts の handleReprojectJob 参照）。カタログは公開レコードの有無ではなく
+  // 「宣言があるか」だけに依存するべき派生物なので、record とは独立に content_types から
+  // 直接作り直せる経路を用意する。
+  getProjectionCatalog(): { type: string; catalog: CatalogRow[] }[] {
+    return loadAllContentTypeRows(this.ctx.storage.sql).map((row) => ({
+      type: row.key,
+      catalog: catalogRowsForFields(row.fields),
+    }));
   }
 
   // §12.3b: テナント単位の再投影を開始する（owner 限定）。epoch を刻んで最初の reproject

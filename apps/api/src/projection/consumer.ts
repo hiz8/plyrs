@@ -1,4 +1,4 @@
-import { asProjectionPayload, asPublishedPage } from "../rpc-unwrap";
+import { asProjectionCatalog, asProjectionPayload, asPublishedPage } from "../rpc-unwrap";
 import {
   REPROJECT_PAGE_SIZE,
   SWEEP_SKEW_MARGIN_MS,
@@ -137,8 +137,12 @@ export function upsertStatements(
   // カタログは record の世代ではなく「payload を組み立てた時点の content_types」を写すため、
   // stale な record ジョブが運ぶカタログも内容的には現在の宣言である（LWW で十分。型定義変更と
   // 競合してズレても、次の publish か再投影が上書きする）。record 側のガードで弾かれたジョブが
-  // カタログだけ更新しても無害。record の EXISTS ガードにも載せない: 公開レコードが 0 件でも
-  // フィルタ検証の 400/空結果の区別はカタログに依存しないため（検証は「宣言があるか」だけを見る）。
+  // カタログだけ更新しても無害。record の EXISTS ガードにも載せない: 400/空結果の区別は宣言
+  // （カタログ）だけに依存させ、公開レコードの有無に依存させない設計だから ―― 検証は「宣言が
+  // あるか」だけを見るべきで、宣言はあるが公開レコードが 0 件の型でもフィルタは 400 ではなく
+  // 空配列を返すべき（Finding 3: この不変条件を守るため、再投影の終端 sweep 直前に
+  // handleReprojectJob が DO の getProjectionCatalog() からカタログを取り直して upsert する。
+  // record が 0 件でも宣言が生きている限りカタログが消えないようにするのがその実装）。
   for (const catalogRow of payload.catalog) {
     statements.push(
       db
@@ -242,6 +246,41 @@ async function handleReprojectJob(env: Env, job: ReprojectJob, nowMs: number): P
       epoch: job.epoch,
     });
     return;
+  }
+  // Finding 3（important）: sweep の前に DO から content_types 由来のカタログを取り直して
+  // upsert する。カタログは record payload への相乗り（upsertStatements）でしか更新されないため、
+  // 全件 unpublish 済みの型（公開レコード 0 件）は歩きのページ読み取りに一度も乗らない ――
+  // 宣言（content_types）はまだ生きているのに、この後の sweep（projected_at < epoch - margin）
+  // だけがカタログ行を「触られなかった残骸」として掃いてしまうと、以後そのテナントのフィルタ/
+  // include 検証が「索引宣言なし」の 400 に化ける（upsertStatements 内のコメント参照: 400/空結果
+  // の区別は宣言だけに依存すべきで、公開レコードの有無に依存させてはならない）。
+  // 再投影はそもそも DO を起こす管理経路（オーナー操作）であり、§12.7 が「公開 read の本線に
+  // DO を挟まない」というコスト前提を置いたのは高頻度の read 経路の話なので、ここで DO を
+  // もう1回追加で叩くことは設計上問題ない。カタログは content_types からも決定的に再構築できる
+  // 派生物である（§12.3b の「投影は snapshot から再構築できる派生物」と同じ考え方）ので、
+  // record の生死とは独立に生存できるべきもの、という不変条件をこれで守る。
+  const catalogTypes = asProjectionCatalog(await stubFor(env, job.tenantId).getProjectionCatalog());
+  const catalogStatements = catalogTypes.flatMap(({ type, catalog }) =>
+    catalog.map((catalogRow) =>
+      env.PROJECTION_DB.prepare(
+        `INSERT INTO projection_fields (tenant_id, type, field_key, kind, multi, projected_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(tenant_id, type, field_key) DO UPDATE SET
+           kind = excluded.kind,
+           multi = excluded.multi,
+           projected_at = excluded.projected_at`,
+      ).bind(
+        job.tenantId,
+        type,
+        catalogRow.fieldKey,
+        catalogRow.kind,
+        catalogRow.multi ? 1 : 0,
+        nowMs,
+      ),
+    ),
+  );
+  if (catalogStatements.length > 0) {
+    await env.PROJECTION_DB.batch(catalogStatements);
   }
   // レビュー指摘（重大）: job.epoch は DO のアイソレートで刻んだ Date.now()、projected_at は
   // この consumer のアイソレートで刻んだ Date.now() ―― 別アイソレートの別時計であり、
