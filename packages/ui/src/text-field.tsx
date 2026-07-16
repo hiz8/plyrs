@@ -50,11 +50,7 @@ export function TextField({ label, errorMessage, ...props }: TextFieldProps) {
           state.isFocused && styles.inputFocused,
         ])}
       />
-      {errorMessage && (
-        <FieldError className={stylex.props(styles.error).className ?? ""}>
-          {errorMessage}
-        </FieldError>
-      )}
+      <FieldError className={stylex.props(styles.error).className ?? ""}>{errorMessage}</FieldError>
     </RacTextField>
   );
 }

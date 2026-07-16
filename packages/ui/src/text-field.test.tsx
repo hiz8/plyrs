@@ -20,4 +20,19 @@ describe("TextField (react-aria-components + StyleX)", () => {
     render(<TextField label="名前" />);
     expect(screen.queryByText("12文字以上にしてください")).not.toBeInTheDocument();
   });
+
+  it("surfaces validate-derived errors when errorMessage is omitted", async () => {
+    render(
+      <form>
+        <TextField
+          label="コード"
+          name="code"
+          validate={(value) => (value === "ok" ? null : "コードが不正です")}
+        />
+        <button type="submit">送信</button>
+      </form>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "送信" }));
+    expect(await screen.findByText("コードが不正です")).toBeInTheDocument();
+  });
 });
