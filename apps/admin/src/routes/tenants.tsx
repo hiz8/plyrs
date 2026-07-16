@@ -93,7 +93,11 @@ function TenantsPage() {
   }
 
   async function logout() {
-    await api.logout();
+    try {
+      await api.logout();
+    } catch {
+      // サーバー側 revoke の失敗とローカル資格情報の破棄は独立の関心 — ローカルは必ず破棄する
+    }
     tokens.clear();
     queryClient.clear();
     await router.navigate({ to: "/login" });

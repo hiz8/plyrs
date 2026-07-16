@@ -11,6 +11,8 @@ const REFRESH_MARGIN_MS = 60_000;
 export function createTokenManager({ issueToken, now = Date.now }: TokenManagerDeps) {
   const cache = new Map<string, { token: string; expiresAt: number }>();
   const inflight = new Map<string, Promise<string>>();
+  // clear() 後に解決した飛行中リクエストが前セッションのトークンを書き戻さないための世代番号
+  let generation = 0;
   return {
     async getToken(tenantId: string): Promise<string> {
       const cached = cache.get(tenantId);
@@ -21,20 +23,28 @@ export function createTokenManager({ issueToken, now = Date.now }: TokenManagerD
       if (pending !== undefined) {
         return pending;
       }
+      const startedGeneration = generation;
       const promise = issueToken(tenantId)
         .then(({ token, expiresIn }) => {
-          cache.set(tenantId, { token, expiresAt: now() + expiresIn * 1000 });
-          inflight.delete(tenantId);
+          if (generation === startedGeneration) {
+            cache.set(tenantId, { token, expiresAt: now() + expiresIn * 1000 });
+          }
+          if (inflight.get(tenantId) === promise) {
+            inflight.delete(tenantId);
+          }
           return token;
         })
         .catch((error: unknown) => {
-          inflight.delete(tenantId);
+          if (inflight.get(tenantId) === promise) {
+            inflight.delete(tenantId);
+          }
           throw error;
         });
       inflight.set(tenantId, promise);
       return promise;
     },
     clear(): void {
+      generation += 1;
       cache.clear();
       inflight.clear();
     },

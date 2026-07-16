@@ -57,4 +57,27 @@ describe("token manager (2026-07-16 裁定: メモリのみ + 先回りリフレ
     await expect(manager.getToken("a")).rejects.toThrow("boom");
     expect(await manager.getToken("a")).toBe("t");
   });
+
+  it("does not repopulate the cache when clear() races an in-flight issue", async () => {
+    let resolveIssue: ((value: { token: string; expiresIn: number }) => void) | undefined;
+    const issueToken = vi.fn(
+      () =>
+        new Promise<{ token: string; expiresIn: number }>((resolve) => {
+          resolveIssue = resolve;
+        }),
+    );
+    const manager = createTokenManager({ issueToken, now: () => 0 });
+    const pending = manager.getToken("a");
+    manager.clear(); // ログアウトが飛行中の発行と競合
+    resolveIssue?.({ token: "stale-user-token", expiresIn: 900 });
+    await pending;
+    // clear 後の解決はキャッシュへ書き戻されない → 次の getToken は再発行
+    // (issueToken への発行呼び出しは getToken 内の同期プレフィックスで即座に走るため、
+    //  再発行分の未解決 Promise を待つ必要はない — ここでは呼び出し回数のみ検証する)
+    const reissued = manager.getToken("a");
+    expect(issueToken).toHaveBeenCalledTimes(2);
+    // 浮いた未解決 Promise を残さない（テスト出力の清潔さ）: 2 回目の発行も解決して回収する
+    resolveIssue?.({ token: "fresh-token", expiresIn: 900 });
+    expect(await reissued).toBe("fresh-token");
+  });
 });

@@ -99,7 +99,6 @@ describe("content type registration", () => {
 
   it("lists all content types ordered by key (Phase 6a)", async () => {
     const stub = freshStub();
-    await stub.registerContentType(articleType(), auth("admin"));
     await stub.registerContentType(
       {
         id: uuid(9),
@@ -111,6 +110,7 @@ describe("content type registration", () => {
       },
       auth("admin"),
     );
+    await stub.registerContentType(articleType(), auth("admin"));
     const rows = asContentTypeRows(await stub.listContentTypes());
     expect(rows.map((row) => row.key)).toStrictEqual(["article", "author"]);
     expect(rows[0]?.fields.some((field) => field.key === "title")).toBe(true);

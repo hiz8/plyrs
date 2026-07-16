@@ -118,4 +118,13 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     expect(await screen.findByRole("heading", { name: "ログイン" })).toBeInTheDocument();
     expect(logout).toHaveBeenCalledTimes(1);
   });
+
+  it("logs out locally even when the server logout fails", async () => {
+    const logout = vi.fn(() => jsonResponse(500, { error: "boom" }));
+    renderAt("/t/blog/content-types", authedRoutes({ "/auth/logout": logout }));
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "ログアウト" }));
+    expect(await screen.findByRole("heading", { name: "ログイン" })).toBeInTheDocument();
+    expect(logout).toHaveBeenCalledTimes(1);
+  });
 });
