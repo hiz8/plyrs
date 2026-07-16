@@ -9,3 +9,7 @@
 # Documentation (including user-authored design specs) is intentionally not
 # auto-formatted; oxfmt formatting policy applies to code only.
 docs/
+
+# 生成物（tanstackStart / wrangler types が再生成する。手整形しない）
+apps/admin/src/routeTree.gen.ts
+apps/admin/worker-configuration.d.ts

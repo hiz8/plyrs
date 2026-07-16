@@ -1,0 +1,9 @@
+{
+  "name": "plyrs-admin",
+  "main": "src/server.ts",
+  "compatibility_date": "2026-07-12",
+  "compatibility_flags": ["nodejs_compat"],
+  // 2026-07-16 裁定: admin は独立 Worker。/auth・/v1 は service binding で api Worker へ
+  // 転送する same-origin プロキシ（SameSite=Strict のセッション cookie がそのまま機能する）。
+  "services": [{ "binding": "API", "service": "plyrs-api" }],
+}
