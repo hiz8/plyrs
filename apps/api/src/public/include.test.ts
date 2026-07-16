@@ -1,10 +1,6 @@
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
-import {
-  collectIncludeTargetIds,
-  expandIncludes,
-  loadFieldRelationIdsForRecords,
-} from "./include";
+import { collectIncludeTargetIds, expandIncludes, loadFieldRelationIdsForRecords } from "./include";
 import { toPublicRecord } from "./serialize";
 
 const tenantId = crypto.randomUUID();
