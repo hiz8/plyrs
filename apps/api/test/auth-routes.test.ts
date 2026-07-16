@@ -131,4 +131,29 @@ describe("auth routes", () => {
     const denied = await app.request("/auth/token", json({ tenantId }, cookie), env);
     expect(denied.status).toBe(403);
   });
+
+  it("lists the session user's tenants with roles (Phase 6a)", async () => {
+    const { cookie } = await signupAndLogin();
+    const slugB = unique("b-");
+    const slugA = unique("a-");
+    await app.request("/v1/tenants", json({ name: "B", slug: slugB }, cookie), env);
+    await app.request("/v1/tenants", json({ name: "A", slug: slugA }, cookie), env);
+    const res = await app.request("/auth/tenants", { headers: { cookie } }, env);
+    expect(res.status).toBe(200);
+    const { tenants } = (await res.json()) as {
+      tenants: { id: string; slug: string; name: string; role: string }[];
+    };
+    expect(tenants.map((t) => t.slug)).toStrictEqual([slugA, slugB]);
+    expect(tenants.every((t) => t.role === "owner")).toBe(true);
+    expect(tenants.every((t) => t.id.length === 36)).toBe(true);
+  });
+
+  it("rejects anonymous and blocked users on /auth/tenants", async () => {
+    const anon = await app.request("/auth/tenants", {}, env);
+    expect(anon.status).toBe(401);
+    const { userId, cookie } = await signupAndLogin();
+    await blockUser(env.BLOCKLIST, userId);
+    const denied = await app.request("/auth/tenants", { headers: { cookie } }, env);
+    expect(denied.status).toBe(403);
+  });
 });

@@ -1,11 +1,11 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { v7 as uuidv7 } from "uuid";
 import { z } from "zod";
-import { memberships, users } from "@plyrs/db/control-plane";
+import { memberships, tenants, users } from "@plyrs/db/control-plane";
 import { isBlocked } from "../auth/blocklist";
 import { signTenantToken, TOKEN_TTL } from "../auth/jwt";
 import { hashPassword, verifyPassword } from "../auth/password";
@@ -97,4 +97,23 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
       role: membership.role,
     });
     return c.json({ token: jwt, expiresIn: TOKEN_TTL });
+  })
+  // Phase 6a: 管理画面のテナント選択（slug→tenantId の解決元）。セッション cookie で認証し、
+  // membership を tenants に join して返す。/auth/token と同じく blocked ユーザーは 403。
+  .get("/tenants", async (c) => {
+    const token = getCookie(c, SESSION_COOKIE);
+    const session = token === undefined ? null : await lookupSession(c.env.DB, token, new Date());
+    if (session === null) {
+      return c.json({ error: "unauthenticated" }, 401);
+    }
+    if (await isBlocked(c.env.BLOCKLIST, session.userId)) {
+      return c.json({ error: "blocked" }, 403);
+    }
+    const rows = await drizzle(c.env.DB)
+      .select({ id: tenants.id, slug: tenants.slug, name: tenants.name, role: memberships.role })
+      .from(memberships)
+      .innerJoin(tenants, eq(memberships.tenantId, tenants.id))
+      .where(eq(memberships.userId, session.userId))
+      .orderBy(asc(tenants.slug));
+    return c.json({ tenants: rows });
   });
