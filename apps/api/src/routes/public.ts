@@ -3,10 +3,14 @@ import { cors } from "hono/cors";
 import { canonicalCacheUrl, withEdgeCache, type EdgeCacheContext } from "../public/cache";
 import { loadCatalog, type CatalogEntry } from "../public/catalog";
 import { encodeCursor } from "../public/cursor";
-import { expandIncludes } from "../public/include";
+import {
+  collectIncludeTargetIds,
+  expandIncludes,
+  loadFieldRelationIdsForRecords,
+} from "../public/include";
 import { parseInclude, parseListQuery } from "../public/query";
 import { toPublicRecord, type ProjectedRecordRow } from "../public/serialize";
-import { buildListQuery, chunk, D1_BIND_CHUNK_SIZE, placeholders, type ListRow } from "../public/sql";
+import { buildListQuery, type ListRow } from "../public/sql";
 import { resolveTenantId } from "../public/tenant-resolver";
 import { TENANT_SLUG_MAX_LENGTH, TENANT_SLUG_PATTERN } from "./tenants";
 
@@ -41,38 +45,6 @@ type PublicEnv = { Bindings: Env };
 
 const SINGLE_COLUMNS = "record_id, type, slug, published_at, data, publish_seq";
 
-// design-spec §6: 関係は data に入らない（write-record.test.ts で確定済みの不変条件）ので
-// toPublicRecord() が返す fields には関係フィールドの値が一切現れない。裁定（2026-07-14 #3）:
-// 既定でも関係フィールドは ID 配列として fields に現れる — include は included[] の同梱だけを
-// 制御し、fields の形を変えない。未公開参照先の ID も残る（ソフト参照で included にだけ現れない）。
-// 単体・一覧の両方から呼ぶ: 対象 record_id 全件の field 由来の関係をチャンク内 1 回で引き、
-// record_id → フィールド別 ID 配列 の Map を返す（カタログ不要: 非関係フィールドはそもそも行が無い）。
-async function loadFieldRelationIdsForRecords(
-  db: D1Database,
-  tenantId: string,
-  recordIds: string[],
-): Promise<Map<string, Record<string, string[]>>> {
-  const byRecord = new Map<string, Record<string, string[]>>();
-  for (const idChunk of chunk(recordIds, D1_BIND_CHUNK_SIZE)) {
-    const { results } = await db
-      .prepare(
-        "SELECT source_id, source_field, target_id FROM projected_relations" +
-          " WHERE tenant_id = ? AND origin = 'field'" +
-          ` AND source_id IN (${placeholders(idChunk.length)})` +
-          " ORDER BY source_field, ordinal",
-      )
-      .bind(tenantId, ...idChunk)
-      .all<{ source_id: string; source_field: string; target_id: string }>();
-    for (const row of results) {
-      const byField = byRecord.get(row.source_id) ?? {};
-      const list = byField[row.source_field] ?? [];
-      list.push(row.target_id);
-      byField[row.source_field] = list;
-      byRecord.set(row.source_id, byField);
-    }
-  }
-  return byRecord;
-}
 
 // Hono の Context#executionCtx は自前の簡略 ExecutionContext 型（waitUntil / passThroughOnException
 // のみ）を返し、workers-types のリッチな ExecutionContext（tracing 等を要求）とは構造的に不一致
@@ -173,7 +145,11 @@ async function serveSingle(
       include.length > 0
         ? {
             ...base,
-            included: await expandIncludes(c.env.PROJECTION_DB, tenantId, [row.record_id], include),
+            included: await expandIncludes(
+              c.env.PROJECTION_DB,
+              tenantId,
+              collectIncludeTargetIds(relationIds, include),
+            ),
           }
         : base;
     const response = c.json(body);
@@ -257,8 +233,7 @@ export const publicRoutes = new Hono<PublicEnv>()
         body["included"] = await expandIncludes(
           c.env.PROJECTION_DB,
           tenantId,
-          page.map((row) => row.record_id),
-          query.include,
+          collectIncludeTargetIds(relationIds, query.include),
         );
       }
       return c.json(body);

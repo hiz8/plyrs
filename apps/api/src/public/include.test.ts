@@ -1,6 +1,10 @@
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
-import { expandIncludes } from "./include";
+import {
+  collectIncludeTargetIds,
+  expandIncludes,
+  loadFieldRelationIdsForRecords,
+} from "./include";
 import { toPublicRecord } from "./serialize";
 
 const tenantId = crypto.randomUUID();
@@ -69,36 +73,65 @@ describe("toPublicRecord (裁定 2026-07-14: 内部値非公開・fields 入れ�
   });
 });
 
-describe("expandIncludes (§12.5: projected_relations のみ・ソフト参照)", () => {
-  it("collects published targets of the requested fields, deduped, sorted by id", async () => {
-    const included = await expandIncludes(
-      env.PROJECTION_DB,
-      tenantId,
-      ["post1", "post2"],
-      ["authors"],
-    );
-    expect(included.map((record) => record.id)).toStrictEqual(["author1", "author2"]);
+describe("loadFieldRelationIdsForRecords (field 由来のみ・ordinal 順)", () => {
+  it("maps record ids to per-field ordered target id arrays", async () => {
+    const map = await loadFieldRelationIdsForRecords(env.PROJECTION_DB, tenantId, [
+      "post1",
+      "post2",
+    ]);
+    expect(map.get("post1")).toStrictEqual({ authors: ["author1", "author3"] });
+    expect(map.get("post2")).toStrictEqual({
+      authors: ["author1", "author2"],
+      hero: ["author2"],
+    });
   });
 
-  it("silently drops unpublished targets (soft reference, no error)", async () => {
-    const included = await expandIncludes(env.PROJECTION_DB, tenantId, ["post1"], ["authors"]);
-    expect(included.map((record) => record.id)).toStrictEqual(["author1"]); // author3 は不在
-  });
-
-  it("only expands field-origin relations of the requested fields", async () => {
-    const included = await expandIncludes(env.PROJECTION_DB, tenantId, ["post1"], ["embedded"]);
-    expect(included).toStrictEqual([]); // body 由来は対象外
-  });
-
-  it("returns empty for empty inputs", async () => {
-    expect(await expandIncludes(env.PROJECTION_DB, tenantId, [], ["authors"])).toStrictEqual([]);
-    expect(await expandIncludes(env.PROJECTION_DB, tenantId, ["post1"], [])).toStrictEqual([]);
+  it("excludes body-origin relations", async () => {
+    const map = await loadFieldRelationIdsForRecords(env.PROJECTION_DB, tenantId, ["post1"]);
+    expect(map.get("post1")?.["embedded"]).toBeUndefined();
   });
 
   it("chunks large id lists under the D1 bind limit", async () => {
-    // 120 ソース（実在するのは post1/post2 のみ）でもエラーにならず正しく返る
     const sources = Array.from({ length: 120 }, (_, i) => `ghost-${i}`).concat(["post1"]);
-    const included = await expandIncludes(env.PROJECTION_DB, tenantId, sources, ["authors"]);
+    const map = await loadFieldRelationIdsForRecords(env.PROJECTION_DB, tenantId, sources);
+    expect(map.get("post1")).toStrictEqual({ authors: ["author1", "author3"] });
+  });
+});
+
+describe("collectIncludeTargetIds (Phase 5c: 二重読みの解消)", () => {
+  it("collects ids of the requested fields only, deduped across records", async () => {
+    const map = await loadFieldRelationIdsForRecords(env.PROJECTION_DB, tenantId, [
+      "post1",
+      "post2",
+    ]);
+    expect(collectIncludeTargetIds(map, ["authors"]).toSorted()).toStrictEqual([
+      "author1",
+      "author2",
+      "author3",
+    ]);
+    expect(collectIncludeTargetIds(map, ["hero"])).toStrictEqual(["author2"]);
+    expect(collectIncludeTargetIds(map, [])).toStrictEqual([]);
+    expect(collectIncludeTargetIds(new Map(), ["authors"])).toStrictEqual([]);
+  });
+});
+
+describe("expandIncludes (§12.5: projected_records の取得とソフト参照)", () => {
+  it("fetches published targets sorted by id, dropping unpublished ones", async () => {
+    const included = await expandIncludes(env.PROJECTION_DB, tenantId, [
+      "author2",
+      "author1",
+      "author3",
+    ]);
+    expect(included.map((record) => record.id)).toStrictEqual(["author1", "author2"]);
+  });
+
+  it("returns empty for empty input", async () => {
+    expect(await expandIncludes(env.PROJECTION_DB, tenantId, [])).toStrictEqual([]);
+  });
+
+  it("chunks large target lists under the D1 bind limit", async () => {
+    const targets = Array.from({ length: 120 }, (_, i) => `ghost-${i}`).concat(["author1"]);
+    const included = await expandIncludes(env.PROJECTION_DB, tenantId, targets);
     expect(included.map((record) => record.id)).toStrictEqual(["author1"]);
   });
 });
