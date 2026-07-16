@@ -217,6 +217,24 @@ describe("parseListQuery: MAX_TOTAL_FILTER_VALUES（D1 バインド予算、Find
   });
 });
 
+describe("parseListQuery: date format validation (Phase 5c)", () => {
+  it("validates date filter values against the write-side format (Phase 5c)", () => {
+    const cat: Catalog = new Map([["published_at", { kind: "date", multi: false }]]);
+    const bad = parseListQuery({ "filter[published_at]": ["not-a-date"] }, cat);
+    expect(bad.ok).toBe(false);
+    // metamodel（record-schema）は UTC 'Z' のみ受理する。オフセット付きは書き込めない値なので 400
+    const offset = parseListQuery({ "filter[published_at]": ["2026-07-12T09:00:00+09:00"] }, cat);
+    expect(offset.ok).toBe(false);
+    const good = parseListQuery({ "filter[published_at]": ["2026-07-12T00:00:00Z"] }, cat);
+    expect(good.ok).toBe(true);
+    const fractional = parseListQuery(
+      { "filter[published_at]": ["2026-07-12T00:00:00.123Z"] },
+      cat,
+    );
+    expect(fractional.ok).toBe(true);
+  });
+});
+
 describe("parseInclude", () => {
   it("splits, trims, dedupes, and sorts", () => {
     const result = parseInclude(" authors ,authors", catalog());

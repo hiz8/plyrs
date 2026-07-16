@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type { Catalog } from "./catalog";
 import { decodeCursor } from "./cursor";
 
@@ -63,6 +65,12 @@ const FILTER_KEY_PATTERN = /^filter\[([a-z][a-z0-9_]*)\]$/u;
 const SORT_PATTERN = /^(-?)([a-z][a-z0-9_]*)$/u;
 const RESERVED_PARAMS = new Set(["sort", "limit", "cursor", "include"]);
 
+// Phase 5c housekeeping: date フィルタ値は書き込み側（metamodel record-schema の
+// z.iso.datetime() = UTC 'Z' のみ）と同じ書式だけを受理する。value_date には正規化済みの
+// ISO8601 UTC 文字列しか入らないため、形の違う値は等値比較で決してヒットしない — D1 まで
+// 運ばず 400 で早期に落とす。
+const isoDatetime = z.iso.datetime();
+
 const COLUMN_BY_KIND = {
   text: "value_text",
   num: "value_num",
@@ -93,6 +101,8 @@ function parseScalarValues(kind: ScalarKind, raw: string[]): (string | number)[]
       }
       return values;
     }
+    case "date":
+      return raw.every((value) => isoDatetime.safeParse(value).success) ? raw : null;
     default:
       return raw;
   }

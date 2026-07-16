@@ -18,7 +18,15 @@ export interface ProjectionIndexRow {
 // Phase 5b: 公開 read API のフィールドカタログ（§12.4）。kind は projection_index の型別カラム
 // （bool は value_num の 0/1）に対応し、'relation' は projected_relations を引く。multi=true は
 // ソート不可（行分割で順序が未定義）。
-export type CatalogKind = "text" | "num" | "bool" | "date" | "relation";
+export const CATALOG_KINDS = ["text", "num", "bool", "date", "relation"] as const;
+export type CatalogKind = (typeof CATALOG_KINDS)[number];
+
+// Phase 5c housekeeping: projection_fields の kind は将来語彙が増えうる（record upsert への
+// LWW 相乗り更新のため、旧コードが新 kind の行を読む窓がある）。未知 kind の行は
+// 「宣言されていない」扱いで skip する保険（loadCatalog が使う）。
+export function isCatalogKind(value: string): value is CatalogKind {
+  return (CATALOG_KINDS as readonly string[]).includes(value);
+}
 
 export interface CatalogRow {
   fieldKey: string;

@@ -28,4 +28,21 @@ describe("loadCatalog", () => {
     const catalog = await loadCatalog(env.PROJECTION_DB, crypto.randomUUID(), "ghost");
     expect(catalog.size).toBe(0);
   });
+
+  it("skips rows with an unknown kind (Phase 5c: forward-compat guard)", async () => {
+    const tenantId = crypto.randomUUID();
+    for (const [fieldKey, kind] of [
+      ["location", "geo"],
+      ["title", "text"],
+    ] as const) {
+      await env.PROJECTION_DB.prepare(
+        "INSERT INTO projection_fields (tenant_id, type, field_key, kind, multi, projected_at) VALUES (?1, 'post', ?2, ?3, 0, 0)",
+      )
+        .bind(tenantId, fieldKey, kind)
+        .run();
+    }
+    const catalog = await loadCatalog(env.PROJECTION_DB, tenantId, "post");
+    expect(catalog.get("location")).toBeUndefined();
+    expect(catalog.get("title")).toStrictEqual({ kind: "text", multi: false });
+  });
 });

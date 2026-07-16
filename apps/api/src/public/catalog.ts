@@ -1,4 +1,4 @@
-import type { CatalogKind } from "../projection/payload";
+import { isCatalogKind, type CatalogKind } from "../projection/payload";
 
 // projection_fields（Phase 5b で追加したフィールドカタログ表）を Map へロードする。
 // 公開 read API がフィルタ/ソート/include の検証と型別カラムの選択に使う。
@@ -22,7 +22,11 @@ export async function loadCatalog(
     .all<{ field_key: string; kind: string; multi: number }>();
   const catalog: Catalog = new Map();
   for (const row of results) {
-    catalog.set(row.field_key, { kind: row.kind as CatalogKind, multi: row.multi === 1 });
+    // Phase 5c: 未知 kind は「宣言されていない」扱いで skip（無検査 cast の除去も兼ねる）
+    if (!isCatalogKind(row.kind)) {
+      continue;
+    }
+    catalog.set(row.field_key, { kind: row.kind, multi: row.multi === 1 });
   }
   return catalog;
 }
