@@ -79,7 +79,9 @@ Phase 2 の詳細計画で最終確定する。
 | 4a | `2026-07-13-phase4a-sync-server.md` | 完了（2026-07-13 main へマージ） |
 | 4b | `2026-07-13-phase4b-sync-client.md` | 完了（2026-07-13 main へマージ） |
 | 5a | `2026-07-13-phase5a-publish-projection.md` | 完了（2026-07-14 main へマージ） |
-| 5b〜10 | 各フェーズ着手時に作成 | 未着手 |
+| 5b | `2026-07-14-phase5b-public-read-api.md` | 完了（2026-07-14 main へマージ） |
+| 5c/6a | `2026-07-16-phase6a-admin-shell.md` | 着手（2026-07-16。6a = 管理画面シェル、6b は別計画） |
+| 6b〜10 | 各フェーズ着手時に作成 | 未着手 |
 
 ---
 
