@@ -27,6 +27,10 @@ export function asContentTypeRow(value: unknown): ContentTypeRow | null {
   return value as ContentTypeRow | null;
 }
 
+export function asContentTypeRows(value: unknown): ContentTypeRow[] {
+  return value as ContentTypeRow[];
+}
+
 export function asPublishResult(value: unknown): PublishResult {
   return value as PublishResult;
 }

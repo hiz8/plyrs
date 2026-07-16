@@ -2,6 +2,7 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { articleType, auth, uuid } from "./fixtures";
+import { asContentTypeRows } from "./rpc-unwrap";
 
 function freshStub() {
   return env.TENANT_DO.get(env.TENANT_DO.idFromName(crypto.randomUUID()));
@@ -94,5 +95,25 @@ describe("content type registration", () => {
     const result = await stub.registerContentType(pluginType, auth("admin"));
     expect(result.ok).toBe(true);
     expect(await stub.getContentType("no_such_type")).toBeNull();
+  });
+
+  it("lists all content types ordered by key (Phase 6a)", async () => {
+    const stub = freshStub();
+    await stub.registerContentType(articleType(), auth("admin"));
+    await stub.registerContentType(
+      {
+        id: uuid(9),
+        key: "author",
+        name: "著者",
+        source: "user",
+        version: 1,
+        fields: [{ key: "name", type: "text", required: true }],
+      },
+      auth("admin"),
+    );
+    const rows = asContentTypeRows(await stub.listContentTypes());
+    expect(rows.map((row) => row.key)).toStrictEqual(["article", "author"]);
+    expect(rows[0]?.fields.some((field) => field.key === "title")).toBe(true);
+    expect(rows[1]?.name).toBe("著者");
   });
 });

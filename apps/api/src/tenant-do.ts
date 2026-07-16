@@ -135,6 +135,11 @@ export class TenantDO extends DurableObject<Env> {
     return loadContentTypeByKey(this.ctx.storage.sql, key);
   }
 
+  // Phase 6a: 管理画面の content_type 一覧（読み取り専用）。key 昇順は SQL 側で保証される。
+  listContentTypes(): ContentTypeRow[] {
+    return loadAllContentTypeRows(this.ctx.storage.sql);
+  }
+
   writeRecord(typeKey: string, params: WriteRecordInput, auth: AuthContext): WriteRecordResult {
     const denial = requireOperation(auth, "record:write");
     if (denial !== null) {

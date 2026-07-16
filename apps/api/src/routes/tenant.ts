@@ -6,6 +6,7 @@ import { WORKFLOW_STATUSES } from "@plyrs/metamodel";
 import { authenticateTenantToken, tenantGate, type GateVariables } from "../middleware/tenant-gate";
 import {
   asContentTypeRow,
+  asContentTypeRows,
   asDeleteResult,
   asPublishResult,
   asRecordSnapshot,
@@ -74,6 +75,10 @@ export const tenantRoutes = new Hono<GateEnv>()
     }
     const result = asRegisterResult(await stubFor(c).registerContentType(body, c.get("auth")));
     return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
+  })
+  .get("/:tenantId/content-types", async (c) => {
+    const rows = asContentTypeRows(await stubFor(c).listContentTypes());
+    return c.json({ contentTypes: rows });
   })
   .get("/:tenantId/content-types/:key", async (c) => {
     const row = asContentTypeRow(await stubFor(c).getContentType(c.req.param("key")));
