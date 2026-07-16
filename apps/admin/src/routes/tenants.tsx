@@ -1,20 +1,10 @@
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
-import { useState, type ComponentType, type ReactNode } from "react";
+import { useState } from "react";
 import { Button, TextField } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { ApiError } from "../lib/api-client";
 import { tenantsQueryOptions } from "../lib/queries";
-
-// Task 12 時点では /t/$tenantSlug/content-types ルートが未作成（Task 13 で追加）のため、
-// typed Link の to union にまだ載らない。ここだけ untyped に落とし、**Task 13 で typed Link に
-// 戻す**（Task 13 Step 3 に置換内容を明記済み）。
-const TenantLink = Link as unknown as ComponentType<{
-  to: string;
-  params: Record<string, string>;
-  className?: string;
-  children: ReactNode;
-}>;
 
 const styles = stylex.create({
   page: {
@@ -120,16 +110,16 @@ function TenantsPage() {
         <ul {...stylex.props(styles.list)}>
           {tenants.map((tenant) => (
             <li key={tenant.id}>
-              <TenantLink
+              <Link
                 to="/t/$tenantSlug/content-types"
                 params={{ tenantSlug: tenant.slug }}
-                className={stylex.props(styles.item).className ?? ""}
+                {...stylex.props(styles.item)}
               >
                 {tenant.name}
                 <span {...stylex.props(styles.role)}>
                   {tenant.slug} / {tenant.role}
                 </span>
-              </TenantLink>
+              </Link>
             </li>
           ))}
         </ul>

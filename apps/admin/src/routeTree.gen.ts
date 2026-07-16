@@ -13,6 +13,9 @@ import { Route as TenantsRouteImport } from './routes/tenants'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TTenantSlugRouteRouteImport } from './routes/t/$tenantSlug/route'
+import { Route as TTenantSlugIndexRouteImport } from './routes/t/$tenantSlug/index'
+import { Route as TTenantSlugContentTypesRouteImport } from './routes/t/$tenantSlug/content-types'
 
 const TenantsRoute = TenantsRouteImport.update({
   id: '/tenants',
@@ -34,18 +37,38 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TTenantSlugRouteRoute = TTenantSlugRouteRouteImport.update({
+  id: '/t/$tenantSlug',
+  path: '/t/$tenantSlug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TTenantSlugIndexRoute = TTenantSlugIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => TTenantSlugRouteRoute,
+} as any)
+const TTenantSlugContentTypesRoute = TTenantSlugContentTypesRouteImport.update({
+  id: '/content-types',
+  path: '/content-types',
+  getParentRoute: () => TTenantSlugRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/tenants': typeof TenantsRoute
+  '/t/$tenantSlug': typeof TTenantSlugRouteRouteWithChildren
+  '/t/$tenantSlug/content-types': typeof TTenantSlugContentTypesRoute
+  '/t/$tenantSlug/': typeof TTenantSlugIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/tenants': typeof TenantsRoute
+  '/t/$tenantSlug/content-types': typeof TTenantSlugContentTypesRoute
+  '/t/$tenantSlug': typeof TTenantSlugIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +76,37 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/tenants': typeof TenantsRoute
+  '/t/$tenantSlug': typeof TTenantSlugRouteRouteWithChildren
+  '/t/$tenantSlug/content-types': typeof TTenantSlugContentTypesRoute
+  '/t/$tenantSlug/': typeof TTenantSlugIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/signup' | '/tenants'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/tenants'
+    | '/t/$tenantSlug'
+    | '/t/$tenantSlug/content-types'
+    | '/t/$tenantSlug/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/signup' | '/tenants'
-  id: '__root__' | '/' | '/login' | '/signup' | '/tenants'
+  to:
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/tenants'
+    | '/t/$tenantSlug/content-types'
+    | '/t/$tenantSlug'
+  id:
+    | '__root__'
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/tenants'
+    | '/t/$tenantSlug'
+    | '/t/$tenantSlug/content-types'
+    | '/t/$tenantSlug/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +114,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
   TenantsRoute: typeof TenantsRoute
+  TTenantSlugRouteRoute: typeof TTenantSlugRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -99,14 +147,49 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/t/$tenantSlug': {
+      id: '/t/$tenantSlug'
+      path: '/t/$tenantSlug'
+      fullPath: '/t/$tenantSlug'
+      preLoaderRoute: typeof TTenantSlugRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/t/$tenantSlug/': {
+      id: '/t/$tenantSlug/'
+      path: '/'
+      fullPath: '/t/$tenantSlug/'
+      preLoaderRoute: typeof TTenantSlugIndexRouteImport
+      parentRoute: typeof TTenantSlugRouteRoute
+    }
+    '/t/$tenantSlug/content-types': {
+      id: '/t/$tenantSlug/content-types'
+      path: '/content-types'
+      fullPath: '/t/$tenantSlug/content-types'
+      preLoaderRoute: typeof TTenantSlugContentTypesRouteImport
+      parentRoute: typeof TTenantSlugRouteRoute
+    }
   }
 }
+
+interface TTenantSlugRouteRouteChildren {
+  TTenantSlugContentTypesRoute: typeof TTenantSlugContentTypesRoute
+  TTenantSlugIndexRoute: typeof TTenantSlugIndexRoute
+}
+
+const TTenantSlugRouteRouteChildren: TTenantSlugRouteRouteChildren = {
+  TTenantSlugContentTypesRoute: TTenantSlugContentTypesRoute,
+  TTenantSlugIndexRoute: TTenantSlugIndexRoute,
+}
+
+const TTenantSlugRouteRouteWithChildren =
+  TTenantSlugRouteRoute._addFileChildren(TTenantSlugRouteRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
   TenantsRoute: TenantsRoute,
+  TTenantSlugRouteRoute: TTenantSlugRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
