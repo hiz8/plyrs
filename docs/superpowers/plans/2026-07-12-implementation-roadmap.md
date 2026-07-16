@@ -392,3 +392,21 @@ routes/public.ts、共有先は sql.ts の placeholders 隣が候補）・includ
 loadCatalog の kind 無検査キャスト（未知 kind を skip する 1 行の保険）・date フィルタ値の書式
 無検証・`unknown_tenant` と `not_found` の応答統一の検討。Phase 10 へ: tenant-resolver /
 キャッシュ put 失敗の可観測性、投影 D1 の QPS 監視、公開面のレート制限。
+
+**Phase 5c housekeeping の消化（2026-07-16、Phase 6a の Task 1〜4 で実施）:**
+
+- `Array#sort` → `toSorted`: src 3 箇所（cache.ts / query.ts）+ テスト 11 箇所を置換（lint warning 0 件）。
+- `chunk<T>` の重複解消: `public/sql.ts` の `chunk` / `D1_BIND_CHUNK_SIZE` へ共有化（placeholders 隣）。
+- include 経路の二重読み解消: include の対象 ID を `loadFieldRelationIdsForRecords` の結果から導出する
+  `collectIncludeTargetIds` を新設し、`expandIncludes` は対象 ID を直接受け取る形へ変更（include.ts に集約）。
+- `cache.match` の前段化: 一覧・単体ともクエリ検証（カタログ読込含む）を withEdgeCache の produce 内へ移動。
+  キャッシュキーが全クエリパラメータを含む = ヒットは「同一パラメータで過去に 200」の証明、が安全性の根拠。
+  ウォームヒット時に投影 D1 を一切読まないことを poisoned binding の回帰テストで固定
+  （test/public-cache-order.test.ts）。
+- loadCatalog の未知 kind: `isCatalogKind`（projection/payload.ts の `CATALOG_KINDS` 導出）で skip。
+  無検査 cast も同時に除去。
+- date フィルタ値の書式検証: 書き込み側（metamodel の `z.iso.datetime()` = UTC 'Z' のみ）と同じ書式のみ
+  受理し、それ以外は 400（等値比較で決してヒットしない値を D1 まで運ばない）。
+- **`unknown_tenant` / `not_found` は統一しない（2026-07-16 裁定）**: slug の打ち間違いと record 不在の
+  区別はヘッドレス利用者のデバッグ価値が高く、テナント slug は公開 URL に載る公開情報のため列挙耐性を
+  得る利益が薄い。現状の応答を維持して close。
