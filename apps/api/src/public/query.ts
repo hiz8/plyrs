@@ -115,7 +115,7 @@ export function parseInclude(
       return { ok: false, error: `include field is not a relation: ${key}` };
     }
   }
-  return { ok: true, include: [...new Set(keys)].sort() };
+  return { ok: true, include: [...new Set(keys)].toSorted() };
 }
 
 export function parseListQuery(params: Record<string, string[]>, catalog: Catalog): ParseResult {

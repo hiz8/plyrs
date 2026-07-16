@@ -138,8 +138,8 @@ describe("public list (§12.4 / §12.5)", () => {
     // 既定ソート: システム published_at 降順・record_id 降順タイブレーク。
     // 期待順はレスポンス自身の publishedAt から計算して検証する（publish 時刻は制御できないため）
     const got = body.items.map((item) => item.id);
-    const expected = [...body.items]
-      .sort((a, b) =>
+    const expected = body.items
+      .toSorted((a, b) =>
         a.publishedAt === b.publishedAt
           ? b.id.localeCompare(a.id)
           : b.publishedAt.localeCompare(a.publishedAt),
@@ -173,8 +173,8 @@ describe("public list (§12.4 / §12.5)", () => {
 
   it("filters: any-of within a key, AND across keys, booleans, multi-select", async () => {
     const tech = await list(tenantSlug, "?filter[category]=tech");
-    expect(tech.body.items.map((item) => item.id).sort()).toStrictEqual(
-      [posts[0], posts[2], posts[4]].sort(),
+    expect(tech.body.items.map((item) => item.id).toSorted()).toStrictEqual(
+      [posts[0], posts[2], posts[4]].toSorted(),
     );
     const anyOf = await list(tenantSlug, "?filter[category]=tech&filter[category]=life");
     expect(anyOf.body.items.length).toBe(5);
@@ -183,22 +183,22 @@ describe("public list (§12.4 / §12.5)", () => {
     const featured = await list(tenantSlug, "?filter[featured]=true");
     expect(featured.body.items.map((item) => item.id)).toStrictEqual([posts[4]]);
     const tagX = await list(tenantSlug, "?filter[tags]=x&filter[tags]=z"); // any-of（1値=1行）
-    expect(tagX.body.items.map((item) => item.id).sort()).toStrictEqual(
-      [posts[0], posts[2], posts[3], posts[4]].sort(),
+    expect(tagX.body.items.map((item) => item.id).toSorted()).toStrictEqual(
+      [posts[0], posts[2], posts[3], posts[4]].toSorted(),
     );
   });
 
   it("filters by relation membership", async () => {
     const byA = await list(tenantSlug, `?filter[authors]=${authorA}`);
-    expect(byA.body.items.map((item) => item.id).sort()).toStrictEqual(
-      [posts[0], posts[1], posts[4]].sort(),
+    expect(byA.body.items.map((item) => item.id).toSorted()).toStrictEqual(
+      [posts[0], posts[1], posts[4]].toSorted(),
     );
   });
 
   it("expands include=authors across the page, deduped", async () => {
     const { body } = await list(tenantSlug, "?include=authors");
-    expect(body.included?.map((record) => record.id).sort()).toStrictEqual(
-      [authorA, authorB].sort(),
+    expect(body.included?.map((record) => record.id).toSorted()).toStrictEqual(
+      [authorA, authorB].toSorted(),
     );
   });
 

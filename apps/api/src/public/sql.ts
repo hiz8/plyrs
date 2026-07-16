@@ -30,6 +30,19 @@ export function placeholders(count: number): string {
   return Array.from({ length: count }, () => "?").join(", ");
 }
 
+// D1 のバインド上限（100/クエリ）に対する IN 句展開の安全マージン。placeholders() と同じく
+// 「バインド列を組み立てる低水準ヘルパー」としてここに置く（Phase 5c: include.ts と
+// routes/public.ts に重複していた定義の共有先）。
+export const D1_BIND_CHUNK_SIZE = 50;
+
+export function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 export function buildListQuery(tenantId: string, type: string, query: ListQuery): BuiltQuery {
   const { sort, filters, cursor, limit } = query;
   const usesIndexSort = sort.column !== "published_at";

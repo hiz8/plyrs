@@ -177,8 +177,8 @@ describe("public single fetch (§12.4)", () => {
     // レコード内の参照値は ID のまま（3 件とも残る）
     expect(body.fields.authors.length).toBe(3);
     // included には公開済みの 2 件だけ（author3 はソフト参照で不在）
-    expect(body.included.map((record) => record.id).sort()).toStrictEqual(
-      [author1, author2].sort(),
+    expect(body.included.map((record) => record.id).toSorted()).toStrictEqual(
+      [author1, author2].toSorted(),
     );
   });
 

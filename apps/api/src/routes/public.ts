@@ -6,7 +6,7 @@ import { encodeCursor } from "../public/cursor";
 import { expandIncludes } from "../public/include";
 import { parseInclude, parseListQuery } from "../public/query";
 import { toPublicRecord, type ProjectedRecordRow } from "../public/serialize";
-import { buildListQuery, placeholders, type ListRow } from "../public/sql";
+import { buildListQuery, chunk, D1_BIND_CHUNK_SIZE, placeholders, type ListRow } from "../public/sql";
 import { resolveTenantId } from "../public/tenant-resolver";
 import { TENANT_SLUG_MAX_LENGTH, TENANT_SLUG_PATTERN } from "./tenants";
 
@@ -41,16 +41,6 @@ type PublicEnv = { Bindings: Env };
 
 const SINGLE_COLUMNS = "record_id, type, slug, published_at, data, publish_seq";
 
-const RELATION_ID_CHUNK_SIZE = 50; // D1 のバインド上限（100/クエリ）への安全マージン
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    chunks.push(items.slice(i, i + size));
-  }
-  return chunks;
-}
-
 // design-spec §6: 関係は data に入らない（write-record.test.ts で確定済みの不変条件）ので
 // toPublicRecord() が返す fields には関係フィールドの値が一切現れない。裁定（2026-07-14 #3）:
 // 既定でも関係フィールドは ID 配列として fields に現れる — include は included[] の同梱だけを
@@ -63,7 +53,7 @@ async function loadFieldRelationIdsForRecords(
   recordIds: string[],
 ): Promise<Map<string, Record<string, string[]>>> {
   const byRecord = new Map<string, Record<string, string[]>>();
-  for (const idChunk of chunk(recordIds, RELATION_ID_CHUNK_SIZE)) {
+  for (const idChunk of chunk(recordIds, D1_BIND_CHUNK_SIZE)) {
     const { results } = await db
       .prepare(
         "SELECT source_id, source_field, target_id FROM projected_relations" +

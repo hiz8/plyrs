@@ -16,8 +16,8 @@ export function canonicalCacheUrl(
   params: Record<string, string[]>,
 ): string {
   const search = new URLSearchParams();
-  for (const key of Object.keys(params).sort()) {
-    for (const value of [...(params[key] ?? [])].sort()) {
+  for (const key of Object.keys(params).toSorted()) {
+    for (const value of (params[key] ?? []).toSorted()) {
       search.append(key, value);
     }
   }

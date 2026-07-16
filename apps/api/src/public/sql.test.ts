@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { ListQuery } from "./query";
-import { buildListQuery, placeholders, type ListRow } from "./sql";
+import { buildListQuery, chunk, placeholders, type ListRow } from "./sql";
 
 // このテスト専用の合成テナント。投影は派生ストアなので直接播種してよい
 // （consumer 経由の播種は Task 10 以降の統合テストが担う）。
@@ -160,5 +160,19 @@ describe("placeholders", () => {
   it("emits comma-separated question marks", () => {
     expect(placeholders(3)).toBe("?, ?, ?");
     expect(placeholders(1)).toBe("?");
+  });
+});
+
+describe("chunk (Phase 5c: include.ts と routes/public.ts の重複解消)", () => {
+  it("splits items into fixed-size chunks preserving order", () => {
+    expect(chunk([1, 2, 3, 4, 5], 2)).toStrictEqual([[1, 2], [3, 4], [5]]);
+  });
+
+  it("returns a single chunk when the list fits", () => {
+    expect(chunk(["a"], 50)).toStrictEqual([["a"]]);
+  });
+
+  it("returns no chunks for an empty list", () => {
+    expect(chunk([], 50)).toStrictEqual([]);
   });
 });
