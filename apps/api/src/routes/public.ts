@@ -45,7 +45,6 @@ type PublicEnv = { Bindings: Env };
 
 const SINGLE_COLUMNS = "record_id, type, slug, published_at, data, publish_seq";
 
-
 // Hono の Context#executionCtx は自前の簡略 ExecutionContext 型（waitUntil / passThroughOnException
 // のみ）を返し、workers-types のリッチな ExecutionContext（tracing 等を要求）とは構造的に不一致
 // なので EdgeCacheContext へそのまま渡せない。実体は同じ CF ランタイムの ExecutionContext なので、
@@ -87,31 +86,36 @@ async function serveSingle(
     return c.json({ error: "unknown_tenant" }, 404);
   }
   const params = c.req.queries();
-  for (const key of Object.keys(params)) {
-    if (key !== "include") {
-      return c.json({ error: "bad_query", message: `unknown query param: ${key}` }, 400);
-    }
-  }
-  let include: string[] = [];
-  const includeParam = params["include"];
-  if (includeParam !== undefined) {
-    if (includeParam.length !== 1 || includeParam[0] === undefined) {
-      return c.json({ error: "bad_query", message: "query param must appear once: include" }, 400);
-    }
-    const catalog = await loadCatalog(c.env.PROJECTION_DB, tenantId, type);
-    const parsed = parseInclude(includeParam[0], catalog);
-    if (!parsed.ok) {
-      return c.json({ error: "bad_query", message: parsed.error }, 400);
-    }
-    include = parsed.include;
-  }
   // slug は任意文字を含みうるため、キャッシュキー URL のフラグメント/クエリ境界に化けないようエンコードする
   const cacheUrl = canonicalCacheUrl(
     tenantId,
     `records/${type}/${lookup}/${encodeURIComponent(value)}`,
     params,
   );
+  // Phase 5c: クエリ検証（カタログ読み込み含む）は produce の中 = キャッシュミス時のみ実行。
+  // キャッシュキーが全パラメータを含むため、ヒット = 同一パラメータで過去に 200、で安全。
   return withEdgeCache(edgeCacheContextFor(c), cacheUrl, async () => {
+    for (const key of Object.keys(params)) {
+      if (key !== "include") {
+        return c.json({ error: "bad_query", message: `unknown query param: ${key}` }, 400);
+      }
+    }
+    let include: string[] = [];
+    const includeParam = params["include"];
+    if (includeParam !== undefined) {
+      if (includeParam.length !== 1 || includeParam[0] === undefined) {
+        return c.json(
+          { error: "bad_query", message: "query param must appear once: include" },
+          400,
+        );
+      }
+      const catalog = await loadCatalog(c.env.PROJECTION_DB, tenantId, type);
+      const parsed = parseInclude(includeParam[0], catalog);
+      if (!parsed.ok) {
+        return c.json({ error: "bad_query", message: parsed.error }, 400);
+      }
+      include = parsed.include;
+    }
     const row =
       lookup === "id"
         ? await c.env.PROJECTION_DB.prepare(
@@ -177,21 +181,23 @@ export const publicRoutes = new Hono<PublicEnv>()
       return c.json({ error: "unknown_tenant" }, 404);
     }
     const params = c.req.queries();
-    // 最頻の「素の一覧」（フィルタ/ソート/include なし）でカタログの 1 クエリを節約する。
-    // 空カタログでも既定ソート（システム published_at）と limit/cursor 検証は成立する。
-    const needsCatalog = Object.keys(params).some(
-      (key) => key === "sort" || key === "include" || key.startsWith("filter["),
-    );
-    const catalog = needsCatalog
-      ? await loadCatalog(c.env.PROJECTION_DB, tenantId, type)
-      : new Map<string, CatalogEntry>();
-    const parsed = parseListQuery(params, catalog);
-    if (!parsed.ok) {
-      return c.json({ error: "bad_query", message: parsed.error }, 400);
-    }
-    const query = parsed.query;
     const cacheUrl = canonicalCacheUrl(tenantId, `records/${type}`, params);
+    // Phase 5c: 検証・カタログ読み込み・クエリ実行のすべてを produce の中へ（ヒット時に
+    // 投影 D1 を一切読まない）。400 は withEdgeCache が保存しないためキャッシュを汚さない。
     return withEdgeCache(edgeCacheContextFor(c), cacheUrl, async () => {
+      // 最頻の「素の一覧」（フィルタ/ソート/include なし）でカタログの 1 クエリを節約する。
+      // 空カタログでも既定ソート（システム published_at）と limit/cursor 検証は成立する。
+      const needsCatalog = Object.keys(params).some(
+        (key) => key === "sort" || key === "include" || key.startsWith("filter["),
+      );
+      const catalog = needsCatalog
+        ? await loadCatalog(c.env.PROJECTION_DB, tenantId, type)
+        : new Map<string, CatalogEntry>();
+      const parsed = parseListQuery(params, catalog);
+      if (!parsed.ok) {
+        return c.json({ error: "bad_query", message: parsed.error }, 400);
+      }
+      const query = parsed.query;
       const built = buildListQuery(tenantId, type, query);
       const { results } = await c.env.PROJECTION_DB.prepare(built.sql)
         .bind(...built.binds)
