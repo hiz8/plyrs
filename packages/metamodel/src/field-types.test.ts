@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { fieldDefinitionSchema } from "./field-types";
 
+const relationFieldInput = (config: Record<string, unknown>) => ({
+  key: "media",
+  type: "relation",
+  config,
+});
+
 describe("fieldDefinitionSchema", () => {
   it("accepts a minimal text field", () => {
     const result = fieldDefinitionSchema.safeParse({ key: "title", type: "text" });
@@ -142,15 +148,9 @@ describe("fieldDefinitionSchema", () => {
 });
 
 describe('relation snapshotEmbed "value" (Phase 8 裁定 4: asset 限定の固定語彙)', () => {
-  const relation = (config: Record<string, unknown>) => ({
-    key: "media",
-    type: "relation",
-    config,
-  });
-
   it('accepts "value" when allowedTypes is exactly ["asset"]', () => {
     const parsed = fieldDefinitionSchema.safeParse(
-      relation({ allowedTypes: ["asset"], cardinality: "many", snapshotEmbed: "value" }),
+      relationFieldInput({ allowedTypes: ["asset"], cardinality: "many", snapshotEmbed: "value" }),
     );
     expect(parsed.success).toBe(true);
   });
@@ -158,12 +158,16 @@ describe('relation snapshotEmbed "value" (Phase 8 裁定 4: asset 限定の固�
   it('rejects "value" for non-asset or mixed allowedTypes (L1 規律を型レベルで保証)', () => {
     expect(
       fieldDefinitionSchema.safeParse(
-        relation({ allowedTypes: ["author"], cardinality: "one", snapshotEmbed: "value" }),
+        relationFieldInput({
+          allowedTypes: ["author"],
+          cardinality: "one",
+          snapshotEmbed: "value",
+        }),
       ).success,
     ).toBe(false);
     expect(
       fieldDefinitionSchema.safeParse(
-        relation({
+        relationFieldInput({
           allowedTypes: ["asset", "author"],
           cardinality: "many",
           snapshotEmbed: "value",
@@ -174,7 +178,7 @@ describe('relation snapshotEmbed "value" (Phase 8 裁定 4: asset 限定の固�
 
   it('still accepts "id" for any allowedTypes', () => {
     const parsed = fieldDefinitionSchema.safeParse(
-      relation({ allowedTypes: ["author"], cardinality: "one", snapshotEmbed: "id" }),
+      relationFieldInput({ allowedTypes: ["author"], cardinality: "one", snapshotEmbed: "id" }),
     );
     expect(parsed.success).toBe(true);
   });
