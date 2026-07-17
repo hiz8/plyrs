@@ -112,4 +112,20 @@ describe("createTenantSync（ロードマップ §8 配線契約 5 点）", () =
     // sync 完了後: onReady → markReady が効いて loading を抜ける
     expect(sync.registry.get("article")?.status).not.toBe("loading");
   });
+
+  it("keeps hasSynced true across a disconnect after the first ready (§12 必須①)", async () => {
+    const socket = new FakeSocket();
+    const sync = createTenantSync({ connect: async () => socket, reconnectDelaysMs: [0] });
+    expect(sync.getHasSynced()).toBe(false);
+    sync.start();
+    await vi.waitFor(() =>
+      expect(socket.parsed()).toContainEqual({ type: "hello", checkpoint: 0 }),
+    );
+    socket.deliver({ type: "welcome", protocolVersion: 1, contentTypes: [], serverSeq: 0 });
+    socket.deliver({ type: "sync", records: [], serverSeq: 0, complete: true });
+    await vi.waitFor(() => expect(sync.getHasSynced()).toBe(true));
+    sync.stop();
+    expect(sync.getStatus()).toBe("closed");
+    expect(sync.getHasSynced()).toBe(true);
+  });
 });

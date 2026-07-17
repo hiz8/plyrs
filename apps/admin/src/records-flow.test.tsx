@@ -280,4 +280,39 @@ describe("record エディタ", () => {
     await bootstrapped(harness.latest(), []);
     expect(await screen.findByText(/未知のコンテンツタイプ/)).toBeInTheDocument();
   });
+
+  it("keeps the form mounted with unsaved input across a disconnect (§12 必須①)", async () => {
+    const harness = socketHarness();
+    renderAt(`/t/blog/records/article/${RECORD_1}`, harness);
+    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
+    await bootstrapped(harness.latest(), [article(RECORD_1, "旧タイトル")]);
+
+    const user = userEvent.setup();
+    const input = await screen.findByRole("textbox", { name: "title" });
+    await user.clear(input);
+    await user.type(input, "未保存の編集");
+
+    // 異常クローズ → engine は新しいソケットで再接続を試みる(checkpoint 10 の hello)
+    harness.latest().close(1006);
+    await vi.waitFor(() => expect(harness.sockets.length).toBe(2));
+
+    // フォームはアンマウントされず、未保存入力と再同期バナーが出る
+    expect(screen.getByRole("textbox", { name: "title" })).toHaveValue("未保存の編集");
+    expect(screen.getByRole("status")).toHaveTextContent(/再同期中/);
+
+    // 再同期が完了するとバナーが消える(差分 hello は checkpoint 10)
+    const socket2 = harness.latest();
+    await vi.waitFor(() =>
+      expect(socket2.parsed()).toContainEqual({ type: "hello", checkpoint: 10 }),
+    );
+    socket2.deliver({
+      type: "welcome",
+      protocolVersion: 1,
+      contentTypes: [articleType],
+      serverSeq: 10,
+    });
+    socket2.deliver({ type: "sync", records: [], serverSeq: 10, complete: true });
+    await vi.waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
+    expect(screen.getByRole("textbox", { name: "title" })).toHaveValue("未保存の編集");
+  });
 });

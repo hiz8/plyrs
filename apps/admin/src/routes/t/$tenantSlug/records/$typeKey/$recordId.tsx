@@ -3,8 +3,14 @@ import * as stylex from "@stylexjs/stylex";
 import { useState } from "react";
 import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
+import { ConnectionBanner } from "../../../../../components/connection-banner";
 import { RecordForm, syncErrorMessage } from "../../../../../components/record-form";
-import { useSyncStatus, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
+import {
+  useSyncHasSynced,
+  useSyncStatus,
+  useSyncTypes,
+  useTenantSync,
+} from "../../../../../lib/sync-context";
 import { useCollectionRows } from "../../../../../lib/use-collection";
 
 const styles = stylex.create({
@@ -42,13 +48,16 @@ function RecordEditorPage() {
   const sync = useTenantSync();
   const status = useSyncStatus(sync);
   const types = useSyncTypes(sync);
+  const hasSynced = useSyncHasSynced(sync);
   const navigate = useNavigate();
   const collection = sync.registry.get(typeKey);
   const rows = useCollectionRows(collection);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  if (status !== "ready") {
+  // §12 必須①(2026-07-17 裁定): ゲートは初回同期の完了までに限る。以降の切断・再同期は
+  // バナー表示のみでフォーム(未保存入力)を維持する。
+  if (!hasSynced) {
     return <p {...stylex.props(styles.muted)}>同期中…（状態: {status}）</p>;
   }
   const contentType = types.find((type) => type.key === typeKey);
@@ -76,6 +85,7 @@ function RecordEditorPage() {
 
   return (
     <>
+      <ConnectionBanner status={status} />
       <h1 {...stylex.props(styles.title)}>{contentType.name} を編集</h1>
       <div {...stylex.props(styles.toolbar)}>
         {slots.get("record-editor:toolbar").map((contribution) => (

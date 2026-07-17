@@ -13,6 +13,9 @@ export interface TenantSync {
   readonly registry: CollectionRegistry;
   getStatus(): SyncStatus;
   getTypes(): ContentTypeDefinition[];
+  /** 初回同期(最初の ready)が完了したか。以降は切断中も true のまま(§12 必須①)。
+      インスタンスの寿命はテナントレイアウトのマウントと一致する(裁定 4)。 */
+  getHasSynced(): boolean;
   /** status / contentTypes の変化で発火(useSyncExternalStore 用) */
   subscribe(listener: () => void): () => void;
   start(): void;
@@ -29,6 +32,7 @@ export function createTenantSync(options: TenantSyncOptions): TenantSync {
   let registry!: CollectionRegistry;
   let status: SyncStatus = "idle";
   let types: ContentTypeDefinition[] = [];
+  let hasSynced = false;
   const listeners = new Set<() => void>();
   const emit = () => {
     for (const listener of listeners) {
@@ -46,7 +50,11 @@ export function createTenantSync(options: TenantSyncOptions): TenantSync {
       registry.sync(next);
       emit();
     },
-    onReady: () => registry.markReady(),
+    onReady: () => {
+      hasSynced = true;
+      registry.markReady();
+      emit();
+    },
     onStoreChange: (change) => registry.applyStoreChange(change),
     onReset: () => registry.reset(),
     onStatus: (next) => {
@@ -60,6 +68,7 @@ export function createTenantSync(options: TenantSyncOptions): TenantSync {
     registry,
     getStatus: () => status,
     getTypes: () => types,
+    getHasSynced: () => hasSynced,
     subscribe: (listener) => {
       listeners.add(listener);
       return () => {

@@ -25,3 +25,7 @@ export function useSyncTypes(sync: TenantSync): ContentTypeDefinition[] {
   // getTypes はメッセージ受信時のみ参照が変わる(安定参照)ため snapshot として安全
   return useSyncExternalStore(sync.subscribe, sync.getTypes);
 }
+
+export function useSyncHasSynced(sync: TenantSync): boolean {
+  return useSyncExternalStore(sync.subscribe, sync.getHasSynced);
+}

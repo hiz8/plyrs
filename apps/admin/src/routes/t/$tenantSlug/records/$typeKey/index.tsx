@@ -2,8 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
 import type { WorkflowStatus } from "@plyrs/metamodel";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
+import { ConnectionBanner } from "../../../../../components/connection-banner";
 import { labelForRecord } from "../../../../../components/record-form";
-import { useSyncStatus, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
+import {
+  useSyncHasSynced,
+  useSyncStatus,
+  useSyncTypes,
+  useTenantSync,
+} from "../../../../../lib/sync-context";
 import { useCollectionRows } from "../../../../../lib/use-collection";
 
 const styles = stylex.create({
@@ -37,10 +43,13 @@ function RecordListPage() {
   const sync = useTenantSync();
   const status = useSyncStatus(sync);
   const types = useSyncTypes(sync);
+  const hasSynced = useSyncHasSynced(sync);
   const contentType = types.find((type) => type.key === typeKey);
   const rows = useCollectionRows(sync.registry.get(typeKey));
 
-  if (status !== "ready") {
+  // §12 必須①(2026-07-17 裁定): ゲートは初回同期の完了までに限る。以降の切断・再同期は
+  // バナー表示のみでフォーム(未保存入力)を維持する。
+  if (!hasSynced) {
     return <p {...stylex.props(styles.muted)}>同期中…（状態: {status}）</p>;
   }
   if (contentType === undefined) {
@@ -50,6 +59,7 @@ function RecordListPage() {
   const sorted = rows.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return (
     <>
+      <ConnectionBanner status={status} />
       <h1 {...stylex.props(styles.title)}>{contentType.name}</h1>
       <div {...stylex.props(styles.toolbar)}>
         <Link

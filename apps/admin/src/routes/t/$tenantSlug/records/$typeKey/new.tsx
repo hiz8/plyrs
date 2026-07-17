@@ -3,8 +3,14 @@ import * as stylex from "@stylexjs/stylex";
 import { v7 as uuidv7 } from "uuid";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { colors, typography } from "@plyrs/ui/tokens.stylex";
+import { ConnectionBanner } from "../../../../../components/connection-banner";
 import { RecordForm } from "../../../../../components/record-form";
-import { useSyncStatus, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
+import {
+  useSyncHasSynced,
+  useSyncStatus,
+  useSyncTypes,
+  useTenantSync,
+} from "../../../../../lib/sync-context";
 
 const styles = stylex.create({
   title: { fontSize: typography.sizeXl, marginTop: 0 },
@@ -20,11 +26,14 @@ function NewRecordPage() {
   const sync = useTenantSync();
   const status = useSyncStatus(sync);
   const types = useSyncTypes(sync);
+  const hasSynced = useSyncHasSynced(sync);
   const navigate = useNavigate();
   const contentType = types.find((type) => type.key === typeKey);
   const collection = sync.registry.get(typeKey);
 
-  if (status !== "ready") {
+  // §12 必須①(2026-07-17 裁定): ゲートは初回同期の完了までに限る。以降の切断・再同期は
+  // バナー表示のみでフォーム(未保存入力)を維持する。
+  if (!hasSynced) {
     return <p {...stylex.props(styles.muted)}>同期中…（状態: {status}）</p>;
   }
   if (contentType === undefined || collection === undefined) {
@@ -33,6 +42,7 @@ function NewRecordPage() {
 
   return (
     <>
+      <ConnectionBanner status={status} />
       <h1 {...stylex.props(styles.title)}>{contentType.name} を作成</h1>
       <RecordForm
         contentType={contentType}
