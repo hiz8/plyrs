@@ -1,9 +1,10 @@
 import { useState } from "react";
 import type { Editor } from "@tiptap/core";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { RICH_TEXT_SCHEMA_VERSION, RichTextEditor, type RichTextValue } from "./rich-text-editor";
+import type { RichTextMentionItem } from "./record-mention";
 
 function docWith(text: string): RichTextValue {
   return {
@@ -109,5 +110,113 @@ describe("RichTextEditor", () => {
     rerender(<RichTextEditor label="body" value={docWith("v2")} onChange={onChange} />);
     expect(textbox).toHaveTextContent("v2");
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+const candidates: RichTextMentionItem[] = [
+  { id: "018f2b6a-7a0a-7000-8000-000000000021", type: "author", label: "山田" },
+  { id: "018f2b6a-7a0a-7000-8000-000000000022", type: "author", label: "佐藤" },
+  { id: "018f2b6a-7a0a-7000-8000-000000000023", type: "note", label: "山の手引き" },
+];
+
+function MentionHarness({
+  onChange,
+  onReady,
+}: {
+  onChange?: (value: RichTextValue) => void;
+  onReady?: (editor: Editor) => void;
+}) {
+  const [value, setValue] = useState<RichTextValue | undefined>(undefined);
+  return (
+    <RichTextEditor
+      label="body"
+      value={value}
+      onChange={(next) => {
+        setValue(next);
+        onChange?.(next);
+      }}
+      mentionCandidates={candidates}
+      onEditorReady={onReady}
+    />
+  );
+}
+
+describe("RichTextEditor mention", () => {
+  it("opens a suggestion listbox on '@' and filters by the query", async () => {
+    let editor: Editor | null = null;
+    render(<MentionHarness onReady={(e) => (editor = e)} />);
+    await screen.findByRole("textbox", { name: "body" });
+    if (editor === null) throw new Error("editor not ready");
+    (editor as Editor).chain().focus().insertContent("@").run();
+    const listbox = await screen.findByRole("listbox", { name: "record 参照の候補" });
+    expect(listbox).toHaveTextContent("山田");
+    expect(listbox).toHaveTextContent("佐藤");
+    (editor as Editor).chain().focus().insertContent("山").run();
+    await vi.waitFor(() => {
+      expect(screen.getByRole("listbox")).toHaveTextContent("山田");
+      expect(screen.getByRole("listbox")).not.toHaveTextContent("佐藤");
+    });
+  });
+
+  it("inserts a recordMention node with attrs when an option is clicked", async () => {
+    const onChange = vi.fn();
+    let editor: Editor | null = null;
+    render(<MentionHarness onChange={onChange} onReady={(e) => (editor = e)} />);
+    await screen.findByRole("textbox", { name: "body" });
+    if (editor === null) throw new Error("editor not ready");
+    (editor as Editor).chain().focus().insertContent("@").run();
+    await screen.findByRole("listbox");
+    await userEvent.setup().click(screen.getByRole("option", { name: /佐藤/ }));
+    const json = JSON.stringify((editor as Editor).getJSON());
+    expect(json).toContain('"recordMention"');
+    expect(json).toContain("018f2b6a-7a0a-7000-8000-000000000022");
+    expect(json).toContain('"recordType":"author"');
+    expect(onChange).toHaveBeenCalled();
+  });
+
+  it("supports keyboard navigation (ArrowDown + Enter selects the second item)", async () => {
+    let editor: Editor | null = null;
+    render(<MentionHarness onReady={(e) => (editor = e)} />);
+    const textbox = await screen.findByRole("textbox", { name: "body" });
+    if (editor === null) throw new Error("editor not ready");
+    (editor as Editor).chain().focus().insertContent("@").run();
+    await screen.findByRole("listbox");
+    fireEvent.keyDown(textbox, { key: "ArrowDown" });
+    await vi.waitFor(() =>
+      expect(screen.getAllByRole("option")[1]).toHaveAttribute("aria-selected", "true"),
+    );
+    fireEvent.keyDown(textbox, { key: "Enter" });
+    await vi.waitFor(() =>
+      expect(JSON.stringify((editor as Editor).getJSON())).toContain(
+        "018f2b6a-7a0a-7000-8000-000000000022",
+      ),
+    );
+  });
+
+  it("closes the listbox on Escape", async () => {
+    let editor: Editor | null = null;
+    render(<MentionHarness onReady={(e) => (editor = e)} />);
+    const textbox = await screen.findByRole("textbox", { name: "body" });
+    if (editor === null) throw new Error("editor not ready");
+    (editor as Editor).chain().focus().insertContent("@").run();
+    await screen.findByRole("listbox");
+    fireEvent.keyDown(textbox, { key: "Escape" });
+    await vi.waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
+  });
+
+  it("round-trips a mention through HTML serialize/parse (paste path)", async () => {
+    let editor: Editor | null = null;
+    render(<MentionHarness onReady={(e) => (editor = e)} />);
+    await screen.findByRole("textbox", { name: "body" });
+    if (editor === null) throw new Error("editor not ready");
+    (editor as Editor).chain().focus().insertContent("@").run();
+    await screen.findByRole("listbox");
+    await userEvent.setup().click(screen.getByRole("option", { name: /山田/ }));
+    const html = (editor as Editor).getHTML();
+    (editor as Editor).commands.setContent(html, { emitUpdate: false });
+    const json = JSON.stringify((editor as Editor).getJSON());
+    expect(json).toContain('"recordMention"');
+    expect(json).toContain("018f2b6a-7a0a-7000-8000-000000000021");
+    expect(json).toContain('"recordType":"author"');
   });
 });

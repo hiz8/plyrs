@@ -20,3 +20,4 @@ export {
   type RichTextEditorProps,
   type RichTextValue,
 } from "./rich-text-editor";
+export { RECORD_MENTION_NODE_NAME, type RichTextMentionItem } from "./record-mention";

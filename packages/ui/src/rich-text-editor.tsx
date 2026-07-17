@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Editor, JSONContent } from "@tiptap/core";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -11,6 +11,12 @@ import { Button } from "./button";
 import { TextField } from "./text-field";
 import { stylexRenderProps } from "./compose";
 import { colors, spacing, typography } from "./tokens.stylex";
+import {
+  createRecordMention,
+  type MentionGlue,
+  type MentionSuggestState,
+  type RichTextMentionItem,
+} from "./record-mention";
 
 const styles = stylex.create({
   root: {
@@ -58,6 +64,26 @@ const styles = stylex.create({
     fontSize: typography.sizeMd,
   },
   error: { fontSize: typography.sizeSm, color: colors.danger },
+  mentionList: {
+    borderRadius: "6px",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    display: "flex",
+    flexDirection: "column",
+    maxWidth: "320px",
+  },
+  mentionOption: {
+    paddingBlock: spacing.xs,
+    paddingInline: spacing.sm,
+    cursor: "pointer",
+    display: "flex",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  mentionOptionActive: { backgroundColor: colors.accent, color: colors.accentText },
+  mentionType: { fontSize: typography.sizeSm, opacity: 0.8 },
 });
 
 // records.data に入る AST エンベロープ(tech-selection 2.7)。doc の構造検証は
@@ -82,6 +108,8 @@ export interface RichTextEditorProps {
   /** undefined = 空ドキュメントから開始 */
   value: RichTextValue | undefined;
   onChange: (value: RichTextValue) => void;
+  /** 本文中 record 参照(@)の候補。省略時は mention 候補なし(ノード自体は常に有効) */
+  mentionCandidates?: RichTextMentionItem[] | undefined;
   errorMessage?: string | undefined;
   /**
    * プログラマティック制御・テスト用の口。jsdom は contenteditable へのタイピングを再現
@@ -95,6 +123,7 @@ export function RichTextEditor({
   label,
   value,
   onChange,
+  mentionCandidates,
   errorMessage,
   onEditorReady,
 }: RichTextEditorProps) {
@@ -104,6 +133,54 @@ export function RichTextEditor({
   onChangeRef.current = onChange;
   const onEditorReadyRef = useRef(onEditorReady);
   onEditorReadyRef.current = onEditorReady;
+  const candidatesRef = useRef<RichTextMentionItem[]>(mentionCandidates ?? []);
+  candidatesRef.current = mentionCandidates ?? [];
+
+  interface SuggestView extends MentionSuggestState {
+    index: number;
+  }
+  const [suggest, setSuggest] = useState<SuggestView | null>(null);
+  const suggestRef = useRef<SuggestView | null>(null);
+  suggestRef.current = suggest;
+
+  // glue は useEditor(deps [])に渡すため生成は 1 回。最新状態は ref 経由で読む。
+  const glue = useMemo<MentionGlue>(
+    () => ({
+      getCandidates: () => candidatesRef.current,
+      onState: (state) =>
+        setSuggest(state === null ? null : { items: state.items, select: state.select, index: 0 }),
+      onKeyDown: (event) => {
+        const current = suggestRef.current;
+        if (current === null || current.items.length === 0) {
+          return false;
+        }
+        if (event.key === "ArrowDown") {
+          setSuggest({ ...current, index: (current.index + 1) % current.items.length });
+          return true;
+        }
+        if (event.key === "ArrowUp") {
+          setSuggest({
+            ...current,
+            index: (current.index - 1 + current.items.length) % current.items.length,
+          });
+          return true;
+        }
+        if (event.key === "Enter") {
+          const item = current.items[current.index];
+          if (item !== undefined) {
+            current.select(item);
+          }
+          return true;
+        }
+        if (event.key === "Escape") {
+          setSuggest(null);
+          return true;
+        }
+        return false;
+      },
+    }),
+    [],
+  );
 
   const editor = useEditor(
     {
@@ -112,6 +189,7 @@ export function RichTextEditor({
           heading: { levels: [1, 2, 3] },
           link: { openOnClick: false },
         }),
+        createRecordMention(glue),
       ],
       content: docContent(value),
       // v3 既定と同じだが明示: transaction ごとに React を再レンダーしない。
@@ -164,6 +242,28 @@ export function RichTextEditor({
       <span {...stylex.props(styles.label)}>{label}</span>
       <Toolbar editor={editor} label={label} />
       <EditorContent editor={editor} {...stylex.props(styles.content)} />
+      {suggest !== null && suggest.items.length > 0 && (
+        <div role="listbox" aria-label="record 参照の候補" {...stylex.props(styles.mentionList)}>
+          {suggest.items.map((item, index) => (
+            <div
+              key={`${item.type}${item.id}`}
+              role="option"
+              aria-selected={index === suggest.index}
+              {...stylex.props(
+                styles.mentionOption,
+                index === suggest.index && styles.mentionOptionActive,
+              )}
+              // click で確定する前にエディタがフォーカス喪失で suggestion を閉じないよう
+              // mousedown を抑止してから click で確定する
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => suggest.select(item)}
+            >
+              <span>{item.label}</span>
+              <span {...stylex.props(styles.mentionType)}>{item.type}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {errorMessage !== undefined && <span {...stylex.props(styles.error)}>{errorMessage}</span>}
     </div>
   );
