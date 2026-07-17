@@ -74,6 +74,13 @@ function ContentTypesPage() {
                 <td {...stylex.props(styles.cell)}>{contentType.source}</td>
                 <td {...stylex.props(styles.cell)}>{contentType.version}</td>
                 <td {...stylex.props(styles.cell)}>
+                  <Link
+                    to="/t/$tenantSlug/records/$typeKey"
+                    params={{ tenantSlug, typeKey: contentType.key }}
+                    {...stylex.props(styles.link)}
+                  >
+                    レコード
+                  </Link>
                   {contentType.source === "user" && (
                     <Link
                       to="/t/$tenantSlug/content-types/$typeKey/edit"

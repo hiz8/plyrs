@@ -74,6 +74,7 @@ describe("content_type ビルダー", () => {
     renderAt("/t/blog/content-types", authedRoutes());
     expect(await screen.findByRole("link", { name: "新規コンテンツタイプ" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "編集" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "レコード" })).toBeInTheDocument();
   });
 
   it("creates a new content type and PUTs the definition", async () => {

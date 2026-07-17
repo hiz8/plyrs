@@ -17,6 +17,9 @@ import { Route as TTenantSlugRouteRouteImport } from './routes/t/$tenantSlug/rou
 import { Route as TTenantSlugIndexRouteImport } from './routes/t/$tenantSlug/index'
 import { Route as TTenantSlugContentTypesIndexRouteImport } from './routes/t/$tenantSlug/content-types/index'
 import { Route as TTenantSlugContentTypesNewRouteImport } from './routes/t/$tenantSlug/content-types/new'
+import { Route as TTenantSlugRecordsTypeKeyIndexRouteImport } from './routes/t/$tenantSlug/records/$typeKey/index'
+import { Route as TTenantSlugRecordsTypeKeyNewRouteImport } from './routes/t/$tenantSlug/records/$typeKey/new'
+import { Route as TTenantSlugRecordsTypeKeyRecordIdRouteImport } from './routes/t/$tenantSlug/records/$typeKey/$recordId'
 import { Route as TTenantSlugContentTypesTypeKeyEditRouteImport } from './routes/t/$tenantSlug/content-types/$typeKey.edit'
 
 const TenantsRoute = TenantsRouteImport.update({
@@ -61,6 +64,24 @@ const TTenantSlugContentTypesNewRoute =
     path: '/content-types/new',
     getParentRoute: () => TTenantSlugRouteRoute,
   } as any)
+const TTenantSlugRecordsTypeKeyIndexRoute =
+  TTenantSlugRecordsTypeKeyIndexRouteImport.update({
+    id: '/records/$typeKey/',
+    path: '/records/$typeKey/',
+    getParentRoute: () => TTenantSlugRouteRoute,
+  } as any)
+const TTenantSlugRecordsTypeKeyNewRoute =
+  TTenantSlugRecordsTypeKeyNewRouteImport.update({
+    id: '/records/$typeKey/new',
+    path: '/records/$typeKey/new',
+    getParentRoute: () => TTenantSlugRouteRoute,
+  } as any)
+const TTenantSlugRecordsTypeKeyRecordIdRoute =
+  TTenantSlugRecordsTypeKeyRecordIdRouteImport.update({
+    id: '/records/$typeKey/$recordId',
+    path: '/records/$typeKey/$recordId',
+    getParentRoute: () => TTenantSlugRouteRoute,
+  } as any)
 const TTenantSlugContentTypesTypeKeyEditRoute =
   TTenantSlugContentTypesTypeKeyEditRouteImport.update({
     id: '/content-types/$typeKey/edit',
@@ -78,6 +99,9 @@ export interface FileRoutesByFullPath {
   '/t/$tenantSlug/content-types/new': typeof TTenantSlugContentTypesNewRoute
   '/t/$tenantSlug/content-types/': typeof TTenantSlugContentTypesIndexRoute
   '/t/$tenantSlug/content-types/$typeKey/edit': typeof TTenantSlugContentTypesTypeKeyEditRoute
+  '/t/$tenantSlug/records/$typeKey/$recordId': typeof TTenantSlugRecordsTypeKeyRecordIdRoute
+  '/t/$tenantSlug/records/$typeKey/new': typeof TTenantSlugRecordsTypeKeyNewRoute
+  '/t/$tenantSlug/records/$typeKey/': typeof TTenantSlugRecordsTypeKeyIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -88,6 +112,9 @@ export interface FileRoutesByTo {
   '/t/$tenantSlug/content-types/new': typeof TTenantSlugContentTypesNewRoute
   '/t/$tenantSlug/content-types': typeof TTenantSlugContentTypesIndexRoute
   '/t/$tenantSlug/content-types/$typeKey/edit': typeof TTenantSlugContentTypesTypeKeyEditRoute
+  '/t/$tenantSlug/records/$typeKey/$recordId': typeof TTenantSlugRecordsTypeKeyRecordIdRoute
+  '/t/$tenantSlug/records/$typeKey/new': typeof TTenantSlugRecordsTypeKeyNewRoute
+  '/t/$tenantSlug/records/$typeKey': typeof TTenantSlugRecordsTypeKeyIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -100,6 +127,9 @@ export interface FileRoutesById {
   '/t/$tenantSlug/content-types/new': typeof TTenantSlugContentTypesNewRoute
   '/t/$tenantSlug/content-types/': typeof TTenantSlugContentTypesIndexRoute
   '/t/$tenantSlug/content-types/$typeKey/edit': typeof TTenantSlugContentTypesTypeKeyEditRoute
+  '/t/$tenantSlug/records/$typeKey/$recordId': typeof TTenantSlugRecordsTypeKeyRecordIdRoute
+  '/t/$tenantSlug/records/$typeKey/new': typeof TTenantSlugRecordsTypeKeyNewRoute
+  '/t/$tenantSlug/records/$typeKey/': typeof TTenantSlugRecordsTypeKeyIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -113,6 +143,9 @@ export interface FileRouteTypes {
     | '/t/$tenantSlug/content-types/new'
     | '/t/$tenantSlug/content-types/'
     | '/t/$tenantSlug/content-types/$typeKey/edit'
+    | '/t/$tenantSlug/records/$typeKey/$recordId'
+    | '/t/$tenantSlug/records/$typeKey/new'
+    | '/t/$tenantSlug/records/$typeKey/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -123,6 +156,9 @@ export interface FileRouteTypes {
     | '/t/$tenantSlug/content-types/new'
     | '/t/$tenantSlug/content-types'
     | '/t/$tenantSlug/content-types/$typeKey/edit'
+    | '/t/$tenantSlug/records/$typeKey/$recordId'
+    | '/t/$tenantSlug/records/$typeKey/new'
+    | '/t/$tenantSlug/records/$typeKey'
   id:
     | '__root__'
     | '/'
@@ -134,6 +170,9 @@ export interface FileRouteTypes {
     | '/t/$tenantSlug/content-types/new'
     | '/t/$tenantSlug/content-types/'
     | '/t/$tenantSlug/content-types/$typeKey/edit'
+    | '/t/$tenantSlug/records/$typeKey/$recordId'
+    | '/t/$tenantSlug/records/$typeKey/new'
+    | '/t/$tenantSlug/records/$typeKey/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -202,6 +241,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTenantSlugContentTypesNewRouteImport
       parentRoute: typeof TTenantSlugRouteRoute
     }
+    '/t/$tenantSlug/records/$typeKey/': {
+      id: '/t/$tenantSlug/records/$typeKey/'
+      path: '/records/$typeKey'
+      fullPath: '/t/$tenantSlug/records/$typeKey/'
+      preLoaderRoute: typeof TTenantSlugRecordsTypeKeyIndexRouteImport
+      parentRoute: typeof TTenantSlugRouteRoute
+    }
+    '/t/$tenantSlug/records/$typeKey/new': {
+      id: '/t/$tenantSlug/records/$typeKey/new'
+      path: '/records/$typeKey/new'
+      fullPath: '/t/$tenantSlug/records/$typeKey/new'
+      preLoaderRoute: typeof TTenantSlugRecordsTypeKeyNewRouteImport
+      parentRoute: typeof TTenantSlugRouteRoute
+    }
+    '/t/$tenantSlug/records/$typeKey/$recordId': {
+      id: '/t/$tenantSlug/records/$typeKey/$recordId'
+      path: '/records/$typeKey/$recordId'
+      fullPath: '/t/$tenantSlug/records/$typeKey/$recordId'
+      preLoaderRoute: typeof TTenantSlugRecordsTypeKeyRecordIdRouteImport
+      parentRoute: typeof TTenantSlugRouteRoute
+    }
     '/t/$tenantSlug/content-types/$typeKey/edit': {
       id: '/t/$tenantSlug/content-types/$typeKey/edit'
       path: '/content-types/$typeKey/edit'
@@ -217,6 +277,9 @@ interface TTenantSlugRouteRouteChildren {
   TTenantSlugContentTypesNewRoute: typeof TTenantSlugContentTypesNewRoute
   TTenantSlugContentTypesIndexRoute: typeof TTenantSlugContentTypesIndexRoute
   TTenantSlugContentTypesTypeKeyEditRoute: typeof TTenantSlugContentTypesTypeKeyEditRoute
+  TTenantSlugRecordsTypeKeyRecordIdRoute: typeof TTenantSlugRecordsTypeKeyRecordIdRoute
+  TTenantSlugRecordsTypeKeyNewRoute: typeof TTenantSlugRecordsTypeKeyNewRoute
+  TTenantSlugRecordsTypeKeyIndexRoute: typeof TTenantSlugRecordsTypeKeyIndexRoute
 }
 
 const TTenantSlugRouteRouteChildren: TTenantSlugRouteRouteChildren = {
@@ -225,6 +288,10 @@ const TTenantSlugRouteRouteChildren: TTenantSlugRouteRouteChildren = {
   TTenantSlugContentTypesIndexRoute: TTenantSlugContentTypesIndexRoute,
   TTenantSlugContentTypesTypeKeyEditRoute:
     TTenantSlugContentTypesTypeKeyEditRoute,
+  TTenantSlugRecordsTypeKeyRecordIdRoute:
+    TTenantSlugRecordsTypeKeyRecordIdRoute,
+  TTenantSlugRecordsTypeKeyNewRoute: TTenantSlugRecordsTypeKeyNewRoute,
+  TTenantSlugRecordsTypeKeyIndexRoute: TTenantSlugRecordsTypeKeyIndexRoute,
 }
 
 const TTenantSlugRouteRouteWithChildren =
