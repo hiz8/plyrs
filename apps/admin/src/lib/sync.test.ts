@@ -95,4 +95,21 @@ describe("createTenantSync（ロードマップ §8 配線契約 5 点）", () =
     sync.stop();
     expect(seen.length).toBe(count);
   });
+
+  it("wires onReady → registry.markReady: collections leave loading only after sync completes", async () => {
+    const { socket, sync } = await readySync();
+    socket.deliver({
+      type: "welcome",
+      protocolVersion: 1,
+      contentTypes: [articleType],
+      serverSeq: 3,
+    });
+    await vi.waitFor(() => expect(sync.registry.get("article")).toBeDefined());
+    // sync 完了前: markReady はまだ呼ばれていない = collection は loading のまま
+    expect(sync.registry.get("article")?.status).toBe("loading");
+    socket.deliver({ type: "sync", records: [record()], serverSeq: 3, complete: true });
+    await vi.waitFor(() => expect(sync.getStatus()).toBe("ready"));
+    // sync 完了後: onReady → markReady が効いて loading を抜ける
+    expect(sync.registry.get("article")?.status).not.toBe("loading");
+  });
 });
