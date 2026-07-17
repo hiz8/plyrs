@@ -14,3 +14,9 @@ export {
   type SlotName,
   type SlotRegistry,
 } from "./slots";
+export {
+  RICH_TEXT_SCHEMA_VERSION,
+  RichTextEditor,
+  type RichTextEditorProps,
+  type RichTextValue,
+} from "./rich-text-editor";
