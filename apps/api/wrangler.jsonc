@@ -25,6 +25,11 @@
     // Phase 5b (G3): 公開 read の tenantSlug→tenantId 解決キャッシュ。BLOCKLIST は認証用なので流用しない
     { "binding": "TENANT_SLUGS", "id": "00000000000000000000000000000001" },
   ],
+  "r2_buckets": [
+    // Phase 8 裁定 1: アセットのバイナリ。キーは `${tenantId}/${assetId}`(バイナリは不変 —
+    // 差し替えは新しい asset として作る。凍結 URL / キャッシュ安全性の根拠)。
+    { "binding": "ASSETS", "bucket_name": "plyrs-assets" },
+  ],
   "queues": {
     "producers": [{ "binding": "PROJECTION_QUEUE", "queue": "plyrs-projection" }],
     "consumers": [

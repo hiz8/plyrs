@@ -15,6 +15,7 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
+          r2Buckets: ["ASSETS"],
           bindings: {
             TEST_MIGRATIONS: migrations,
             TEST_PROJECTION_MIGRATIONS: projectionMigrations,
