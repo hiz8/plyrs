@@ -194,8 +194,10 @@ describe("parseListQuery: MAX_TOTAL_FILTER_VALUES（D1 バインド予算、Find
     );
     expect(parsed.ok).toBe(true);
   });
+});
 
-  it("keeps buildListQuery's bind count within D1's 100/query cap for the worst allowed query", () => {
+describe("buildListQuery: D1 バインド予算（Finding 1）", () => {
+  it("keeps the bind count within D1's 100/query cap for the worst allowed query", () => {
     // 語彙が許す最大形: フィルタ 8 個（MAX_FILTERS）× 値の総数 60（MAX_TOTAL_FILTER_VALUES）＋
     // 索引ソート（+1 バインド）＋ カーソル（+2 バインド）。
     const params: Record<string, string[]> = {

@@ -144,6 +144,7 @@ describe("auth routes", () => {
       tenants: { id: string; slug: string; name: string; role: string }[];
     };
     expect(tenants.map((t) => t.slug)).toStrictEqual([slugA, slugB]);
+    expect(tenants.map((t) => t.name)).toStrictEqual(["A", "B"]);
     expect(tenants.every((t) => t.role === "owner")).toBe(true);
     expect(tenants.every((t) => t.id.length === 36)).toBe(true);
   });
