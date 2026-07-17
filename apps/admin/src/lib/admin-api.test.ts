@@ -18,6 +18,9 @@ function manager(token = "jwt-1") {
   });
 }
 
+const fetchBinaryStub: typeof fetch = async () =>
+  new Response(Uint8Array.from([9, 9]), { status: 200 });
+
 // パスごとにハンドラを引くだけの最小 fetch スタブ。呼び出し検証は各ハンドラの vi.fn() 側で行う。
 function stubFetch(routes: Record<string, (init?: RequestInit) => Response>): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -155,5 +158,56 @@ describe("admin api (Bearer 付き /v1/t/:tenantId)", () => {
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).code).toBe("id_mismatch");
     expect((error as ApiError).detail).toBe("key taken");
+  });
+});
+
+describe("asset endpoints (Phase 8)", () => {
+  it("uploadAsset posts the raw file with filename query and content-type", async () => {
+    const calls: { url: string; init: RequestInit | undefined }[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      calls.push({ url: String(input), init });
+      return jsonResponse(201, { ok: true, record: { id: "asset-1" } });
+    };
+    const api = createAdminApi(manager(), fetchImpl);
+    const file = new File([Uint8Array.from([1, 2, 3])], "hero 1.png", { type: "image/png" });
+    const result = await api.uploadAsset("t1", file);
+    expect(result).toEqual({ id: "asset-1" });
+    expect(calls[0]?.url).toBe("/v1/t/t1/assets?filename=hero%201.png");
+    expect(calls[0]?.init?.method).toBe("POST");
+    const headers = calls[0]?.init?.headers as Record<string, string>;
+    expect(headers["content-type"]).toBe("image/png");
+  });
+
+  it("fetchAssetBlob returns the binary body", async () => {
+    const api = createAdminApi(manager(), fetchBinaryStub);
+    const blob = await api.fetchAssetBlob("t1", "asset-1");
+    expect(blob.size).toBe(2);
+  });
+
+  it("listOrphanAssetIds / getAssetUsage / deleteRecord hit the expected paths", async () => {
+    const urls: string[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      urls.push(`${init?.method ?? "GET"} ${String(input)}`);
+      if (String(input).endsWith("/orphans")) {
+        return jsonResponse(200, { orphanIds: ["a1"] });
+      }
+      if (String(input).endsWith("/usage")) {
+        return jsonResponse(200, {
+          usage: [{ sourceId: "r1", sourceType: "article", sourceField: "hero", origin: "field" }],
+        });
+      }
+      return jsonResponse(200, { ok: true });
+    };
+    const api = createAdminApi(manager(), fetchImpl);
+    expect(await api.listOrphanAssetIds("t1")).toEqual(["a1"]);
+    expect(await api.getAssetUsage("t1", "a1")).toEqual([
+      { sourceId: "r1", sourceType: "article", sourceField: "hero", origin: "field" },
+    ]);
+    await api.deleteRecord("t1", "r1");
+    expect(urls).toEqual([
+      "GET /v1/t/t1/assets/orphans",
+      "GET /v1/t/t1/assets/a1/usage",
+      "DELETE /v1/t/t1/records/r1",
+    ]);
   });
 });

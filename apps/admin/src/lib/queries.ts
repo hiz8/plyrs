@@ -27,3 +27,20 @@ export function publicationQueryOptions(adminApi: AdminApi, tenantId: string, re
     staleTime: 5_000,
   });
 }
+
+export function orphanAssetsQueryOptions(adminApi: AdminApi, tenantId: string) {
+  return queryOptions({
+    queryKey: ["assets", tenantId, "orphans"],
+    queryFn: () => adminApi.listOrphanAssetIds(tenantId),
+    // 参照の付け外しは同期経路で頻繁に起きるため常に取り直す(フィルタ ON のたびに最新)
+    staleTime: 0,
+  });
+}
+
+export function assetUsageQueryOptions(adminApi: AdminApi, tenantId: string, assetId: string) {
+  return queryOptions({
+    queryKey: ["assets", tenantId, "usage", assetId],
+    queryFn: () => adminApi.getAssetUsage(tenantId, assetId),
+    staleTime: 0,
+  });
+}

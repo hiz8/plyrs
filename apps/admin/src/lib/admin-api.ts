@@ -21,6 +21,14 @@ export type PublicationState =
   | { published: false }
   | { published: true; publishedAt: string; publishedBy: string; sourceVersion: number };
 
+// apps/api/src/do/asset-usage.ts の AssetUsageRow と構造一致(HTTP 契約)
+export interface AssetUsageEntry {
+  sourceId: string;
+  sourceType: string | null;
+  sourceField: string;
+  origin: string;
+}
+
 const JSON_HEADERS = { "content-type": "application/json" } as const;
 
 export function createAdminApi(
@@ -84,6 +92,43 @@ export function createAdminApi(
     },
     getPublication(tenantId: string, recordId: string): Promise<PublicationState> {
       return requestJson<PublicationState>(tenantId, `/records/${recordId}/publication`);
+    },
+    async uploadAsset(tenantId: string, file: File): Promise<{ id: string }> {
+      const response = await authedFetch(
+        tenantId,
+        `/assets?filename=${encodeURIComponent(file.name)}`,
+        {
+          method: "POST",
+          headers: { "content-type": file.type === "" ? "application/octet-stream" : file.type },
+          body: file,
+        },
+      );
+      if (!response.ok) {
+        return throwApiError(response);
+      }
+      const result = (await response.json()) as { ok: true; record: { id: string } };
+      return { id: result.record.id };
+    },
+    async fetchAssetBlob(tenantId: string, assetId: string): Promise<Blob> {
+      const response = await authedFetch(tenantId, `/assets/${assetId}/file`, {});
+      if (!response.ok) {
+        return throwApiError(response);
+      }
+      return response.blob();
+    },
+    async listOrphanAssetIds(tenantId: string): Promise<string[]> {
+      const { orphanIds } = await requestJson<{ orphanIds: string[] }>(tenantId, "/assets/orphans");
+      return orphanIds;
+    },
+    async getAssetUsage(tenantId: string, assetId: string): Promise<AssetUsageEntry[]> {
+      const { usage } = await requestJson<{ usage: AssetUsageEntry[] }>(
+        tenantId,
+        `/assets/${assetId}/usage`,
+      );
+      return usage;
+    },
+    async deleteRecord(tenantId: string, recordId: string): Promise<void> {
+      await requestJson<{ ok: true }>(tenantId, `/records/${recordId}`, { method: "DELETE" });
     },
   };
 }
