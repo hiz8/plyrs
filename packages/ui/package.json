@@ -13,6 +13,12 @@
   },
   "dependencies": {
     "@stylexjs/stylex": "catalog:",
+    "@tiptap/core": "catalog:",
+    "@tiptap/extension-mention": "catalog:",
+    "@tiptap/pm": "catalog:",
+    "@tiptap/react": "catalog:",
+    "@tiptap/starter-kit": "catalog:",
+    "@tiptap/suggestion": "catalog:",
     "react": "catalog:",
     "react-aria-components": "catalog:"
   },
