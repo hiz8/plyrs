@@ -1,7 +1,12 @@
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useState } from "react";
 import { useForm } from "@tanstack/react-form";
-import type { ContentTypeDefinition, FieldDefinition } from "@plyrs/metamodel";
+import {
+  ASSET_SYSTEM_MANAGED_FIELD_KEYS,
+  ASSET_TYPE_KEY,
+  type ContentTypeDefinition,
+  type FieldDefinition,
+} from "@plyrs/metamodel";
 import type { FieldConflict, SyncRecord } from "@plyrs/sync-protocol";
 import { SyncRejectedError } from "@plyrs/sync-client";
 import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
@@ -16,6 +21,7 @@ import {
   type RichTextMentionItem,
 } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
+import type { AssetServices } from "../lib/asset-services";
 import {
   asRichTextValue,
   draftValueEquals,
@@ -26,6 +32,7 @@ import {
 } from "../lib/record-form-values";
 import { richTextPlainText } from "../lib/richtext-text";
 import { useRelationCandidates } from "../lib/use-collection";
+import { AssetRelationPicker, AssetSelectDialog, type AssetSelectItem } from "./asset-picker";
 import { ConflictDialog } from "./conflict-dialog";
 
 // サーバー版採用でサーバー側に本文が無い場合に使う明示的な空ドキュメント。
@@ -134,6 +141,8 @@ export interface RecordFormProps {
   record: SyncRecord | null;
   submitLabel: string;
   onSubmit: (input: Record<string, unknown>) => Promise<void>;
+  /** アセット操作(アップロード・プレビュー)。省略時はアセット UI を出さず従来表示に落ちる */
+  assets?: AssetServices | undefined;
 }
 
 interface PendingConflict {
@@ -149,11 +158,14 @@ export function RecordForm({
   record,
   submitLabel,
   onSubmit,
+  assets,
 }: RecordFormProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [banner, setBanner] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [conflict, setConflict] = useState<PendingConflict | null>(null);
+  // 本文画像挿入: ツールバーの「画像」→ ダイアログ → insert(挿入関数は state に保持)
+  const [imageInsert, setImageInsert] = useState<((item: AssetSelectItem) => void) | null>(null);
   // §12 必須②: dirty 判定の基準。マウント時のスナップショットから始め、保存成功・
   // サーバー版採用のたびに「確定した姿」へ進める。
   const [initialDraft, setInitialDraft] = useState<DraftValues>(() =>
@@ -323,6 +335,14 @@ export function RecordForm({
               types={types}
               registry={registry}
               mentionCandidates={mentionCandidates}
+              assets={assets}
+              locked={
+                contentType.key === ASSET_TYPE_KEY &&
+                (ASSET_SYSTEM_MANAGED_FIELD_KEYS as readonly string[]).includes(field.key)
+              }
+              onRequestAssetImage={
+                assets === undefined ? undefined : (insert) => setImageInsert(() => insert)
+              }
             />
           )}
         </form.Field>
@@ -332,6 +352,18 @@ export function RecordForm({
           {submitLabel}
         </Button>
       </div>
+      {imageInsert !== null && assets !== undefined && (
+        <AssetSelectDialog
+          registry={registry}
+          types={types}
+          assets={assets}
+          onSelect={(item) => {
+            imageInsert(item);
+            setImageInsert(null);
+          }}
+          onClose={() => setImageInsert(null)}
+        />
+      )}
     </form>
   );
 }
@@ -344,6 +376,9 @@ function FieldInput({
   types,
   registry,
   mentionCandidates,
+  assets,
+  locked,
+  onRequestAssetImage,
 }: {
   field: FieldDefinition;
   value: unknown;
@@ -352,6 +387,9 @@ function FieldInput({
   types: ContentTypeDefinition[];
   registry: CollectionRegistry;
   mentionCandidates: RichTextMentionItem[];
+  assets: AssetServices | undefined;
+  locked: boolean;
+  onRequestAssetImage: ((insert: (item: AssetSelectItem) => void) => void) | undefined;
 }) {
   switch (field.type) {
     case "text":
@@ -363,6 +401,7 @@ function FieldInput({
           isRequired={field.required ?? false}
           isInvalid={error !== undefined}
           errorMessage={error}
+          isDisabled={locked}
         />
       );
     case "number":
@@ -374,6 +413,7 @@ function FieldInput({
           inputMode="numeric"
           isInvalid={error !== undefined}
           errorMessage={error}
+          isDisabled={locked}
         />
       );
     case "datetime":
@@ -385,11 +425,12 @@ function FieldInput({
           // design-spec §5: 格納は UTC ISO8601('Z' 終端)。表示層の TZ 変換は将来課題。
           isInvalid={error !== undefined}
           errorMessage={error}
+          isDisabled={locked}
         />
       );
     case "boolean":
       return (
-        <Checkbox isSelected={value === true} onChange={onChange}>
+        <Checkbox isSelected={value === true} onChange={onChange} isDisabled={locked}>
           {field.key}
         </Checkbox>
       );
@@ -401,6 +442,7 @@ function FieldInput({
           onChange={onChange}
           isInvalid={error !== undefined}
           errorMessage={error}
+          isDisabled={locked}
         />
       );
     case "select": {
@@ -438,9 +480,30 @@ function FieldInput({
           onChange={onChange}
           mentionCandidates={mentionCandidates}
           errorMessage={error}
+          onRequestAssetImage={onRequestAssetImage}
+          resolveAssetUrl={assets?.resolveUrl}
         />
       );
     case "relation":
+      // Phase 8 裁定: メディアフィールド = allowedTypes ["asset"] の関係フィールド。
+      // assets(アップロード経路)が配線されているときだけ専用 UI に切り替える。
+      if (
+        assets !== undefined &&
+        field.config.allowedTypes.length === 1 &&
+        field.config.allowedTypes[0] === ASSET_TYPE_KEY
+      ) {
+        return (
+          <AssetRelationPicker
+            field={field}
+            value={value}
+            onChange={onChange}
+            error={error}
+            types={types}
+            registry={registry}
+            assets={assets}
+          />
+        );
+      }
       return (
         <RelationPicker
           field={field}

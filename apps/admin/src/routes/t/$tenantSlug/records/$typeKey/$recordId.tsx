@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { ConnectionBanner } from "../../../../../components/connection-banner";
 import { RecordForm, syncErrorMessage } from "../../../../../components/record-form";
+import { createAssetServices } from "../../../../../lib/asset-services";
 import {
   useSyncHasSynced,
   useSyncStatus,
@@ -43,13 +44,14 @@ export const Route = createFileRoute("/t/$tenantSlug/records/$typeKey/$recordId"
 });
 
 function RecordEditorPage() {
-  const { slots } = Route.useRouteContext();
+  const { slots, tenant, adminApi } = Route.useRouteContext();
   const { tenantSlug, typeKey, recordId } = Route.useParams();
   const sync = useTenantSync();
   const status = useSyncStatus(sync);
   const types = useSyncTypes(sync);
   const hasSynced = useSyncHasSynced(sync);
   const navigate = useNavigate();
+  const assets = useMemo(() => createAssetServices(adminApi, tenant.id), [adminApi, tenant.id]);
   const collection = sync.registry.get(typeKey);
   const rows = useCollectionRows(collection);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -100,6 +102,7 @@ function RecordEditorPage() {
             registry={sync.registry}
             record={record}
             submitLabel="保存"
+            assets={assets}
             onSubmit={async (input) => {
               const tx = collection.update(recordId, (draft) => {
                 // WritableDeep<SyncRecord>["input"] は SyncRecord["input"] と構造同一だが

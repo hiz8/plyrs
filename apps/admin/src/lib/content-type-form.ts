@@ -20,6 +20,8 @@ export interface FieldDraft {
   allowedTypes: string;
   cardinality: "one" | "many";
   ordered: boolean;
+  /** 公開時に値を埋め込む(Phase 8 裁定 4: snapshotEmbed "value"。asset 限定) */
+  embedValue: boolean;
   indexed: boolean;
   unique: boolean;
 }
@@ -36,6 +38,7 @@ export function emptyFieldDraft(): FieldDraft {
     allowedTypes: "",
     cardinality: "one",
     ordered: false,
+    embedValue: false,
     indexed: false,
     unique: false,
   };
@@ -80,6 +83,7 @@ export function toFieldDraft(field: FieldDefinition): FieldDraft {
       draft.allowedTypes = field.config.allowedTypes.join(", ");
       draft.cardinality = field.config.cardinality;
       draft.ordered = field.config.ordered ?? false;
+      draft.embedValue = field.config.snapshotEmbed === "value";
       break;
   }
   return draft;
@@ -154,6 +158,7 @@ function fromFieldDraft(
         allowedTypes,
         cardinality: draft.cardinality,
         ...(draft.ordered ? { ordered: true } : {}),
+        ...(draft.embedValue ? { snapshotEmbed: "value" as const } : {}),
       };
       return { ok: true, field: { ...base, type: "relation", config } };
     }

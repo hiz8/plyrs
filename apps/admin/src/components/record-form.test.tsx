@@ -1,10 +1,11 @@
-import type { ContentTypeDefinition } from "@plyrs/metamodel";
+import { ASSET_TYPE_DEFINITION, type ContentTypeDefinition } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { SyncEngine, SyncRejectedError } from "@plyrs/sync-client";
 import { CollectionRegistry } from "@plyrs/sync-client/tanstack";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import type { AssetServices } from "../lib/asset-services";
 import { pendingConnect } from "../test-utils/fake-socket";
 import { RecordForm, labelForRecord, syncErrorMessage } from "./record-form";
 
@@ -483,5 +484,123 @@ describe("RecordForm 本文競合(裁定 3)", () => {
     );
     await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
+
+const mediaType: ContentTypeDefinition = {
+  id: "018f2b6a-7a0a-7000-8000-000000000040",
+  key: "media",
+  name: "メディア記事",
+  source: "user",
+  version: 1,
+  fields: [
+    { key: "title", type: "text", required: true },
+    {
+      key: "hero",
+      type: "relation",
+      config: { allowedTypes: ["asset"], cardinality: "one", snapshotEmbed: "value" },
+    },
+  ],
+};
+
+const assetTypeDefinition = ASSET_TYPE_DEFINITION;
+
+const ASSET_RECORD_ID = "018f2b6a-7a0a-7000-8000-0000000000f0";
+
+function assetRecordFixture(): SyncRecord {
+  return {
+    id: ASSET_RECORD_ID,
+    type: "asset",
+    input: {
+      filename: "hero.png",
+      content_type: "image/png",
+      size: 2048,
+      r2_key: "t1/assets/hero.png",
+    },
+    fieldVersions: { filename: 1, content_type: 1, size: 1, r2_key: 1 },
+    status: "draft",
+    seq: 1,
+    version: 1,
+    deletedAt: null,
+    updatedAt: "2026-07-17T00:00:00Z",
+    updatedBy: "u1",
+  };
+}
+
+const assetRecord = assetRecordFixture();
+
+function buildRegistryWithAsset(): CollectionRegistry {
+  const engine = new SyncEngine({ connect: pendingConnect });
+  const registry = new CollectionRegistry(engine);
+  registry.sync([mediaType, assetTypeDefinition]);
+  registry.markReady();
+  registry.applyStoreChange({ kind: "upsert", record: assetRecord });
+  return registry;
+}
+
+const registryWithAsset = buildRegistryWithAsset();
+
+function assetServicesStub(overrides: Partial<AssetServices> = {}): AssetServices {
+  return {
+    upload: vi.fn(async () => ({ id: "018f2b6a-7a0a-7000-8000-0000000000f1" })),
+    resolveUrl: vi.fn(async () => null),
+    ...overrides,
+  };
+}
+
+describe("アセット関係フィールド (Phase 8 裁定: メディア UI)", () => {
+  it("renders the asset picker for allowedTypes=['asset'] fields and selects from the dialog", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn(async () => {});
+    render(
+      <RecordForm
+        contentType={mediaType}
+        types={[mediaType, assetTypeDefinition]}
+        registry={registryWithAsset}
+        record={null}
+        submitLabel="作成"
+        onSubmit={onSubmit}
+        assets={assetServicesStub()}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "アセットを選択" }));
+    const dialog = await screen.findByRole("dialog", { name: "アセットを選択" });
+    expect(dialog).toHaveTextContent("hero.png");
+    await user.click(screen.getByRole("button", { name: /hero\.png/ }));
+    // 選択結果がフィールドに表示される
+    expect(screen.getByText("hero.png", { selector: "span" })).toBeInTheDocument();
+  });
+
+  it("falls back to the plain RelationPicker without the assets prop", () => {
+    const onSubmit = vi.fn(async () => {});
+    render(
+      <RecordForm
+        contentType={mediaType}
+        types={[mediaType, assetTypeDefinition]}
+        registry={registryWithAsset}
+        record={null}
+        submitLabel="作成"
+        onSubmit={onSubmit}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "アセットを選択" })).not.toBeInTheDocument();
+  });
+
+  it("disables system-managed inputs when editing an asset record", () => {
+    const onSubmit = vi.fn(async () => {});
+    render(
+      <RecordForm
+        contentType={assetTypeDefinition}
+        types={[assetTypeDefinition]}
+        registry={registryWithAsset}
+        record={assetRecord}
+        submitLabel="保存"
+        onSubmit={onSubmit}
+        assets={assetServicesStub()}
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "filename" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "r2_key" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "alt" })).toBeEnabled();
   });
 });

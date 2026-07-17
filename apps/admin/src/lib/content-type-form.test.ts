@@ -121,6 +121,51 @@ describe("toFieldDraft / buildDefinition round-trip", () => {
   });
 });
 
+describe("relation snapshotEmbed (Phase 8 裁定 4)", () => {
+  it("round-trips embedValue through draft and definition", () => {
+    const field: FieldDefinition = {
+      key: "hero",
+      type: "relation",
+      config: { allowedTypes: ["asset"], cardinality: "one", snapshotEmbed: "value" },
+    };
+    const draft = toFieldDraft(field);
+    expect(draft.embedValue).toBe(true);
+    const built = buildDefinition({
+      id: "018f2b6a-7a0a-7000-8000-00000000e001",
+      key: "article",
+      name: "記事",
+      drafts: [draft],
+      version: 1,
+    });
+    expect(built.ok).toBe(true);
+    if (built.ok) {
+      const rebuilt = built.definition.fields[0];
+      expect(rebuilt?.type === "relation" && rebuilt.config.snapshotEmbed).toBe("value");
+    }
+  });
+
+  it("rejects embedValue for non-asset allowedTypes with a readable error", () => {
+    const draft = {
+      ...emptyFieldDraft(),
+      key: "author",
+      type: "relation" as const,
+      allowedTypes: "author",
+      embedValue: true,
+    };
+    const built = buildDefinition({
+      id: "018f2b6a-7a0a-7000-8000-00000000e002",
+      key: "article",
+      name: "記事",
+      drafts: [draft],
+      version: 1,
+    });
+    expect(built.ok).toBe(false);
+    if (!built.ok) {
+      expect(built.errors.join("\n")).toContain("snapshotEmbed");
+    }
+  });
+});
+
 describe("summaryToDefinition", () => {
   it("drops row-only columns and null pluginId", () => {
     const definition = summaryToDefinition({

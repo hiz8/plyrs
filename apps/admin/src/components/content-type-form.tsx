@@ -231,6 +231,12 @@ function FieldDraftCard({
           <Checkbox isSelected={draft.ordered} onChange={(next) => onChange({ ordered: next })}>
             順序を保持
           </Checkbox>
+          <Checkbox
+            isSelected={draft.embedValue}
+            onChange={(next) => onChange({ embedValue: next })}
+          >
+            公開時に値を埋め込む(asset 限定)
+          </Checkbox>
         </div>
       )}
     </div>

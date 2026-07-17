@@ -1,10 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
+import { useMemo } from "react";
 import { v7 as uuidv7 } from "uuid";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { colors, typography } from "@plyrs/ui/tokens.stylex";
 import { ConnectionBanner } from "../../../../../components/connection-banner";
 import { RecordForm } from "../../../../../components/record-form";
+import { createAssetServices } from "../../../../../lib/asset-services";
 import {
   useSyncHasSynced,
   useSyncStatus,
@@ -23,11 +25,13 @@ export const Route = createFileRoute("/t/$tenantSlug/records/$typeKey/new")({
 
 function NewRecordPage() {
   const { tenantSlug, typeKey } = Route.useParams();
+  const { tenant, adminApi } = Route.useRouteContext();
   const sync = useTenantSync();
   const status = useSyncStatus(sync);
   const types = useSyncTypes(sync);
   const hasSynced = useSyncHasSynced(sync);
   const navigate = useNavigate();
+  const assets = useMemo(() => createAssetServices(adminApi, tenant.id), [adminApi, tenant.id]);
   const contentType = types.find((type) => type.key === typeKey);
   const collection = sync.registry.get(typeKey);
 
@@ -50,6 +54,7 @@ function NewRecordPage() {
         registry={sync.registry}
         record={null}
         submitLabel="作成"
+        assets={assets}
         onSubmit={async (input) => {
           // design-spec §5: ID はクライアント生成（UUIDv7）。updatedAt/updatedBy/seq/version は
           // サーバー権威 — ack の確定レコードで上書きされる仮値を入れる。
