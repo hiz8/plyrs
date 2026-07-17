@@ -92,10 +92,10 @@ export function upsertStatements(
       db
         .prepare(
           `INSERT INTO projected_relations
-             (tenant_id, source_id, source_field, target_type, target_id, ordinal, origin)
-           SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
+             (tenant_id, source_id, source_field, target_type, target_id, ordinal, origin, embed)
+           SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8
            WHERE EXISTS (SELECT 1 FROM projected_records
-                         WHERE tenant_id = ?1 AND record_id = ?2 AND publish_seq = ?8)`,
+                         WHERE tenant_id = ?1 AND record_id = ?2 AND publish_seq = ?9)`,
         )
         .bind(
           tenantId,
@@ -105,6 +105,9 @@ export function upsertStatements(
           relation.targetId,
           relation.ordinal,
           relation.origin,
+          relation.embed === undefined || relation.embed === null
+            ? null
+            : JSON.stringify(relation.embed),
           payload.publishSeq,
         ),
     );

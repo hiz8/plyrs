@@ -1,0 +1,1 @@
+ALTER TABLE `projected_relations` ADD `embed` text;

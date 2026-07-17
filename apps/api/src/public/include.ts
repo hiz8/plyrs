@@ -1,3 +1,4 @@
+import type { AssetEmbed } from "../projection/payload";
 import { toPublicRecord, type ProjectedRecordRow, type PublicRecord } from "./serialize";
 import { chunk, D1_BIND_CHUNK_SIZE, placeholders } from "./sql";
 
@@ -9,28 +10,42 @@ import { chunk, D1_BIND_CHUNK_SIZE, placeholders } from "./sql";
 // toPublicRecord() が返す fields には関係フィールドの値が一切現れない。裁定（2026-07-14 #3）:
 // 既定でも関係フィールドは ID 配列として fields に現れる — include は included[] の同梱だけを
 // 制御し、fields の形を変えない。未公開参照先の ID も残る（ソフト参照で included にだけ現れない）。
+
+// Phase 8 裁定 4: snapshotEmbed "value" の関係は凍結埋め込みオブジェクトとして fields に
+// 現れる(素の ID 文字列と排他 — 同じフィールドの同じ publish 世代内では形が揃う)。
+export interface PublicAssetEmbed extends AssetEmbed {
+  id: string;
+}
+
+export type PublicRelationValue = string | PublicAssetEmbed;
+
 // 単体・一覧の両方から呼ぶ: 対象 record_id 全件の field 由来の関係をチャンク内 1 回で引き、
-// record_id → フィールド別 ID 配列 の Map を返す（カタログ不要: 非関係フィールドはそもそも行が無い）。
+// record_id → フィールド別 値配列 の Map を返す(カタログ不要: 非関係フィールドはそもそも行が無い)。
 export async function loadFieldRelationIdsForRecords(
   db: D1Database,
   tenantId: string,
   recordIds: string[],
-): Promise<Map<string, Record<string, string[]>>> {
-  const byRecord = new Map<string, Record<string, string[]>>();
+): Promise<Map<string, Record<string, PublicRelationValue[]>>> {
+  const byRecord = new Map<string, Record<string, PublicRelationValue[]>>();
   for (const idChunk of chunk(recordIds, D1_BIND_CHUNK_SIZE)) {
     const { results } = await db
       .prepare(
-        "SELECT source_id, source_field, target_id FROM projected_relations" +
+        "SELECT source_id, source_field, target_id, embed FROM projected_relations" +
           " WHERE tenant_id = ? AND origin = 'field'" +
           ` AND source_id IN (${placeholders(idChunk.length)})` +
           " ORDER BY source_field, ordinal",
       )
       .bind(tenantId, ...idChunk)
-      .all<{ source_id: string; source_field: string; target_id: string }>();
+      .all<{ source_id: string; source_field: string; target_id: string; embed: string | null }>();
     for (const row of results) {
       const byField = byRecord.get(row.source_id) ?? {};
       const list = byField[row.source_field] ?? [];
-      list.push(row.target_id);
+      if (row.embed === null) {
+        list.push(row.target_id);
+      } else {
+        // embed 列は buildAssetEmbed(do/publish.ts)が書いた AssetEmbed の JSON(境界 cast)
+        list.push({ id: row.target_id, ...(JSON.parse(row.embed) as AssetEmbed) });
+      }
       byField[row.source_field] = list;
       byRecord.set(row.source_id, byField);
     }
@@ -41,14 +56,14 @@ export async function loadFieldRelationIdsForRecords(
 // Phase 5c housekeeping: include の対象 ID は loadFieldRelationIdsForRecords の結果から導出する
 // （従来は projected_relations をもう一度 DISTINCT で引き直していた = 同一テーブルの二重読み）。
 export function collectIncludeTargetIds(
-  relationIds: Map<string, Record<string, string[]>>,
+  relationIds: Map<string, Record<string, PublicRelationValue[]>>,
   includeFields: string[],
 ): string[] {
   const targetIds = new Set<string>();
   for (const byField of relationIds.values()) {
     for (const field of includeFields) {
-      for (const id of byField[field] ?? []) {
-        targetIds.add(id);
+      for (const entry of byField[field] ?? []) {
+        targetIds.add(typeof entry === "string" ? entry : entry.id);
       }
     }
   }

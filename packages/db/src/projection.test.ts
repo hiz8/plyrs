@@ -58,4 +58,9 @@ describe("@plyrs/db projection schema", () => {
     expect(projectionFields.multi).toBeDefined();
     expect(projectionFields.projectedAt).toBeDefined();
   });
+
+  it("projected_relations has the embed column (Phase 8)", () => {
+    expect(projectedRelations.embed).toBeDefined();
+    expect(projectedRelations.embed.columnType).toBe("SQLiteText");
+  });
 });

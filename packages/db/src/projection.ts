@@ -60,6 +60,9 @@ export const projectedRelations = sqliteTable(
     ordinal: integer("ordinal").notNull().default(0),
     // origin は DO 側 relations と同じ語彙（'field' | 'body'）。body 由来は Phase 7 で入る
     origin: text("origin").notNull().default("field"),
+    // Phase 8 裁定 4: snapshotEmbed "value" の凍結埋め込み(AssetEmbed の JSON)。
+    // null = 素の ID 参照。公開 read はこの値をそのまま fields へインラインする(§12.5)。
+    embed: text("embed"),
   },
   (table) => [
     primaryKey({
