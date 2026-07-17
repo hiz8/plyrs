@@ -9,7 +9,7 @@ import { buildRecordInputSchema, type ContentTypeDefinition } from "@plyrs/metam
 export type DraftValues = Record<string, unknown>;
 
 // type key(snake_case)にも UUID にも現れない Unit Separator(U+001F)を区切りに使う
-const RELATION_KEY_SEPARATOR = "";
+const RELATION_KEY_SEPARATOR = "\u001f";
 
 export function relationDraftKey(ref: { type: string; id: string }): string {
   return `${ref.type}${RELATION_KEY_SEPARATOR}${ref.id}`;

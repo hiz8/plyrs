@@ -30,6 +30,16 @@ const contentType: ContentTypeDefinition = {
         multiple: true,
       },
     },
+    {
+      key: "category",
+      type: "select",
+      config: {
+        options: [
+          { value: "news", label: "News" },
+          { value: "blog", label: "Blog" },
+        ],
+      },
+    },
     { key: "body", type: "richtext" },
     {
       key: "authors",
@@ -67,6 +77,7 @@ describe("toDraftValues", () => {
       published_at: "2026-07-17T00:00:00Z",
       meta: { a: 1 },
       tags: ["tech"],
+      category: "news",
       body: { schemaVersion: 1, doc: {} },
       authors: [authorRef],
       hero: heroRef,
@@ -77,6 +88,7 @@ describe("toDraftValues", () => {
     expect(draft["published_at"]).toBe("2026-07-17T00:00:00Z");
     expect(draft["meta"]).toBe(JSON.stringify({ a: 1 }, null, 2));
     expect(draft["tags"]).toStrictEqual(["tech"]);
+    expect(draft["category"]).toBe("news");
     expect(draft["body"]).toStrictEqual({ schemaVersion: 1, doc: {} });
     expect(draft["authors"]).toStrictEqual([relationDraftKey(authorRef)]);
     expect(draft["hero"]).toBe(relationDraftKey(heroRef));
@@ -89,6 +101,7 @@ describe("toDraftValues", () => {
     expect(draft["featured"]).toBe(false);
     expect(draft["meta"]).toBe("");
     expect(draft["tags"]).toStrictEqual([]);
+    expect(draft["category"]).toBe("");
     expect(draft["authors"]).toStrictEqual([]);
     expect(draft["hero"]).toBe("");
   });
@@ -159,5 +172,33 @@ describe("fromDraftValues", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.fieldErrors["published_at"]).toBeDefined();
+  });
+
+  it("round-trips valid optional values (datetime / json / single select / one relation)", () => {
+    const draft = toDraftValues(contentType, {
+      title: "hello",
+      count: 2,
+      featured: true,
+      published_at: "2026-07-17T00:00:00Z",
+      meta: { a: 1 },
+      tags: ["life"],
+      category: "news",
+      authors: [authorRef],
+      hero: heroRef,
+    });
+    const result = fromDraftValues(contentType, draft, {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.input).toStrictEqual({
+      title: "hello",
+      count: 2,
+      featured: true,
+      published_at: "2026-07-17T00:00:00Z",
+      meta: { a: 1 },
+      tags: ["life"],
+      category: "news",
+      authors: [authorRef],
+      hero: heroRef,
+    });
   });
 });
