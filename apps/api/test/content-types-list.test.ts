@@ -130,6 +130,21 @@ describe("GET /v1/t/:tenantId/records/:recordId/publication (Phase 6b)", () => {
     const state = (await after.json()) as { published: boolean; sourceVersion?: number };
     expect(state.published).toBe(true);
     expect(state.sourceVersion).toBe(1);
+
+    const unpublished = await app.request(
+      `/v1/t/${tenantId}/records/${recordId}/unpublish`,
+      { method: "POST", headers: { authorization: bearer } },
+      env,
+    );
+    expect(unpublished.status).toBe(200);
+
+    const final = await app.request(
+      `/v1/t/${tenantId}/records/${recordId}/publication`,
+      { headers: { authorization: bearer } },
+      env,
+    );
+    expect(final.status).toBe(200);
+    expect(await final.json()).toStrictEqual({ published: false });
   });
 
   it("requires authentication", async () => {
