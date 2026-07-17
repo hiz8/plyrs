@@ -35,3 +35,8 @@ export {
   type SplitRecordInput,
 } from "./record-schema";
 export { tolerantReadData, type TolerantReadResult } from "./tolerant-read";
+export {
+  RECORD_MENTION_NODE_TYPE,
+  extractBodyRelations,
+  type BodyRelationWrite,
+} from "./body-relations";
