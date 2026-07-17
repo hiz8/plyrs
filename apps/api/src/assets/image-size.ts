@@ -104,6 +104,9 @@ function sniffWebp(bytes: Uint8Array): ImageSize | null {
   }
   if (matches(bytes, 12, "VP8 ")) {
     // 3 バイトのフレームタグの後に start code 9D 01 2A、続いて 14bit LE の寸法
+    if (bytes.length < data + 10) {
+      return null;
+    }
     if (bytes[data + 3] !== 0x9d || bytes[data + 4] !== 0x01 || bytes[data + 5] !== 0x2a) {
       return null;
     }

@@ -88,6 +88,20 @@ describe("sniffImageSize", () => {
     expect(sniffImageSize(webp)).toEqual({ width: 800, height: 600 });
   });
 
+  it("returns null for truncated WebP VP8 after start code", () => {
+    const webp = bytes(
+      ascii("RIFF"),
+      [0x12, 0x00, 0x00, 0x00], // size = 18 (file size - 8)
+      ascii("WEBP"),
+      ascii("VP8 "),
+      [0x0a, 0x00, 0x00, 0x00], // chunk size = 10
+      [0x00, 0x00, 0x00], // frame tag
+      [0x9d, 0x01, 0x2a], // start code
+      // truncated here, no dimension bytes
+    );
+    expect(sniffImageSize(webp)).toBeNull();
+  });
+
   it("reads WebP lossless (VP8L) dimensions", () => {
     // width-1=799 (14bit), height-1=599 (14bit) を LSB からパックした 32bit 値:
     // v = 799 | (599 << 14) = 0x0095c31f → bytes LE: 1f c3 95 00
