@@ -10,10 +10,13 @@ export interface BeforeWriteContext {
   data: Record<string, unknown>;
   prev: RecordSnapshot | null;
   sql: SqlStorage;
+  // Phase 8: サーバー内部の書き込み(アップロード API 経由の createAssetRecord)は true。
+  // クライアント由来(同期 push / HTTP writeRecord)は false — assetGuardHook が参照する。
+  systemWrite: boolean;
 }
 
 export type HookRejection = {
-  code: Extract<WriteErrorCode, "unique_violation">;
+  code: Extract<WriteErrorCode, "unique_violation" | "forbidden">;
   message: string;
 };
 

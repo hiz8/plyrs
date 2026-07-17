@@ -3,7 +3,7 @@ import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlit
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import * as schema from "@plyrs/db";
 import migrations from "@plyrs/db/migrations";
-import { contentTypeDefinitionSchema } from "@plyrs/metamodel";
+import { ASSET_TYPE_KEY, contentTypeDefinitionSchema } from "@plyrs/metamodel";
 import { v7 as uuidv7 } from "uuid";
 import {
   clearAlarm,
@@ -173,6 +173,40 @@ export class TenantDO extends DurableObject<Env> {
         },
         contentType,
         { ...params, actor: auth.userId },
+      ),
+    );
+    if (result.ok && result.applied) {
+      const stored = loadSyncRecord(this.ctx.storage.sql, params.recordId);
+      if (stored !== null) {
+        this.broadcastAll({ type: "change", record: stored });
+      }
+    }
+    return result;
+  }
+
+  // Phase 8 裁定 1: asset record の作成・システム管理フィールドの書き込みはアップロード API
+  // 専用の経路。writeRecord と同じコアを systemWrite で通す(assetGuardHook だけが免除される —
+  // unique 検証や validate-on-write は同じに掛かる)。
+  createAssetRecord(params: WriteRecordInput, auth: AuthContext): WriteRecordResult {
+    const denial = requireOperation(auth, "record:write");
+    if (denial !== null) {
+      return denial;
+    }
+    const contentType = loadContentTypeByKey(this.ctx.storage.sql, ASSET_TYPE_KEY);
+    if (contentType === null) {
+      return { ok: false, code: "unknown_type", message: "asset type is not registered" };
+    }
+    const result = this.ctx.storage.transactionSync(() =>
+      writeRecordCore(
+        {
+          sql: this.ctx.storage.sql,
+          nextSeq: () => ++this.seq,
+          now: () => new Date().toISOString(),
+          newRelationId: () => uuidv7(),
+        },
+        contentType,
+        { ...params, actor: auth.userId },
+        { systemWrite: true },
       ),
     );
     if (result.ok && result.applied) {

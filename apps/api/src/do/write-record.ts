@@ -6,6 +6,7 @@ import {
   type RelationRef,
   type WorkflowStatus,
 } from "@plyrs/metamodel";
+import { assetGuardHook } from "./asset-guard";
 import { issuesToMessage, rowToDefinition, type ContentTypeRow } from "./content-types";
 import { computeChangeSet } from "./diff";
 import { runBeforeWriteHooks, type BeforeWriteHook } from "./hooks";
@@ -72,12 +73,17 @@ export interface WriteDeps {
   newRelationId: () => string;
 }
 
-const systemBeforeWriteHooks: readonly BeforeWriteHook[] = [uniqueCheckHook];
+const systemBeforeWriteHooks: readonly BeforeWriteHook[] = [assetGuardHook, uniqueCheckHook];
+
+export interface WriteOptions {
+  systemWrite?: boolean;
+}
 
 export function writeRecordCore(
   deps: WriteDeps,
   contentType: ContentTypeRow,
   params: WriteRecordParams,
+  options: WriteOptions = {},
 ): WriteRecordResult {
   if (!uuidSchema.safeParse(params.recordId).success) {
     return {
@@ -146,6 +152,7 @@ export function writeRecordCore(
     data: change.data,
     prev,
     sql: deps.sql,
+    systemWrite: options.systemWrite === true,
   });
   if (rejection !== null) {
     return { ok: false, code: rejection.code, message: rejection.message };
