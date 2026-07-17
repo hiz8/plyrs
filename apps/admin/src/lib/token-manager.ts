@@ -1,6 +1,7 @@
 // 2026-07-16 裁定 #2: 短命 JWT（15 分）は JS メモリにだけ保持し、storage に置かない。
 // exp の 60 秒前を切ったら /auth/token で再取得（Phase 4b 申し送りの「exp 前の先回り」）。
 // ページリロード時はキャッシュが空になり、セッション cookie 経由の issueToken 1 往復で復元される。
+// forceRefresh はマージン内でもサーバー側で失効している場合（WS 4001 / HTTP 401）の再発行用。
 export interface TokenManagerDeps {
   issueToken: (tenantId: string) => Promise<{ token: string; expiresIn: number }>;
   now?: () => number;
@@ -14,11 +15,16 @@ export function createTokenManager({ issueToken, now = Date.now }: TokenManagerD
   // clear() 後に解決した飛行中リクエストが前セッションのトークンを書き戻さないための世代番号
   let generation = 0;
   return {
-    async getToken(tenantId: string): Promise<string> {
+    async getToken(tenantId: string, options?: { forceRefresh?: boolean }): Promise<string> {
       const cached = cache.get(tenantId);
-      if (cached !== undefined && cached.expiresAt - now() > REFRESH_MARGIN_MS) {
+      if (
+        options?.forceRefresh !== true &&
+        cached !== undefined &&
+        cached.expiresAt - now() > REFRESH_MARGIN_MS
+      ) {
         return cached.token;
       }
+      // forceRefresh でも飛行中リクエストは再利用する（結果はどのみち発行直後の新トークン）
       const pending = inflight.get(tenantId);
       if (pending !== undefined) {
         return pending;

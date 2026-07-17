@@ -19,3 +19,11 @@ export function contentTypesQueryOptions(adminApi: AdminApi, tenantId: string) {
     staleTime: 10_000,
   });
 }
+
+export function publicationQueryOptions(adminApi: AdminApi, tenantId: string, recordId: string) {
+  return queryOptions({
+    queryKey: ["publication", tenantId, recordId],
+    queryFn: () => adminApi.getPublication(tenantId, recordId),
+    staleTime: 5_000,
+  });
+}

@@ -58,6 +58,40 @@ describe("token manager (2026-07-16 裁定: メモリのみ + 先回りリフレ
     expect(await manager.getToken("a")).toBe("t");
   });
 
+  it("forceRefresh bypasses a fresh cache entry", async () => {
+    let calls = 0;
+    const tokens = createTokenManager({
+      issueToken: async () => {
+        calls += 1;
+        return { token: `t${calls}`, expiresIn: 900 };
+      },
+    });
+    expect(await tokens.getToken("t1")).toBe("t1");
+    expect(await tokens.getToken("t1")).toBe("t1"); // キャッシュヒット
+    expect(await tokens.getToken("t1", { forceRefresh: true })).toBe("t2");
+    expect(calls).toBe(2);
+    // forceRefresh 後はキャッシュも更新されている
+    expect(await tokens.getToken("t1")).toBe("t2");
+  });
+
+  it("forceRefresh reuses an inflight request instead of stacking a second one", async () => {
+    let calls = 0;
+    let release: (() => void) | undefined;
+    const tokens = createTokenManager({
+      issueToken: () =>
+        new Promise((resolve) => {
+          calls += 1;
+          release = () => resolve({ token: `t${calls}`, expiresIn: 900 });
+        }),
+    });
+    const first = tokens.getToken("t1");
+    const second = tokens.getToken("t1", { forceRefresh: true });
+    release?.();
+    expect(await first).toBe("t1");
+    expect(await second).toBe("t1");
+    expect(calls).toBe(1);
+  });
+
   it("does not repopulate the cache when clear() races an in-flight issue", async () => {
     let resolveIssue: ((value: { token: string; expiresIn: number }) => void) | undefined;
     const issueToken = vi.fn(

@@ -11,23 +11,31 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
+    readonly detail?: string,
   ) {
-    super(`${status}: ${code}`);
+    super(detail === undefined ? `${status}: ${code}` : `${status}: ${code} (${detail})`);
     this.name = "ApiError";
   }
 }
 
 export async function throwApiError(response: Response): Promise<never> {
   let code = "unknown_error";
+  let detail: string | undefined;
   try {
-    const body = (await response.json()) as { error?: unknown };
+    const body = (await response.json()) as { error?: unknown; code?: unknown; message?: unknown };
+    // /auth 系は { error }、DO 由来の結果は { ok: false, code, message } — 両対応で拾う
     if (typeof body.error === "string") {
       code = body.error;
+    } else if (typeof body.code === "string") {
+      code = body.code;
+    }
+    if (typeof body.message === "string") {
+      detail = body.message;
     }
   } catch {
     // 本文が JSON でない（ゲートウェイ応答等）場合は unknown_error のまま
   }
-  throw new ApiError(response.status, code);
+  throw new ApiError(response.status, code, detail);
 }
 
 const JSON_HEADERS = { "content-type": "application/json" } as const;
