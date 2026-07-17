@@ -128,13 +128,31 @@ describe("sync push", () => {
       "article",
       {
         recordId: uuid(90),
-        input: { ...validArticleInput(), body: { schemaVersion: 1, doc: { server: true } } },
+        input: {
+          ...validArticleInput(),
+          body: {
+            schemaVersion: 1,
+            doc: {
+              type: "doc",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "server" }] }],
+            },
+          },
+        },
       },
       auth("editor-2"),
     );
 
     const stale = change({
-      input: { ...validArticleInput(), body: { schemaVersion: 1, doc: { client: true } } },
+      input: {
+        ...validArticleInput(),
+        body: {
+          schemaVersion: 1,
+          doc: {
+            type: "doc",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "client" }] }],
+          },
+        },
+      },
       changedFields: ["body"],
       baseFieldVersions: { body: 1 },
     });
@@ -146,7 +164,13 @@ describe("sync push", () => {
       expect(result.conflicts?.[0]?.fieldKey).toBe("body");
     }
     const stored = asRecordSnapshot(await stub.getRecord(uuid(90)));
-    expect(stored?.data["body"]).toEqual({ schemaVersion: 1, doc: { server: true } });
+    expect(stored?.data["body"]).toEqual({
+      schemaVersion: 1,
+      doc: {
+        type: "doc",
+        content: [{ type: "paragraph", content: [{ type: "text", text: "server" }] }],
+      },
+    });
     socket.close(1000, "done");
   });
 
