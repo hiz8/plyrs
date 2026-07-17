@@ -1,5 +1,6 @@
 import {
   buildRecordInputSchema,
+  extractBodyRelations,
   uuidSchema,
   WORKFLOW_STATUSES,
   type RelationRef,
@@ -190,12 +191,31 @@ export function writeRecordCore(
   }
 
   // relations は派生データ: この record の field 由来行を全消しして張り直す（design-spec §6）。
-  // 型定義から外れた旧フィールドの残骸もここで一掃される。origin='body' は Phase 7 の領分なので触れない。
+  // 型定義から外れた旧フィールドの残骸もここで一掃される。
   deps.sql.exec("DELETE FROM relations WHERE source_id = ? AND origin = 'field'", params.recordId);
   for (const write of change.relationWrites) {
     write.refs.forEach((ref, ordinal) => {
       deps.sql.exec(
         "INSERT INTO relations (id, source_id, source_field, target_type, target_id, ordinal, origin) VALUES (?, ?, ?, ?, ?, ?, 'field')",
+        deps.newRelationId(),
+        params.recordId,
+        write.fieldKey,
+        ref.type,
+        ref.id,
+        ordinal,
+      );
+    });
+  }
+
+  // 本文由来の参照も同じ規約で張り直す(design-spec §6「record を書くたびに張り直す」)。
+  // 抽出元は relation 分離後の data(richtext は data 側に残る)。同期の record 組み立て
+  // (loadRelationRefs)と公開 read の field マージは origin='field' でフィルタ済みのため、
+  // body 行が richtext フィールド値を汚染することはない。
+  deps.sql.exec("DELETE FROM relations WHERE source_id = ? AND origin = 'body'", params.recordId);
+  for (const write of extractBodyRelations(definition, change.data)) {
+    write.refs.forEach((ref, ordinal) => {
+      deps.sql.exec(
+        "INSERT INTO relations (id, source_id, source_field, target_type, target_id, ordinal, origin) VALUES (?, ?, ?, ?, ?, ?, 'body')",
         deps.newRelationId(),
         params.recordId,
         write.fieldKey,

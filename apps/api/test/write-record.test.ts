@@ -8,6 +8,27 @@ function freshStub() {
   return env.TENANT_DO.get(env.TENANT_DO.idFromName(crypto.randomUUID()));
 }
 
+function mentionBody(refs: Array<{ type: string; id: string }>): Record<string, unknown> {
+  return {
+    schemaVersion: 1,
+    doc: {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: refs.flatMap((ref) => [
+            {
+              type: "recordMention",
+              attrs: { recordType: ref.type, recordId: ref.id, label: "参照" },
+            },
+            { type: "text", text: " " },
+          ]),
+        },
+      ],
+    },
+  };
+}
+
 describe("writeRecord", () => {
   let stub: ReturnType<typeof freshStub>;
 
@@ -297,5 +318,104 @@ describe("writeRecord", () => {
     expect(record?.type).toBe("article");
     expect(record?.data["title"]).toBe("こんにちは");
     expect(asRecordSnapshot(await stub.getRecord(uuid(99)))).toBeNull();
+  });
+
+  async function bodyRelationRows(recordId: string) {
+    return runInDurableObject(stub, async (_instance, state) =>
+      state.storage.sql
+        .exec<{ source_field: string; target_type: string; target_id: string; ordinal: number }>(
+          "SELECT source_field, target_type, target_id, ordinal FROM relations WHERE source_id = ? AND origin = 'body' ORDER BY ordinal",
+          recordId,
+        )
+        .toArray(),
+    );
+  }
+
+  it("projects richtext mentions into relations with origin='body'", async () => {
+    const result = asWriteResult(
+      await stub.writeRecord(
+        "article",
+        {
+          recordId: uuid(30),
+          input: {
+            ...validArticleInput(),
+            body: mentionBody([
+              { type: "author", id: uuid(2) },
+              { type: "note", id: uuid(5) }, // 未登録型への dangling 参照も可(ソフト参照)
+            ]),
+          },
+        },
+        auth("user-a"),
+      ),
+    );
+    expect(result.ok).toBe(true);
+    expect(await bodyRelationRows(uuid(30))).toEqual([
+      { source_field: "body", target_type: "author", target_id: uuid(2), ordinal: 0 },
+      { source_field: "body", target_type: "note", target_id: uuid(5), ordinal: 1 },
+    ]);
+    // field 由来の行は独立して残る(authors 2 件 + hero 1 件)
+    await runInDurableObject(stub, async (_instance, state) => {
+      const fieldRows = state.storage.sql
+        .exec<{ origin: string }>(
+          "SELECT origin FROM relations WHERE source_id = ? AND origin = 'field'",
+          uuid(30),
+        )
+        .toArray();
+      expect(fieldRows).toHaveLength(3);
+    });
+  });
+
+  it("reprojects body relations on every applied write (design-spec §6)", async () => {
+    await stub.writeRecord(
+      "article",
+      {
+        recordId: uuid(31),
+        input: { ...validArticleInput(), body: mentionBody([{ type: "author", id: uuid(2) }]) },
+      },
+      auth("a"),
+    );
+    // mention を差し替え → 行が張り直される
+    await stub.writeRecord(
+      "article",
+      {
+        recordId: uuid(31),
+        input: { ...validArticleInput(), body: mentionBody([{ type: "author", id: uuid(3) }]) },
+      },
+      auth("a"),
+    );
+    expect(await bodyRelationRows(uuid(31))).toEqual([
+      { source_field: "body", target_type: "author", target_id: uuid(3), ordinal: 0 },
+    ]);
+    // mention を全部消す → 行が消える(空 doc は richTextEnvelopeSchema を満たす)
+    await stub.writeRecord(
+      "article",
+      {
+        recordId: uuid(31),
+        input: {
+          ...validArticleInput(),
+          body: { schemaVersion: 1, doc: { type: "doc", content: [] } },
+        },
+      },
+      auth("a"),
+    );
+    expect(await bodyRelationRows(uuid(31))).toEqual([]);
+  });
+
+  it("keeps richtext value in data and out of the relations diff", async () => {
+    const result = asWriteResult(
+      await stub.writeRecord(
+        "article",
+        {
+          recordId: uuid(32),
+          input: { ...validArticleInput(), body: mentionBody([{ type: "author", id: uuid(2) }]) },
+        },
+        auth("a"),
+      ),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // richtext は data に残る(mention は data と relations の両方に現れる — relations は派生)
+    expect(result.record.data["body"]).toMatchObject({ schemaVersion: 1 });
+    expect(result.record.fieldVersions["body"]).toBe(1);
   });
 });
