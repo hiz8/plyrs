@@ -408,6 +408,46 @@ describe("RecordForm 本文競合(裁定 3)", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
+  it("adopts a server-side body deletion by clearing the editor", async () => {
+    const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
+      throw conflictError();
+    });
+    const registry = buildRegistry();
+    const view = render(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={registry}
+        record={articleRecord({ title: "t", body: bodyEnvelope("旧本文") })}
+        submitLabel="保存"
+        onSubmit={onSubmit}
+      />,
+    );
+    const user = userEvent.setup();
+    await editBodyAndSave(user);
+    // rollback 後の最新 record = サーバー側で本文が削除された版(body キーなし)
+    view.rerender(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={registry}
+        record={articleRecord(
+          { title: "t" },
+          { fieldVersions: { title: 1, body: 2 }, version: 2, seq: 3 },
+        )}
+        submitLabel="保存"
+        onSubmit={onSubmit}
+      />,
+    );
+    const dialog = await screen.findByRole("alertdialog", { name: "本文の競合" });
+    expect(dialog).toHaveTextContent("（空）");
+    await user.click(screen.getByRole("button", { name: "サーバー版を採用" }));
+    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    // エディタは自分の版(旧本文の見出し化)ではなく空ドキュメントを表示する
+    expect(screen.getByRole("textbox", { name: "body" })).not.toHaveTextContent("旧本文");
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
   it("silently succeeds when the conflicting server value equals my submission (§8 自己競合ガード)", async () => {
     const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
       throw conflictError();

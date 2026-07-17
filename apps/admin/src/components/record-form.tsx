@@ -28,6 +28,14 @@ import { richTextPlainText } from "../lib/richtext-text";
 import { useRelationCandidates } from "../lib/use-collection";
 import { ConflictDialog } from "./conflict-dialog";
 
+// サーバー版採用でサーバー側に本文が無い場合に使う明示的な空ドキュメント。
+// undefined のままだと RichTextEditor が「初期状態」として無視し、自分の版が表示され続ける。
+// 空 envelope は fromDraftValues でキー削除に写るため保存意味論は変わらない。
+const EMPTY_RICH_TEXT_DRAFT = {
+  schemaVersion: 1,
+  doc: { type: "doc", content: [{ type: "paragraph" }] },
+};
+
 const styles = stylex.create({
   form: {
     display: "flex",
@@ -237,15 +245,17 @@ export function RecordForm({
       return;
     }
     const serverDraft = toDraftValues(contentType, record?.input ?? {});
-    setInitialDraft((previous) => {
-      const next = { ...previous };
-      for (const key of conflict.fieldKeys) {
-        next[key] = serverDraft[key];
-      }
-      return next;
-    });
+    const adopted: DraftValues = {};
     for (const key of conflict.fieldKeys) {
-      form.setFieldValue(key, serverDraft[key]);
+      const field = contentType.fields.find((entry) => entry.key === key);
+      adopted[key] =
+        field?.type === "richtext" && serverDraft[key] === undefined
+          ? EMPTY_RICH_TEXT_DRAFT
+          : serverDraft[key];
+    }
+    setInitialDraft((previous) => ({ ...previous, ...adopted }));
+    for (const key of conflict.fieldKeys) {
+      form.setFieldValue(key, adopted[key]);
     }
     setConflict(null);
     setNotice(
