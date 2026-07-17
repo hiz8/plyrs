@@ -81,7 +81,8 @@ Phase 2 の詳細計画で最終確定する。
 | 5a | `2026-07-13-phase5a-publish-projection.md` | 完了（2026-07-14 main へマージ） |
 | 5b | `2026-07-14-phase5b-public-read-api.md` | 完了（2026-07-14 main へマージ） |
 | 5c/6a | `2026-07-16-phase6a-admin-shell.md` | 完了（2026-07-17 main へマージ。6a = 管理画面シェル、6b は別計画） |
-| 6b〜10 | 各フェーズ着手時に作成 | 未着手 |
+| 6b | `2026-07-17-phase6b-content-modeling-and-records.md` | 計画済み（実行中） |
+| 7〜10 | 各フェーズ着手時に作成 | 未着手 |
 
 ---
 
