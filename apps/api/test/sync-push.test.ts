@@ -208,7 +208,9 @@ describe("sync push", () => {
       await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("admin")),
     );
     expect(written.ok).toBe(true);
-    const published = asPublishResult(await stub.publishRecord(TENANT, recordId, auth("admin")));
+    const published = asPublishResult(
+      await stub.publishRecord(TENANT, TENANT, recordId, auth("admin")),
+    );
     expect(published.ok).toBe(true);
 
     const { socket } = await openSyncSocket(stub, socketAuth("editor-1"));
@@ -250,7 +252,9 @@ describe("sync push", () => {
       await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("admin")),
     );
     expect(written.ok).toBe(true);
-    const published = asPublishResult(await stub.publishRecord(TENANT, recordId, auth("admin")));
+    const published = asPublishResult(
+      await stub.publishRecord(TENANT, TENANT, recordId, auth("admin")),
+    );
     expect(published.ok).toBe(true);
     // publish 自身の drain で outbox は既に空。ただし正常系でもレジストリの掃除は sweeper の
     // 仕事なので、この時点ではまだ publish が張った登録が残っている（他のテストと同じ前提）。

@@ -41,7 +41,9 @@ export async function writeAndPublish(
   if (!written.ok) {
     throw new Error(`writeRecord failed: ${JSON.stringify(written)}`);
   }
-  const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+  const published = asPublishResult(
+    await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
+  );
   if (!published.ok) {
     throw new Error(`publishRecord failed: ${JSON.stringify(published)}`);
   }

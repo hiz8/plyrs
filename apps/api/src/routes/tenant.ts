@@ -207,9 +207,19 @@ export const tenantRoutes = new Hono<GateEnv>()
     return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
   })
   .post("/:tenantId/records/:recordId/publish", async (c) => {
+    // Phase 8 裁定 4: 凍結 embed URL は公開パス(/public/v1/:tenantSlug/...)を指す。
+    // slug の真実源はコントロールプレーン D1(publish は低頻度なので 1 クエリを許容)。
+    const tenantId = c.req.param("tenantId");
+    const slugRow = await c.env.DB.prepare("SELECT slug FROM tenants WHERE id = ?")
+      .bind(tenantId)
+      .first<{ slug: string }>();
+    if (slugRow === null) {
+      return c.json({ error: "unknown_tenant" }, 404);
+    }
     const result = asPublishResult(
       await stubFor(c).publishRecord(
-        c.req.param("tenantId"),
+        tenantId,
+        slugRow.slug,
         c.req.param("recordId"),
         c.get("auth"),
       ),

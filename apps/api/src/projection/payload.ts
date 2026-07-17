@@ -1,11 +1,26 @@
 import type { FieldDefinition } from "@plyrs/metamodel";
 
+// Phase 8 裁定 4: snapshotEmbed "value" の凍結埋め込み(asset 限定の固定語彙)。
+// publish 時点の asset record から凍結し、以後 asset 側の変更には追従しない
+// (L1: 埋め込むのは実質不変値のみ / L2: 古くなったら記事を再 publish — design-spec §7)。
+export interface AssetEmbed {
+  url: string;
+  filename: string;
+  contentType: string;
+  alt: string | null;
+  width: number | null;
+  height: number | null;
+}
+
 export interface ProjectionRelationRow {
   sourceField: string;
   targetType: string;
   targetId: string;
   ordinal: number;
   origin: string; // 'field' | 'body'
+  // Phase 8 より前の snapshot の JSON には存在しないため optional。null = 凍結対象だったが
+  // 参照先が dangling(素の ID 参照として投影される)。
+  embed?: AssetEmbed | null;
 }
 
 export interface ProjectionIndexRow {

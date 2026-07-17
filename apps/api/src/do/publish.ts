@@ -1,11 +1,14 @@
+import { ASSET_TYPE_KEY } from "@plyrs/metamodel";
 import {
   buildProjectionPayload,
+  type AssetEmbed,
   type ProjectionPayload,
   type ProjectionRelationRow,
   type PublishedSnapshot,
 } from "../projection/payload";
 import { loadContentTypeByKey } from "./content-types";
 import { enqueueOutbox } from "./outbox";
+import type { RecordSnapshot } from "./types";
 import { loadRecord } from "./write-record";
 
 export interface PublishDeps {
@@ -73,25 +76,20 @@ export function loadRelationRows(sql: SqlStorage, recordId: string): ProjectionR
     }));
 }
 
-export function publishRecordCore(
+// snapshot の作成 + outbox 投入(publish の物理部分)。カスケードでも記事本体でも同じ経路。
+function writeSnapshot(
   deps: PublishDeps,
-  recordId: string,
+  record: RecordSnapshot,
+  relations: ProjectionRelationRow[],
   actor: string,
-): PublishResult {
-  const record = loadRecord(deps.sql, recordId);
-  if (record === null) {
-    return { ok: false, code: "not_found", message: `record not found: ${recordId}` };
-  }
-  if (record.deletedAt !== null) {
-    return { ok: false, code: "record_deleted", message: `record is deleted: ${recordId}` };
-  }
+): PublishedSnapshot {
   const now = deps.now();
   const publishSeq = deps.nextPublishSeq();
   const snapshot: PublishedSnapshot = {
-    recordId,
+    recordId: record.id,
     type: record.type,
     data: record.data,
-    relations: loadRelationRows(deps.sql, recordId),
+    relations,
     publishedAt: now,
     publishedBy: actor,
     sourceVersion: record.version,
@@ -112,12 +110,100 @@ export function publishRecordCore(
     deps.sql,
     deps.newId(),
     "upsert",
-    recordId,
+    record.id,
     snapshot.sourceVersion,
     snapshot.publishSeq,
     now,
   );
-  return { ok: true, snapshot };
+  return snapshot;
+}
+
+// Phase 8 裁定 4: 凍結埋め込みは publish 時点の asset record(編集の真実源)から読む。
+// dangling(不在・削除済み・型違い)は null — 素の ID 参照として投影される(ソフト参照)。
+function buildAssetEmbed(sql: SqlStorage, tenantSlug: string, assetId: string): AssetEmbed | null {
+  const asset = loadRecord(sql, assetId);
+  if (asset === null || asset.deletedAt !== null || asset.type !== ASSET_TYPE_KEY) {
+    return null;
+  }
+  const data = asset.data;
+  const str = (key: string): string | null => {
+    const value = data[key];
+    return typeof value === "string" ? value : null;
+  };
+  const num = (key: string): number | null => {
+    const value = data[key];
+    return typeof value === "number" ? value : null;
+  };
+  return {
+    url: `/public/v1/${tenantSlug}/assets/${assetId}`,
+    filename: str("filename") ?? "",
+    contentType: str("content_type") ?? "application/octet-stream",
+    alt: str("alt"),
+    width: num("width"),
+    height: num("height"),
+  };
+}
+
+export function publishRecordCore(
+  deps: PublishDeps,
+  recordId: string,
+  actor: string,
+  tenantSlug: string,
+): PublishResult {
+  const record = loadRecord(deps.sql, recordId);
+  if (record === null) {
+    return { ok: false, code: "not_found", message: `record not found: ${recordId}` };
+  }
+  if (record.deletedAt !== null) {
+    return { ok: false, code: "record_deleted", message: `record is deleted: ${recordId}` };
+  }
+  const relations = loadRelationRows(deps.sql, recordId);
+
+  // Phase 8 裁定 7: 参照中(field + body)の未公開 asset を同一トランザクションで一緒に
+  // publish する(公開ゲート付き配信の帰結 — 凍結 URL が publish 直後から機能するため)。
+  // asset 自身は relation / richtext フィールドを持たないため再帰は起きない。
+  // unpublish はカスケードしない(他の公開 record が参照中かもしれない)。
+  const assetIds = [
+    ...new Set(
+      relations.filter((row) => row.targetType === ASSET_TYPE_KEY).map((row) => row.targetId),
+    ),
+  ];
+  for (const assetId of assetIds) {
+    if (assetId === recordId) {
+      continue; // 自己参照の保険
+    }
+    const published = deps.sql
+      .exec<{ record_id: string }>(
+        "SELECT record_id FROM published_snapshots WHERE record_id = ?",
+        assetId,
+      )
+      .toArray()[0];
+    if (published !== undefined) {
+      continue;
+    }
+    const asset = loadRecord(deps.sql, assetId);
+    if (asset === null || asset.deletedAt !== null || asset.type !== ASSET_TYPE_KEY) {
+      continue; // dangling は正常系(ソフト参照)
+    }
+    writeSnapshot(deps, asset, loadRelationRows(deps.sql, assetId), actor);
+  }
+
+  // 裁定 4: snapshotEmbed "value" のフィールド由来行へ凍結値を埋め込む。body 由来の asset
+  // 参照には埋め込まない(フィールド設定を持たない — 公開側は URL 規約
+  // /public/v1/:slug/assets/:id で解決する)。
+  const contentType = loadContentTypeByKey(deps.sql, record.type);
+  const embedFields = new Set<string>();
+  for (const field of contentType?.fields ?? []) {
+    if (field.type === "relation" && field.config.snapshotEmbed === "value") {
+      embedFields.add(field.key);
+    }
+  }
+  const frozen = relations.map((row) =>
+    row.origin === "field" && embedFields.has(row.sourceField)
+      ? { ...row, embed: buildAssetEmbed(deps.sql, tenantSlug, row.targetId) }
+      : row,
+  );
+  return { ok: true, snapshot: writeSnapshot(deps, record, frozen, actor) };
 }
 
 export function unpublishRecordCore(deps: PublishDeps, recordId: string): UnpublishResult {

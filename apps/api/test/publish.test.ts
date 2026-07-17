@@ -1,7 +1,9 @@
 import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
+import { v7 as uuidv7 } from "uuid";
 import { purgeSent } from "../src/do/outbox";
+import type { AuthContext } from "../src/do/authorize";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import {
   asDeleteResult,
@@ -9,6 +11,7 @@ import {
   asPublishedPage,
   asPublicationState,
   asPublishResult,
+  asRegisterResult,
   asUnpublishResult,
   asWriteResult,
 } from "./rpc-unwrap";
@@ -17,6 +20,14 @@ const TENANT = "tenant-publish";
 
 function freshStub() {
   return env.TENANT_DO.get(env.TENANT_DO.idFromName(crypto.randomUUID()));
+}
+
+// Phase 8 の追加テスト（asset-guard.test.ts / asset-type.test.ts の様式に合わせる）:
+// 名前付きの DO を立て、任意の tenantSlug を publishRecord に渡して埋め込み URL を検証する。
+const OWNER: AuthContext = { userId: "u-owner", role: "owner" };
+
+function namedStub(name: string) {
+  return env.TENANT_DO.get(env.TENANT_DO.idFromName(name));
 }
 
 describe("publish / unpublish (design-spec §7)", () => {
@@ -37,7 +48,9 @@ describe("publish / unpublish (design-spec §7)", () => {
   });
 
   it("freezes the record into a snapshot and queues an upsert job", async () => {
-    const result = asPublishResult(await stub.publishRecord(TENANT, uuid(100), auth("owner1")));
+    const result = asPublishResult(
+      await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1")),
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -60,7 +73,7 @@ describe("publish / unpublish (design-spec §7)", () => {
   });
 
   it("keeps the snapshot frozen while the record keeps changing", async () => {
-    await stub.publishRecord(TENANT, uuid(100), auth("owner1"));
+    await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1"));
     const edited = asWriteResult(
       await stub.writeRecord(
         "article",
@@ -76,14 +89,14 @@ describe("publish / unpublish (design-spec §7)", () => {
   });
 
   it("republish advances the snapshot's source version", async () => {
-    await stub.publishRecord(TENANT, uuid(100), auth("owner1"));
+    await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1"));
     await stub.writeRecord(
       "article",
       { recordId: uuid(100), input: { ...validArticleInput(), title: "編集後" } },
       auth("owner1"),
     );
     const republished = asPublishResult(
-      await stub.publishRecord(TENANT, uuid(100), auth("owner1")),
+      await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1")),
     );
     expect(republished.ok).toBe(true);
     if (republished.ok) {
@@ -93,7 +106,7 @@ describe("publish / unpublish (design-spec §7)", () => {
   });
 
   it("unpublish removes the snapshot", async () => {
-    await stub.publishRecord(TENANT, uuid(100), auth("owner1"));
+    await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1"));
     const result = asUnpublishResult(await stub.unpublishRecord(TENANT, uuid(100), auth("owner1")));
     expect(result).toMatchObject({ ok: true, sourceVersion: 1 });
     expect(asProjectionPayload(await stub.getProjectionPayload(uuid(100)))).toBeNull();
@@ -105,16 +118,20 @@ describe("publish / unpublish (design-spec §7)", () => {
   });
 
   it("refuses to publish a missing or deleted record", async () => {
-    const missing = asPublishResult(await stub.publishRecord(TENANT, uuid(199), auth("owner1")));
+    const missing = asPublishResult(
+      await stub.publishRecord(TENANT, TENANT, uuid(199), auth("owner1")),
+    );
     expect(missing).toMatchObject({ ok: false, code: "not_found" });
 
     await stub.deleteRecord(uuid(100), auth("owner1"));
-    const deleted = asPublishResult(await stub.publishRecord(TENANT, uuid(100), auth("owner1")));
+    const deleted = asPublishResult(
+      await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1")),
+    );
     expect(deleted).toMatchObject({ ok: false, code: "record_deleted" });
   });
 
   it("cascades unpublish when a published record is deleted (裁定 2026-07-13)", async () => {
-    await stub.publishRecord(TENANT, uuid(100), auth("owner1"));
+    await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1"));
     const deleted = asDeleteResult(await stub.deleteRecord(uuid(100), auth("owner1")));
     expect(deleted.ok).toBe(true);
     expect(asProjectionPayload(await stub.getProjectionPayload(uuid(100)))).toBeNull();
@@ -122,12 +139,12 @@ describe("publish / unpublish (design-spec §7)", () => {
 
   it("denies publish to viewers and allows it to editors", async () => {
     const denied = asPublishResult(
-      await stub.publishRecord(TENANT, uuid(100), auth("mallory", "viewer")),
+      await stub.publishRecord(TENANT, TENANT, uuid(100), auth("mallory", "viewer")),
     );
     expect(denied).toMatchObject({ ok: false, code: "forbidden" });
 
     const allowed = asPublishResult(
-      await stub.publishRecord(TENANT, uuid(100), auth("eve", "editor")),
+      await stub.publishRecord(TENANT, TENANT, uuid(100), auth("eve", "editor")),
     );
     expect(allowed.ok).toBe(true);
   });
@@ -136,7 +153,9 @@ describe("publish / unpublish (design-spec §7)", () => {
     expect(asPublicationState(await stub.getPublication(uuid(100)))).toStrictEqual({
       published: false,
     });
-    const published = asPublishResult(await stub.publishRecord(TENANT, uuid(100), auth("owner1")));
+    const published = asPublishResult(
+      await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1")),
+    );
     expect(published.ok).toBe(true);
     const state = asPublicationState(await stub.getPublication(uuid(100)));
     expect(state).toMatchObject({ published: true, sourceVersion: 1, publishedBy: "owner1" });
@@ -167,7 +186,9 @@ describe("outbox rows (design-spec §12.3)", () => {
   // Task 6: DO は publish のコミット直後に producer としてアウトボックスを排出する。
   // 行自体は sweeper の purgeSent() が掃くまで残るが、sent は 1 になっている。
   it("queues exactly one upsert row on publish and the producer drains it immediately", async () => {
-    const published = asPublishResult(await stub.publishRecord(TENANT, uuid(100), auth("owner1")));
+    const published = asPublishResult(
+      await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1")),
+    );
     expect(published.ok).toBe(true);
     await runInDurableObject(stub, async (_instance, state) => {
       const rows = state.storage.sql
@@ -186,7 +207,7 @@ describe("outbox rows (design-spec §12.3)", () => {
   });
 
   it("queues a delete row carrying the previously published version on unpublish, both drained", async () => {
-    await stub.publishRecord(TENANT, uuid(100), auth("owner1"));
+    await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1"));
     const unpublished = asUnpublishResult(
       await stub.unpublishRecord(TENANT, uuid(100), auth("owner1")),
     );
@@ -224,7 +245,9 @@ describe("outbox rows (design-spec §12.3)", () => {
   // 復元すると番号が 0 に巻き戻り、republish が既に送出済みの delete と同じ番号を再び採ってしまい
   // このバグを再び開けてしまう。
   it("restores publish_seq from outbox after eviction even when published_snapshots is empty", async () => {
-    const published = asPublishResult(await stub.publishRecord(TENANT, uuid(100), auth("owner1")));
+    const published = asPublishResult(
+      await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1")),
+    );
     expect(published.ok).toBe(true);
     const unpublished = asUnpublishResult(
       await stub.unpublishRecord(TENANT, uuid(100), auth("owner1")),
@@ -246,7 +269,7 @@ describe("outbox rows (design-spec §12.3)", () => {
     await evictDurableObject(stub, { webSockets: "hibernate" });
 
     const republished = asPublishResult(
-      await stub.publishRecord(TENANT, uuid(100), auth("owner1")),
+      await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1")),
     );
     expect(republished.ok).toBe(true);
     if (republished.ok) {
@@ -261,7 +284,9 @@ describe("outbox rows (design-spec §12.3)", () => {
   // （Task 6 のスイーパーが sent=1 の outbox 行を定期的に掃除する経路）で outbox 行も消えたら、
   // 起動時 MAX スキャンは両方とも 0 を返し番号が巻き戻る。do_config に永続化した値だけがこの穴を塞ぐ。
   it("does not let publish_seq rewind after unpublish, an outbox purge, and eviction", async () => {
-    const published = asPublishResult(await stub.publishRecord(TENANT, uuid(100), auth("owner1")));
+    const published = asPublishResult(
+      await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1")),
+    );
     expect(published.ok).toBe(true);
     const unpublished = asUnpublishResult(
       await stub.unpublishRecord(TENANT, uuid(100), auth("owner1")),
@@ -298,7 +323,7 @@ describe("outbox rows (design-spec §12.3)", () => {
     await evictDurableObject(stub, { webSockets: "hibernate" });
 
     const republished = asPublishResult(
-      await stub.publishRecord(TENANT, uuid(100), auth("owner1")),
+      await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1")),
     );
     expect(republished.ok).toBe(true);
     if (republished.ok) {
@@ -326,7 +351,9 @@ describe("getPublishedPage keyset pagination (Task 7 dependency)", () => {
         ),
       );
       expect(written.ok).toBe(true);
-      const published = asPublishResult(await stub.publishRecord(TENANT, id, auth("owner1")));
+      const published = asPublishResult(
+        await stub.publishRecord(TENANT, TENANT, id, auth("owner1")),
+      );
       expect(published.ok).toBe(true);
     }
   });
@@ -428,5 +455,129 @@ describe("publish routes", () => {
       env,
     );
     expect(again.status).toBe(409);
+  });
+});
+
+describe("publish のアセット統合 (Phase 8 裁定 4, 7)", () => {
+  const mediaArticleType = {
+    id: "018f2b6a-7a0a-7000-8000-00000000c001",
+    key: "media_article",
+    name: "メディア記事",
+    source: "user",
+    version: 1,
+    fields: [
+      { key: "title", type: "text", required: true },
+      {
+        key: "hero",
+        type: "relation",
+        config: { allowedTypes: ["asset"], cardinality: "one", snapshotEmbed: "value" },
+      },
+      { key: "body", type: "richtext" },
+    ],
+  };
+
+  async function setupArticleWithAsset(name: string) {
+    const tenant = namedStub(name);
+    const registered = asRegisterResult(await tenant.registerContentType(mediaArticleType, OWNER));
+    expect(registered.ok).toBe(true);
+    const assetId = uuidv7();
+    const created = asWriteResult(
+      await tenant.createAssetRecord(
+        {
+          recordId: assetId,
+          input: {
+            filename: "hero.png",
+            content_type: "image/png",
+            size: 100,
+            r2_key: `${name}/${assetId}`,
+            width: 800,
+            height: 600,
+            alt: "ヒーロー",
+          },
+        },
+        OWNER,
+      ),
+    );
+    expect(created.ok).toBe(true);
+    const articleId = uuidv7();
+    const written = asWriteResult(
+      await tenant.writeRecord(
+        "media_article",
+        {
+          recordId: articleId,
+          input: { title: "記事", hero: { type: "asset", id: assetId } },
+        },
+        OWNER,
+      ),
+    );
+    expect(written.ok).toBe(true);
+    return { tenant, assetId, articleId };
+  }
+
+  it("cascades publish to referenced unpublished assets in the same transaction", async () => {
+    const { tenant, assetId, articleId } = await setupArticleWithAsset("publish-cascade");
+    const result = asPublishResult(
+      await tenant.publishRecord("publish-cascade", "blog", articleId, OWNER),
+    );
+    expect(result.ok).toBe(true);
+    const assetPublication = asPublicationState(await tenant.getPublication(assetId));
+    expect(assetPublication.published).toBe(true);
+    // outbox には記事と asset の 2 ジョブが積まれている(排出済みなら pendingOutbox は 0 でも
+    // よい — 投影ペイロードが両方取れることを確認する)
+    expect(asProjectionPayload(await tenant.getProjectionPayload(assetId))).not.toBeNull();
+    expect(asProjectionPayload(await tenant.getProjectionPayload(articleId))).not.toBeNull();
+  });
+
+  it("freezes the asset embed on snapshotEmbed value relations", async () => {
+    const { tenant, assetId, articleId } = await setupArticleWithAsset("publish-embed");
+    const result = asPublishResult(
+      await tenant.publishRecord("publish-embed", "blog", articleId, OWNER),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const heroRow = result.snapshot.relations.find((row) => row.sourceField === "hero");
+    expect(heroRow?.embed).toEqual({
+      url: `/public/v1/blog/assets/${assetId}`,
+      filename: "hero.png",
+      contentType: "image/png",
+      alt: "ヒーロー",
+      width: 800,
+      height: 600,
+    });
+  });
+
+  it("does not republish an already-published asset (publish_seq が進まない)", async () => {
+    const { tenant, assetId, articleId } = await setupArticleWithAsset("publish-no-repub");
+    asPublishResult(await tenant.publishRecord("publish-no-repub", "blog", assetId, OWNER));
+    const before = asProjectionPayload(await tenant.getProjectionPayload(assetId));
+    asPublishResult(await tenant.publishRecord("publish-no-repub", "blog", articleId, OWNER));
+    const after = asProjectionPayload(await tenant.getProjectionPayload(assetId));
+    expect(after?.publishSeq).toBe(before?.publishSeq);
+  });
+
+  it("dangling asset references freeze embed: null (ソフト参照)", async () => {
+    const tenant = namedStub("publish-dangling");
+    asRegisterResult(await tenant.registerContentType(mediaArticleType, OWNER));
+    const articleId = uuidv7();
+    asWriteResult(
+      await tenant.writeRecord(
+        "media_article",
+        {
+          recordId: articleId,
+          input: {
+            title: "記事",
+            hero: { type: "asset", id: "018f2b6a-7a0a-7000-8000-00000000dead" },
+          },
+        },
+        OWNER,
+      ),
+    );
+    const result = asPublishResult(
+      await tenant.publishRecord("publish-dangling", "blog", articleId, OWNER),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const heroRow = result.snapshot.relations.find((row) => row.sourceField === "hero");
+    expect(heroRow?.embed).toBeNull();
   });
 });

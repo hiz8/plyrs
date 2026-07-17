@@ -290,6 +290,7 @@ export class TenantDO extends DurableObject<Env> {
 
   async publishRecord(
     tenantId: string,
+    tenantSlug: string,
     recordId: string,
     auth: AuthContext,
   ): Promise<PublishResult> {
@@ -311,6 +312,7 @@ export class TenantDO extends DurableObject<Env> {
         },
         recordId,
         auth.userId,
+        tenantSlug,
       );
       if (inner.ok) {
         armed = this.armSweep(Date.now() + SWEEP_DELAY_MS);

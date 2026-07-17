@@ -53,7 +53,9 @@ describe("projection field catalog (Phase 5b)", () => {
       await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
     );
     expect(written.ok).toBe(true);
-    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    const published = asPublishResult(
+      await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
+    );
     if (!published.ok) {
       throw new Error(`publish failed: ${published.code}`);
     }

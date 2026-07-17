@@ -37,7 +37,9 @@ describe("publish → outbox → queue → projection D1 (wiring)", () => {
     );
     expect(written.ok).toBe(true);
 
-    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    const published = asPublishResult(
+      await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
+    );
     expect(published.ok).toBe(true);
 
     const row = await waitFor(() =>
@@ -57,7 +59,7 @@ describe("publish → outbox → queue → projection D1 (wiring)", () => {
 
     await stub.registerContentType(articleType(), auth("owner1"));
     await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1"));
-    await stub.publishRecord(tenantId, recordId, auth("owner1"));
+    await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1"));
     await waitFor(() =>
       env.PROJECTION_DB.prepare(
         "SELECT record_id FROM projected_records WHERE tenant_id = ? AND record_id = ?",
@@ -85,7 +87,7 @@ describe("publish → outbox → queue → projection D1 (wiring)", () => {
 
     await stub.registerContentType(articleType(), auth("owner1"));
     await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1"));
-    await stub.publishRecord(tenantId, recordId, auth("owner1"));
+    await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1"));
     await waitFor(() =>
       env.PROJECTION_DB.prepare(
         "SELECT record_id FROM projected_records WHERE tenant_id = ? AND record_id = ?",
@@ -121,7 +123,7 @@ describe("publish → outbox → queue → projection D1 (wiring)", () => {
 
     await stub.registerContentType(articleType(), auth("owner1"));
     await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1"));
-    await stub.publishRecord(tenantId, recordId, auth("owner1"));
+    await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1"));
     await waitFor(() =>
       env.PROJECTION_DB.prepare(
         "SELECT record_id FROM projected_records WHERE tenant_id = ? AND record_id = ?",

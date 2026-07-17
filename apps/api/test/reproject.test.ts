@@ -72,7 +72,7 @@ describe("tenant reprojection (design-spec §12.3b)", () => {
         ),
       );
       expect(written.ok).toBe(true);
-      await stub.publishRecord(tenantId, uuid(n), auth("owner1"));
+      await stub.publishRecord(tenantId, tenantId, uuid(n), auth("owner1"));
     }
     // publish 経路の排出分を投影に反映
     // NOTE: publishSeq は brief 執筆後に追加された順序ガード本体（source_version とは別物）。
@@ -123,7 +123,7 @@ describe("tenant reprojection (design-spec §12.3b)", () => {
     await stub.registerContentType(articleType(), auth("owner1"));
     const recordId = uuid(410);
     await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1"));
-    await stub.publishRecord(tenantId, recordId, auth("owner1"));
+    await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1"));
     // このテナントで最初の publish なので publishSeq は 1
     await deliver([{ jobType: "upsert", tenantId, recordId, sourceVersion: 1, publishSeq: 1 }]);
 
@@ -192,7 +192,7 @@ describe("reprojection self-chains across pages (design-spec §12.3b)", () => {
       );
       expect(written.ok).toBe(true);
       const published = asPublishResult(
-        await stub.publishRecord(tenantId, recordId, auth("owner1")),
+        await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
       );
       expect(published.ok).toBe(true);
     }

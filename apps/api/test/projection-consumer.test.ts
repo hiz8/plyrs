@@ -107,7 +107,9 @@ describe("projection consumer (design-spec §12.3)", () => {
       await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
     );
     expect(written.ok).toBe(true);
-    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    const published = asPublishResult(
+      await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
+    );
     expect(published.ok).toBe(true);
   });
 
@@ -157,7 +159,7 @@ describe("projection consumer (design-spec §12.3)", () => {
       { recordId, input: { ...validArticleInput(), title: "第2版" } },
       auth("owner1"),
     );
-    await stub.publishRecord(tenantId, recordId, auth("owner1"));
+    await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1"));
     const v2 = await lastOutboxRow(stub);
     expect(v2.publish_seq).toBeGreaterThan(v1.publish_seq);
     // 新しい版（v2）が先に着き、古い版（v1）のジョブが遅れて届く
@@ -230,7 +232,7 @@ describe("projection consumer (design-spec §12.3)", () => {
       { recordId, input: { ...validArticleInput(), title: "第2版" } },
       auth("owner1"),
     );
-    await stub.publishRecord(tenantId, recordId, auth("owner1"));
+    await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1"));
     const v2 = await lastOutboxRow(stub);
     await deliver([
       {
@@ -284,7 +286,9 @@ describe("publish generation ordering — CRITICAL fix (レビュー指摘)", ()
       await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
     );
     expect(written.ok).toBe(true);
-    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    const published = asPublishResult(
+      await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
+    );
     expect(published.ok).toBe(true);
   });
 
@@ -316,7 +320,7 @@ describe("publish generation ordering — CRITICAL fix (レビュー指摘)", ()
 
     // 編集せずに republish → records.version（source_version）は変わらないが世代番号はさらに進む
     const republished = asPublishResult(
-      await stub.publishRecord(tenantId, recordId, auth("owner1")),
+      await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
     );
     expect(republished.ok).toBe(true);
     if (republished.ok) {
@@ -457,7 +461,9 @@ describe("projected_at refresh on redelivery — pins the >= guard (not >)", () 
       await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
     );
     expect(written.ok).toBe(true);
-    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    const published = asPublishResult(
+      await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
+    );
     expect(published.ok).toBe(true);
   });
 
@@ -501,7 +507,9 @@ describe("resurrection race — a stale write must not undo a delete (CRITICAL f
       await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
     );
     expect(written.ok).toBe(true);
-    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    const published = asPublishResult(
+      await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
+    );
     expect(published.ok).toBe(true);
 
     // 「再投影がページを読んだ」瞬間を模す: この時点ではまだ公開中（publish_seq 1）。
@@ -559,7 +567,7 @@ describe("resurrection race — a stale write must not undo a delete (CRITICAL f
       );
       expect(written.ok).toBe(true);
       const published = asPublishResult(
-        await stub.publishRecord(tenantId, recordId, auth("owner1")),
+        await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
       );
       expect(published.ok).toBe(true);
     }
@@ -613,7 +621,9 @@ describe("resurrection race — a stale write must not undo a delete (CRITICAL f
       await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
     );
     expect(written.ok).toBe(true);
-    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    const published = asPublishResult(
+      await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
+    );
     expect(published.ok).toBe(true);
     const v1 = await lastOutboxRow(stub);
     await deliver([
@@ -647,7 +657,7 @@ describe("resurrection race — a stale write must not undo a delete (CRITICAL f
 
     // republish（世代番号は unpublish より真に大きい）→ upsert ジョブ
     const republished = asPublishResult(
-      await stub.publishRecord(tenantId, recordId, auth("owner1")),
+      await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
     );
     expect(republished.ok).toBe(true);
     const v2 = await lastOutboxRow(stub);
@@ -683,7 +693,9 @@ describe("overlapping reprojection walks cannot resurrect a record (Task 7 fix)"
       await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("owner1")),
     );
     expect(written.ok).toBe(true);
-    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    const published = asPublishResult(
+      await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
+    );
     expect(published.ok).toBe(true);
 
     const v1 = await lastOutboxRow(stub);
@@ -776,7 +788,7 @@ describe("tombstone guard scoping — tenant_id must gate the NOT EXISTS subquer
     );
     expect(writtenA.ok).toBe(true);
     const publishedA = asPublishResult(
-      await stubA.publishRecord(tenantA, recordId, auth("owner1")),
+      await stubA.publishRecord(tenantA, tenantA, recordId, auth("owner1")),
     );
     expect(publishedA.ok).toBe(true);
 
@@ -786,7 +798,7 @@ describe("tombstone guard scoping — tenant_id must gate the NOT EXISTS subquer
     );
     expect(writtenB.ok).toBe(true);
     const publishedB = asPublishResult(
-      await stubB.publishRecord(tenantB, recordId, auth("owner1")),
+      await stubB.publishRecord(tenantB, tenantB, recordId, auth("owner1")),
     );
     expect(publishedB.ok).toBe(true);
 

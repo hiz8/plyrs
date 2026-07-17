@@ -20,13 +20,15 @@ describe("outbox sweeper on the alarm registry (design-spec §9.6 / §12.3)", ()
   });
 
   it("drains the outbox on the publish path and leaves nothing pending", async () => {
-    const published = asPublishResult(await stub.publishRecord(tenantId, recordId, auth("owner1")));
+    const published = asPublishResult(
+      await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
+    );
     expect(published.ok).toBe(true);
     expect(await stub.pendingOutbox()).toBe(0);
   });
 
   it("arms an alarm in the same transaction as the outbox row", async () => {
-    await stub.publishRecord(tenantId, recordId, auth("owner1"));
+    await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1"));
     await runInDurableObject(stub, async (_instance, state) => {
       // 正常系で排出済みでも、レジストリの掃除は sweeper の仕事なのでアラームは張られたまま
       expect(await state.storage.getAlarm()).not.toBeNull();
@@ -34,7 +36,7 @@ describe("outbox sweeper on the alarm registry (design-spec §9.6 / §12.3)", ()
   });
 
   it("sweeps unsent rows and clears its registration when the outbox is empty", async () => {
-    await stub.publishRecord(tenantId, recordId, auth("owner1"));
+    await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1"));
     expect(await runDurableObjectAlarm(stub)).toBe(true);
     expect(await stub.pendingOutbox()).toBe(0);
 
@@ -45,7 +47,7 @@ describe("outbox sweeper on the alarm registry (design-spec §9.6 / §12.3)", ()
   });
 
   it("re-arms the alarm from the registry when the DO restarts", async () => {
-    await stub.publishRecord(tenantId, recordId, auth("owner1"));
+    await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1"));
     await runInDurableObject(stub, async (_instance, state) => {
       // アラームを失った状態（sweeper のバグ・リトライ枯渇等）を再現
       await state.storage.deleteAlarm();
