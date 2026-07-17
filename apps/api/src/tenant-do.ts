@@ -15,6 +15,11 @@ import {
   SWEEP_DELAY_MS,
   SWEEP_RETRY_MS,
 } from "./do/alarms";
+import {
+  listAssetOrphanIds as loadAssetOrphanIds,
+  listAssetUsage as loadAssetUsage,
+  type AssetUsageRow,
+} from "./do/asset-usage";
 import { requireOperation, type AuthContext } from "./do/authorize";
 import {
   loadAllContentTypeRows,
@@ -225,6 +230,15 @@ export class TenantDO extends DurableObject<Env> {
   // Phase 6b: 公開状態の読み取り（読み取り系は getRecord と同じく role 不問 — authorize.ts 冒頭コメント参照）
   getPublication(recordId: string): PublicationState {
     return loadPublicationState(this.ctx.storage.sql, recordId);
+  }
+
+  // Phase 8 裁定 6: 読み取り系は getRecord と同じく role 不問(authorize.ts 冒頭コメントの既存規律)
+  listAssetOrphanIds(): string[] {
+    return loadAssetOrphanIds(this.ctx.storage.sql);
+  }
+
+  listAssetUsage(assetId: string): AssetUsageRow[] {
+    return loadAssetUsage(this.ctx.storage.sql, assetId);
   }
 
   async deleteRecord(recordId: string, auth: AuthContext): Promise<DeleteRecordResult> {

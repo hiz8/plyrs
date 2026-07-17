@@ -1,3 +1,4 @@
+import type { AssetUsageRow } from "./do/asset-usage";
 import type { ContentTypeRow, RegisterContentTypeResult } from "./do/content-types";
 import type { DeleteRecordResult } from "./do/delete-record";
 import type { PublicationState, PublishResult, UnpublishResult } from "./do/publish";
@@ -62,4 +63,12 @@ export function asProjectionCatalog(value: unknown): { type: string; catalog: Ca
 
 export function asPublicationState(value: unknown): PublicationState {
   return value as PublicationState;
+}
+
+export function asOrphanIds(value: unknown): string[] {
+  return value as string[];
+}
+
+export function asAssetUsage(value: unknown): AssetUsageRow[] {
+  return value as AssetUsageRow[];
 }

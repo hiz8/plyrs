@@ -7,9 +7,11 @@ import { ASSET_TYPE_KEY, WORKFLOW_STATUSES } from "@plyrs/metamodel";
 import { sniffImageSize } from "../assets/image-size";
 import { authenticateTenantToken, tenantGate, type GateVariables } from "../middleware/tenant-gate";
 import {
+  asAssetUsage,
   asContentTypeRow,
   asContentTypeRows,
   asDeleteResult,
+  asOrphanIds,
   asPublicationState,
   asPublishResult,
   asRecordSnapshot,
@@ -125,6 +127,12 @@ export const tenantRoutes = new Hono<GateEnv>()
     }
     return c.json(result, 201);
   })
+  // Phase 8 裁定 6: リテラル "orphans" が :assetId として捕捉されないよう、
+  // 上記アップロードルートより前・:assetId 系ルートより前に置く。
+  .get("/:tenantId/assets/orphans", async (c) => {
+    const orphanIds = asOrphanIds(await stubFor(c).listAssetOrphanIds());
+    return c.json({ orphanIds });
+  })
   // 管理画面のプレビュー配信(認証付き)。未 publish の asset を表示するための経路で、
   // 公開配信(/public/v1/.../assets/:assetId — Task 8)とはゲートが違う。
   .get("/:tenantId/assets/:assetId/file", async (c) => {
@@ -150,6 +158,10 @@ export const tenantRoutes = new Hono<GateEnv>()
         "content-security-policy": "default-src 'none'; sandbox",
       },
     });
+  })
+  .get("/:tenantId/assets/:assetId/usage", async (c) => {
+    const usage = asAssetUsage(await stubFor(c).listAssetUsage(c.req.param("assetId")));
+    return c.json({ usage });
   })
   .put("/:tenantId/content-types", async (c) => {
     let body: unknown;
