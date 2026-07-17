@@ -1,10 +1,12 @@
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
-import type { ComponentType, ReactNode } from "react";
+import { useEffect, useMemo, type ComponentType, type ReactNode } from "react";
+import type { SyncStatus } from "@plyrs/sync-client";
 import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { ApiError } from "../../../lib/api-client";
 import { tenantsQueryOptions } from "../../../lib/queries";
+import { TenantSyncProvider, useSyncStatus } from "../../../lib/sync-context";
 
 const styles = stylex.create({
   shell: {
@@ -44,6 +46,8 @@ const styles = stylex.create({
   },
   tenantLink: { color: colors.textMuted, textDecoration: "none", fontSize: typography.sizeSm },
   content: { padding: spacing.lg },
+  headerSide: { display: "flex", alignItems: "center", gap: spacing.md },
+  syncStatus: { color: colors.textMuted, fontSize: typography.sizeSm },
 });
 
 export const Route = createFileRoute("/t/$tenantSlug")({
@@ -77,12 +81,36 @@ const UntypedLink = Link as unknown as ComponentType<{
   children: ReactNode;
 }>;
 
+const SYNC_STATUS_LABELS: Record<SyncStatus, string> = {
+  idle: "待機",
+  connecting: "接続中",
+  syncing: "同期中",
+  ready: "同期済み",
+  closed: "切断",
+};
+
 function ShellLayout() {
-  const { tenant, slots, api, tokens, queryClient } = Route.useRouteContext();
+  const { tenant, slots, api, tokens, queryClient, sync } = Route.useRouteContext();
   const { tenantSlug } = Route.useParams();
   const navigate = useNavigate();
+  // 裁定 4: 接続はテナントレイアウトの寿命に一致させる。テナント切替は
+  // tenant.id が変わる = useMemo が作り直し、effect cleanup が旧接続を stop する。
+  const tenantSync = useMemo(() => sync(tenant.id), [sync, tenant.id]);
+  const syncStatus = useSyncStatus(tenantSync);
+
+  useEffect(() => {
+    tenantSync.start();
+    // §8 契約 3: バックオフ枯渇後の再開はアプリの責務。online で start() を再度呼ぶ。
+    const onOnline = () => tenantSync.start();
+    window.addEventListener("online", onOnline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      tenantSync.stop();
+    };
+  }, [tenantSync]);
 
   async function logout() {
+    tenantSync.stop();
     try {
       await api.logout();
     } catch {
@@ -113,12 +141,22 @@ function ShellLayout() {
           <Link to="/tenants" {...stylex.props(styles.tenantLink)}>
             {tenant.name}（テナント切替）
           </Link>
-          <Button variant="secondary" onPress={() => void logout()}>
-            ログアウト
-          </Button>
+          <div {...stylex.props(styles.headerSide)}>
+            <span {...stylex.props(styles.syncStatus)}>同期: {SYNC_STATUS_LABELS[syncStatus]}</span>
+            {syncStatus === "closed" && (
+              <Button variant="secondary" onPress={() => tenantSync.start()}>
+                再接続
+              </Button>
+            )}
+            <Button variant="secondary" onPress={() => void logout()}>
+              ログアウト
+            </Button>
+          </div>
         </header>
         <main {...stylex.props(styles.content)}>
-          <Outlet />
+          <TenantSyncProvider sync={tenantSync}>
+            <Outlet />
+          </TenantSyncProvider>
         </main>
       </div>
     </div>

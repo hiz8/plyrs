@@ -13,14 +13,19 @@
   },
   "dependencies": {
     "@plyrs/metamodel": "workspace:*",
+    "@plyrs/sync-client": "workspace:*",
+    "@plyrs/sync-protocol": "workspace:*",
     "@plyrs/ui": "workspace:*",
     "@stylexjs/stylex": "catalog:",
+    "@tanstack/db": "catalog:",
+    "@tanstack/react-form": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
     "react": "catalog:",
     "react-aria-components": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "uuid": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "catalog:",

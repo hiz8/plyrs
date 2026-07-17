@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { createAppContext, getRouter } from "./router";
+import { FakeSocket, pendingConnect } from "./test-utils/fake-socket";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -29,9 +30,13 @@ function stubFetch(routes: Record<string, Handler>): typeof fetch {
   };
 }
 
-function renderAt(path: string, routes: Record<string, Handler>) {
+function renderAt(
+  path: string,
+  routes: Record<string, Handler>,
+  connect: () => Promise<import("@plyrs/sync-client").WebSocketLike> = pendingConnect,
+) {
   const router = getRouter({
-    context: createAppContext(stubFetch(routes)),
+    context: createAppContext(stubFetch(routes), { connect: () => () => connect() }),
     history: createMemoryHistory({ initialEntries: [path] }),
   });
   render(<RouterProvider router={router} />);
@@ -138,5 +143,28 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("エラーが発生しました");
     expect(screen.getByText("500: boom")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "再読み込み" })).toBeInTheDocument();
+  });
+
+  it("shows the sync status indicator while connecting", async () => {
+    renderAt("/t/blog/content-types", authedRoutes());
+    expect(await screen.findByText(/同期: 接続中/)).toBeInTheDocument();
+  });
+
+  it("offers a reconnect button when the sync connection is lost", async () => {
+    let socket: FakeSocket | undefined;
+    const connects: number[] = [];
+    renderAt("/t/blog/content-types", authedRoutes(), async () => {
+      connects.push(connects.length);
+      socket = new FakeSocket();
+      return socket;
+    });
+    expect(await screen.findByText(/同期: 同期中/)).toBeInTheDocument();
+    // 正常クローズ → エンジンは再接続を試み、失敗が続くと closed に落ちる。
+    // ここでは接続関数を 1 回で止めるため 4003（blocked）で確定拒否させる。
+    socket?.emit("close", { code: 4003, reason: "blocked" });
+    expect(await screen.findByRole("button", { name: "再接続" })).toBeInTheDocument();
+    const before = connects.length;
+    await userEvent.setup().click(screen.getByRole("button", { name: "再接続" }));
+    await vi.waitFor(() => expect(connects.length).toBe(before + 1));
   });
 });
