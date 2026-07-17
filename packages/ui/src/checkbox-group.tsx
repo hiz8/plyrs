@@ -1,3 +1,4 @@
+import { useId } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { Checkbox } from "./checkbox";
 import { colors, spacing, typography } from "./tokens.stylex";
@@ -34,8 +35,15 @@ export function CheckboxGroup({
   onChange,
   errorMessage,
 }: CheckboxGroupProps) {
+  const errorId = useId();
+
   return (
-    <div role="group" aria-label={label} className={stylex.props(styles.group).className ?? ""}>
+    <div
+      role="group"
+      aria-label={label}
+      aria-describedby={errorMessage !== undefined ? errorId : undefined}
+      className={stylex.props(styles.group).className ?? ""}
+    >
       <span className={stylex.props(styles.label).className ?? ""}>{label}</span>
       {options.map((option) => (
         <Checkbox
@@ -49,7 +57,9 @@ export function CheckboxGroup({
         </Checkbox>
       ))}
       {errorMessage !== undefined && (
-        <span className={stylex.props(styles.error).className ?? ""}>{errorMessage}</span>
+        <span id={errorId} className={stylex.props(styles.error).className ?? ""}>
+          {errorMessage}
+        </span>
       )}
     </div>
   );

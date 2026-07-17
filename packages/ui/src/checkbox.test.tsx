@@ -43,4 +43,25 @@ describe("CheckboxGroup", () => {
     );
     expect(screen.getByText("必須です")).toBeInTheDocument();
   });
+
+  it("links the error message to the group via aria-describedby", () => {
+    render(
+      <CheckboxGroup
+        label="タグ"
+        options={options}
+        value={[]}
+        onChange={() => {}}
+        errorMessage="必須です"
+      />,
+    );
+    const group = screen.getByRole("group", { name: "タグ" });
+    const describedBy = group.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(document.getElementById(describedBy ?? "")).toHaveTextContent("必須です");
+  });
+
+  it("omits aria-describedby when there is no error", () => {
+    render(<CheckboxGroup label="タグ" options={options} value={[]} onChange={() => {}} />);
+    expect(screen.getByRole("group", { name: "タグ" })).not.toHaveAttribute("aria-describedby");
+  });
 });
