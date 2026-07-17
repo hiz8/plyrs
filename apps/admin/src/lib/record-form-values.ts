@@ -1,11 +1,17 @@
-import { buildRecordInputSchema, type ContentTypeDefinition } from "@plyrs/metamodel";
+import {
+  buildRecordInputSchema,
+  richTextEnvelopeSchema,
+  type ContentTypeDefinition,
+  type RichTextEnvelope,
+} from "@plyrs/metamodel";
 
 // 動的フォームの UI 状態（draft）と records の input 形式の変換層。
 // - draft: text/number/datetime/json は string、boolean は boolean、
 //   multiple-select / many-relation は string[]、one-relation は合成キー string、
-//   richtext は不透明値（編集しない — 裁定 1）。
+//   richtext は AST エンベロープそのもの(Phase 7 でエディタが編集する)。
 // - 空 draft は「キーを省略」に写す（空文字列を書き込まない）。
-// - baseInput の未知キー・richtext は保持(遅延適合 = design-spec §4.2)。
+// - baseInput の未知キーは保持(遅延適合 = design-spec §4.2)。
+// - initialDraft を与えると dirty キーのみ書き戻す(§12 必須② — 2026-07-17 裁定)。
 export type DraftValues = Record<string, unknown>;
 
 // type key(snake_case)にも UUID にも現れない Unit Separator(U+001F)を区切りに使う
@@ -21,6 +27,39 @@ export function parseRelationDraftKey(key: string): { type: string; id: string }
     return null;
   }
   return { type: key.slice(0, index), id: key.slice(index + 1) };
+}
+
+// richtext draft 値をエンベロープに絞る(エディタ・競合ダイアログへ渡す境界)
+export function asRichTextValue(value: unknown): RichTextEnvelope | undefined {
+  const parsed = richTextEnvelopeSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
+
+// 「空」= ブロックが無い、または唯一のブロックが中身の無い段落。ユーザーが本文を全部
+// 消した状態を「キー削除」に写す UI 意味論(required richtext は G7 と同様に空を拒める)。
+export function isEmptyRichTextValue(value: RichTextEnvelope): boolean {
+  const content = value.doc.content ?? [];
+  if (content.length === 0) {
+    return true;
+  }
+  const only = content[0];
+  return (
+    content.length === 1 &&
+    only !== undefined &&
+    only.type === "paragraph" &&
+    (only.content === undefined || only.content.length === 0)
+  );
+}
+
+// draft 値の同値判定。draft は JSON 直列化可能な値(文字列/boolean/配列/エンベロープ)に
+// 閉じているため JSON 文字列比較で足りる(sync-client の toChange と同じ手法)。
+export function draftValueEquals(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  const left = JSON.stringify(a);
+  const right = JSON.stringify(b);
+  return left !== undefined && left === right;
 }
 
 function isRelationRef(value: unknown): value is { type: string; id: string } {
@@ -87,8 +126,13 @@ export function fromDraftValues(
   contentType: ContentTypeDefinition,
   draft: DraftValues,
   baseInput: Record<string, unknown>,
+  // §12 必須②(2026-07-17 裁定): 編集モードではマウント時(または直近保存時)の draft を
+  // 基準に「ユーザーが実際に変えたキーだけ」を書き戻す。untouched キーは baseInput
+  // (最新 record.input)の値がそのまま残り、他編集者の変更を巻き戻さない。
+  // undefined(新規作成)は従来どおり全フィールドを書く。
+  initialDraft?: DraftValues,
 ): FromDraftResult {
-  // baseInput が土台: 未知キー・型定義から消えたキー・richtext がここから引き継がれる
+  // baseInput が土台: 未知キー・型定義から消えたキー・untouched キーがここから引き継がれる
   const input: Record<string, unknown> = { ...baseInput };
   const fieldErrors: Record<string, string> = {};
 
@@ -102,6 +146,9 @@ export function fromDraftValues(
 
   for (const field of contentType.fields) {
     const value = draft[field.key];
+    if (initialDraft !== undefined && draftValueEquals(value, initialDraft[field.key])) {
+      continue; // untouched: baseInput の現在値を維持(§12 必須②)
+    }
     switch (field.type) {
       case "text":
       case "datetime": {
@@ -151,9 +198,23 @@ export function fromDraftValues(
         }
         break;
       }
-      case "richtext":
-        // 裁定 1: richtext は編集しない。baseInput の値がそのまま残る。
+      case "richtext": {
+        const envelope = asRichTextValue(value);
+        if (envelope === undefined) {
+          if (value !== undefined) {
+            // Value was explicitly set but is not a valid envelope → delete
+            delete input[field.key];
+          }
+          // else: value is undefined (not edited) → preserve from baseInput
+        } else if (isEmptyRichTextValue(envelope)) {
+          // Value is a valid envelope but empty → delete
+          delete input[field.key];
+        } else {
+          // Value is a valid non-empty envelope → use it
+          input[field.key] = envelope;
+        }
         break;
+      }
       case "relation": {
         if (field.config.cardinality === "many") {
           const keys = Array.isArray(value) ? value : [];
