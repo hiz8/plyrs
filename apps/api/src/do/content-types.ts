@@ -89,6 +89,7 @@ export function registerContentTypeCore(
   sql: SqlStorage,
   input: unknown,
   now: string,
+  options: { allowSystem?: boolean } = {},
 ): RegisterContentTypeResult {
   const parsed = contentTypeDefinitionSchema.safeParse(input);
   if (!parsed.success) {
@@ -96,6 +97,16 @@ export function registerContentTypeCore(
   }
   const def = parsed.data;
   const prev = loadContentTypeByKey(sql, def.key);
+  // Phase 8: システム型はコード配布(ensureAssetContentType)だけが書ける。クライアント経由の
+  // 登録・変更を許すと、r2_key 等のシステム管理フィールド定義を挿げ替えて配信を壊せてしまう
+  // (フィールド値の防御 = assetGuardHook とは別レイヤーの、型定義そのものの防御)。
+  if (options.allowSystem !== true && (def.source === "system" || prev?.source === "system")) {
+    return {
+      ok: false,
+      code: "forbidden",
+      message: "system content types are managed by the platform",
+    };
+  }
   if (prev !== null && prev.id !== def.id) {
     return {
       ok: false,

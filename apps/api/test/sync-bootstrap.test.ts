@@ -48,7 +48,8 @@ describe("sync bootstrap", () => {
 
     expect(welcome).toMatchObject({ type: "welcome", protocolVersion: 1 });
     if (welcome.type === "welcome") {
-      expect(welcome.contentTypes.map((type) => type.key)).toEqual(["article"]);
+      // Phase 8 裁定 2: システム asset 型が key 昇順で article の次に自動登録される
+      expect(welcome.contentTypes.map((type) => type.key)).toEqual(["article", "asset"]);
       expect(welcome.serverSeq).toBeGreaterThan(0);
     }
 

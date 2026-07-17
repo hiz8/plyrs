@@ -68,7 +68,11 @@ describe("sync lifecycle", () => {
     const message = await received;
     expect(message.type).toBe("content-types");
     if (message.type === "content-types") {
-      expect(message.contentTypes.map((type) => type.key).toSorted()).toEqual(["article", "note"]);
+      expect(message.contentTypes.map((type) => type.key).toSorted()).toEqual([
+        "article",
+        "asset",
+        "note",
+      ]);
     }
     socket.close(1000, "done");
   });

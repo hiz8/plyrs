@@ -60,11 +60,12 @@ describe("GET /v1/t/:tenantId/content-types (Phase 6a)", () => {
     const { contentTypes } = (await res.json()) as {
       contentTypes: { key: string; name: string; version: number }[];
     };
-    expect(contentTypes.map((t) => t.key)).toStrictEqual(["article"]);
+    // Phase 8 裁定 2: asset はシステム型として全テナントに自動登録される(key 昇順で article の次)
+    expect(contentTypes.map((t) => t.key)).toStrictEqual(["article", "asset"]);
     expect(contentTypes[0]?.version).toBe(1);
   });
 
-  it("returns an empty list for a fresh tenant", async () => {
+  it("returns only the system asset type for a fresh tenant", async () => {
     const { tenantId, bearer } = await bootstrapTenant();
     const res = await app.request(
       `/v1/t/${tenantId}/content-types`,
@@ -72,8 +73,12 @@ describe("GET /v1/t/:tenantId/content-types (Phase 6a)", () => {
       env,
     );
     expect(res.status).toBe(200);
-    const { contentTypes } = (await res.json()) as { contentTypes: unknown[] };
-    expect(contentTypes).toStrictEqual([]);
+    const { contentTypes } = (await res.json()) as {
+      contentTypes: { key: string; source: string }[];
+    };
+    // Phase 8 裁定 2: 新規テナントも DO 構築時にシステム asset 型が自動登録される
+    expect(contentTypes.map((t) => t.key)).toStrictEqual(["asset"]);
+    expect(contentTypes[0]?.source).toBe("system");
   });
 
   it("rejects unauthenticated listing (first-stage gate)", async () => {

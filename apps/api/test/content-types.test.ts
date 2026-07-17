@@ -26,8 +26,11 @@ describe("content type registration", () => {
     expect(row?.name).toBe("記事");
     expect(row?.fields.map((f) => f.key)).toContain("slug");
     await runInDurableObject(stub, async (_instance, state) => {
+      // Phase 8 裁定 2: システム asset 型も自動登録されており content_types は単一行ではない
       const stored = state.storage.sql
-        .exec<{ key: string; version: number }>("SELECT key, version FROM content_types")
+        .exec<{ key: string; version: number }>(
+          "SELECT key, version FROM content_types WHERE key = 'article'",
+        )
         .one();
       expect(stored).toEqual({ key: "article", version: 1 });
     });
@@ -112,8 +115,9 @@ describe("content type registration", () => {
     );
     await stub.registerContentType(articleType(), auth("admin"));
     const rows = asContentTypeRows(await stub.listContentTypes());
-    expect(rows.map((row) => row.key)).toStrictEqual(["article", "author"]);
+    // Phase 8 裁定 2: システム asset 型が key 昇順で article と author の間に自動登録される
+    expect(rows.map((row) => row.key)).toStrictEqual(["article", "asset", "author"]);
     expect(rows[0]?.fields.some((field) => field.key === "title")).toBe(true);
-    expect(rows[1]?.name).toBe("著者");
+    expect(rows[2]?.name).toBe("著者");
   });
 });

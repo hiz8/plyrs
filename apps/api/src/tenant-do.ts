@@ -24,6 +24,7 @@ import {
   type RegisterContentTypeResult,
 } from "./do/content-types";
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
+import { ensureAssetContentType } from "./do/ensure-asset-type";
 import { countUnsent, markOutboxSent, purgeSent, unsentOutbox } from "./do/outbox";
 import {
   loadProjectionPayload,
@@ -70,6 +71,17 @@ export class TenantDO extends DurableObject<Env> {
     this.db = drizzle(ctx.storage, { schema });
     ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
+      // Phase 8 裁定 2: システム asset 型を自動登録(冪等)。Phase 8 デプロイ以前から存在する
+      // テナントも、次に DO が起きた時点でここを通って型を得る。変更があった時だけ、
+      // hibernation 復帰で生きているソケットへ型カタログを配り直す(registerContentType RPC の
+      // broadcast と同じ契約 — G1: content_types は seq を消費しない別チャネル)。
+      const assetTypeChanged = ensureAssetContentType(ctx.storage.sql, new Date().toISOString());
+      if (assetTypeChanged) {
+        this.broadcastAll({
+          type: "content-types",
+          contentTypes: loadAllContentTypes(ctx.storage.sql),
+        });
+      }
       const row = ctx.storage.sql
         .exec<{ max_seq: number | null }>("SELECT MAX(seq) AS max_seq FROM records")
         .one();
