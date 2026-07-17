@@ -17,6 +17,7 @@ import {
   type MentionSuggestState,
   type RichTextMentionItem,
 } from "./record-mention";
+import { ASSET_IMAGE_NODE_NAME, createAssetImage, type AssetUrlResolver } from "./asset-image";
 
 const styles = stylex.create({
   root: {
@@ -117,6 +118,16 @@ export interface RichTextEditorProps {
    * 同じ transaction dispatch を通る — 6b の隠しネイティブ select と同型の判断)。
    */
   onEditorReady?: ((editor: Editor) => void) | undefined;
+  /**
+   * ツールバーの「画像」ボタン。押されると insert コールバックを渡して呼ばれる —
+   * 呼び出し側(admin)がアセット選択 UI を開き、確定時に insert({id, label}) を呼ぶ。
+   * 省略時はボタン非表示(ノード自体は常に登録される — 語彙進化の制約)。
+   */
+  onRequestAssetImage?:
+    | ((insert: (item: { id: string; label: string }) => void) => void)
+    | undefined;
+  /** 本文中画像のプレビュー URL 解決(認証付き fetch → objectURL)。省略時は src なし表示 */
+  resolveAssetUrl?: AssetUrlResolver | undefined;
 }
 
 export function RichTextEditor({
@@ -126,6 +137,8 @@ export function RichTextEditor({
   mentionCandidates,
   errorMessage,
   onEditorReady,
+  onRequestAssetImage,
+  resolveAssetUrl,
 }: RichTextEditorProps) {
   // useEditor のオプションは初回マウントで確定する(deps [])。以降に変わりうる
   // コールバックは ref 経由で最新を参照する。
@@ -135,6 +148,10 @@ export function RichTextEditor({
   onEditorReadyRef.current = onEditorReady;
   const candidatesRef = useRef<RichTextMentionItem[]>(mentionCandidates ?? []);
   candidatesRef.current = mentionCandidates ?? [];
+  const onRequestAssetImageRef = useRef(onRequestAssetImage);
+  onRequestAssetImageRef.current = onRequestAssetImage;
+  const resolveAssetUrlRef = useRef(resolveAssetUrl);
+  resolveAssetUrlRef.current = resolveAssetUrl;
 
   interface SuggestView extends MentionSuggestState {
     index: number;
@@ -190,6 +207,7 @@ export function RichTextEditor({
           link: { openOnClick: false },
         }),
         createRecordMention(glue),
+        createAssetImage(() => resolveAssetUrlRef.current),
       ],
       content: docContent(value),
       // v3 既定と同じだが明示: transaction ごとに React を再レンダーしない。
@@ -240,7 +258,27 @@ export function RichTextEditor({
   return (
     <div {...stylex.props(styles.root)}>
       <span {...stylex.props(styles.label)}>{label}</span>
-      <Toolbar editor={editor} label={label} />
+      <Toolbar
+        editor={editor}
+        label={label}
+        onRequestAssetImage={
+          onRequestAssetImage === undefined
+            ? undefined
+            : () =>
+                onRequestAssetImageRef.current?.((item) => {
+                  editor
+                    .chain()
+                    .focus()
+                    .insertContent([
+                      {
+                        type: ASSET_IMAGE_NODE_NAME,
+                        attrs: { recordType: "asset", recordId: item.id, label: item.label },
+                      },
+                    ])
+                    .run();
+                })
+        }
+      />
       <EditorContent editor={editor} {...stylex.props(styles.content)} />
       {suggest !== null && suggest.items.length > 0 && (
         <div role="listbox" aria-label="record 参照の候補" {...stylex.props(styles.mentionList)}>
@@ -269,7 +307,15 @@ export function RichTextEditor({
   );
 }
 
-function Toolbar({ editor, label }: { editor: Editor; label: string }) {
+function Toolbar({
+  editor,
+  label,
+  onRequestAssetImage,
+}: {
+  editor: Editor;
+  label: string;
+  onRequestAssetImage?: (() => void) | undefined;
+}) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkHref, setLinkHref] = useState("");
   const active = useEditorState({
@@ -382,6 +428,11 @@ function Toolbar({ editor, label }: { editor: Editor; label: string }) {
         <ToolbarToggle label="リンク" isActive={active.link} onToggle={openLinkPanel}>
           🔗
         </ToolbarToggle>
+        {onRequestAssetImage !== undefined && (
+          <ToolbarToggle label="画像" isActive={false} onToggle={onRequestAssetImage}>
+            🖼
+          </ToolbarToggle>
+        )}
       </div>
       {linkOpen && (
         <div {...stylex.props(styles.linkPanel)}>

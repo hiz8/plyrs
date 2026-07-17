@@ -220,3 +220,76 @@ describe("RichTextEditor mention", () => {
     expect(json).toContain('"recordType":"author"');
   });
 });
+
+describe("画像挿入 (Phase 8 裁定 5)", () => {
+  it("always registers the assetImage node so docs containing it open safely", async () => {
+    let captured: Editor | null = null;
+    render(
+      <RichTextEditor
+        label="本文"
+        value={{
+          schemaVersion: 1,
+          doc: {
+            type: "doc",
+            content: [
+              {
+                type: "assetImage",
+                attrs: {
+                  recordType: "asset",
+                  recordId: "018f2b6a-7a0a-7000-8000-0000000000ab",
+                  label: "hero.png",
+                },
+              },
+            ],
+          },
+        }}
+        onChange={() => {}}
+        onEditorReady={(editor) => {
+          captured = editor;
+        }}
+      />,
+    );
+    await vi.waitFor(() => expect(captured).not.toBeNull());
+    // TS narrows `captured` to `never` past the closure-reassignment + await boundary
+    // (同ファイル既存テストと同じ null ガード + cast の慣習)。
+    if (captured === null) throw new Error("editor not ready");
+    const doc = (captured as Editor).getJSON();
+    expect(doc?.content?.[0]?.type).toBe("assetImage");
+  });
+
+  it("shows the 画像 toolbar button only with onRequestAssetImage and inserts via callback", async () => {
+    const onChange = vi.fn();
+    let insertFn: ((item: { id: string; label: string }) => void) | null = null;
+    const { rerender } = render(
+      <RichTextEditor label="本文" value={undefined} onChange={onChange} />,
+    );
+    expect(screen.queryByRole("button", { name: "画像" })).not.toBeInTheDocument();
+
+    rerender(
+      <RichTextEditor
+        label="本文"
+        value={undefined}
+        onChange={onChange}
+        onRequestAssetImage={(insert) => {
+          insertFn = insert;
+        }}
+      />,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "画像" }));
+    expect(insertFn).not.toBeNull();
+    // 同上: 閉包での再代入越しの読み出しは never に narrow されるため null ガード + cast
+    if (insertFn === null) throw new Error("insertFn not captured");
+    (insertFn as (item: { id: string; label: string }) => void)({
+      id: "018f2b6a-7a0a-7000-8000-0000000000ab",
+      label: "hero.png",
+    });
+    await vi.waitFor(() => expect(onChange).toHaveBeenCalled());
+    const last = onChange.mock.lastCall?.[0] as {
+      doc: { content: Array<{ type: string; attrs?: Record<string, unknown> }> };
+    };
+    const node = last.doc.content.find((child) => child.type === "assetImage");
+    expect(node?.attrs?.["recordId"]).toBe("018f2b6a-7a0a-7000-8000-0000000000ab");
+    expect(node?.attrs?.["label"]).toBe("hero.png");
+  });
+});
