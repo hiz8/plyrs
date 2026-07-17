@@ -199,7 +199,13 @@ function AssetListPage() {
           </div>
         </div>
       )}
-      {sorted.length === 0 ? (
+      {orphansOnly && orphans.isPending ? (
+        <p {...stylex.props(styles.muted)}>未参照アセットを確認中…</p>
+      ) : orphansOnly && orphans.isError ? (
+        <p role="alert" {...stylex.props(styles.banner)}>
+          未参照アセットの取得に失敗しました。
+        </p>
+      ) : sorted.length === 0 ? (
         <p {...stylex.props(styles.muted)}>
           {orphansOnly ? "未参照のアセットはありません" : "アセットはまだありません"}
         </p>
