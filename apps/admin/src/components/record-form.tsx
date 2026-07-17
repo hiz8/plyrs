@@ -1,14 +1,32 @@
 import * as stylex from "@stylexjs/stylex";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import type { ContentTypeDefinition, FieldDefinition } from "@plyrs/metamodel";
-import type { SyncRecord } from "@plyrs/sync-protocol";
+import type { FieldConflict, SyncRecord } from "@plyrs/sync-protocol";
 import { SyncRejectedError } from "@plyrs/sync-client";
 import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
-import { Button, Checkbox, CheckboxGroup, Select, TextArea, TextField } from "@plyrs/ui";
+import {
+  Button,
+  Checkbox,
+  CheckboxGroup,
+  RichTextEditor,
+  Select,
+  TextArea,
+  TextField,
+  type RichTextMentionItem,
+} from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
-import { fromDraftValues, relationDraftKey, toDraftValues } from "../lib/record-form-values";
+import {
+  asRichTextValue,
+  draftValueEquals,
+  fromDraftValues,
+  relationDraftKey,
+  toDraftValues,
+  type DraftValues,
+} from "../lib/record-form-values";
+import { richTextPlainText } from "../lib/richtext-text";
 import { useRelationCandidates } from "../lib/use-collection";
+import { ConflictDialog } from "./conflict-dialog";
 
 const styles = stylex.create({
   form: {
@@ -27,7 +45,16 @@ const styles = stylex.create({
     color: colors.danger,
     fontSize: typography.sizeMd,
   },
-  richtext: {
+  notice: {
+    padding: spacing.sm,
+    borderRadius: "6px",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: colors.border,
+    color: colors.textMuted,
+    fontSize: typography.sizeMd,
+  },
+  emptyHint: {
     padding: spacing.md,
     borderRadius: "6px",
     borderWidth: "1px",
@@ -54,8 +81,6 @@ export function labelForRecord(types: ContentTypeDefinition[], record: SyncRecor
   return record.id.slice(0, 8);
 }
 
-// 裁定 6: 最小のエラーバナー文言。conflict ack は richtext のみで 6b UI からは発生しないが、
-// 発生した場合も同じバナーに落ちる(本文競合の解決 UI は Phase 7)。
 export function syncErrorMessage(cause: unknown): string {
   if (
     cause instanceof SyncRejectedError ||
@@ -65,6 +90,32 @@ export function syncErrorMessage(cause: unknown): string {
     return `保存できませんでした（${code}）: ${cause.message}`;
   }
   return "保存できませんでした。接続状態を確認して再試行してください。";
+}
+
+// conflict ack(ok:false, code:"conflict")から競合フィールド一覧を取り出す。
+// それ以外のエラーは空配列(既存のエラーバナー経路へ)。
+export function syncConflictFields(cause: unknown): string[] {
+  const isRejection =
+    cause instanceof SyncRejectedError ||
+    (cause instanceof Error && cause.name === "SyncRejectedError");
+  if (!isRejection || (cause as { code?: string }).code !== "conflict") {
+    return [];
+  }
+  const conflicts = (cause as { conflicts?: FieldConflict[] }).conflicts ?? [];
+  return conflicts.map((conflict) => conflict.fieldKey);
+}
+
+// 競合ダイアログの抜粋。richtext 以外が競合し得る将来拡張にも壊れないようフォールバックを持つ
+function conflictExcerpt(value: unknown): string {
+  const envelope = asRichTextValue(value);
+  if (envelope !== undefined) {
+    return richTextPlainText(envelope);
+  }
+  if (value === undefined) {
+    return "（空）";
+  }
+  const text = JSON.stringify(value);
+  return text.length <= 120 ? text : `${text.slice(0, 120)}…`;
 }
 
 export interface RecordFormProps {
@@ -77,6 +128,12 @@ export interface RecordFormProps {
   onSubmit: (input: Record<string, unknown>) => Promise<void>;
 }
 
+interface PendingConflict {
+  fieldKeys: string[];
+  submittedInput: Record<string, unknown>;
+  submittedDraft: DraftValues;
+}
+
 export function RecordForm({
   contentType,
   types,
@@ -87,11 +144,40 @@ export function RecordForm({
 }: RecordFormProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [banner, setBanner] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<PendingConflict | null>(null);
+  // §12 必須②: dirty 判定の基準。マウント時のスナップショットから始め、保存成功・
+  // サーバー版採用のたびに「確定した姿」へ進める。
+  const [initialDraft, setInitialDraft] = useState<DraftValues>(() =>
+    toDraftValues(contentType, record?.input ?? {}),
+  );
+
+  // 本文中 record 参照(@)の候補: 同期済みの全型のコレクションを束ねて購読する
+  // (relation picker と同じフックを全型キーで使い回す)。自分自身への参照は候補から外す。
+  const mentionSource = useRelationCandidates(
+    registry,
+    types.map((type) => type.key),
+  );
+  const mentionCandidates: RichTextMentionItem[] = mentionSource
+    .filter((candidate) => candidate.id !== record?.id)
+    .map((candidate) => ({
+      id: candidate.id,
+      type: candidate.type,
+      label: labelForRecord(types, candidate),
+    }));
+
   const form = useForm({
-    defaultValues: toDraftValues(contentType, record?.input ?? {}),
+    defaultValues: initialDraft,
     onSubmit: async ({ value }) => {
       setBanner(null);
-      const converted = fromDraftValues(contentType, value, record?.input ?? {});
+      setNotice(null);
+      // 編集(record あり)は dirty キーのみ書き戻す(§12 必須②)。新規作成は全量。
+      const converted = fromDraftValues(
+        contentType,
+        value,
+        record?.input ?? {},
+        record !== null ? initialDraft : undefined,
+      );
       if (!converted.ok) {
         setFieldErrors(converted.fieldErrors);
         const formLevel = converted.fieldErrors[""];
@@ -103,11 +189,76 @@ export function RecordForm({
       setFieldErrors({});
       try {
         await onSubmit(converted.input);
+        // 保存成功: dirty 判定の基準を「今保存した姿」へ進める(次回以降の保存が
+        // 直前保存分を再送して他者の後続変更を巻き戻すのを防ぐ)
+        setInitialDraft(value);
       } catch (cause) {
+        const conflictFields = syncConflictFields(cause);
+        if (conflictFields.length > 0) {
+          setConflict({
+            fieldKeys: conflictFields,
+            submittedInput: converted.input,
+            submittedDraft: value,
+          });
+          return;
+        }
         setBanner(syncErrorMessage(cause));
       }
     },
   });
+
+  // §8 の自己競合ガード: conflict ack は「ack 消失後の再送が、適用済みの自分自身の変更と
+  // 衝突した」だけのことがある。手元 store の最新 record と突き合わせ、全競合フィールドが
+  // 自分の送信値と一致していれば実質成功として静かに閉じる。
+  useEffect(() => {
+    if (conflict === null) {
+      return;
+    }
+    const latest = record?.input ?? {};
+    const real = conflict.fieldKeys.filter(
+      (key) => !draftValueEquals(latest[key], conflict.submittedInput[key]),
+    );
+    if (real.length === 0) {
+      setInitialDraft(conflict.submittedDraft);
+      setConflict(null);
+    }
+  }, [conflict, record]);
+
+  const latestInput = record?.input ?? {};
+  const realConflictKeys =
+    conflict === null
+      ? []
+      : conflict.fieldKeys.filter(
+          (key) => !draftValueEquals(latestInput[key], conflict.submittedInput[key]),
+        );
+
+  const adoptServer = () => {
+    if (conflict === null) {
+      return;
+    }
+    const serverDraft = toDraftValues(contentType, record?.input ?? {});
+    setInitialDraft((previous) => {
+      const next = { ...previous };
+      for (const key of conflict.fieldKeys) {
+        next[key] = serverDraft[key];
+      }
+      return next;
+    });
+    for (const key of conflict.fieldKeys) {
+      form.setFieldValue(key, serverDraft[key]);
+    }
+    setConflict(null);
+    setNotice(
+      "サーバー版を反映しました。他に未保存の変更が残っている場合は改めて保存してください。",
+    );
+  };
+
+  const keepMine = () => {
+    setConflict(null);
+    // draft は自分の版のまま。他者の変更は既に store に確定しているため、再送信の
+    // baseFieldVersions は最新へ進み、今度はクリーンな上書き(手動裁定の LWW)として通る。
+    void form.handleSubmit();
+  };
 
   return (
     <form
@@ -118,6 +269,11 @@ export function RecordForm({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
+        // 競合ダイアログ表示中は新しい送信を受け付けない(Enter キー経由の送信も含む)。
+        // keepMine は form.handleSubmit() を直接呼ぶためこのガードの影響を受けない。
+        if (conflict !== null) {
+          return;
+        }
         void form.handleSubmit();
       }}
     >
@@ -125,6 +281,22 @@ export function RecordForm({
         <div role="alert" {...stylex.props(styles.banner)}>
           {banner}
         </div>
+      )}
+      {notice !== null && (
+        <div role="status" {...stylex.props(styles.notice)}>
+          {notice}
+        </div>
+      )}
+      {conflict !== null && realConflictKeys.length > 0 && (
+        <ConflictDialog
+          conflicts={realConflictKeys.map((key) => ({
+            fieldKey: key,
+            mine: conflictExcerpt(conflict.submittedInput[key]),
+            theirs: conflictExcerpt(latestInput[key]),
+          }))}
+          onKeepMine={keepMine}
+          onAdoptServer={adoptServer}
+        />
       )}
       {contentType.fields.map((field) => (
         // 動的キー: DraftValues は Record<string, unknown> のため form.Field の
@@ -140,12 +312,15 @@ export function RecordForm({
               error={fieldErrors[field.key]}
               types={types}
               registry={registry}
+              mentionCandidates={mentionCandidates}
             />
           )}
         </form.Field>
       ))}
       <div {...stylex.props(styles.actions)}>
-        <Button type="submit">{submitLabel}</Button>
+        <Button type="submit" isDisabled={conflict !== null}>
+          {submitLabel}
+        </Button>
       </div>
     </form>
   );
@@ -158,6 +333,7 @@ function FieldInput({
   error,
   types,
   registry,
+  mentionCandidates,
 }: {
   field: FieldDefinition;
   value: unknown;
@@ -165,6 +341,7 @@ function FieldInput({
   error: string | undefined;
   types: ContentTypeDefinition[];
   registry: CollectionRegistry;
+  mentionCandidates: RichTextMentionItem[];
 }) {
   switch (field.type) {
     case "text":
@@ -196,7 +373,6 @@ function FieldInput({
           value={typeof value === "string" ? value : ""}
           onChange={onChange}
           // design-spec §5: 格納は UTC ISO8601('Z' 終端)。表示層の TZ 変換は将来課題。
-          // 6b は素の ISO 文字列入力(date-fns の picker 化は Phase 7 以降の磨き込み)。
           isInvalid={error !== undefined}
           errorMessage={error}
         />
@@ -246,15 +422,13 @@ function FieldInput({
     }
     case "richtext":
       return (
-        <div>
-          <span {...stylex.props(styles.fieldLabel)}>{field.key}</span>
-          <div {...stylex.props(styles.richtext)}>
-            リッチテキスト（Phase 7 で編集できるようになります）
-            {value !== undefined && value !== ""
-              ? " — 既存の本文は保存時にそのまま保持されます"
-              : ""}
-          </div>
-        </div>
+        <RichTextEditor
+          label={field.key}
+          value={asRichTextValue(value)}
+          onChange={onChange}
+          mentionCandidates={mentionCandidates}
+          errorMessage={error}
+        />
       );
     case "relation":
       return (
@@ -294,7 +468,7 @@ function RelationPicker({
     return (
       <div>
         <span {...stylex.props(styles.fieldLabel)}>{field.key}</span>
-        <div {...stylex.props(styles.richtext)}>
+        <div {...stylex.props(styles.emptyHint)}>
           参照できるレコードがありません（許可型: {field.config.allowedTypes.join(", ")}）
         </div>
         {error !== undefined && <span {...stylex.props(styles.fieldError)}>{error}</span>}

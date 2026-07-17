@@ -1,6 +1,6 @@
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import { SyncEngine } from "@plyrs/sync-client";
+import { SyncEngine, SyncRejectedError } from "@plyrs/sync-client";
 import { CollectionRegistry } from "@plyrs/sync-client/tanstack";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -75,7 +75,7 @@ function buildRegistry(): CollectionRegistry {
 }
 
 describe("RecordForm", () => {
-  it("renders inputs per field type with a read-only richtext placeholder", () => {
+  it("renders inputs per field type including the richtext editor", async () => {
     render(
       <RecordForm
         contentType={articleType}
@@ -89,10 +89,9 @@ describe("RecordForm", () => {
     expect(screen.getByRole("textbox", { name: "title" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "featured" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /category/ })).toBeInTheDocument();
-    expect(
-      screen.getByText(/リッチテキスト（Phase 7 で編集できるようになります）/),
-    ).toBeInTheDocument();
-    // relation picker: 候補（山田）がチェックボックスで出る
+    // richtext は Phase 7 で編集可能になった(プレースホルダーは廃止)
+    expect(await screen.findByRole("textbox", { name: "body" })).toBeInTheDocument();
+    expect(screen.getByRole("toolbar", { name: "body の書式" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /山田/ })).toBeInTheDocument();
   });
 
@@ -191,5 +190,258 @@ describe("syncErrorMessage", () => {
 
   it("falls back for unknown errors", () => {
     expect(syncErrorMessage(new Error("x"))).toMatch(/保存できませんでした/);
+  });
+});
+
+const RECORD_ID = "018f2b6a-7a0a-7000-8000-000000000201";
+
+function bodyEnvelope(text: string) {
+  return {
+    schemaVersion: 1,
+    doc: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] },
+  };
+}
+
+function articleRecord(
+  input: Record<string, unknown>,
+  overrides: Partial<SyncRecord> = {},
+): SyncRecord {
+  return {
+    id: RECORD_ID,
+    type: "article",
+    input,
+    fieldVersions: { title: 1, body: 1 },
+    status: "draft",
+    seq: 2,
+    version: 1,
+    deletedAt: null,
+    updatedAt: "2026-07-17T00:00:00Z",
+    updatedBy: "u1",
+    ...overrides,
+  };
+}
+
+function conflictError() {
+  return new SyncRejectedError("conflict", "field conflicts: body", [
+    { fieldKey: "body", baseVersion: 1, currentVersion: 2 },
+  ]);
+}
+
+async function editBodyAndSave(user: ReturnType<typeof userEvent.setup>) {
+  await screen.findByRole("textbox", { name: "body" });
+  await user.click(screen.getByRole("button", { name: "見出し1" }));
+  await user.click(screen.getByRole("button", { name: "保存" }));
+}
+
+describe("RecordForm dirty-only 保存(§12 必須②)", () => {
+  it("writes only user-touched keys and keeps others' concurrent edits", async () => {
+    const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {});
+    const registry = buildRegistry();
+    const initial = articleRecord({ title: "旧タイトル", body: bodyEnvelope("旧本文") });
+    const view = render(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={registry}
+        record={initial}
+        submitLabel="保存"
+        onSubmit={onSubmit}
+      />,
+    );
+    const user = userEvent.setup();
+    const title = await screen.findByRole("textbox", { name: "title" });
+    await user.clear(title);
+    await user.type(title, "自分の新タイトル");
+    // 他編集者の本文変更が WS で届いた(= record プロップが最新化された)
+    const updated = articleRecord(
+      { title: "旧タイトル", body: bodyEnvelope("他者の新本文") },
+      { fieldVersions: { title: 1, body: 2 }, version: 2, seq: 3 },
+    );
+    view.rerender(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={registry}
+        record={updated}
+        submitLabel="保存"
+        onSubmit={onSubmit}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    const input = onSubmit.mock.calls[0]?.[0];
+    expect(input?.["title"]).toBe("自分の新タイトル");
+    // 触っていない body は他者の版が生き残る(巻き戻さない)
+    expect(input?.["body"]).toEqual(bodyEnvelope("他者の新本文"));
+  });
+
+  it("submits an edited richtext envelope from the toolbar path", async () => {
+    const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {});
+    render(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={buildRegistry()}
+        record={articleRecord({ title: "t", body: bodyEnvelope("本文") })}
+        submitLabel="保存"
+        onSubmit={onSubmit}
+      />,
+    );
+    const user = userEvent.setup();
+    await screen.findByRole("textbox", { name: "body" });
+    await user.click(screen.getByRole("button", { name: "見出し1" }));
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    const body = onSubmit.mock.calls[0]?.[0]?.["body"] as {
+      schemaVersion: number;
+      doc: { content: Array<{ type: string }> };
+    };
+    expect(body.schemaVersion).toBe(1);
+    expect(body.doc.content[0]?.type).toBe("heading");
+  });
+});
+
+describe("RecordForm 本文競合(裁定 3)", () => {
+  it("adopts the server version: resets the editor without re-submitting", async () => {
+    const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
+      throw conflictError();
+    });
+    const registry = buildRegistry();
+    const initial = articleRecord({ title: "t", body: bodyEnvelope("旧本文") });
+    const view = render(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={registry}
+        record={initial}
+        submitLabel="保存"
+        onSubmit={onSubmit}
+      />,
+    );
+    const user = userEvent.setup();
+    await editBodyAndSave(user);
+    // rollback 後の record プロップ = 他者の版(broadcast が先に適用されている)
+    const serverSide = articleRecord(
+      { title: "t", body: bodyEnvelope("他者の本文") },
+      { fieldVersions: { title: 1, body: 2 }, version: 2, seq: 3 },
+    );
+    view.rerender(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={registry}
+        record={serverSide}
+        submitLabel="保存"
+        onSubmit={onSubmit}
+      />,
+    );
+    const dialog = await screen.findByRole("alertdialog", { name: "本文の競合" });
+    expect(dialog).toHaveTextContent("自分の版");
+    expect(dialog).toHaveTextContent("他者の本文");
+    await user.click(screen.getByRole("button", { name: "サーバー版を採用" }));
+    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("textbox", { name: "body" })).toHaveTextContent("他者の本文");
+    expect(onSubmit).toHaveBeenCalledTimes(1); // 再送はしない
+  });
+
+  it("keeps mine: re-submits the same draft as a clean overwrite", async () => {
+    const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>();
+    onSubmit.mockRejectedValueOnce(conflictError());
+    onSubmit.mockResolvedValueOnce(undefined);
+    const registry = buildRegistry();
+    const initial = articleRecord({ title: "t", body: bodyEnvelope("旧本文") });
+    const view = render(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={registry}
+        record={initial}
+        submitLabel="保存"
+        onSubmit={onSubmit}
+      />,
+    );
+    const user = userEvent.setup();
+    await editBodyAndSave(user);
+    view.rerender(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={registry}
+        record={articleRecord(
+          { title: "t", body: bodyEnvelope("他者の本文") },
+          { fieldVersions: { title: 1, body: 2 }, version: 2, seq: 3 },
+        )}
+        submitLabel="保存"
+        onSubmit={onSubmit}
+      />,
+    );
+    await screen.findByRole("alertdialog");
+    await user.click(screen.getByRole("button", { name: "自分の版で上書き保存" }));
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
+    const secondBody = onSubmit.mock.calls[1]?.[0]?.["body"] as {
+      doc: { content: Array<{ type: string }> };
+    };
+    expect(secondBody.doc.content[0]?.type).toBe("heading");
+    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+  });
+
+  it("blocks further submits while the conflict dialog is open", async () => {
+    const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
+      throw conflictError();
+    });
+    const registry = buildRegistry();
+    render(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={registry}
+        record={articleRecord({ title: "t", body: bodyEnvelope("旧本文") })}
+        submitLabel="保存"
+        onSubmit={onSubmit}
+      />,
+    );
+    const user = userEvent.setup();
+    await editBodyAndSave(user);
+    await screen.findByRole("alertdialog", { name: "本文の競合" });
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("silently succeeds when the conflicting server value equals my submission (§8 自己競合ガード)", async () => {
+    const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
+      throw conflictError();
+    });
+    const registry = buildRegistry();
+    const initial = articleRecord({ title: "t", body: bodyEnvelope("旧本文") });
+    const view = render(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={registry}
+        record={initial}
+        submitLabel="保存"
+        onSubmit={onSubmit}
+      />,
+    );
+    const user = userEvent.setup();
+    await editBodyAndSave(user);
+    // ack 消失後の再送シナリオ: サーバーの現在値 = 自分が送った版
+    const myBody = onSubmit.mock.calls[0]?.[0]?.["body"] as Record<string, unknown>;
+    view.rerender(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={registry}
+        record={articleRecord(
+          { title: "t", body: myBody },
+          { fieldVersions: { title: 1, body: 2 }, version: 2, seq: 3 },
+        )}
+        submitLabel="保存"
+        onSubmit={onSubmit}
+      />,
+    );
+    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
