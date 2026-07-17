@@ -36,7 +36,14 @@ export {
 } from "./record-schema";
 export { tolerantReadData, type TolerantReadResult } from "./tolerant-read";
 export {
+  ASSET_IMAGE_NODE_TYPE,
   RECORD_MENTION_NODE_TYPE,
   extractBodyRelations,
   type BodyRelationWrite,
 } from "./body-relations";
+export {
+  ASSET_SYSTEM_MANAGED_FIELD_KEYS,
+  ASSET_TYPE_DEFINITION,
+  ASSET_TYPE_ID,
+  ASSET_TYPE_KEY,
+} from "./asset-type";

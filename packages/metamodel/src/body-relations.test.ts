@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ContentTypeDefinition } from "./content-type";
-import { extractBodyRelations, RECORD_MENTION_NODE_TYPE } from "./body-relations";
+import {
+  extractBodyRelations,
+  ASSET_IMAGE_NODE_TYPE,
+  RECORD_MENTION_NODE_TYPE,
+} from "./body-relations";
 
 const UUID_A = "018f2b6a-7a0a-7000-8000-00000000000a";
 const UUID_B = "018f2b6a-7a0a-7000-8000-00000000000b";
@@ -103,5 +107,94 @@ describe("extractBodyRelations", () => {
     expect(
       extractBodyRelations(articleType, { body: envelope({ type: "text", text: "plain" }) }),
     ).toEqual([]);
+  });
+});
+
+describe("assetImage ノードの抽出 (Phase 8 裁定 5)", () => {
+  const contentTypeWithBody: ContentTypeDefinition = {
+    id: "018f2b6a-7a0a-7000-8000-0000000000aa",
+    key: "article",
+    name: "記事",
+    source: "user",
+    version: 1,
+    fields: [{ key: "body", type: "richtext" }],
+  };
+  const assetId = "018f2b6a-7a0a-7000-8000-0000000000ab";
+  const mentionId = "018f2b6a-7a0a-7000-8000-0000000000ac";
+
+  it("extracts asset references from assetImage nodes (mention と同じ attrs 契約)", () => {
+    const data = {
+      body: {
+        schemaVersion: 1,
+        doc: {
+          type: "doc",
+          content: [
+            {
+              type: ASSET_IMAGE_NODE_TYPE,
+              attrs: { recordType: "asset", recordId: assetId, label: "hero.png" },
+            },
+            {
+              type: "paragraph",
+              content: [
+                {
+                  type: RECORD_MENTION_NODE_TYPE,
+                  attrs: { recordType: "author", recordId: mentionId, label: "山田" },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    expect(extractBodyRelations(contentTypeWithBody, data)).toEqual([
+      {
+        fieldKey: "body",
+        refs: [
+          { type: "asset", id: assetId },
+          { type: "author", id: mentionId },
+        ],
+      },
+    ]);
+  });
+
+  it("dedupes the same asset referenced by image and mention", () => {
+    const data = {
+      body: {
+        schemaVersion: 1,
+        doc: {
+          type: "doc",
+          content: [
+            {
+              type: ASSET_IMAGE_NODE_TYPE,
+              attrs: { recordType: "asset", recordId: assetId, label: "hero.png" },
+            },
+            {
+              type: "paragraph",
+              content: [
+                {
+                  type: RECORD_MENTION_NODE_TYPE,
+                  attrs: { recordType: "asset", recordId: assetId, label: "hero.png" },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    const writes = extractBodyRelations(contentTypeWithBody, data);
+    expect(writes[0]?.refs).toEqual([{ type: "asset", id: assetId }]);
+  });
+
+  it("skips assetImage nodes with malformed attrs (防御的読み)", () => {
+    const data = {
+      body: {
+        schemaVersion: 1,
+        doc: {
+          type: "doc",
+          content: [{ type: ASSET_IMAGE_NODE_TYPE, attrs: { recordId: "not-a-uuid" } }],
+        },
+      },
+    };
+    expect(extractBodyRelations(contentTypeWithBody, data)).toEqual([]);
   });
 });

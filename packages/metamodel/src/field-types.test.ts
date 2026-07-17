@@ -140,3 +140,42 @@ describe("fieldDefinitionSchema", () => {
     ).toBe(true);
   });
 });
+
+describe('relation snapshotEmbed "value" (Phase 8 裁定 4: asset 限定の固定語彙)', () => {
+  const relation = (config: Record<string, unknown>) => ({
+    key: "media",
+    type: "relation",
+    config,
+  });
+
+  it('accepts "value" when allowedTypes is exactly ["asset"]', () => {
+    const parsed = fieldDefinitionSchema.safeParse(
+      relation({ allowedTypes: ["asset"], cardinality: "many", snapshotEmbed: "value" }),
+    );
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects "value" for non-asset or mixed allowedTypes (L1 規律を型レベルで保証)', () => {
+    expect(
+      fieldDefinitionSchema.safeParse(
+        relation({ allowedTypes: ["author"], cardinality: "one", snapshotEmbed: "value" }),
+      ).success,
+    ).toBe(false);
+    expect(
+      fieldDefinitionSchema.safeParse(
+        relation({
+          allowedTypes: ["asset", "author"],
+          cardinality: "many",
+          snapshotEmbed: "value",
+        }),
+      ).success,
+    ).toBe(false);
+  });
+
+  it('still accepts "id" for any allowedTypes', () => {
+    const parsed = fieldDefinitionSchema.safeParse(
+      relation({ allowedTypes: ["author"], cardinality: "one", snapshotEmbed: "id" }),
+    );
+    expect(parsed.success).toBe(true);
+  });
+});

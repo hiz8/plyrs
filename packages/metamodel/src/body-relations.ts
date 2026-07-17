@@ -7,6 +7,16 @@ import { richTextEnvelopeSchema, type RelationRef, type RichTextNode } from "./r
 // こと(apps/admin/src/lib/mention-contract.test.ts が両者の一致を固定する)。
 export const RECORD_MENTION_NODE_TYPE = "recordMention";
 
+// 本文中の画像埋め込みノードの型名。packages/ui の ASSET_IMAGE_NODE_NAME と一致すること
+// (apps/admin/src/lib/mention-contract.test.ts が両者の一致を固定する)。attrs は mention と
+// 同型 {recordType, recordId, label} — 抽出経路を 1 本に保つための Phase 8 裁定 5。
+export const ASSET_IMAGE_NODE_TYPE = "assetImage";
+
+const BODY_REFERENCE_NODE_TYPES: readonly string[] = [
+  RECORD_MENTION_NODE_TYPE,
+  ASSET_IMAGE_NODE_TYPE,
+];
+
 // mention ノードの attrs 契約: { recordType, recordId, label }。label は挿入時点の表示名の
 // スナップショット(エディタ表示専用 — relations には投影しない。真実源は参照先 record)。
 const mentionAttrsSchema = z.looseObject({
@@ -20,7 +30,7 @@ export interface BodyRelationWrite {
 }
 
 function collectMentionRefs(node: RichTextNode, refs: RelationRef[], seen: Set<string>): void {
-  if (node.type === RECORD_MENTION_NODE_TYPE) {
+  if (BODY_REFERENCE_NODE_TYPES.includes(node.type)) {
     const attrs = mentionAttrsSchema.safeParse(node.attrs);
     if (attrs.success) {
       // 区切りは type key にも UUID にも現れない Unit Separator(エスケープ表記で書く)

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SYSTEM_FIELD_KEYS } from "./system-fields";
+import { ASSET_TYPE_KEY } from "./asset-type";
 
 export const FIELD_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
 
@@ -82,16 +83,31 @@ export const richtextFieldSchema = z.strictObject({
   config: z.strictObject({}).optional(),
 });
 
-export const relationFieldSchema = z.strictObject({
-  ...baseFieldShape,
-  type: z.literal("relation"),
-  config: z.strictObject({
-    allowedTypes: z.array(z.string().min(1)).min(1),
-    cardinality: z.enum(["one", "many"]),
-    ordered: z.boolean().optional(),
-    snapshotEmbed: z.enum(["id", "value"]).optional(),
-  }),
-});
+export const relationFieldSchema = z
+  .strictObject({
+    ...baseFieldShape,
+    type: z.literal("relation"),
+    config: z.strictObject({
+      allowedTypes: z.array(z.string().min(1)).min(1),
+      cardinality: z.enum(["one", "many"]),
+      ordered: z.boolean().optional(),
+      snapshotEmbed: z.enum(["id", "value"]).optional(),
+    }),
+  })
+  .superRefine((field, ctx) => {
+    // Phase 8 裁定 4: "value" は asset 限定の固定語彙。埋め込むのは実質不変値のみという
+    // L1 規律(design-spec §7)を、宣言の時点で型レベルに固定する。
+    if (
+      field.config.snapshotEmbed === "value" &&
+      !(field.config.allowedTypes.length === 1 && field.config.allowedTypes[0] === ASSET_TYPE_KEY)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["config", "snapshotEmbed"],
+        message: 'snapshotEmbed "value" is only allowed when allowedTypes is exactly ["asset"]',
+      });
+    }
+  });
 
 export const fieldDefinitionSchema = z.discriminatedUnion("type", [
   textFieldSchema,
