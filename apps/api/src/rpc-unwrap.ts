@@ -1,6 +1,6 @@
 import type { ContentTypeRow, RegisterContentTypeResult } from "./do/content-types";
 import type { DeleteRecordResult } from "./do/delete-record";
-import type { PublishResult, UnpublishResult } from "./do/publish";
+import type { PublicationState, PublishResult, UnpublishResult } from "./do/publish";
 import type { RecordSnapshot, WriteRecordResult } from "./do/types";
 import type { CatalogRow, ProjectionPayload } from "./projection/payload";
 
@@ -58,4 +58,8 @@ export function asReprojectResult(
 
 export function asProjectionCatalog(value: unknown): { type: string; catalog: CatalogRow[] }[] {
   return value as { type: string; catalog: CatalogRow[] }[];
+}
+
+export function asPublicationState(value: unknown): PublicationState {
+  return value as PublicationState;
 }

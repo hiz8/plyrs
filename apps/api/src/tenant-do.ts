@@ -27,9 +27,11 @@ import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
 import { countUnsent, markOutboxSent, purgeSent, unsentOutbox } from "./do/outbox";
 import {
   loadProjectionPayload,
+  loadPublicationState,
   loadPublishedPage,
   publishRecordCore,
   unpublishRecordCore,
+  type PublicationState,
   type PublishResult,
   type UnpublishResult,
 } from "./do/publish";
@@ -172,6 +174,11 @@ export class TenantDO extends DurableObject<Env> {
 
   getRecord(id: string): RecordSnapshot | null {
     return loadRecord(this.ctx.storage.sql, id);
+  }
+
+  // Phase 6b: 公開状態の読み取り（読み取り系は getRecord と同じく role 不問 — authorize.ts 冒頭コメント参照）
+  getPublication(recordId: string): PublicationState {
+    return loadPublicationState(this.ctx.storage.sql, recordId);
   }
 
   async deleteRecord(recordId: string, auth: AuthContext): Promise<DeleteRecordResult> {

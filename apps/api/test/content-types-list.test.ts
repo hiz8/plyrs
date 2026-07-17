@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { app } from "../src/index";
-import { articleType } from "./fixtures";
+import { articleType, validArticleInput } from "./fixtures";
 
 // 共有ストレージ（--no-isolate）ではファイル間でも衝突しないよう、実行ごとのランダム接頭辞を混ぜる
 const RUN_ID = crypto.randomUUID().slice(0, 8);
@@ -79,6 +79,62 @@ describe("GET /v1/t/:tenantId/content-types (Phase 6a)", () => {
   it("rejects unauthenticated listing (first-stage gate)", async () => {
     const { tenantId } = await bootstrapTenant();
     const res = await app.request(`/v1/t/${tenantId}/content-types`, {}, env);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /v1/t/:tenantId/records/:recordId/publication (Phase 6b)", () => {
+  it("reflects publish and unpublish", async () => {
+    const { tenantId, bearer } = await bootstrapTenant();
+    await app.request(
+      `/v1/t/${tenantId}/content-types`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json", authorization: bearer },
+        body: JSON.stringify(articleType()),
+      },
+      env,
+    );
+    const recordId = crypto.randomUUID();
+    const written = await app.request(
+      `/v1/t/${tenantId}/records/article/${recordId}`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json", authorization: bearer },
+        body: JSON.stringify({ input: validArticleInput() }),
+      },
+      env,
+    );
+    expect(written.status).toBe(200);
+
+    const before = await app.request(
+      `/v1/t/${tenantId}/records/${recordId}/publication`,
+      { headers: { authorization: bearer } },
+      env,
+    );
+    expect(before.status).toBe(200);
+    expect(await before.json()).toStrictEqual({ published: false });
+
+    const published = await app.request(
+      `/v1/t/${tenantId}/records/${recordId}/publish`,
+      { method: "POST", headers: { authorization: bearer } },
+      env,
+    );
+    expect(published.status).toBe(200);
+
+    const after = await app.request(
+      `/v1/t/${tenantId}/records/${recordId}/publication`,
+      { headers: { authorization: bearer } },
+      env,
+    );
+    const state = (await after.json()) as { published: boolean; sourceVersion?: number };
+    expect(state.published).toBe(true);
+    expect(state.sourceVersion).toBe(1);
+  });
+
+  it("requires authentication", async () => {
+    const { tenantId } = await bootstrapTenant();
+    const res = await app.request(`/v1/t/${tenantId}/records/whatever/publication`, {}, env);
     expect(res.status).toBe(401);
   });
 });

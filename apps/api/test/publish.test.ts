@@ -7,6 +7,7 @@ import {
   asDeleteResult,
   asProjectionPayload,
   asPublishedPage,
+  asPublicationState,
   asPublishResult,
   asUnpublishResult,
   asWriteResult,
@@ -129,6 +130,21 @@ describe("publish / unpublish (design-spec §7)", () => {
       await stub.publishRecord(TENANT, uuid(100), auth("eve", "editor")),
     );
     expect(allowed.ok).toBe(true);
+  });
+
+  it("reports the publication state for the admin panel (Phase 6b)", async () => {
+    expect(asPublicationState(await stub.getPublication(uuid(100)))).toStrictEqual({
+      published: false,
+    });
+    const published = asPublishResult(await stub.publishRecord(TENANT, uuid(100), auth("owner1")));
+    expect(published.ok).toBe(true);
+    const state = asPublicationState(await stub.getPublication(uuid(100)));
+    expect(state).toMatchObject({ published: true, sourceVersion: 1, publishedBy: "owner1" });
+    const un = asUnpublishResult(await stub.unpublishRecord(TENANT, uuid(100), auth("owner1")));
+    expect(un.ok).toBe(true);
+    expect(asPublicationState(await stub.getPublication(uuid(100)))).toStrictEqual({
+      published: false,
+    });
   });
 });
 

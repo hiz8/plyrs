@@ -8,6 +8,7 @@ import {
   asContentTypeRow,
   asContentTypeRows,
   asDeleteResult,
+  asPublicationState,
   asPublishResult,
   asRecordSnapshot,
   asRegisterResult,
@@ -94,6 +95,10 @@ export const tenantRoutes = new Hono<GateEnv>()
       ),
     );
     return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
+  })
+  .get("/:tenantId/records/:recordId/publication", async (c) => {
+    const state = asPublicationState(await stubFor(c).getPublication(c.req.param("recordId")));
+    return c.json(state);
   })
   .get("/:tenantId/records/:recordId", async (c) => {
     const record = asRecordSnapshot(await stubFor(c).getRecord(c.req.param("recordId")));

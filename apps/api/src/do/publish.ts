@@ -194,3 +194,26 @@ export function loadPublishedPage(
   const nextCursor = payloads.length === limit && last !== undefined ? last.recordId : null;
   return { payloads, nextCursor };
 }
+
+// Phase 6b: 管理画面の公開状態表示・archive 警告（design-spec §7）のための読み取り。
+// 公開状態の真実源 = published_snapshots 行の有無（§7）なので、record の存在は見ない。
+export type PublicationState =
+  | { published: false }
+  | { published: true; publishedAt: string; publishedBy: string; sourceVersion: number };
+
+export function loadPublicationState(sql: SqlStorage, recordId: string): PublicationState {
+  const row = sql
+    .exec<{ published_at: string; published_by: string; source_version: number }>(
+      "SELECT published_at, published_by, source_version FROM published_snapshots WHERE record_id = ?",
+      recordId,
+    )
+    .toArray()[0];
+  return row === undefined
+    ? { published: false }
+    : {
+        published: true,
+        publishedAt: row.published_at,
+        publishedBy: row.published_by,
+        sourceVersion: row.source_version,
+      };
+}
