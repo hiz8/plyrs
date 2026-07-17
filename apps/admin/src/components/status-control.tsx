@@ -52,6 +52,8 @@ export function StatusControl({ typeKey, recordId }: { typeKey: string; recordId
   const [pendingArchive, setPendingArchive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canWrite = tenant.role !== "viewer";
+  // §7 の archive 警告は公開状態が既知であることが前提 — 解決まで操作を保留(通常ミリ秒)
+  const publicationKnown = publication.data !== undefined;
 
   if (record === undefined || collection === undefined) {
     return null;
@@ -88,7 +90,7 @@ export function StatusControl({ typeKey, recordId }: { typeKey: string; recordId
         items={WORKFLOW_STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status] }))}
         selectedValue={record.status}
         onChange={onSelect}
-        isDisabled={!canWrite}
+        isDisabled={!canWrite || !publicationKnown}
       />
       {pendingArchive && (
         <div {...stylex.props(styles.warning)} role="alert">

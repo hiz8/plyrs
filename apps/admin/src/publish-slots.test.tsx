@@ -14,7 +14,7 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-type Handler = Mock<(init?: RequestInit) => Response>;
+type Handler = Mock<(init?: RequestInit) => Response | Promise<Response>>;
 
 function stubFetch(routes: Record<string, Handler>): typeof fetch {
   return async (input, init) => {
@@ -283,5 +283,33 @@ describe("ワークフロー status 操作（record-editor:toolbar スロット�
         | undefined;
       expect(push?.changes[0]).toMatchObject({ status: "archived" });
     });
+  });
+
+  it("holds status changes until the publication state is known (§7 warning race)", async () => {
+    const harness = socketHarness();
+    let release: ((response: Response) => void) | undefined;
+    const publicationHandler: Handler = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = resolve;
+        }),
+    );
+    renderEditor(
+      harness,
+      routesWith("owner", {
+        [`/v1/t/t1/records/${RECORD_1}/publication`]: publicationHandler,
+      }),
+    );
+    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
+    await bootstrapped(harness.latest(), [article()]);
+
+    // publication 未解決の間は status 操作を保留（archive 警告の判定ができないため）
+    const trigger = await screen.findByRole("button", { name: /ステータス/ });
+    expect(trigger).toBeDisabled();
+
+    release?.(jsonResponse(200, { published: false }));
+    await vi.waitFor(() =>
+      expect(screen.getByRole("button", { name: /ステータス/ })).not.toBeDisabled(),
+    );
   });
 });
