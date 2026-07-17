@@ -22,12 +22,46 @@ export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   ]),
 );
 
-// tech-selection 2.7: AST ルートに schemaVersion を刻む。doc（ProseMirror JSON）は
-// この層では不透明な JSON 値。ノード構造の検証は richtext 実装フェーズで深める。
+// tech-selection 2.7: AST ルートに schemaVersion を刻む。
+// 裁定 6(2026-07-17): doc は「語彙非依存の構造検証」— ノード型名の語彙(heading 等)は
+// 検証しない(エディタ拡張 = スキーマ進化を metamodel の変更なしに受け入れる。§4.2 の
+// 寛容 read と同じ思想)が、ツリー構造(type: string を持つノードの再帰)だけは強制し、
+// DO 側の relations 抽出(body-relations.ts)が壊れた形の doc を受け取らないことを保証する。
+export interface RichTextMark {
+  type: string;
+  attrs?: Record<string, JsonValue> | undefined;
+}
+
+export interface RichTextNode {
+  type: string;
+  content?: RichTextNode[] | undefined;
+  marks?: RichTextMark[] | undefined;
+  attrs?: Record<string, JsonValue> | undefined;
+  text?: string | undefined;
+}
+
+// looseObject: ProseMirror が将来 JSON 表現にキーを足しても破棄も拒否もしない(遅延適合)
+const richTextMarkSchema: z.ZodType<RichTextMark> = z.looseObject({
+  type: z.string().min(1),
+  attrs: z.record(z.string(), jsonValueSchema).optional(),
+});
+
+export const richTextNodeSchema: z.ZodType<RichTextNode> = z.lazy(() =>
+  z.looseObject({
+    type: z.string().min(1),
+    content: z.array(richTextNodeSchema).optional(),
+    marks: z.array(richTextMarkSchema).optional(),
+    attrs: z.record(z.string(), jsonValueSchema).optional(),
+    text: z.string().optional(),
+  }),
+);
+
 export const richTextEnvelopeSchema = z.strictObject({
   schemaVersion: z.number().int().positive(),
-  doc: jsonValueSchema,
+  doc: richTextNodeSchema,
 });
+
+export type RichTextEnvelope = z.infer<typeof richTextEnvelopeSchema>;
 
 export const relationRefSchema = z.strictObject({
   type: z.string().min(1),

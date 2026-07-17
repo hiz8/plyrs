@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContentTypeDefinition } from "./content-type";
-import { buildRecordInputSchema, splitRecordInput } from "./record-schema";
+import { buildRecordInputSchema, richTextEnvelopeSchema, splitRecordInput } from "./record-schema";
 
 const UUID = (n: number) => `018f2b6a-7a0a-7000-8000-00000000000${n}`;
 
@@ -199,5 +199,80 @@ describe("splitRecordInput", () => {
     const { hero: _hero, ...rest } = validInput;
     const { relations } = splitRecordInput(articleType, rest);
     expect(relations.map((r) => r.fieldKey)).toEqual(["authors"]);
+  });
+});
+
+describe("richTextEnvelopeSchema (Phase 7: 語彙非依存の構造検証)", () => {
+  const validDoc = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: "hello", marks: [{ type: "bold" }] }],
+      },
+    ],
+  };
+
+  it("accepts a ProseMirror-shaped tree including unknown node vocabulary", () => {
+    const envelope = {
+      schemaVersion: 1,
+      doc: {
+        type: "doc",
+        content: [
+          { type: "someFutureBlock", attrs: { x: 1 }, content: [{ type: "text", text: "t" }] },
+        ],
+      },
+    };
+    expect(richTextEnvelopeSchema.safeParse(envelope).success).toBe(true);
+  });
+
+  it("accepts marks and preserves unknown keys on nodes (loose)", () => {
+    const parsed = richTextEnvelopeSchema.safeParse({
+      schemaVersion: 1,
+      doc: { ...validDoc, futureKey: "kept" },
+    });
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    // RichTextNode に index signature が無いため、looseObject が保持した未知キーの実行時確認は unknown 経由で覗く(境界 cast)
+    expect((parsed.data.doc as unknown as Record<string, unknown>)["futureKey"]).toBe("kept");
+  });
+
+  it("rejects a doc that is not a node tree", () => {
+    expect(richTextEnvelopeSchema.safeParse({ schemaVersion: 1, doc: "plain" }).success).toBe(
+      false,
+    );
+    expect(
+      richTextEnvelopeSchema.safeParse({ schemaVersion: 1, doc: { content: [] } }).success,
+    ).toBe(false);
+    expect(
+      richTextEnvelopeSchema.safeParse({
+        schemaVersion: 1,
+        doc: { type: "doc", content: [{ text: "typeなし" }] },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a non-positive or missing schemaVersion and unknown envelope keys", () => {
+    expect(richTextEnvelopeSchema.safeParse({ schemaVersion: 0, doc: validDoc }).success).toBe(
+      false,
+    );
+    expect(richTextEnvelopeSchema.safeParse({ doc: validDoc }).success).toBe(false);
+    expect(
+      richTextEnvelopeSchema.safeParse({ schemaVersion: 1, doc: validDoc, extra: true }).success,
+    ).toBe(false);
+  });
+
+  it("still validates through buildRecordInputSchema for a richtext field", () => {
+    const contentType: ContentTypeDefinition = {
+      id: "018f2b6a-7a0a-7000-8000-000000000001",
+      key: "article",
+      name: "記事",
+      source: "user",
+      version: 1,
+      fields: [{ key: "body", type: "richtext" }],
+    };
+    const schema = buildRecordInputSchema(contentType);
+    expect(schema.safeParse({ body: { schemaVersion: 1, doc: validDoc } }).success).toBe(true);
+    expect(schema.safeParse({ body: { schemaVersion: 1, doc: 42 } }).success).toBe(false);
   });
 });

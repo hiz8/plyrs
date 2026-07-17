@@ -25,9 +25,13 @@ export {
   jsonValueSchema,
   relationRefSchema,
   richTextEnvelopeSchema,
+  richTextNodeSchema,
   splitRecordInput,
   type JsonValue,
   type RelationRef,
+  type RichTextEnvelope,
+  type RichTextMark,
+  type RichTextNode,
   type SplitRecordInput,
 } from "./record-schema";
 export { tolerantReadData, type TolerantReadResult } from "./tolerant-read";
