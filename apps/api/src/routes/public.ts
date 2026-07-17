@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
+import { uuidSchema } from "@plyrs/metamodel";
 import { canonicalCacheUrl, withEdgeCache, type EdgeCacheContext } from "../public/cache";
 import { loadCatalog, type CatalogEntry } from "../public/catalog";
 import { encodeCursor } from "../public/cursor";
@@ -165,6 +166,57 @@ async function serveSingle(
 
 export const publicRoutes = new Hono<PublicEnv>()
   .use("*", cors({ origin: "*", allowMethods: ["GET", "HEAD", "OPTIONS"] }))
+  // Phase 8 裁定 3: 公開アセット配信。公開ゲート = projected_records に asset の投影行が
+  // あること（publish 済みの真実源の公開側投影）。DO を起こさない（§8/§12.7）。バイナリは
+  // 不変（アップロード後の差し替え無し）なので Cache API の短 TTL はゲートの陳腐化だけを
+  // 有界化する（unpublish 後も最大 TTL 秒は配信されうる — §12.6 の既存トレードオフと同じ）。
+  .get("/:tenantSlug/assets/:assetId", async (c) => {
+    const assetId = c.req.param("assetId") ?? "";
+    if (!uuidSchema.safeParse(assetId).success) {
+      return c.json({ error: "not_found" }, 404);
+    }
+    const tenantSlug = c.req.param("tenantSlug") ?? "";
+    if (!isValidTenantSlug(tenantSlug)) {
+      return c.json({ error: "unknown_tenant" }, 404);
+    }
+    const tenantId = await resolveTenantId(c.env, tenantSlug);
+    if (tenantId === null) {
+      return c.json({ error: "unknown_tenant" }, 404);
+    }
+    const cacheUrl = canonicalCacheUrl(tenantId, `assets/${assetId}`, {});
+    return withEdgeCache(edgeCacheContextFor(c), cacheUrl, async () => {
+      const row = await c.env.PROJECTION_DB.prepare(
+        "SELECT data FROM projected_records WHERE tenant_id = ?1 AND record_id = ?2 AND type = 'asset'",
+      )
+        .bind(tenantId, assetId)
+        .first<{ data: string }>();
+      if (row === null) {
+        return c.json({ error: "not_found" }, 404);
+      }
+      const data = JSON.parse(row.data) as Record<string, unknown>;
+      const r2Key = data["r2_key"];
+      if (typeof r2Key !== "string") {
+        return c.json({ error: "not_found" }, 404);
+      }
+      const object = await c.env.ASSETS.get(r2Key);
+      if (object === null) {
+        // 投影はあるがバイナリが無い（削除競合の窓）。ソフト参照と同じく不在として扱う
+        return c.json({ error: "not_found" }, 404);
+      }
+      const contentType = data["content_type"];
+      return new Response(object.body, {
+        headers: {
+          "content-type":
+            typeof contentType === "string" ? contentType : "application/octet-stream",
+          // ユーザー投稿バイナリを API オリジンで inline 配信するための封じ込め
+          // （SVG/HTML 内スクリプトの実行面を潰す。ロードマップ §13 の href サニタイズ責務と同系）
+          "x-content-type-options": "nosniff",
+          "content-security-policy": "default-src 'none'; sandbox",
+          etag: object.httpEtag,
+        },
+      });
+    });
+  })
   // 注意: 一覧ルートを slug / :id ルートより先に登録する（/records/:type が /records/:type/... の
   // どちらとも被らないことを明示的に保証）
   .get("/:tenantSlug/records/:type", async (c) => {
