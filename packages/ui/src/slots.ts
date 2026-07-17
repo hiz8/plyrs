@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 
 // design-spec §9.9（論点P）: 管理画面コアが定義する拡張スロットの語彙。2026-07-16 裁定の
-// 最小初版 = nav:item のみ実配線し、record-editor:* は Phase 6b で配線する型予約。
+// 最小初版 = nav:item のみ実配線し、record-editor:* は Phase 6b で実配線済み。
 // 語彙を増やすときは SlotContributions にキーを足す（登録機構は不変）。
 
 interface SlotContributionBase {
@@ -13,17 +13,28 @@ interface SlotContributionBase {
 
 export interface NavItemContribution extends SlotContributionBase {
   label: string;
-  /** TanStack Router のルートパス（例: "/t/$tenantSlug/content-types"）。params は描画側が束縛する */
+  /**
+   * TanStack Router のルートパス（例: "/t/$tenantSlug/content-types"）。
+   *
+   * 契約（Phase 6a 裁定・6b 文書化）: 描画側（/t/$tenantSlug レイアウト）は
+   * `params={{ tenantSlug }}` **だけ**を束縛する。つまり nav:item に載せてよいのは
+   * パスパラメータが $tenantSlug のみのルートに限る。$typeKey 等の追加パラメータを
+   * 持つルート（例: /t/$tenantSlug/records/$typeKey）を載せるには、contribution に
+   * params を持たせるようレイアウト側の拡張が先に必要（Phase 9 のモジュール UI で再訪）。
+   */
   to: string;
 }
 
-// 型予約（Phase 6b で配線）: record 編集画面のサイドパネル
+// Phase 6b で実配線済み: record 編集画面のサイドパネル（コアの core.publication が実例）。
+// render は /t/$tenantSlug 配下のエディタルートでのみ描画される。ルート context
+// （tenant / adminApi / queryClient）は getRouteApi("/t/$tenantSlug") で取得できる。
 export interface RecordEditorPanelContribution extends SlotContributionBase {
   title: string;
   render: ComponentType<{ typeKey: string; recordId: string }>;
 }
 
-// 型予約（Phase 6b で配線）: record 編集画面のツールバーアクション
+// Phase 6b で実配線済み: record 編集画面のツールバーアクション
+// （コアの core.publish / core.status が実例）。
 export interface RecordEditorToolbarContribution extends SlotContributionBase {
   render: ComponentType<{ typeKey: string; recordId: string }>;
 }
