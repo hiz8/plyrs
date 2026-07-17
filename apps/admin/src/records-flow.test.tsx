@@ -39,6 +39,11 @@ function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, H
     "/auth/tenants": vi.fn(() => jsonResponse(200, { tenants: [blogTenant] })),
     "/auth/token": vi.fn(() => jsonResponse(200, { token: "jwt-abc", expiresIn: 900 })),
     "/v1/t/t1/content-types": vi.fn(() => jsonResponse(200, { contentTypes: [] })),
+    // Task 11: エディタルートが record-editor:toolbar/panel スロット経由で
+    // publication を fetch するようになったため、既存のエディタ系テストにも要スタブ。
+    [`/v1/t/t1/records/${RECORD_1}/publication`]: vi.fn(() =>
+      jsonResponse(200, { published: false }),
+    ),
     ...overrides,
   };
 }
