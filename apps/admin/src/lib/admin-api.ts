@@ -1,5 +1,5 @@
 import type { FieldDefinition } from "@plyrs/metamodel";
-import { throwApiError, type ApiClient } from "./api-client";
+import { throwApiError } from "./api-client";
 import type { TokenManager } from "./token-manager";
 
 // Bearer 付きの管理 API（/v1/t/:tenantId/...）。トークンは token-manager が供給する。
@@ -42,6 +42,3 @@ export function createAdminApi(
 }
 
 export type AdminApi = ReturnType<typeof createAdminApi>;
-
-// ApiClient は router context の組み立て（Task 12）で token-manager と束ねる
-export type { ApiClient };

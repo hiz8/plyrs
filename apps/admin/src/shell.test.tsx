@@ -127,4 +127,16 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     expect(await screen.findByRole("heading", { name: "ログイン" })).toBeInTheDocument();
     expect(logout).toHaveBeenCalledTimes(1);
   });
+
+  it("shows the error screen when a loader fails with a server error", async () => {
+    renderAt(
+      "/t/blog/content-types",
+      authedRoutes({
+        "/v1/t/t1/content-types": vi.fn(() => jsonResponse(500, { error: "boom" })),
+      }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("エラーが発生しました");
+    expect(screen.getByText("500: boom")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "再読み込み" })).toBeInTheDocument();
+  });
 });

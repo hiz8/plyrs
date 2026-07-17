@@ -7,6 +7,13 @@ import { contentTypesQueryOptions } from "../../../lib/queries";
 const styles = stylex.create({
   title: { fontSize: typography.sizeXl, marginTop: 0 },
   table: { borderCollapse: "collapse", width: "100%", fontSize: typography.sizeMd },
+  caption: {
+    captionSide: "top",
+    textAlign: "left",
+    color: colors.textMuted,
+    fontSize: typography.sizeSm,
+    paddingBottom: spacing.xs,
+  },
   cell: {
     textAlign: "left",
     padding: spacing.sm,
@@ -39,6 +46,7 @@ function ContentTypesPage() {
         </p>
       ) : (
         <table {...stylex.props(styles.table)}>
+          <caption {...stylex.props(styles.caption)}>登録済みコンテンツタイプの一覧</caption>
           <thead>
             <tr>
               <th {...stylex.props(styles.cell)}>key</th>

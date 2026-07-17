@@ -1,6 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter, type RouterHistory } from "@tanstack/react-router";
 import { createSlotRegistry, type SlotRegistry } from "@plyrs/ui";
+import { ErrorScreen } from "./components/error-screen";
 import { createAdminApi, type AdminApi } from "./lib/admin-api";
 import { createApiClient, type ApiClient } from "./lib/api-client";
 import { createTokenManager, type TokenManager } from "./lib/token-manager";
@@ -38,6 +39,7 @@ export function getRouter(options?: { context?: RouterContext; history?: RouterH
     routeTree,
     context: options?.context ?? createAppContext(),
     defaultPreload: "intent",
+    defaultErrorComponent: ErrorScreen,
     ...(options?.history ? { history: options.history } : {}),
   });
 }
