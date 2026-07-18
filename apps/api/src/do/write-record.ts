@@ -10,6 +10,7 @@ import { assetGuardHook } from "./asset-guard";
 import { issuesToMessage, rowToDefinition, type ContentTypeRow } from "./content-types";
 import { computeChangeSet } from "./diff";
 import { runBeforeWriteHooks, type BeforeWriteHook } from "./hooks";
+import { moduleBeforeWriteHooks } from "../modules/hooks";
 import { uniqueCheckHook } from "./unique-check";
 import type { RecordSnapshot, WriteRecordParams, WriteRecordResult } from "./types";
 
@@ -71,6 +72,10 @@ export interface WriteDeps {
   nextSeq: () => number;
   now: () => string;
   newRelationId: () => string;
+  // Phase 9: モジュールイベント(afterWrite 等)の event id 発行 seam。定義のみ、使用は Task 9。
+  newEventId?: () => string;
+  // Phase 9: モジュール alarm の予約 seam(§9.6)。定義のみ、使用は Task 9。
+  scheduleModuleAlarm?: (moduleId: string, dueAtMs: number) => void;
 }
 
 const systemBeforeWriteHooks: readonly BeforeWriteHook[] = [assetGuardHook, uniqueCheckHook];
@@ -146,14 +151,22 @@ export function writeRecordCore(
     return { ok: true, record: prev, changedFields: [], applied: false };
   }
 
-  const rejection = runBeforeWriteHooks(systemBeforeWriteHooks, {
-    contentType,
-    recordId: params.recordId,
-    data: change.data,
-    prev,
-    sql: deps.sql,
-    systemWrite: options.systemWrite === true,
-  });
+  const relationState = new Map<string, readonly RelationRef[]>(
+    change.relationWrites.map((write) => [write.fieldKey, write.refs]),
+  );
+  const rejection = runBeforeWriteHooks(
+    [...systemBeforeWriteHooks, ...moduleBeforeWriteHooks(deps.sql)],
+    {
+      contentType,
+      recordId: params.recordId,
+      data: change.data,
+      prev,
+      sql: deps.sql,
+      systemWrite: options.systemWrite === true,
+      relations: relationState,
+      scheduleModuleAlarm: deps.scheduleModuleAlarm,
+    },
+  );
   if (rejection !== null) {
     return { ok: false, code: rejection.code, message: rejection.message };
   }
