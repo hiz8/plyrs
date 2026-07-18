@@ -13,6 +13,8 @@ import {
   asContentTypeRow,
   asContentTypeRows,
   asDeleteResult,
+  asEnableModuleResult,
+  asModuleSummaries,
   asOrphanIds,
   asPublicationState,
   asPublishResult,
@@ -27,10 +29,12 @@ import { AUTH_HEADER, extractTokenProtocol } from "../sync/session";
 const ERROR_STATUS: Record<string, ContentfulStatusCode> = {
   forbidden: 403,
   unknown_type: 404,
+  unknown_module: 404,
   not_found: 404,
   unique_violation: 409,
   id_mismatch: 409,
   key_mismatch: 409,
+  type_conflict: 409,
   record_deleted: 410,
   already_deleted: 410,
   not_published: 409,
@@ -56,6 +60,25 @@ function stubFor(c: { env: Env; req: { param: (key: "tenantId") => string } }) {
   // design-spec §2: テナント = 1 DO。tenantId がそのまま DO 名（＝物理分離の境界）
   const id = c.env.TENANT_DO.idFromName(c.req.param("tenantId"));
   return c.env.TENANT_DO.get(id);
+}
+
+// Phase 9: 有効化状態の control-plane ミラー(真実源は DO)。再配布(§4.2)の宛先列挙用。
+// best-effort — 失敗しても DO 側は確定しており、起床時の遅延適用が安全網になる。
+async function mirrorTenantModule(
+  env: Env,
+  tenantId: string,
+  moduleId: string,
+  enabled: boolean,
+): Promise<void> {
+  try {
+    await env.DB.prepare(
+      "INSERT INTO tenant_modules (tenant_id, module_id, enabled, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(tenant_id, module_id) DO UPDATE SET enabled = excluded.enabled, updated_at = excluded.updated_at",
+    )
+      .bind(tenantId, moduleId, enabled ? 1 : 0, new Date().toISOString())
+      .run();
+  } catch (error) {
+    console.error("tenant_modules mirror failed", tenantId, moduleId, error);
+  }
 }
 
 export const tenantRoutes = new Hono<GateEnv>()
@@ -266,4 +289,30 @@ export const tenantRoutes = new Hono<GateEnv>()
       await stubFor(c).startReprojection(c.req.param("tenantId"), c.get("auth")),
     );
     return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
+  })
+  .get("/:tenantId/modules", async (c) => {
+    const modules = asModuleSummaries(await stubFor(c).listModules());
+    return c.json({ modules });
+  })
+  .post("/:tenantId/modules/:moduleId/enable", async (c) => {
+    const tenantId = c.req.param("tenantId");
+    const result = asEnableModuleResult(
+      await stubFor(c).enableModule(tenantId, c.req.param("moduleId"), c.get("auth")),
+    );
+    if (result.ok) {
+      await mirrorTenantModule(c.env, tenantId, result.module.moduleId, true);
+      return c.json(result);
+    }
+    return c.json(result, statusFor(result.code));
+  })
+  .post("/:tenantId/modules/:moduleId/disable", async (c) => {
+    const tenantId = c.req.param("tenantId");
+    const result = asEnableModuleResult(
+      await stubFor(c).disableModule(tenantId, c.req.param("moduleId"), c.get("auth")),
+    );
+    if (result.ok) {
+      await mirrorTenantModule(c.env, tenantId, result.module.moduleId, false);
+      return c.json(result);
+    }
+    return c.json(result, statusFor(result.code));
   });
