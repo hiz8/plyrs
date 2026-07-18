@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { eq } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
@@ -51,6 +51,8 @@ export const superAuthRoutes = new Hono<SuperAuthEnv>()
         : c.json({ error: "rate_limiter_unavailable" }, 503);
     }
     const db = drizzle(c.env.DB);
+    // 早期チェック(高速パス)。並行リクエストの最終判定は下の条件付き INSERT の変更行数で行う
+    // (このチェックだけでは SELECT→INSERT の間に TOCTOU があり、同時 2 リクエストが両方成立し得る)。
     const existing = (await db.select({ id: superAdmins.id }).from(superAdmins).limit(1))[0];
     if (existing !== undefined) {
       return c.json({ error: "already_bootstrapped" }, 403);
@@ -59,14 +61,19 @@ export const superAuthRoutes = new Hono<SuperAuthEnv>()
     const normalized = normalizeEmail(email);
     const secret = generateTotpSecret();
     const adminId = uuidv7();
-    await db.insert(superAdmins).values({
-      id: adminId,
-      email: normalized,
-      passwordHash: await hashPassword(password),
-      totpSecret: secret,
-      totpLastCounter: 0,
-      createdAt: new Date().toISOString(),
-    });
+    const passwordHash = await hashPassword(password);
+    const createdAt = new Date().toISOString();
+    // 単文の条件付き INSERT(WHERE NOT EXISTS)で「super_admins が 0 行のときだけ成立」を
+    // DB レベルでアトミックに保証する。並行 bootstrap は片方だけが変更行数 1 を得て勝つ。
+    const insertResult = await c.env.DB.prepare(
+      "INSERT INTO super_admins (id, email, password_hash, totp_secret, totp_last_counter, created_at) " +
+        "SELECT ?1, ?2, ?3, ?4, 0, ?5 WHERE NOT EXISTS (SELECT 1 FROM super_admins)",
+    )
+      .bind(adminId, normalized, passwordHash, secret, createdAt)
+      .run();
+    if (insertResult.meta.changes !== 1) {
+      return c.json({ error: "already_bootstrapped" }, 403);
+    }
     await writeAudit(c.env.DB, {
       actorId: adminId,
       action: "super.bootstrap",
@@ -98,12 +105,19 @@ export const superAuthRoutes = new Hono<SuperAuthEnv>()
     }
     const counter = await verifyTotpCode(row.totpSecret, totpCode, Date.now());
     if (counter === null || counter <= row.totpLastCounter) {
-      return c.json({ error: "invalid_credentials" }, 401); // 不一致もリプレイも同じ応答
+      return c.json({ error: "invalid_credentials" }, 401); // 不一致もリプレイも同じ応答(早期チェック・高速パス)
     }
-    await db
+    // 並行リクエストの TOCTOU 対策: 上の早期チェックだけでは同一コードの 2 リクエストが両方
+    // 通り得る。WHERE に totp_last_counter < counter を含む条件付き UPDATE(CAS)にし、
+    // 変更行数が 1 のときだけ「このリクエストが counter を確定させた」とみなす。
+    // 0 行なら並行した別リクエストが先に確定させた = リプレイと同じ扱いで 401。
+    const casResult = await db
       .update(superAdmins)
       .set({ totpLastCounter: counter })
-      .where(eq(superAdmins.id, row.id));
+      .where(and(eq(superAdmins.id, row.id), lt(superAdmins.totpLastCounter, counter)));
+    if (casResult.meta.changes !== 1) {
+      return c.json({ error: "invalid_credentials" }, 401);
+    }
     const now = new Date();
     const { token } = await createSuperSession(c.env.DB, row.id, now);
     setCookie(c, SUPER_SESSION_COOKIE, token, SUPER_COOKIE_OPTIONS);

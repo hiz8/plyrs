@@ -129,4 +129,41 @@ describe("super auth", () => {
     );
     expect(res.status).toBe(429);
   });
+
+  // 並行リクエストの TOCTOU 対策(CAS)の回帰テスト。同一 totp コードで 2 リクエストを真に
+  // 並行発火し、片方だけが 200(セッション発行)・もう片方が 401 になることを確認する。
+  // CAS の WHERE totp_last_counter < counter を外して(無条件 UPDATE に戻して)同じテストを
+  // 実行すると、この harness では 3/3 回とも 200/200(セッション二重発行)が再現することを
+  // 実装時に確認済み — 単発リクエストの「totp_last_counter を先回りして書き換えてから 1 回
+  // ログインする」形の検証は、早期チェック(counter <= totpLastCounter)だけで 401 になって
+  // しまい CAS 自体の効果を判別できないため、実際に並行させる形にしている。
+  it("allows only one of two concurrent logins presenting the same totp code", async () => {
+    const e = testEnv();
+    const db = drizzle(env.DB);
+    // 先行の lifecycle テストで bootstrap 済みの CREDS admin を使う(このファイルは 1 worker 内で
+    // 直列実行されるため、この時点で必ず存在する)。
+    const admin = (
+      await db
+        .select({ id: superAdmins.id, totpSecret: superAdmins.totpSecret })
+        .from(superAdmins)
+        .where(eq(superAdmins.email, "root@example.com"))
+        .limit(1)
+    )[0];
+    if (admin === undefined) {
+      throw new Error(
+        "root@example.com super admin fixture missing (bootstrap test must run first)",
+      );
+    }
+    // 先行テストで totp_last_counter が既に進んでいる。verifyTotpCode の許容ドリフトは
+    // 現在時刻 ±1 window しかないため、時刻オフセットで「未消費の window」を探すのではなく、
+    // totp_last_counter 自体を現在時刻の counter より確実に低い値へ巻き戻してから、
+    // 「現在時刻」のコード(ドリフト 0 で最も確実に一致する)を使う。
+    await db.update(superAdmins).set({ totpLastCounter: 0 }).where(eq(superAdmins.id, admin.id));
+    const code = await generateTotpCode(admin.totpSecret, Date.now());
+    const [r1, r2] = await Promise.all([
+      app.request(post("/super-auth/login", { ...CREDS, totpCode: code }), undefined, e),
+      app.request(post("/super-auth/login", { ...CREDS, totpCode: code }), undefined, e),
+    ]);
+    expect([r1.status, r2.status].toSorted()).toEqual([200, 401]);
+  });
 });
