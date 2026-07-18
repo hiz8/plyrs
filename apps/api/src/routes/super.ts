@@ -4,17 +4,19 @@ import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
 import { v7 as uuidv7 } from "uuid";
 import { z } from "zod";
-import { deadLetters, memberships, tenants, users } from "@plyrs/db/control-plane";
+import { deadLetters, memberships, tenantModules, tenants, users } from "@plyrs/db/control-plane";
 import { assetKeyBelongsToTenant } from "../assets/ownership";
 import { writeAudit } from "../audit";
 import { banUserEverywhere, revokeMembership } from "../auth/ban";
 import { unblockUser } from "../auth/blocklist";
 import { normalizeEmail } from "../auth/email";
+import { superAuthContext } from "../auth/super-context";
 import type { ModuleQueueJob } from "../modules/events";
+import { MODULE_REGISTRY } from "../modules/registry";
 import { deleteTenantCascade } from "../ops/tenant-delete";
 import { superGate, type SuperGateVariables } from "../middleware/super-gate";
 import type { ProjectionJob } from "../projection/jobs";
-import { asHealthReport, asStringArray } from "../rpc-unwrap";
+import { asHealthReport, asReprojectResult, asStringArray } from "../rpc-unwrap";
 import { TENANT_SLUG_MAX_LENGTH, TENANT_SLUG_PATTERN } from "./tenants";
 
 const createTenantSchema = z.object({
@@ -253,6 +255,60 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       return c.json({ ok: true, deleted: keys.length });
     },
   )
+  // §12.3b: テナント単位の再投影を super が起動する。第2段認可(型×操作)は owner 相当の
+  // 合成 AuthContext(superAuthContext)で飛び越える(design-spec §11.6)。
+  .post("/tenants/:tenantId/reproject", async (c) => {
+    const tenantId = c.req.param("tenantId");
+    const stub = c.env.TENANT_DO.get(c.env.TENANT_DO.idFromName(tenantId));
+    const result = asReprojectResult(
+      await stub.startReprojection(
+        tenantId,
+        superAuthContext(c.get("superAdmin").adminId, tenantId),
+      ),
+    );
+    if (!result.ok) {
+      return c.json(result, 403);
+    }
+    await writeAudit(c.env.DB, {
+      actorId: c.get("superAdmin").adminId,
+      action: "reproject.start",
+      targetType: "tenant",
+      targetId: tenantId,
+      detail: { epoch: result.epoch },
+    });
+    return c.json(result);
+  })
+  // モジュールカタログ(コード内静的レジストリ)+ 有効化テナント数(D1 ミラー集計)。
+  .get("/modules", async (c) => {
+    const counts = await drizzle(c.env.DB)
+      .select({ moduleId: tenantModules.moduleId, enabledTenants: count() })
+      .from(tenantModules)
+      .where(eq(tenantModules.enabled, 1))
+      .groupBy(tenantModules.moduleId);
+    const byId = new Map(counts.map((row) => [row.moduleId, row.enabledTenants]));
+    const modules = Object.values(MODULE_REGISTRY).map((definition) => ({
+      moduleId: definition.manifest.moduleId,
+      version: definition.manifest.version,
+      name: definition.manifest.name,
+      enabledTenants: byId.get(definition.manifest.moduleId) ?? 0,
+    }));
+    return c.json({ modules });
+  })
+  // §15-1: 型定義再配布のトリガー(機構は Phase 9 で完成済み — ここが「誰がいつ積むか」)
+  .post("/modules/:moduleId/redistribute", async (c) => {
+    const moduleId = c.req.param("moduleId");
+    if (!(moduleId in MODULE_REGISTRY)) {
+      return c.json({ error: "unknown_module" }, 404);
+    }
+    await c.env.MODULES_QUEUE.send({ kind: "module_redistribute", moduleId });
+    await writeAudit(c.env.DB, {
+      actorId: c.get("superAdmin").adminId,
+      action: "module.redistribute",
+      targetType: "module",
+      targetId: moduleId,
+    });
+    return c.json({ ok: true }, 202);
+  })
   // Phase 10: DLQ は D1 退避(dead_letters)。一覧は failed_at 降順・最大 200 件。
   .get("/dead-letters", async (c) => {
     const rows = await drizzle(c.env.DB)
