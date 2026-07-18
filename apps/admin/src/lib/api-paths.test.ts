@@ -17,4 +17,11 @@ describe("isApiPath", () => {
     // /public/v1 はヘッドレス契約 = api Worker の直接責務（プロキシしない）
     expect(isApiPath("/public/v1/blog/records/post")).toBe(false);
   });
+
+  it("forwards super paths", () => {
+    expect(isApiPath("/super-auth/login")).toBe(true);
+    expect(isApiPath("/super/v1/tenants")).toBe(true);
+    expect(isApiPath("/super")).toBe(false); // ページルートは転送しない
+    expect(isApiPath("/super-login")).toBe(false);
+  });
 });

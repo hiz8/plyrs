@@ -1,0 +1,4 @@
+# ローカル開発専用の上書き。実ファイル(.dev.vars)はコミットしない。
+# 裁定 10(2026-07-18): E2E がコアジャーニー(publish → 公開 read)を検証するための dev 限定転送。
+# 本番は 6a 裁定どおり /public/v1 を admin から配信しない(wrangler.jsonc の既定値は "0")。
+DEV_PROXY_PUBLIC=1

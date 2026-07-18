@@ -10,11 +10,19 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TenantsRouteImport } from './routes/tenants'
+import { Route as SuperLoginRouteImport } from './routes/super-login'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as SuperRouteRouteImport } from './routes/super/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SuperIndexRouteImport } from './routes/super/index'
+import { Route as SuperUsersRouteImport } from './routes/super/users'
+import { Route as SuperModulesRouteImport } from './routes/super/modules'
+import { Route as SuperDlqRouteImport } from './routes/super/dlq'
+import { Route as SuperAuditRouteImport } from './routes/super/audit'
 import { Route as TTenantSlugRouteRouteImport } from './routes/t/$tenantSlug/route'
 import { Route as TTenantSlugIndexRouteImport } from './routes/t/$tenantSlug/index'
+import { Route as SuperTenantsTenantIdRouteImport } from './routes/super/tenants.$tenantId'
 import { Route as TTenantSlugModulesIndexRouteImport } from './routes/t/$tenantSlug/modules/index'
 import { Route as TTenantSlugContentTypesIndexRouteImport } from './routes/t/$tenantSlug/content-types/index'
 import { Route as TTenantSlugAssetsIndexRouteImport } from './routes/t/$tenantSlug/assets/index'
@@ -29,6 +37,11 @@ const TenantsRoute = TenantsRouteImport.update({
   path: '/tenants',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SuperLoginRoute = SuperLoginRouteImport.update({
+  id: '/super-login',
+  path: '/super-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -39,10 +52,40 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SuperRouteRoute = SuperRouteRouteImport.update({
+  id: '/super',
+  path: '/super',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SuperIndexRoute = SuperIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SuperRouteRoute,
+} as any)
+const SuperUsersRoute = SuperUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => SuperRouteRoute,
+} as any)
+const SuperModulesRoute = SuperModulesRouteImport.update({
+  id: '/modules',
+  path: '/modules',
+  getParentRoute: () => SuperRouteRoute,
+} as any)
+const SuperDlqRoute = SuperDlqRouteImport.update({
+  id: '/dlq',
+  path: '/dlq',
+  getParentRoute: () => SuperRouteRoute,
+} as any)
+const SuperAuditRoute = SuperAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => SuperRouteRoute,
 } as any)
 const TTenantSlugRouteRoute = TTenantSlugRouteRouteImport.update({
   id: '/t/$tenantSlug',
@@ -53,6 +96,11 @@ const TTenantSlugIndexRoute = TTenantSlugIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => TTenantSlugRouteRoute,
+} as any)
+const SuperTenantsTenantIdRoute = SuperTenantsTenantIdRouteImport.update({
+  id: '/tenants/$tenantId',
+  path: '/tenants/$tenantId',
+  getParentRoute: () => SuperRouteRoute,
 } as any)
 const TTenantSlugModulesIndexRoute = TTenantSlugModulesIndexRouteImport.update({
   id: '/modules/',
@@ -103,10 +151,18 @@ const TTenantSlugContentTypesTypeKeyEditRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/super': typeof SuperRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/super-login': typeof SuperLoginRoute
   '/tenants': typeof TenantsRoute
   '/t/$tenantSlug': typeof TTenantSlugRouteRouteWithChildren
+  '/super/audit': typeof SuperAuditRoute
+  '/super/dlq': typeof SuperDlqRoute
+  '/super/modules': typeof SuperModulesRoute
+  '/super/users': typeof SuperUsersRoute
+  '/super/': typeof SuperIndexRoute
+  '/super/tenants/$tenantId': typeof SuperTenantsTenantIdRoute
   '/t/$tenantSlug/': typeof TTenantSlugIndexRoute
   '/t/$tenantSlug/content-types/new': typeof TTenantSlugContentTypesNewRoute
   '/t/$tenantSlug/assets/': typeof TTenantSlugAssetsIndexRoute
@@ -121,7 +177,14 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/super-login': typeof SuperLoginRoute
   '/tenants': typeof TenantsRoute
+  '/super/audit': typeof SuperAuditRoute
+  '/super/dlq': typeof SuperDlqRoute
+  '/super/modules': typeof SuperModulesRoute
+  '/super/users': typeof SuperUsersRoute
+  '/super': typeof SuperIndexRoute
+  '/super/tenants/$tenantId': typeof SuperTenantsTenantIdRoute
   '/t/$tenantSlug': typeof TTenantSlugIndexRoute
   '/t/$tenantSlug/content-types/new': typeof TTenantSlugContentTypesNewRoute
   '/t/$tenantSlug/assets': typeof TTenantSlugAssetsIndexRoute
@@ -135,10 +198,18 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/super': typeof SuperRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/super-login': typeof SuperLoginRoute
   '/tenants': typeof TenantsRoute
   '/t/$tenantSlug': typeof TTenantSlugRouteRouteWithChildren
+  '/super/audit': typeof SuperAuditRoute
+  '/super/dlq': typeof SuperDlqRoute
+  '/super/modules': typeof SuperModulesRoute
+  '/super/users': typeof SuperUsersRoute
+  '/super/': typeof SuperIndexRoute
+  '/super/tenants/$tenantId': typeof SuperTenantsTenantIdRoute
   '/t/$tenantSlug/': typeof TTenantSlugIndexRoute
   '/t/$tenantSlug/content-types/new': typeof TTenantSlugContentTypesNewRoute
   '/t/$tenantSlug/assets/': typeof TTenantSlugAssetsIndexRoute
@@ -153,10 +224,18 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/super'
     | '/login'
     | '/signup'
+    | '/super-login'
     | '/tenants'
     | '/t/$tenantSlug'
+    | '/super/audit'
+    | '/super/dlq'
+    | '/super/modules'
+    | '/super/users'
+    | '/super/'
+    | '/super/tenants/$tenantId'
     | '/t/$tenantSlug/'
     | '/t/$tenantSlug/content-types/new'
     | '/t/$tenantSlug/assets/'
@@ -171,7 +250,14 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/signup'
+    | '/super-login'
     | '/tenants'
+    | '/super/audit'
+    | '/super/dlq'
+    | '/super/modules'
+    | '/super/users'
+    | '/super'
+    | '/super/tenants/$tenantId'
     | '/t/$tenantSlug'
     | '/t/$tenantSlug/content-types/new'
     | '/t/$tenantSlug/assets'
@@ -184,10 +270,18 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/super'
     | '/login'
     | '/signup'
+    | '/super-login'
     | '/tenants'
     | '/t/$tenantSlug'
+    | '/super/audit'
+    | '/super/dlq'
+    | '/super/modules'
+    | '/super/users'
+    | '/super/'
+    | '/super/tenants/$tenantId'
     | '/t/$tenantSlug/'
     | '/t/$tenantSlug/content-types/new'
     | '/t/$tenantSlug/assets/'
@@ -201,8 +295,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SuperRouteRoute: typeof SuperRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  SuperLoginRoute: typeof SuperLoginRoute
   TenantsRoute: typeof TenantsRoute
   TTenantSlugRouteRoute: typeof TTenantSlugRouteRouteWithChildren
 }
@@ -214,6 +310,13 @@ declare module '@tanstack/react-router' {
       path: '/tenants'
       fullPath: '/tenants'
       preLoaderRoute: typeof TenantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/super-login': {
+      id: '/super-login'
+      path: '/super-login'
+      fullPath: '/super-login'
+      preLoaderRoute: typeof SuperLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -230,12 +333,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/super': {
+      id: '/super'
+      path: '/super'
+      fullPath: '/super'
+      preLoaderRoute: typeof SuperRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/super/': {
+      id: '/super/'
+      path: '/'
+      fullPath: '/super/'
+      preLoaderRoute: typeof SuperIndexRouteImport
+      parentRoute: typeof SuperRouteRoute
+    }
+    '/super/users': {
+      id: '/super/users'
+      path: '/users'
+      fullPath: '/super/users'
+      preLoaderRoute: typeof SuperUsersRouteImport
+      parentRoute: typeof SuperRouteRoute
+    }
+    '/super/modules': {
+      id: '/super/modules'
+      path: '/modules'
+      fullPath: '/super/modules'
+      preLoaderRoute: typeof SuperModulesRouteImport
+      parentRoute: typeof SuperRouteRoute
+    }
+    '/super/dlq': {
+      id: '/super/dlq'
+      path: '/dlq'
+      fullPath: '/super/dlq'
+      preLoaderRoute: typeof SuperDlqRouteImport
+      parentRoute: typeof SuperRouteRoute
+    }
+    '/super/audit': {
+      id: '/super/audit'
+      path: '/audit'
+      fullPath: '/super/audit'
+      preLoaderRoute: typeof SuperAuditRouteImport
+      parentRoute: typeof SuperRouteRoute
     }
     '/t/$tenantSlug': {
       id: '/t/$tenantSlug'
@@ -250,6 +395,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/t/$tenantSlug/'
       preLoaderRoute: typeof TTenantSlugIndexRouteImport
       parentRoute: typeof TTenantSlugRouteRoute
+    }
+    '/super/tenants/$tenantId': {
+      id: '/super/tenants/$tenantId'
+      path: '/tenants/$tenantId'
+      fullPath: '/super/tenants/$tenantId'
+      preLoaderRoute: typeof SuperTenantsTenantIdRouteImport
+      parentRoute: typeof SuperRouteRoute
     }
     '/t/$tenantSlug/modules/': {
       id: '/t/$tenantSlug/modules/'
@@ -310,6 +462,28 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface SuperRouteRouteChildren {
+  SuperAuditRoute: typeof SuperAuditRoute
+  SuperDlqRoute: typeof SuperDlqRoute
+  SuperModulesRoute: typeof SuperModulesRoute
+  SuperUsersRoute: typeof SuperUsersRoute
+  SuperIndexRoute: typeof SuperIndexRoute
+  SuperTenantsTenantIdRoute: typeof SuperTenantsTenantIdRoute
+}
+
+const SuperRouteRouteChildren: SuperRouteRouteChildren = {
+  SuperAuditRoute: SuperAuditRoute,
+  SuperDlqRoute: SuperDlqRoute,
+  SuperModulesRoute: SuperModulesRoute,
+  SuperUsersRoute: SuperUsersRoute,
+  SuperIndexRoute: SuperIndexRoute,
+  SuperTenantsTenantIdRoute: SuperTenantsTenantIdRoute,
+}
+
+const SuperRouteRouteWithChildren = SuperRouteRoute._addFileChildren(
+  SuperRouteRouteChildren,
+)
+
 interface TTenantSlugRouteRouteChildren {
   TTenantSlugIndexRoute: typeof TTenantSlugIndexRoute
   TTenantSlugContentTypesNewRoute: typeof TTenantSlugContentTypesNewRoute
@@ -341,8 +515,10 @@ const TTenantSlugRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SuperRouteRoute: SuperRouteRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  SuperLoginRoute: SuperLoginRoute,
   TenantsRoute: TenantsRoute,
   TTenantSlugRouteRoute: TTenantSlugRouteRouteWithChildren,
 }

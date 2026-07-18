@@ -6,4 +6,7 @@
   // 2026-07-16 裁定: admin は独立 Worker。/auth・/v1 は service binding で api Worker へ
   // 転送する same-origin プロキシ（SameSite=Strict のセッション cookie がそのまま機能する）。
   "services": [{ "binding": "API", "service": "plyrs-api" }],
+  // 裁定 10(2026-07-18): /public/v1 の dev 限定転送スイッチ。既定は無効(本番挙動)。
+  // ローカル E2E は apps/admin/.dev.vars で "1" に上書きする(.dev.vars.example 参照)。
+  "vars": { "DEV_PROXY_PUBLIC": "0" },
 }

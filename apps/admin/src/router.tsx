@@ -9,6 +9,7 @@ import { PublishToolbar } from "./components/publish-toolbar";
 import { StatusControl } from "./components/status-control";
 import { createAdminApi, type AdminApi } from "./lib/admin-api";
 import { createApiClient, type ApiClient } from "./lib/api-client";
+import { createSuperApi, type SuperApi } from "./lib/super-api";
 import { createTenantSync, type TenantSync } from "./lib/sync";
 import { createTokenManager, type TokenManager } from "./lib/token-manager";
 import { routeTree } from "./routeTree.gen";
@@ -19,6 +20,7 @@ export interface RouterContext {
   queryClient: QueryClient;
   api: ApiClient;
   adminApi: AdminApi;
+  superApi: SuperApi;
   tokens: TokenManager;
   slots: SlotRegistry;
   sync: SyncFactory;
@@ -49,6 +51,7 @@ export function createAppContext(
   const api = createApiClient(fetchImpl);
   const tokens = createTokenManager({ issueToken: api.issueToken });
   const adminApi = createAdminApi(tokens, fetchImpl);
+  const superApi = createSuperApi(fetchImpl);
   const slots = createSlotRegistry();
   // コアのナビ項目。モジュール(Phase 9)も同じ register 経路で項目を足す(design-spec §9.9)
   slots.register("nav:item", {
@@ -89,7 +92,7 @@ export function createAppContext(
         await tokens.getToken(tenantId, { forceRefresh: true });
       },
     });
-  return { queryClient: new QueryClient(), api, adminApi, tokens, slots, sync };
+  return { queryClient: new QueryClient(), api, adminApi, superApi, tokens, slots, sync };
 }
 
 export function getRouter(options?: { context?: RouterContext; history?: RouterHistory }) {
