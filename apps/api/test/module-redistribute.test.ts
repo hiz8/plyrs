@@ -1,6 +1,9 @@
 import { env, runInDurableObject, evictDurableObject } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { handleModuleJob, type ModuleQueueJob } from "../src/modules/events";
+import { ensureEnabledModuleTypes, upsertModuleEnablement } from "../src/modules/enablement";
+import type { ModuleManifest } from "../src/modules/manifest";
+import type { ModuleDefinition } from "../src/modules/registry";
 import { asModuleSummaries } from "../src/rpc-unwrap";
 import type { AuthContext } from "../src/do/authorize";
 
@@ -11,6 +14,30 @@ function stub(name: string) {
 function owner(tenantId: string): AuthContext {
   return { userId: "u-owner", role: "owner", tenantId };
 }
+
+// Important fix（レビュー指摘）用の注入マニフェスト: 既存の system 型 'asset' と key が
+// 衝突する contentType を持たせ、applyModuleTypes → registerContentTypeCore が forbidden を
+// 返して throw する経路を作る(§4.2 の allowSystem 未許可チェックに引っかかる)。
+const ASSET_COLLISION_MANIFEST: ModuleManifest = {
+  moduleId: "demo",
+  version: 1,
+  name: "デモ",
+  contentTypes: [
+    {
+      id: "00000000-0000-7000-8000-00000d000001",
+      key: "asset", // 既存の system 型と衝突させる
+      name: "衝突デモ型",
+      fields: [],
+      source: "system",
+      version: 1,
+    },
+  ],
+  permissions: [],
+  typeWriteGuards: {},
+  publicWriteTypes: [],
+};
+
+const DEMO_MODULE: ModuleDefinition = { manifest: ASSET_COLLISION_MANIFEST };
 
 async function markStale(tenant: ReturnType<typeof stub>): Promise<void> {
   await runInDurableObject(tenant, async (_instance, state) => {
@@ -86,5 +113,61 @@ describe("型定義再配布 (design-spec §4.2)", () => {
     await tenant.ping(); // constructor の ensureEnabledModuleTypes が走る
     const modules = asModuleSummaries(await tenant.listModules());
     expect(modules[0]).toMatchObject({ appliedVersion: 1 });
+  });
+});
+
+describe("ensureEnabledModuleTypes の防御 (Important fix)", () => {
+  it("applyModuleTypes が throw してもモジュール単位でスキップし DO 起動を継続する(テナント全損の回避)", async () => {
+    const tenantId = "mod-guard-demo-1";
+    const tenant = stub(tenantId);
+    await tenant.ping(); // system asset 型を含む通常初期化を先に走らせる
+
+    await runInDurableObject(tenant, async (_instance, state) => {
+      upsertModuleEnablement(state.storage.sql, {
+        moduleId: "demo",
+        enabled: true,
+        appliedVersion: 0,
+        permissions: { grants: {}, typeWriteGuards: {} },
+        now: new Date().toISOString(),
+      });
+    });
+
+    // 注入 registry を使った直接呼び出し: applyModuleTypes → registerContentTypeCore が
+    // 'asset' との system 衝突で forbidden を返し throw する経路を通す。
+    const changed = await runInDurableObject(tenant, async (_instance, state) =>
+      ensureEnabledModuleTypes(state.storage.sql, new Date().toISOString(), { demo: DEMO_MODULE }),
+    );
+    expect(changed).toBe(false); // throw を捕捉してスキップしたので変更なし
+
+    await runInDurableObject(tenant, async (_instance, state) => {
+      const row = state.storage.sql
+        .exec<{ applied_version: number }>(
+          "SELECT applied_version FROM module_registry WHERE module_id = 'demo'",
+        )
+        .one();
+      expect(row.applied_version).toBe(0); // 進んでいない
+    });
+  });
+
+  it("実コンストラクタ経路も生存する(demo は静的 MODULE_REGISTRY 未定義のため単に skip される)", async () => {
+    const tenantId = "mod-guard-demo-2";
+    const tenant = stub(tenantId);
+    await tenant.ping();
+    await runInDurableObject(tenant, async (_instance, state) => {
+      upsertModuleEnablement(state.storage.sql, {
+        moduleId: "demo",
+        enabled: true,
+        appliedVersion: 0,
+        permissions: { grants: {}, typeWriteGuards: {} },
+        now: new Date().toISOString(),
+      });
+    });
+    await evictDurableObject(tenant);
+    // 注: 実運用の静的 MODULE_REGISTRY(registry.ts)には 'demo' が定義されていないため、
+    // constructor 経由の ensureEnabledModuleTypes は module === undefined で単に continue する
+    // ―― ここで固定するのは「未定義モジュールの行が残っていても DO 起動を落とさない」ことで
+    // あり、上のテストが固定する「throw を捕捉してスキップする」防御そのものは
+    // (登録済みモジュールの version bump でしか再現できないため)この経路では再現できない。
+    await expect(tenant.ping()).resolves.toBe("pong");
   });
 });

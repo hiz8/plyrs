@@ -115,6 +115,12 @@ export function applyModuleTypes(sql: SqlStorage, manifest: ModuleManifest, now:
 
 // §4.2 の安全網: DO が起きたとき、有効モジュールの適用済み version がコード側と違えば
 // その場で追い付かせる(Queues の再配布を待たない。ensureAssetContentType と同じ思想)。
+// Important fix（レビュー指摘）: これは blockConcurrencyWhile(constructor) 内で呼ばれる。
+// applyModuleTypes は将来のマニフェスト version bump で legacy 型と衝突する等の理由で
+// throw しうるが、ここで捕捉しないと有効化済み全テナントの DO が起床のたびに throw する
+// = テナント全損になる。enable 経路(try/catch → type_conflict)や ensureAssetContentType
+// (skip + console.error)と同じ防御をモジュール単位で入れる: 失敗したモジュールは
+// console.error してスキップし(applied_version を進めない)、他モジュールと DO 起動は継続する。
 export function ensureEnabledModuleTypes(
   sql: SqlStorage,
   now: string,
@@ -129,16 +135,20 @@ export function ensureEnabledModuleTypes(
     if (module === undefined || module.manifest.version === row.appliedVersion) {
       continue;
     }
-    if (applyModuleTypes(sql, module.manifest, now)) {
-      changed = true;
+    try {
+      if (applyModuleTypes(sql, module.manifest, now)) {
+        changed = true;
+      }
+      upsertModuleEnablement(sql, {
+        moduleId: row.moduleId,
+        enabled: true,
+        appliedVersion: module.manifest.version,
+        permissions: permissionsFromManifest(module.manifest),
+        now,
+      });
+    } catch (error) {
+      console.error(`ensureEnabledModuleTypes: failed to apply module '${row.moduleId}'`, error);
     }
-    upsertModuleEnablement(sql, {
-      moduleId: row.moduleId,
-      enabled: true,
-      appliedVersion: module.manifest.version,
-      permissions: permissionsFromManifest(module.manifest),
-      now,
-    });
   }
   return changed;
 }
