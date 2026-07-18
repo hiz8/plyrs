@@ -32,6 +32,7 @@ import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
 import { ensureAssetContentType } from "./do/ensure-asset-type";
 import {
   applyModuleTypes,
+  isModuleEnabled,
   moduleRegistryRow,
   moduleWriteDenial,
   permissionsFromManifest,
@@ -39,6 +40,7 @@ import {
   type EnableModuleResult,
   type ModuleSummary,
 } from "./modules/enablement";
+import { moduleAlarmKind, moduleIdFromAlarmKind } from "./modules/module-alarms";
 import { moduleById, moduleCatalog } from "./modules/registry";
 import { countUnsent, markOutboxSent, purgeSent, unsentOutbox } from "./do/outbox";
 import {
@@ -537,11 +539,72 @@ export class TenantDO extends DurableObject<Env> {
     for (const kind of dueKinds(this.ctx.storage.sql, now)) {
       if (kind === OUTBOX_SWEEP) {
         await this.sweepOutbox();
+        continue;
       }
+      const moduleId = moduleIdFromAlarmKind(kind);
+      if (moduleId !== null) {
+        this.runModuleAlarm(moduleId, now);
+        continue;
+      }
+      // 未知 kind を放置すると「常に最早 due が過去」の永久起床ループになる。消して記録する。
+      console.error("unknown alarm kind purged", kind);
+      clearAlarm(this.ctx.storage.sql, kind);
     }
     const min = minDueAt(this.ctx.storage.sql);
     if (min !== null) {
       await this.ctx.storage.setAlarm(min);
+    }
+  }
+
+  // §9.6: モジュール alarm のディスパッチ。ハンドラはトランザクション内で走り、
+  // schedule はレジストリ登録のみ(物理再アームは alarm() 末尾の minDueAt 経路が担う —
+  // §9 申し送り: モジュールに ctx.storage.setAlarm を触らせない)。
+  private runModuleAlarm(moduleId: string, nowMs: number): void {
+    const written: string[] = [];
+    this.ctx.storage.transactionSync(() => {
+      const sql = this.ctx.storage.sql;
+      // 消してから走らせる(MIN() 意味論の registerAlarm では過去 due を前倒しできない —
+      // sweepOutbox と同じ理由)。ハンドラが schedule() すれば次回が入り直す。
+      clearAlarm(sql, moduleAlarmKind(moduleId));
+      const module = moduleById(moduleId);
+      if (module?.onAlarm === undefined || !isModuleEnabled(sql, moduleId)) {
+        return;
+      }
+      module.onAlarm({
+        sql,
+        now: nowMs,
+        schedule: (dueAtMs) => {
+          registerAlarm(sql, moduleAlarmKind(moduleId), dueAtMs);
+        },
+        writeRecord: (typeKey, params) => {
+          const contentType = loadContentTypeByKey(sql, typeKey);
+          if (contentType === null) {
+            return { ok: false, code: "unknown_type", message: `unknown content type: ${typeKey}` };
+          }
+          const result = writeRecordCore(
+            {
+              sql,
+              nextSeq: () => ++this.seq,
+              now: () => new Date().toISOString(),
+              newRelationId: () => uuidv7(),
+              newEventId: () => uuidv7(),
+            },
+            contentType,
+            { ...params, actor: `module:${moduleId}` },
+          );
+          if (result.ok && result.applied) {
+            written.push(params.recordId);
+          }
+          return result;
+        },
+      });
+    });
+    // コミット後に同期チャネルへ配る(writeRecord RPC と同じ契約)
+    for (const recordId of written) {
+      const stored = loadSyncRecord(this.ctx.storage.sql, recordId);
+      if (stored !== null) {
+        this.broadcastAll({ type: "change", record: stored });
+      }
     }
   }
 
