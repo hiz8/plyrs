@@ -126,4 +126,36 @@ describe("super user management", () => {
     expect(await isMembershipBlocked(env.BLOCKLIST, userId, tenantId)).toBe(true);
     expect(await actions()).toContain("membership.revoke");
   });
+
+  it("lists audit logs in createdAt descending order", async () => {
+    const { cookie } = await superLogin();
+    const e = superEnv();
+    const actorId = crypto.randomUUID();
+    const targetId = crypto.randomUUID();
+    const older = {
+      id: crypto.randomUUID(),
+      actorId,
+      action: "tenant.create",
+      targetType: "tenant",
+      targetId,
+      detail: "{}",
+      createdAt: "2026-07-01T00:00:00.000Z",
+    };
+    const newer = {
+      id: crypto.randomUUID(),
+      actorId,
+      action: "tenant.delete",
+      targetType: "tenant",
+      targetId,
+      detail: "{}",
+      createdAt: "2026-07-02T00:00:00.000Z",
+    };
+    await drizzle(env.DB).insert(auditLogs).values([older, newer]);
+
+    const res = await app.request("/super/v1/audit-logs", { headers: { cookie } }, e);
+    expect(res.status).toBe(200);
+    const { auditLogs: rows } = (await res.json()) as { auditLogs: { id: string }[] };
+    const ids = rows.map((row) => row.id);
+    expect(ids.indexOf(newer.id)).toBeLessThan(ids.indexOf(older.id));
+  });
 });

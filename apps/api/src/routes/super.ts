@@ -4,7 +4,14 @@ import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
 import { v7 as uuidv7 } from "uuid";
 import { z } from "zod";
-import { deadLetters, memberships, tenantModules, tenants, users } from "@plyrs/db/control-plane";
+import {
+  auditLogs,
+  deadLetters,
+  memberships,
+  tenantModules,
+  tenants,
+  users,
+} from "@plyrs/db/control-plane";
 import { assetKeyBelongsToTenant } from "../assets/ownership";
 import { writeAudit } from "../audit";
 import { banUserEverywhere, revokeMembership } from "../auth/ban";
@@ -355,4 +362,13 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       targetId: id,
     });
     return c.json({ ok: true });
+  })
+  // §11.6: 監査ログの一覧。append-only なので参照専用(削除 API は無い)。直近 200 件。
+  .get("/audit-logs", async (c) => {
+    const rows = await drizzle(c.env.DB)
+      .select()
+      .from(auditLogs)
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(200);
+    return c.json({ auditLogs: rows });
   });
