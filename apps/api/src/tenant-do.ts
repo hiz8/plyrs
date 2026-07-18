@@ -268,6 +268,13 @@ export class TenantDO extends DurableObject<Env> {
     if (!isModuleEnabled(this.ctx.storage.sql, moduleId)) {
       return { ok: true, applied: false };
     }
+    // Queues の at-least-once 再配達対策: 既に現行 version が適用済みなら書き込みしない
+    // (ensureEnabledModuleTypes と同じ version 一致ガード)。
+    if (
+      moduleRegistryRow(this.ctx.storage.sql, moduleId)?.appliedVersion === module.manifest.version
+    ) {
+      return { ok: true, applied: false };
+    }
     const now = new Date().toISOString();
     let changed = false;
     this.ctx.storage.transactionSync(() => {

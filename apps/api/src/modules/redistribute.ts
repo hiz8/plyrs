@@ -10,9 +10,7 @@ export async function handleModuleSyncJob(
 ): Promise<void> {
   if (job.kind === "module_sync") {
     const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(job.tenantId));
-    const result = (await stub.applyModuleManifest(job.moduleId)) as
-      | { ok: true; applied: boolean }
-      | { ok: false; code: string; message: string }; // RPC 境界の型戻し(rpc-unwrap 様式)
+    const result = await stub.applyModuleManifest(job.moduleId);
     if (!result.ok) {
       throw new Error(`module sync failed: ${result.message}`); // retry へ
     }

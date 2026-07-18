@@ -57,6 +57,26 @@ describe("型定義再配布 (design-spec §4.2)", () => {
     expect(modules[0]).toMatchObject({ enabled: false, appliedVersion: 0 });
   });
 
+  it("同一 version の module_sync 再配達は書き込まない(updated_at 不変・冪等)", async () => {
+    const tenantId = "redis-sync-idempotent";
+    const tenant = stub(tenantId);
+    await tenant.enableModule(tenantId, "booking", owner(tenantId));
+    const readUpdatedAt = async () =>
+      runInDurableObject(tenant, async (_instance, state) =>
+        state.storage.sql
+          .exec<{ updated_at: string }>(
+            "SELECT updated_at FROM module_registry WHERE module_id = 'booking'",
+          )
+          .one(),
+      );
+    const before = await readUpdatedAt();
+    // Queues は at-least-once。既に現行 version が適用済みの module_sync が再配達されても
+    // module_registry へは一切書き込まないはず(§4.2 の冪等制約)。
+    await handleModuleJob(env, { kind: "module_sync", tenantId, moduleId: "booking" });
+    const after = await readUpdatedAt();
+    expect(after.updated_at).toBe(before.updated_at);
+  });
+
   it("DO 起床時の遅延再適用が applied_version を追い付かせる(Queues を待たない安全網)", async () => {
     const tenantId = "redis-lazy";
     const tenant = stub(tenantId);
