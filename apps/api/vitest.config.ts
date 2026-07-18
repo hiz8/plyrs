@@ -19,7 +19,7 @@ export default defineConfig(async () => {
           bindings: {
             TEST_MIGRATIONS: migrations,
             TEST_PROJECTION_MIGRATIONS: projectionMigrations,
-            JWT_SECRET: "test-secret-do-not-use-in-prod",
+            JWT_SECRET: "test-secret-do-not-use-in-prod-0123456789",
             TURNSTILE_SECRET_KEY: "test-turnstile-secret",
           },
         },

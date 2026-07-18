@@ -25,6 +25,15 @@ interface EnvBindings {
   // Rate Limiting binding(open beta)。型は wrangler 生成に依存せず構造で持つ。
   // 未構成は公開 write ルートが 503 で閉じる(fail-closed)。
   PUBLIC_WRITE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
+  // §6: 認証系(signup/login)のレート制限。RateLimit は @cloudflare/workers-types のグローバル型
+  // (wrangler.jsonc の unsafe.bindings に宣言済み。apps/api は `wrangler types` 生成を使わないため
+  // TURNSTILE_SECRET_KEY と同じ方式でここに手書きする)。未構成は fail-closed(503)。
+  AUTH_LIMITER: RateLimit;
+  // §6: 認証系エンドポイント専用の Turnstile。未設定なら Turnstile 不要(optional 設計)。
+  // secret/site key とも TURNSTILE_SECRET_KEY と同じ管理(テスト = vitest.config、dev = .dev.vars、
+  // 本番 = wrangler secret / vars)。
+  AUTH_TURNSTILE_SECRET_KEY?: string;
+  AUTH_TURNSTILE_SITE_KEY?: string;
   // テスト専用: vitest.config の miniflare.bindings が注入する（本番には存在しない）
   TEST_MIGRATIONS: import("cloudflare:test").D1Migration[];
   TEST_PROJECTION_MIGRATIONS: import("cloudflare:test").D1Migration[];

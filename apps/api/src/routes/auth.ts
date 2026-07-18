@@ -7,14 +7,18 @@ import { v7 as uuidv7 } from "uuid";
 import { z } from "zod";
 import { memberships, tenants, users } from "@plyrs/db/control-plane";
 import { isBlocked } from "../auth/blocklist";
+import { normalizeEmail } from "../auth/email";
 import { signTenantToken, TOKEN_TTL } from "../auth/jwt";
 import { hashPassword, verifyPassword } from "../auth/password";
 import { isRole } from "../auth/permissions";
+import { checkAuthRateLimit } from "../auth/rate-limit";
 import { createSession, lookupSession, revokeSession, SESSION_COOKIE } from "../auth/session";
+import { verifyTurnstile } from "../modules/turnstile";
 
 const credentialsSchema = z.object({
   email: z.email().max(254),
   password: z.string().min(12).max(128),
+  turnstileToken: z.string().max(2048).optional(),
 });
 
 const SESSION_COOKIE_OPTIONS = {
@@ -25,9 +29,40 @@ const SESSION_COOKIE_OPTIONS = {
   maxAge: 30 * 86_400,
 } as const;
 
+// §6: 認証系エンドポイント専用の Turnstile。AUTH_TURNSTILE_SECRET_KEY 未設定なら不要
+// (optional 設計 — 本番有効化は手順書)。設定時は token 必須、siteverify 失敗は 403。
+async function requireAuthTurnstile(
+  env: Env,
+  token: string | undefined,
+  ip: string | undefined,
+): Promise<"ok" | "required" | "failed"> {
+  const secret = env.AUTH_TURNSTILE_SECRET_KEY;
+  if (secret === undefined || secret === "") {
+    return "ok"; // 未設定なら不要(optional 設計 — 本番有効化は手順書)
+  }
+  if (token === undefined) {
+    return "required";
+  }
+  return (await verifyTurnstile(secret, token, ip ?? null)) ? "ok" : "failed";
+}
+
 export const authRoutes = new Hono<{ Bindings: Env }>()
   .post("/signup", zValidator("json", credentialsSchema), async (c) => {
-    const { email, password } = c.req.valid("json");
+    const ip = c.req.header("cf-connecting-ip");
+    const decision = await checkAuthRateLimit(c.env, ip);
+    if (decision !== "ok") {
+      return decision === "limited"
+        ? c.json({ error: "rate_limited" }, 429)
+        : c.json({ error: "rate_limiter_unavailable" }, 503);
+    }
+    const turnstile = await requireAuthTurnstile(c.env, c.req.valid("json").turnstileToken, ip);
+    if (turnstile !== "ok") {
+      return turnstile === "required"
+        ? c.json({ error: "turnstile_required" }, 400)
+        : c.json({ error: "turnstile_failed" }, 403);
+    }
+    const email = normalizeEmail(c.req.valid("json").email);
+    const { password } = c.req.valid("json");
     const db = drizzle(c.env.DB);
     const existing = await db
       .select({ id: users.id })
@@ -50,7 +85,21 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
     return c.json({ userId }, 201);
   })
   .post("/login", zValidator("json", credentialsSchema), async (c) => {
-    const { email, password } = c.req.valid("json");
+    const ip = c.req.header("cf-connecting-ip");
+    const decision = await checkAuthRateLimit(c.env, ip);
+    if (decision !== "ok") {
+      return decision === "limited"
+        ? c.json({ error: "rate_limited" }, 429)
+        : c.json({ error: "rate_limiter_unavailable" }, 503);
+    }
+    const turnstile = await requireAuthTurnstile(c.env, c.req.valid("json").turnstileToken, ip);
+    if (turnstile !== "ok") {
+      return turnstile === "required"
+        ? c.json({ error: "turnstile_required" }, 400)
+        : c.json({ error: "turnstile_failed" }, 403);
+    }
+    const email = normalizeEmail(c.req.valid("json").email);
+    const { password } = c.req.valid("json");
     const row = (
       await drizzle(c.env.DB).select().from(users).where(eq(users.email, email)).limit(1)
     )[0];
@@ -67,7 +116,8 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
     if (token !== undefined) {
       await revokeSession(c.env.DB, token, new Date());
     }
-    deleteCookie(c, SESSION_COOKIE, { path: "/" });
+    // __Host- prefix は Secure 必須(setCookie と同じ属性で削除しないとブラウザが cookie を認識しない)
+    deleteCookie(c, SESSION_COOKIE, { path: "/", secure: true });
     return c.json({ ok: true });
   })
   // G5: セッション cookie（D1 真実源）を提示して短命 JWT を再発行する
@@ -116,4 +166,7 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
       .where(eq(memberships.userId, session.userId))
       .orderBy(asc(tenants.slug));
     return c.json({ tenants: rows });
-  });
+  })
+  // §6: フロントエンドが signup/login フォームに Turnstile ウィジェットを出すかどうかの判定材料。
+  // secret key と違い site key は公開情報(未設定なら Turnstile 無効の合図として null)。
+  .get("/turnstile-config", (c) => c.json({ siteKey: c.env.AUTH_TURNSTILE_SITE_KEY ?? null }));

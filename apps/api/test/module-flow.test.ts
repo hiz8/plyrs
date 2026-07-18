@@ -50,7 +50,13 @@ function fakeLimiter(succeed: boolean): {
 }
 
 function testEnv(limiterSucceeds = true): Env {
-  return { ...env, PUBLIC_WRITE_LIMITER: fakeLimiter(limiterSucceeds) };
+  // §6: AUTH_LIMITER も本物の Miniflare シミュレート ratelimit(--no-isolate で全ファイル共有)。
+  // このファイルは auth 系のレート制限自体をテストしないので常に成功させる。
+  return {
+    ...env,
+    PUBLIC_WRITE_LIMITER: fakeLimiter(limiterSucceeds),
+    AUTH_LIMITER: fakeLimiter(true),
+  };
 }
 
 // public-write.test.ts と同じ理由(cloudflare:test の fetchMock 撤去)で globalThis.fetch を spy する。
@@ -85,17 +91,17 @@ async function setupTenant(): Promise<{
   const signup = await app.request(
     "/auth/signup",
     json({ email: `${unique("owner")}@example.com`, password: "hunter2hunter2" }),
-    env,
+    testEnv(),
   );
   const cookie = (signup.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
   const tenantSlug = unique("t-");
   const created = await app.request(
     "/v1/tenants",
     json({ name: "T", slug: tenantSlug }, { cookie }),
-    env,
+    testEnv(),
   );
   const { tenantId } = (await created.json()) as { tenantId: string };
-  const issued = await app.request("/auth/token", json({ tenantId }, { cookie }), env);
+  const issued = await app.request("/auth/token", json({ tenantId }, { cookie }), testEnv());
   const { token: ownerToken } = (await issued.json()) as { token: string };
   return { tenantId, tenantSlug, ownerToken };
 }

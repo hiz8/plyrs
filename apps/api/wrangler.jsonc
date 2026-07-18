@@ -69,6 +69,15 @@
         "namespace_id": "1001",
         "simple": { "limit": 10, "period": 60 },
       },
+      // §6: 認証系エンドポイント(signup/login)のレート制限。IP キー。
+      {
+        "name": "AUTH_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "1002",
+        "simple": { "limit": 10, "period": 60 },
+      },
     ],
   },
+  // §6: 期限切れ・失効済みセッションの日次掃除
+  "triggers": { "crons": ["17 3 * * *"] },
 }

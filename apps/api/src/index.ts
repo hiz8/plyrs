@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { purgeExpiredSessions } from "./auth/session";
+import { requireSaneSecret } from "./middleware/sane-secret";
 import { handleModuleJob, type ModuleQueueJob } from "./modules/events";
 import { handleProjectionJob } from "./projection/consumer";
 import type { ProjectionJob } from "./projection/jobs";
@@ -11,6 +13,10 @@ import { tenantAdminRoutes } from "./routes/tenants";
 export { TenantDO } from "./tenant-do";
 
 const app = new Hono<{ Bindings: Env }>();
+// §6: JWT_SECRET が短い(設定事故)場合は認証・テナント系を丸ごと fail-closed で閉じる。
+// /super-auth・/super/v1 は Task 6/7 の配線時に同じガードを併設する。
+app.use("/auth/*", requireSaneSecret);
+app.use("/v1/*", requireSaneSecret);
 app.route("/auth", authRoutes);
 app.route("/v1/tenants", tenantAdminRoutes);
 app.route("/v1/t", tenantRoutes);
@@ -25,6 +31,14 @@ export { app };
 
 export default {
   fetch: app.fetch,
+  // §6: 期限切れ・失効済みセッションの日次掃除(wrangler.jsonc の triggers.crons が起動する)。
+  async scheduled(
+    _controller: ScheduledController,
+    env: Env,
+    _ctx: ExecutionContext,
+  ): Promise<void> {
+    await purgeExpiredSessions(env.DB, new Date());
+  },
   // design-spec §12.3 / Phase 9 §9.4: projection と module events の 2 キューを 1 ハンドラで
   // 受ける（wrangler.jsonc の consumers はどちらもこの queue() を指す）。冪等なので
   // at-least-once 配信をそのまま受ける。ExportedHandlerQueueHandler は ctx を第3引数として

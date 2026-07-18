@@ -2,6 +2,7 @@ import { env, runInDurableObject } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { v7 as uuidv7 } from "uuid";
 import { app } from "../src/index";
+import { fakeLimiter } from "./rate-limit-helper";
 
 // 最終レビュー指摘(important, merge blocker): r2_key のテナント所有権ガード。
 //
@@ -29,6 +30,10 @@ function json(body: unknown, headers: Record<string, string> = {}): RequestInit 
   };
 }
 
+// §6: AUTH_LIMITER は本物の Miniflare シミュレート ratelimit(--no-isolate で全ファイル共有)。
+// signup を叩く setupTenant はこの env を使う(素の env だと他テストの呼び出し数次第で 429 が混入する)。
+const authEnv: Env = { ...env, AUTH_LIMITER: fakeLimiter(true) };
+
 async function setupTenant(): Promise<{
   tenantId: string;
   headers: { authorization: string };
@@ -37,16 +42,16 @@ async function setupTenant(): Promise<{
   const signup = await app.request(
     "/auth/signup",
     json({ email, password: "hunter2hunter2" }),
-    env,
+    authEnv,
   );
   const cookie = (signup.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
   const created = await app.request(
     "/v1/tenants",
     json({ name: "T", slug: unique("t-") }, { cookie }),
-    env,
+    authEnv,
   );
   const { tenantId } = (await created.json()) as { tenantId: string };
-  const issued = await app.request("/auth/token", json({ tenantId }, { cookie }), env);
+  const issued = await app.request("/auth/token", json({ tenantId }, { cookie }), authEnv);
   const { token } = (await issued.json()) as { token: string };
   return { tenantId, headers: { authorization: `Bearer ${token}` } };
 }
