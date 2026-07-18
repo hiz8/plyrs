@@ -269,6 +269,10 @@ export class TenantDO extends DurableObject<Env> {
       return { ok: false, ...moduleDenial };
     }
     const armed: Promise<void>[] = [];
+    // outbox 系 RPC(publish/unpublish/delete/push)と同じ規律: 実際に module_events が
+    // 積まれた時だけ drain する(§14 の MINOR fix と同じアンチパターン ―
+    // 「tenant unknown」ログの空撃ちと無駄な unsentModuleEvents クエリ ― を避ける)。
+    let moduleEventsPending = false;
     const result = this.ctx.storage.transactionSync(() => {
       const inner = writeRecordCore(
         {
@@ -288,6 +292,7 @@ export class TenantDO extends DurableObject<Env> {
       // module_events の宛先(do_config.tenant_id)は write 経路でも刻む(§14 の push 教訓と同型:
       // 実際に積まれた時だけ)。auth.tenantId は HTTP ゲート由来のときのみ存在する。
       if (countUnsentModuleEvents(this.ctx.storage.sql) > 0 && auth.tenantId !== undefined) {
+        moduleEventsPending = true;
         this.rememberTenant(auth.tenantId);
         armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
       }
@@ -299,7 +304,9 @@ export class TenantDO extends DurableObject<Env> {
       if (stored !== null) {
         this.broadcastAll({ type: "change", record: stored });
       }
-      await this.drainModuleEvents();
+      if (moduleEventsPending) {
+        await this.drainModuleEvents();
+      }
     }
     return result;
   }
@@ -317,6 +324,7 @@ export class TenantDO extends DurableObject<Env> {
       return { ok: false, code: "unknown_type", message: "asset type is not registered" };
     }
     const armed: Promise<void>[] = [];
+    let moduleEventsPending = false;
     const result = this.ctx.storage.transactionSync(() => {
       const inner = writeRecordCore(
         {
@@ -335,6 +343,7 @@ export class TenantDO extends DurableObject<Env> {
         { systemWrite: true },
       );
       if (countUnsentModuleEvents(this.ctx.storage.sql) > 0 && auth.tenantId !== undefined) {
+        moduleEventsPending = true;
         this.rememberTenant(auth.tenantId);
         armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
       }
@@ -346,7 +355,9 @@ export class TenantDO extends DurableObject<Env> {
       if (stored !== null) {
         this.broadcastAll({ type: "change", record: stored });
       }
-      await this.drainModuleEvents();
+      if (moduleEventsPending) {
+        await this.drainModuleEvents();
+      }
     }
     return result;
   }
