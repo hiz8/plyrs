@@ -134,13 +134,22 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
     if (row === undefined) {
       return c.json({ error: "not_found" }, 404);
     }
+    // カスケード開始前に "start" を記録する(best-effort にしない): 途中で throw しても
+    // 破壊が始まった事実は監査に残る。成功後に "complete" を追記する。
+    await writeAudit(c.env.DB, {
+      actorId: c.get("superAdmin").adminId,
+      action: "tenant.delete",
+      targetType: "tenant",
+      targetId: tenantId,
+      detail: { slug: row.slug, phase: "start" },
+    });
     await deleteTenantCascade(c.env, row);
     await writeAudit(c.env.DB, {
       actorId: c.get("superAdmin").adminId,
       action: "tenant.delete",
       targetType: "tenant",
       targetId: tenantId,
-      detail: { slug: row.slug },
+      detail: { slug: row.slug, phase: "complete" },
     });
     return c.json({ ok: true });
   })
@@ -354,7 +363,10 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
   })
   .delete("/dead-letters/:id", async (c) => {
     const id = c.req.param("id");
-    await drizzle(c.env.DB).delete(deadLetters).where(eq(deadLetters.id, id));
+    const result = await drizzle(c.env.DB).delete(deadLetters).where(eq(deadLetters.id, id));
+    if (result.meta.changes === 0) {
+      return c.json({ error: "not_found" }, 404);
+    }
     await writeAudit(c.env.DB, {
       actorId: c.get("superAdmin").adminId,
       action: "dlq.discard",

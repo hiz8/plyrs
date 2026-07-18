@@ -993,9 +993,10 @@ export class TenantDO extends DurableObject<Env> {
   }
 
   // Phase 10: テナント削除のカスケード。全ソケット切断 → alarm 解除 → 全ストレージ削除。
-  // deleteAll 後もこのインスタンスのメモリ状態は残るが、control-plane 行が先に消えている
-  // (ゲートが新規到達を止める)ため後続リクエストは来ない前提。次回起床時は constructor の
-  // JIT migration が空のテナントとして再初期化する。
+  // deleteAll 後もこのインスタンスのメモリ状態は残るが、旧メンバーの membership ブロック
+  // (blockMembership・TTL 1200s)+ membership 行削除がゲートを止めるため後続リクエストは
+  // 来ない前提(tenants 行自体はカスケードの最後段まで残る — 再実行可能性のため)。次回起床時は
+  // constructor の JIT migration が空のテナントとして再初期化する。
   async wipeTenant(): Promise<{ ok: true }> {
     for (const socket of this.ctx.getWebSockets()) {
       socket.close(CLOSE_CODES.blocked, "tenant_deleted");

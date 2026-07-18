@@ -174,6 +174,14 @@ describe("dead letter park & replay", () => {
       await drizzle(env.DB).select({ action: auditLogs.action }).from(auditLogs)
     ).map((row) => row.action);
     expect(actionsAfterDiscard).toContain("dlq.discard");
+
+    // 最終ブランチレビュー(修正3): 既に消えている行への discard は 404(audit も増えない)。
+    const discardedAgain = await app.request(
+      jsonReq("DELETE", `/super/v1/dead-letters/${dlqId}`, cookie),
+      undefined,
+      e,
+    );
+    expect(discardedAgain.status).toBe(404);
   });
 
   it("parks from env-suffixed dlq names and routes suffixed module queues", async () => {

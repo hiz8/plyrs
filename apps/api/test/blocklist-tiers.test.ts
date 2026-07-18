@@ -2,11 +2,12 @@ import { env } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { describe, expect, it } from "vitest";
-import { memberships, users } from "@plyrs/db/control-plane";
+import { memberships, tenants, users } from "@plyrs/db/control-plane";
 import { banUserEverywhere, revokeMembership } from "../src/auth/ban";
 import { blockMembership, isBlocked, isMembershipBlocked } from "../src/auth/blocklist";
 import { signTenantToken } from "../src/auth/jwt";
 import { authenticateTenantToken } from "../src/middleware/tenant-gate";
+import { deleteTenantCascade } from "../src/ops/tenant-delete";
 
 describe("two-tier blocklist", () => {
   it("blocks the gate for a (userId, tenantId) membership block only on that tenant", async () => {
@@ -58,5 +59,26 @@ describe("two-tier blocklist", () => {
       0,
     );
     expect(await isMembershipBlocked(env.BLOCKLIST, userId, tenantId)).toBe(true);
+  });
+
+  // 最終ブランチレビュー(修正2): テナント削除前に発行済みの JWT は、削除後も exp まで
+  // 有効な「粗い身分証」のままなので、blockMembership で復活ウィンドウを封鎖する。
+  it("deleteTenantCascade blocks a former member's still-valid JWT", async () => {
+    const userId = crypto.randomUUID();
+    const tenantId = crypto.randomUUID();
+    const slug = `del-${tenantId}`;
+    const now = new Date().toISOString();
+    const db = drizzle(env.DB);
+    await db.insert(tenants).values({ id: tenantId, slug, name: "T", createdAt: now });
+    await db.insert(memberships).values({ userId, tenantId, role: "owner", createdAt: now });
+    const token = await signTenantToken(env.JWT_SECRET, { userId, tenantId, role: "owner" });
+
+    const before = await authenticateTenantToken(env, tenantId, token);
+    expect(before.ok).toBe(true);
+
+    await deleteTenantCascade(env, { id: tenantId, slug });
+
+    const after = await authenticateTenantToken(env, tenantId, token);
+    expect(after).toMatchObject({ ok: false, failure: { code: "blocked", status: 403 } });
   });
 });

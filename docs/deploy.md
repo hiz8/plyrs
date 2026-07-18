@@ -5,6 +5,7 @@
 - **素の `wrangler deploy`(`--env` なし)は禁止**。`apps/api/wrangler.jsonc` / `apps/admin/wrangler.jsonc` のトップレベルブロックは dev/vitest 用(`vitest-pool-workers` が `configPath` で読む)であり、`database_id` や KV `id` はすべてダミー値。必ず `--env preview` か `--env production` を付けてデプロイする。
 - GitHub Secrets(リポジトリまたは各 Environment に設定): `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`。
 - GitHub の `production` Environment には **必須レビュアー(Required reviewers)を設定する**(Settings → Environments → production → Deployment protection rules)。`.github/workflows/deploy.yml` の `workflow_dispatch` はこの Environment 保護を経由するため、レビュー承認なしに本番へは出ない。`preview` Environment はレビュー不要のまま(push のたびに自動デプロイするため)。
+- 初回リソース作成(§1)と ID 転記が完了するまで、main push の preview デプロイは失敗する(想定内)。
 
 ## 1. 初回リソース作成(環境ごと)
 
@@ -93,6 +94,8 @@ pnpm exec wrangler deploy -c "$(find apps/admin/dist -name wrangler.json -print 
 `<env>` は `preview` か `production`。
 
 ## 4. super 管理者の初期化
+
+**デプロイ後は直ちに bootstrap を実行すること** — super_admins が空の間は到達可能な誰でも初期化できる(レート制限のみ)。
 
 初回のみ(`super_admins` テーブルが空のときだけ成立する):
 
