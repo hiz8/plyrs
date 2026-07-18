@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { base32Decode, generateTotpCode, generateTotpSecret, otpauthUri, verifyTotpCode } from "./totp";
+import {
+  base32Decode,
+  generateTotpCode,
+  generateTotpSecret,
+  otpauthUri,
+  verifyTotpCode,
+} from "./totp";
 
 const RFC_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
 
