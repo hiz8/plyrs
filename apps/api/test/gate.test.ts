@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { memberships } from "@plyrs/db/control-plane";
 import { app } from "../src/index";
 import { blockUser } from "../src/auth/blocklist";
+import { insertTenantWithOwner } from "./create-tenant";
 import { articleType, uuid, validArticleInput } from "./fixtures";
 import { fakeLimiter } from "./rate-limit-helper";
 
@@ -41,12 +42,7 @@ async function bootstrapTenant(): Promise<{
   );
   const { userId } = (await signup.json()) as { userId: string };
   const cookie = (signup.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
-  const created = await app.request(
-    "/v1/tenants",
-    json({ name: "T", slug: unique("t-") }, { cookie }),
-    authEnv,
-  );
-  const { tenantId } = (await created.json()) as { tenantId: string };
+  const { tenantId } = await insertTenantWithOwner(userId, { slug: unique("t-") });
   const issued = await app.request("/auth/token", json({ tenantId }, { cookie }), authEnv);
   const { token } = (await issued.json()) as { token: string };
   return { tenantId, userId, bearer: `Bearer ${token}`, cookie };

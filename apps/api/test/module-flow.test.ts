@@ -19,6 +19,7 @@ import type { ModuleQueueJob } from "../src/modules/events";
 import { moduleAlarmKind } from "../src/modules/module-alarms";
 import { TURNSTILE_VERIFY_URL } from "../src/modules/turnstile";
 import { asModuleSummaries, asRecordSnapshot, asWriteResult } from "../src/rpc-unwrap";
+import { insertTenantWithOwner } from "./create-tenant";
 
 // Task 11(module-routes.test.ts)+ publish.test.ts の bootstrapTenant 様式・
 // Task 12(public-write.test.ts)の mockSiteverify / fakeLimiter / reservationBody 様式・
@@ -93,14 +94,11 @@ async function setupTenant(): Promise<{
     json({ email: `${unique("owner")}@example.com`, password: "hunter2hunter2" }),
     testEnv(),
   );
+  const { userId } = (await signup.json()) as { userId: string };
   const cookie = (signup.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
-  const tenantSlug = unique("t-");
-  const created = await app.request(
-    "/v1/tenants",
-    json({ name: "T", slug: tenantSlug }, { cookie }),
-    testEnv(),
-  );
-  const { tenantId } = (await created.json()) as { tenantId: string };
+  const { tenantId, slug: tenantSlug } = await insertTenantWithOwner(userId, {
+    slug: unique("t-"),
+  });
   const issued = await app.request("/auth/token", json({ tenantId }, { cookie }), testEnv());
   const { token: ownerToken } = (await issued.json()) as { token: string };
   return { tenantId, tenantSlug, ownerToken };

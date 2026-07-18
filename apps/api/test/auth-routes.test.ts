@@ -4,6 +4,7 @@ import { app } from "../src/index";
 import { blockUser } from "../src/auth/blocklist";
 import { verifyTenantToken } from "../src/auth/jwt";
 import { SESSION_COOKIE } from "../src/auth/session";
+import { insertTenantWithOwner } from "./create-tenant";
 import { fakeLimiter } from "./rate-limit-helper";
 
 // 共有ストレージ（--no-isolate）ではファイル間でも衝突しないよう、実行ごとのランダム接頭辞を混ぜる
@@ -101,25 +102,12 @@ describe("auth routes", () => {
     expect(denied.status).toBe(401);
   });
 
-  it("creates a tenant with an owner membership and unique slug", async () => {
-    const { cookie } = await signupAndLogin();
-    const slug = unique("blog-");
-    const created = await app.request("/v1/tenants", json({ name: "Blog", slug }, cookie), testEnv);
-    expect(created.status).toBe(201);
-    const dup = await app.request("/v1/tenants", json({ name: "Blog2", slug }, cookie), testEnv);
-    expect(dup.status).toBe(409);
-    const anon = await app.request("/v1/tenants", json({ name: "X", slug: unique("s-") }), testEnv);
-    expect(anon.status).toBe(401);
-  });
+  // 裁定 9: self-serve テナント作成(POST /v1/tenants)は撤去され、常に 404 を返す
+  // (super-tenants.test.ts の「self-serve tenant creation is gone」で検証済み)。
 
   it("issues a 15-minute tenant JWT to members only (G5)", async () => {
     const { userId, cookie } = await signupAndLogin();
-    const created = await app.request(
-      "/v1/tenants",
-      json({ name: "T", slug: unique("t-") }, cookie),
-      testEnv,
-    );
-    const { tenantId } = (await created.json()) as { tenantId: string };
+    const { tenantId } = await insertTenantWithOwner(userId, { slug: unique("t-") });
 
     const issued = await app.request("/auth/token", json({ tenantId }, cookie), testEnv);
     expect(issued.status).toBe(200);
@@ -140,23 +128,18 @@ describe("auth routes", () => {
 
   it("refuses tokens to blocked users (design-spec §11.2)", async () => {
     const { userId, cookie } = await signupAndLogin();
-    const created = await app.request(
-      "/v1/tenants",
-      json({ name: "B", slug: unique("b-") }, cookie),
-      testEnv,
-    );
-    const { tenantId } = (await created.json()) as { tenantId: string };
+    const { tenantId } = await insertTenantWithOwner(userId, { name: "B", slug: unique("b-") });
     await blockUser(env.BLOCKLIST, userId);
     const denied = await app.request("/auth/token", json({ tenantId }, cookie), testEnv);
     expect(denied.status).toBe(403);
   });
 
   it("lists the session user's tenants with roles (Phase 6a)", async () => {
-    const { cookie } = await signupAndLogin();
+    const { userId, cookie } = await signupAndLogin();
     const slugB = unique("b-");
     const slugA = unique("a-");
-    await app.request("/v1/tenants", json({ name: "B", slug: slugB }, cookie), testEnv);
-    await app.request("/v1/tenants", json({ name: "A", slug: slugA }, cookie), testEnv);
+    await insertTenantWithOwner(userId, { name: "B", slug: slugB });
+    await insertTenantWithOwner(userId, { name: "A", slug: slugA });
     const res = await app.request("/auth/tenants", { headers: { cookie } }, testEnv);
     expect(res.status).toBe(200);
     const { tenants } = (await res.json()) as {

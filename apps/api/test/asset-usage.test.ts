@@ -4,6 +4,7 @@ import { v7 as uuidv7 } from "uuid";
 import { asAssetUsage, asOrphanIds, asRegisterResult, asWriteResult } from "../src/rpc-unwrap";
 import type { AuthContext } from "../src/do/authorize";
 import { app } from "../src/index";
+import { insertTenantWithOwner } from "./create-tenant";
 import { fakeLimiter } from "./rate-limit-helper";
 
 // §6: AUTH_LIMITER は本物の Miniflare シミュレート ratelimit(--no-isolate で全ファイル共有)。
@@ -73,13 +74,9 @@ async function setupTenant(): Promise<{
     json({ email, password: "hunter2hunter2" }),
     authEnv,
   );
+  const { userId } = (await signup.json()) as { userId: string };
   const cookie = (signup.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
-  const created = await app.request(
-    "/v1/tenants",
-    json({ name: "T", slug: unique("t-") }, { cookie }),
-    authEnv,
-  );
-  const { tenantId } = (await created.json()) as { tenantId: string };
+  const { tenantId } = await insertTenantWithOwner(userId, { slug: unique("t-") });
   const issued = await app.request("/auth/token", json({ tenantId }, { cookie }), authEnv);
   const { token } = (await issued.json()) as { token: string };
   return { tenantId, headers: { authorization: `Bearer ${token}` } };
