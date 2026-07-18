@@ -7,7 +7,7 @@ import {
 import { requireOperation, type AuthContext } from "../do/authorize";
 import { loadContentTypeByKey, rowToDefinition } from "../do/content-types";
 import { deleteRecordCore } from "../do/delete-record";
-import { writeRecordCore } from "../do/write-record";
+import { loadRecord, writeRecordCore } from "../do/write-record";
 import { moduleWriteDenial } from "../modules/enablement";
 import {
   currentServerSeq,
@@ -110,6 +110,30 @@ export function handlePush(
     }
 
     if (change.op === "delete") {
+      // CRITICAL fix（レビュー指摘）: delete は change.typeKey という「クライアント申告」を
+      // 信用できない。write は writeRecordCore 内の prev.type !== contentType.key 検査で
+      // 詐称が閉じるが、delete（deleteRecordCore）には対がなく recordId だけで tombstone する。
+      // 実 record を引き、その実型に対してモジュール write ガードを再判定する
+      // (apps/api/src/tenant-do.ts の HTTP deleteRecord の既存ガードと同型)。
+      const target = loadRecord(deps.sql, change.recordId);
+      if (target !== null) {
+        const actualType = loadContentTypeByKey(deps.sql, target.type);
+        if (actualType !== null) {
+          const actualModuleDenial = moduleWriteDenial(deps.sql, actualType, auth.role);
+          if (actualModuleDenial !== null) {
+            acks.push({
+              type: "ack",
+              changeId: change.changeId,
+              result: {
+                ok: false,
+                code: actualModuleDenial.code,
+                message: actualModuleDenial.message,
+              },
+            });
+            continue;
+          }
+        }
+      }
       // outbox 行の id 空間は relations と同じでよい（どちらも新規 uuidv7 の払い出しに過ぎない）
       const deleted = deleteRecordCore(
         {

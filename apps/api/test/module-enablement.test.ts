@@ -1,17 +1,21 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import type { ClientChange } from "@plyrs/sync-protocol";
 import {
   BOOKING_MANIFEST,
   BOOKING_RESERVATION_KEY,
   BOOKING_RESOURCE_KEY,
+  BOOKING_SLOT_KEY,
 } from "../src/modules/booking/manifest";
 import {
   asContentTypeRow,
   asEnableModuleResult,
   asModuleSummaries,
+  asRecordSnapshot,
   asWriteResult,
 } from "../src/rpc-unwrap";
 import type { AuthContext } from "../src/do/authorize";
+import { nextMessage, openSyncSocket } from "./ws-helpers";
 
 const OWNER: AuthContext = { userId: "u-owner", role: "owner", tenantId: "t-mod" };
 const EDITOR: AuthContext = { userId: "u-editor", role: "editor", tenantId: "t-mod" };
@@ -22,6 +26,61 @@ function stub(name: string) {
 
 function uuid(n: number): string {
   return `00000000-0000-7000-8000-${String(n).padStart(12, "0")}`;
+}
+
+function socketAuth(role: "owner" | "editor", tenantId: string) {
+  return {
+    userId: role === "owner" ? "u-owner" : "u-editor",
+    role,
+    tenantId,
+    exp: Math.floor(Date.now() / 1000) + 900,
+  };
+}
+
+// booking-module.test.ts の setupSlot 様式: resource / slot(capacity 1) を owner が用意し、
+// 続けて booking.reservation(owner 限定の guard 型)を 1 件作る。
+async function setupReservation(
+  tenant: ReturnType<typeof stub>,
+  tenantId: string,
+  reservationId: string,
+): Promise<void> {
+  await tenant.enableModule(tenantId, "booking", OWNER);
+  await tenant.writeRecord(
+    BOOKING_RESOURCE_KEY,
+    { recordId: uuid(500), input: { name: "会議室" } },
+    OWNER,
+  );
+  await tenant.writeRecord(
+    BOOKING_SLOT_KEY,
+    {
+      recordId: uuid(501),
+      input: {
+        resource: { type: BOOKING_RESOURCE_KEY, id: uuid(500) },
+        starts_at: "2026-08-01T10:00:00Z",
+        ends_at: "2026-08-01T11:00:00Z",
+        capacity: 1,
+      },
+    },
+    OWNER,
+  );
+  const created = asWriteResult(
+    await tenant.writeRecord(
+      BOOKING_RESERVATION_KEY,
+      {
+        recordId: reservationId,
+        input: {
+          slot: { type: BOOKING_SLOT_KEY, id: uuid(501) },
+          name: "予約者",
+          email: "r@example.com",
+          state: "pending",
+        },
+      },
+      OWNER,
+    ),
+  );
+  if (!created.ok) {
+    throw new Error(`setup failed: ${created.message}`);
+  }
 }
 
 describe("モジュール有効化レジストリ (design-spec §9.5)", () => {
@@ -127,6 +186,82 @@ describe("モジュール権限の書き込みガード (design-spec §11.5)", (
       ),
     );
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("push 経由 delete のモジュール write ガード (Critical fix)", () => {
+  // write は writeRecordCore の prev.type !== contentType.key 検査で typeKey 詐称が閉じるが、
+  // delete(deleteRecordCore)は recordId だけで tombstone するため対がなかった。editor が
+  // typeKey を editor が書ける非ガード型(booking.resource)へ詐称し、recordId には owner 限定の
+  // booking.reservation を指す delete change を push すると、ガードを迂回して削除できてしまう
+  // 穴を固定する。
+  it("editor が typeKey を非ガード型に詐称した delete push は forbidden で拒否され record は残る", async () => {
+    const tenantId = "t-mod-del-1";
+    const tenant = stub("mod-push-delete-1");
+    const reservationId = uuid(600);
+    await setupReservation(tenant, tenantId, reservationId);
+
+    const { socket } = await openSyncSocket(tenant, socketAuth("editor", tenantId));
+    socket.send(JSON.stringify({ type: "hello", checkpoint: 0 }));
+    await nextMessage(socket); // welcome
+    await nextMessage(socket); // sync page
+
+    const spoofed: ClientChange = {
+      changeId: crypto.randomUUID(),
+      recordId: reservationId,
+      typeKey: BOOKING_RESOURCE_KEY, // editor が書ける非ガード型への詐称
+      op: "delete",
+      input: {},
+      changedFields: [],
+      baseFieldVersions: {},
+    };
+    socket.send(JSON.stringify({ type: "push", changes: [spoofed] }));
+    const ack = await nextMessage(socket);
+    expect(ack.type).toBe("ack");
+    if (ack.type === "ack") {
+      expect(ack.result.ok).toBe(false);
+      if (!ack.result.ok) {
+        expect(ack.result.code).toBe("forbidden");
+      }
+    }
+
+    const stillThere = asRecordSnapshot(await tenant.getRecord(reservationId));
+    expect(stillThere?.deletedAt).toBeNull();
+
+    socket.close(1000, "done");
+  });
+
+  it("対照: owner の正しい typeKey での delete push は成功する", async () => {
+    const tenantId = "t-mod-del-2";
+    const tenant = stub("mod-push-delete-2");
+    const reservationId = uuid(601);
+    await setupReservation(tenant, tenantId, reservationId);
+
+    const { socket } = await openSyncSocket(tenant, socketAuth("owner", tenantId));
+    socket.send(JSON.stringify({ type: "hello", checkpoint: 0 }));
+    await nextMessage(socket); // welcome
+    await nextMessage(socket); // sync page
+
+    const removal: ClientChange = {
+      changeId: crypto.randomUUID(),
+      recordId: reservationId,
+      typeKey: BOOKING_RESERVATION_KEY,
+      op: "delete",
+      input: {},
+      changedFields: [],
+      baseFieldVersions: {},
+    };
+    socket.send(JSON.stringify({ type: "push", changes: [removal] }));
+    const ack = await nextMessage(socket);
+    expect(ack.type).toBe("ack");
+    if (ack.type === "ack") {
+      expect(ack.result.ok).toBe(true);
+    }
+
+    const deleted = asRecordSnapshot(await tenant.getRecord(reservationId));
+    expect(deleted?.deletedAt).not.toBeNull();
+
+    socket.close(1000, "done");
   });
 });
 
