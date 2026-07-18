@@ -6,10 +6,10 @@ import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
 import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import type { AssetServices } from "../lib/asset-services";
+import { labelForRecord } from "../lib/record-label";
 import { parseRelationDraftKey, relationDraftKey } from "../lib/record-form-values";
 import { useRelationCandidates } from "../lib/use-collection";
 import { AssetThumb } from "./asset-thumb";
-import { labelForRecord } from "./record-form";
 
 const styles = stylex.create({
   dialog: {

@@ -7,7 +7,7 @@ import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { ASSET_TYPE_KEY } from "@plyrs/metamodel";
 import { AssetThumb } from "../../../../components/asset-thumb";
 import { ConnectionBanner } from "../../../../components/connection-banner";
-import { labelForRecord } from "../../../../components/record-form";
+import { labelForRecord } from "../../../../lib/record-label";
 import { createAssetServices } from "../../../../lib/asset-services";
 import { assetUsageQueryOptions, orphanAssetsQueryOptions } from "../../../../lib/queries";
 import {

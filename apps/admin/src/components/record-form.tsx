@@ -22,6 +22,7 @@ import {
 } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import type { AssetServices } from "../lib/asset-services";
+import { labelForRecord } from "../lib/record-label";
 import {
   asRichTextValue,
   draftValueEquals,
@@ -82,19 +83,6 @@ const styles = stylex.create({
   fieldError: { fontSize: typography.sizeSm, color: colors.danger },
   actions: { display: "flex", gap: spacing.sm },
 });
-
-// 一覧・relation picker 共用: 最初の text フィールド値をラベルに、無ければ id 先頭 8 桁
-export function labelForRecord(types: ContentTypeDefinition[], record: SyncRecord): string {
-  const definition = types.find((type) => type.key === record.type);
-  const firstText = definition?.fields.find((field) => field.type === "text");
-  if (firstText !== undefined) {
-    const value = record.input[firstText.key];
-    if (typeof value === "string" && value !== "") {
-      return value;
-    }
-  }
-  return record.id.slice(0, 8);
-}
 
 export function syncErrorMessage(cause: unknown): string {
   if (

@@ -6,8 +6,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { AssetServices } from "../lib/asset-services";
+import { labelForRecord } from "../lib/record-label";
 import { pendingConnect } from "../test-utils/fake-socket";
-import { RecordForm, labelForRecord, syncErrorMessage } from "./record-form";
+import { RecordForm, syncErrorMessage } from "./record-form";
 
 const authorType: ContentTypeDefinition = {
   id: "018f2b6a-7a0a-7000-8000-000000000010",

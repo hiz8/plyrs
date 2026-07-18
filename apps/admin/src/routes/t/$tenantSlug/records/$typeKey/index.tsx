@@ -3,7 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import type { WorkflowStatus } from "@plyrs/metamodel";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { ConnectionBanner } from "../../../../../components/connection-banner";
-import { labelForRecord } from "../../../../../components/record-form";
+import { labelForRecord } from "../../../../../lib/record-label";
 import {
   useSyncHasSynced,
   useSyncStatus,
