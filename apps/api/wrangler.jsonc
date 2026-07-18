@@ -92,4 +92,166 @@
   },
   // §6: 期限切れ・失効済みセッションの日次掃除
   "triggers": { "crons": ["17 3 * * *"] },
+  // Task 15: preview/production 環境分割。main/compatibility_date/migrations はトップレベルから
+  // 継承されるが、binding 系(d1/kv/r2/queues/unsafe/triggers/durable_objects)は wrangler の
+  // 仕様上 env ごとに全定義が必要(継承されない)。素の `wrangler deploy`(--env なし)は禁止 —
+  // トップレベルは dev/vitest 用のダミー ID のまま(docs/deploy.md §0 参照)。
+  "env": {
+    "preview": {
+      "name": "plyrs-api-preview",
+      "durable_objects": {
+        "bindings": [{ "name": "TENANT_DO", "class_name": "TenantDO" }],
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "plyrs-control-plane-preview",
+          // database_id は docs/deploy.md §1 の手順で作成後に実値へ差し替える(それまでダミー)
+          "database_id": "10000000-0000-0000-0000-000000000000",
+          "migrations_dir": "../../packages/db/drizzle-d1",
+        },
+        {
+          "binding": "PROJECTION_DB",
+          "database_name": "plyrs-projection-preview",
+          "database_id": "10000000-0000-0000-0000-000000000001",
+          "migrations_dir": "../../packages/db/drizzle-projection",
+        },
+      ],
+      "kv_namespaces": [
+        { "binding": "BLOCKLIST", "id": "10000000000000000000000000000000" },
+        { "binding": "TENANT_SLUGS", "id": "10000000000000000000000000000001" },
+      ],
+      "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "plyrs-assets-preview" }],
+      "queues": {
+        "producers": [
+          { "binding": "PROJECTION_QUEUE", "queue": "plyrs-projection-preview" },
+          { "binding": "MODULES_QUEUE", "queue": "plyrs-modules-preview" },
+        ],
+        "consumers": [
+          {
+            "queue": "plyrs-projection-preview",
+            "max_batch_timeout": 0,
+            "max_batch_size": 10,
+            "max_retries": 5,
+            "dead_letter_queue": "plyrs-projection-preview-dlq",
+          },
+          {
+            "queue": "plyrs-modules-preview",
+            "max_batch_timeout": 0,
+            "max_batch_size": 10,
+            "max_retries": 5,
+            "dead_letter_queue": "plyrs-modules-preview-dlq",
+          },
+          {
+            "queue": "plyrs-projection-preview-dlq",
+            "max_batch_timeout": 0,
+            "max_batch_size": 10,
+            "max_retries": 10,
+          },
+          {
+            "queue": "plyrs-modules-preview-dlq",
+            "max_batch_timeout": 0,
+            "max_batch_size": 10,
+            "max_retries": 10,
+          },
+        ],
+      },
+      "unsafe": {
+        "bindings": [
+          // §15-2: namespace_id はアカウント内で一意の実値(環境ごとに別)。作成手順は docs/deploy.md §1。
+          {
+            "name": "PUBLIC_WRITE_LIMITER",
+            "type": "ratelimit",
+            "namespace_id": "2001",
+            "simple": { "limit": 10, "period": 60 },
+          },
+          {
+            "name": "AUTH_LIMITER",
+            "type": "ratelimit",
+            "namespace_id": "2002",
+            "simple": { "limit": 10, "period": 60 },
+          },
+        ],
+      },
+      "triggers": { "crons": ["17 3 * * *"] },
+    },
+    "production": {
+      "name": "plyrs-api",
+      "durable_objects": {
+        "bindings": [{ "name": "TENANT_DO", "class_name": "TenantDO" }],
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "plyrs-control-plane",
+          // database_id は docs/deploy.md §1 の手順で作成後に実値へ差し替える(それまでダミー)
+          "database_id": "20000000-0000-0000-0000-000000000000",
+          "migrations_dir": "../../packages/db/drizzle-d1",
+        },
+        {
+          "binding": "PROJECTION_DB",
+          "database_name": "plyrs-projection",
+          "database_id": "20000000-0000-0000-0000-000000000001",
+          "migrations_dir": "../../packages/db/drizzle-projection",
+        },
+      ],
+      "kv_namespaces": [
+        { "binding": "BLOCKLIST", "id": "20000000000000000000000000000000" },
+        { "binding": "TENANT_SLUGS", "id": "20000000000000000000000000000001" },
+      ],
+      "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "plyrs-assets" }],
+      "queues": {
+        "producers": [
+          { "binding": "PROJECTION_QUEUE", "queue": "plyrs-projection" },
+          { "binding": "MODULES_QUEUE", "queue": "plyrs-modules" },
+        ],
+        "consumers": [
+          {
+            "queue": "plyrs-projection",
+            "max_batch_timeout": 0,
+            "max_batch_size": 10,
+            "max_retries": 5,
+            "dead_letter_queue": "plyrs-projection-dlq",
+          },
+          {
+            "queue": "plyrs-modules",
+            "max_batch_timeout": 0,
+            "max_batch_size": 10,
+            "max_retries": 5,
+            "dead_letter_queue": "plyrs-modules-dlq",
+          },
+          {
+            "queue": "plyrs-projection-dlq",
+            "max_batch_timeout": 0,
+            "max_batch_size": 10,
+            "max_retries": 10,
+          },
+          {
+            "queue": "plyrs-modules-dlq",
+            "max_batch_timeout": 0,
+            "max_batch_size": 10,
+            "max_retries": 10,
+          },
+        ],
+      },
+      "unsafe": {
+        "bindings": [
+          // §15-2: namespace_id はアカウント内で一意の実値(環境ごとに別)。作成手順は docs/deploy.md §1。
+          {
+            "name": "PUBLIC_WRITE_LIMITER",
+            "type": "ratelimit",
+            "namespace_id": "3001",
+            "simple": { "limit": 10, "period": 60 },
+          },
+          {
+            "name": "AUTH_LIMITER",
+            "type": "ratelimit",
+            "namespace_id": "3002",
+            "simple": { "limit": 10, "period": 60 },
+          },
+        ],
+      },
+      "triggers": { "crons": ["17 3 * * *"] },
+    },
+  },
 }

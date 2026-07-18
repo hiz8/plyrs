@@ -72,7 +72,8 @@ export default {
     const nowMs = Date.now();
     for (const message of batch.messages) {
       try {
-        if (batch.queue === "plyrs-modules") {
+        if (batch.queue.startsWith("plyrs-modules")) {
+          // env サフィックス(plyrs-modules-preview 等)でも module キューとして扱う(Task 15 の命名規約)。
           // batch.queue で判別済み。メッセージ型はキューごとに閉じている(境界 cast)。
           await handleModuleJob(env, message.body as ModuleQueueJob);
         } else {

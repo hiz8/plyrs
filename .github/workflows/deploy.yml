@@ -1,0 +1,45 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "deploy target"
+        required: true
+        default: "production"
+        type: choice
+        options: [preview, production]
+
+concurrency:
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'preview' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # GitHub の environment 保護(production に必須レビュアーを設定)は docs/deploy.md §0 の初期設定に含む
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'preview' }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'preview' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply D1 migrations
+        run: |
+          pnpm exec wrangler d1 migrations apply DB --remote -c apps/api/wrangler.jsonc --env "$DEPLOY_ENV"
+          pnpm exec wrangler d1 migrations apply PROJECTION_DB --remote -c apps/api/wrangler.jsonc --env "$DEPLOY_ENV"
+      - name: Deploy api
+        run: pnpm exec wrangler deploy -c apps/api/wrangler.jsonc --env "$DEPLOY_ENV"
+      - name: Build and deploy admin
+        run: |
+          CLOUDFLARE_ENV="$DEPLOY_ENV" pnpm --filter @plyrs/admin build
+          pnpm exec wrangler deploy -c "$(find apps/admin/dist -name wrangler.json -print -quit)"

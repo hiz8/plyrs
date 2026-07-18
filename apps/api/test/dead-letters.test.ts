@@ -175,4 +175,20 @@ describe("dead letter park & replay", () => {
     ).map((row) => row.action);
     expect(actionsAfterDiscard).toContain("dlq.discard");
   });
+
+  it("parks from env-suffixed dlq names and routes suffixed module queues", async () => {
+    const batch = createMessageBatch<ProjectionJob>("plyrs-projection-preview-dlq", [
+      {
+        id: "msg-env",
+        timestamp: new Date(),
+        body: { jobType: "reproject", tenantId: "t", cursor: null, epoch: 1 },
+        attempts: 5,
+      },
+    ]);
+    await worker.queue(batch, env, createExecutionContext());
+    const row = (
+      await drizzle(env.DB).select().from(deadLetters).where(eq(deadLetters.id, "msg-env"))
+    )[0];
+    expect(row?.queue).toBe("plyrs-projection-preview");
+  });
 });
