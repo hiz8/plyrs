@@ -21,13 +21,14 @@ describe("totp", () => {
     expect(await verifyTotpCode(RFC_SECRET, code, 59_000)).toBe(1);
     expect(await verifyTotpCode(RFC_SECRET, code, 89_000)).toBe(1); // drift -1
     expect(await verifyTotpCode(RFC_SECRET, code, 29_000)).toBe(1); // drift +1
-    expect(await verifyTotpCode(RFC_SECRET, code, 149_000)).toBeNull(); // 2 step 先は拒否
+    expect(await verifyTotpCode(RFC_SECRET, code, 119_000)).toBeNull(); // 2 step 先(最初に拒否される境界)
   });
 
   it("rejects malformed codes and secrets", async () => {
     expect(await verifyTotpCode(RFC_SECRET, "12345", 59_000)).toBeNull();
     expect(await verifyTotpCode(RFC_SECRET, "abcdef", 59_000)).toBeNull();
     expect(await verifyTotpCode("!!invalid!!", "287082", 59_000)).toBeNull();
+    await expect(generateTotpCode("!!invalid!!", 59_000)).rejects.toThrow("invalid base32 secret");
   });
 
   it("generates a 32-char base32 secret that roundtrips", () => {
