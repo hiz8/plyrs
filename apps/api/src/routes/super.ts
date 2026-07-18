@@ -1,11 +1,13 @@
 import { zValidator } from "@hono/zod-validator";
-import { asc, count, eq } from "drizzle-orm";
+import { asc, count, eq, like } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
 import { v7 as uuidv7 } from "uuid";
 import { z } from "zod";
 import { memberships, tenants, users } from "@plyrs/db/control-plane";
 import { writeAudit } from "../audit";
+import { banUserEverywhere, revokeMembership } from "../auth/ban";
+import { unblockUser } from "../auth/blocklist";
 import { normalizeEmail } from "../auth/email";
 import { deleteTenantCascade } from "../ops/tenant-delete";
 import { superGate, type SuperGateVariables } from "../middleware/super-gate";
@@ -128,4 +130,72 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       detail: { slug: row.slug },
     });
     return c.json({ ok: true });
+  })
+  .get("/users", async (c) => {
+    const q = c.req.query("q") ?? "";
+    const db = drizzle(c.env.DB);
+    const rows = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        createdAt: users.createdAt,
+        membershipCount: count(memberships.tenantId),
+      })
+      .from(users)
+      .leftJoin(memberships, eq(memberships.userId, users.id))
+      .where(q === "" ? undefined : like(users.email, `%${q}%`))
+      .groupBy(users.id)
+      .orderBy(asc(users.email))
+      .limit(100);
+    return c.json({ users: rows });
+  })
+  .post("/users/:userId/ban", async (c) => {
+    const userId = c.req.param("userId");
+    const { disconnected } = await banUserEverywhere(c.env, userId);
+    await writeAudit(c.env.DB, {
+      actorId: c.get("superAdmin").adminId,
+      action: "user.ban",
+      targetType: "user",
+      targetId: userId,
+      detail: { disconnected },
+    });
+    return c.json({ ok: true, disconnected });
+  })
+  .post("/users/:userId/unban", async (c) => {
+    const userId = c.req.param("userId");
+    await unblockUser(c.env.BLOCKLIST, userId);
+    await writeAudit(c.env.DB, {
+      actorId: c.get("superAdmin").adminId,
+      action: "user.unban",
+      targetType: "user",
+      targetId: userId,
+    });
+    return c.json({ ok: true });
+  })
+  .get("/tenants/:tenantId/members", async (c) => {
+    const rows = await drizzle(c.env.DB)
+      .select({
+        userId: memberships.userId,
+        email: users.email,
+        role: memberships.role,
+        createdAt: memberships.createdAt,
+      })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(eq(memberships.tenantId, c.req.param("tenantId")))
+      .orderBy(asc(users.email));
+    return c.json({ members: rows });
+  })
+  .delete("/tenants/:tenantId/members/:userId", async (c) => {
+    const tenantId = c.req.param("tenantId");
+    const userId = c.req.param("userId");
+    const { disconnected } = await revokeMembership(c.env, userId, tenantId);
+    await writeAudit(c.env.DB, {
+      actorId: c.get("superAdmin").adminId,
+      action: "membership.revoke",
+      targetType: "membership",
+      targetId: `${userId}:${tenantId}`,
+      detail: { disconnected },
+    });
+    return c.json({ ok: true, disconnected });
   });
