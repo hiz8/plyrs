@@ -1,6 +1,7 @@
 import type { AssetUsageRow } from "./do/asset-usage";
 import type { ContentTypeRow, RegisterContentTypeResult } from "./do/content-types";
 import type { DeleteRecordResult } from "./do/delete-record";
+import type { HealthReport } from "./do/health";
 import type { PublicationState, PublishResult, UnpublishResult } from "./do/publish";
 import type { RecordSnapshot, WriteRecordResult } from "./do/types";
 import type { EnableModuleResult, ModuleSummary } from "./modules/enablement";
@@ -80,4 +81,12 @@ export function asModuleSummaries(value: unknown): ModuleSummary[] {
 
 export function asEnableModuleResult(value: unknown): EnableModuleResult {
   return value as EnableModuleResult;
+}
+
+export function asHealthReport(value: unknown): HealthReport {
+  return value as HealthReport;
+}
+
+export function asStringArray(value: unknown): string[] {
+  return value as string[];
 }

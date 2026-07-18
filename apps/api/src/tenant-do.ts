@@ -30,6 +30,7 @@ import {
 } from "./do/content-types";
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
 import { ensureAssetContentType } from "./do/ensure-asset-type";
+import { healthCheckCore, listAssetR2KeysCore, type HealthReport } from "./do/health";
 import {
   applyModuleTypes,
   ensureEnabledModuleTypes,
@@ -543,6 +544,18 @@ export class TenantDO extends DurableObject<Env> {
 
   listAssetUsage(assetId: string): AssetUsageRow[] {
     return loadAssetUsage(this.ctx.storage.sql, assetId);
+  }
+
+  // Phase 10: 特権コンソールの健全性チェック。管理オンデマンド呼び出し前提のフルスキャン
+  // (DO 内 SQLite なので実テナント規模では許容。公開経路からは呼ばれない)。読み取り系は
+  // getRecord と同じく role 不問(authorize.ts 冒頭コメントの既存規律)。
+  healthCheck(): HealthReport {
+    return healthCheckCore(this.ctx.storage.sql);
+  }
+
+  // 孤児 R2 検出の参照側一覧(super.ts の GET/DELETE orphan-assets が使う)。
+  listAssetR2Keys(): string[] {
+    return listAssetR2KeysCore(this.ctx.storage.sql);
   }
 
   async deleteRecord(recordId: string, auth: AuthContext): Promise<DeleteRecordResult> {

@@ -5,12 +5,14 @@ import { Hono } from "hono";
 import { v7 as uuidv7 } from "uuid";
 import { z } from "zod";
 import { memberships, tenants, users } from "@plyrs/db/control-plane";
+import { assetKeyBelongsToTenant } from "../assets/ownership";
 import { writeAudit } from "../audit";
 import { banUserEverywhere, revokeMembership } from "../auth/ban";
 import { unblockUser } from "../auth/blocklist";
 import { normalizeEmail } from "../auth/email";
 import { deleteTenantCascade } from "../ops/tenant-delete";
 import { superGate, type SuperGateVariables } from "../middleware/super-gate";
+import { asHealthReport, asStringArray } from "../rpc-unwrap";
 import { TENANT_SLUG_MAX_LENGTH, TENANT_SLUG_PATTERN } from "./tenants";
 
 const createTenantSchema = z.object({
@@ -198,4 +200,54 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       detail: { disconnected },
     });
     return c.json({ ok: true, disconnected });
-  });
+  })
+  // design-spec §7 の確定事項(archived かつ公開中)/ §14(レガシー user 型 asset・旧形式 richtext)
+  // の点検。DO 内 SQLite のフルスキャンなので管理オンデマンド呼び出し前提(tenant-do.ts 参照)。
+  .get("/tenants/:tenantId/health", async (c) => {
+    const tenantId = c.req.param("tenantId");
+    const stub = c.env.TENANT_DO.get(c.env.TENANT_DO.idFromName(tenantId));
+    return c.json(asHealthReport(await stub.healthCheck()));
+  })
+  .get("/tenants/:tenantId/orphan-assets", async (c) => {
+    const tenantId = c.req.param("tenantId");
+    const stub = c.env.TENANT_DO.get(c.env.TENANT_DO.idFromName(tenantId));
+    const referenced = new Set(asStringArray(await stub.listAssetR2Keys()));
+    const orphans: { key: string; size: number }[] = [];
+    let cursor: string | undefined;
+    do {
+      const listing = await c.env.ASSETS.list({ prefix: `${tenantId}/`, cursor });
+      for (const object of listing.objects) {
+        if (!referenced.has(object.key)) {
+          orphans.push({ key: object.key, size: object.size });
+        }
+      }
+      cursor = listing.truncated ? listing.cursor : undefined;
+    } while (cursor !== undefined);
+    return c.json({ orphans });
+  })
+  .delete(
+    "/tenants/:tenantId/orphan-assets",
+    zValidator("json", z.object({ keys: z.array(z.string().min(1)).min(1).max(100) })),
+    async (c) => {
+      const tenantId = c.req.param("tenantId");
+      const { keys } = c.req.valid("json");
+      // §14 の教訓: asset 系の新経路には必ず帰属ガードを併設する
+      if (!keys.every((key) => assetKeyBelongsToTenant(key, tenantId))) {
+        return c.json({ error: "foreign_key" }, 400);
+      }
+      const stub = c.env.TENANT_DO.get(c.env.TENANT_DO.idFromName(tenantId));
+      const referenced = new Set(asStringArray(await stub.listAssetR2Keys()));
+      if (keys.some((key) => referenced.has(key))) {
+        return c.json({ error: "still_referenced" }, 400); // 削除直前の再照会(レース対策)
+      }
+      await c.env.ASSETS.delete(keys);
+      await writeAudit(c.env.DB, {
+        actorId: c.get("superAdmin").adminId,
+        action: "orphan_assets.delete",
+        targetType: "tenant",
+        targetId: tenantId,
+        detail: { keys },
+      });
+      return c.json({ ok: true, deleted: keys.length });
+    },
+  );
