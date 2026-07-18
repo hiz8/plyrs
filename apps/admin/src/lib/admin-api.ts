@@ -29,6 +29,15 @@ export interface AssetUsageEntry {
   origin: string;
 }
 
+// apps/api の ModuleSummary と構造一致(HTTP 契約)
+export interface ModuleSummary {
+  moduleId: string;
+  name: string;
+  version: number;
+  enabled: boolean;
+  appliedVersion: number;
+}
+
 const JSON_HEADERS = { "content-type": "application/json" } as const;
 
 export function createAdminApi(
@@ -129,6 +138,22 @@ export function createAdminApi(
     },
     async deleteRecord(tenantId: string, recordId: string): Promise<void> {
       await requestJson<{ ok: true }>(tenantId, `/records/${recordId}`, { method: "DELETE" });
+    },
+    async listModules(tenantId: string): Promise<ModuleSummary[]> {
+      const { modules } = await requestJson<{ modules: ModuleSummary[] }>(tenantId, "/modules");
+      return modules;
+    },
+    async setModuleEnabled(
+      tenantId: string,
+      moduleId: string,
+      enabled: boolean,
+    ): Promise<ModuleSummary> {
+      const { module } = await requestJson<{ ok: true; module: ModuleSummary }>(
+        tenantId,
+        `/modules/${moduleId}/${enabled ? "enable" : "disable"}`,
+        { method: "POST" },
+      );
+      return module;
     },
   };
 }

@@ -63,6 +63,12 @@ export function createAppContext(
     to: "/t/$tenantSlug/assets",
     order: 1,
   });
+  slots.register("nav:item", {
+    id: "core.modules",
+    label: "モジュール",
+    to: "/t/$tenantSlug/modules",
+    order: 2,
+  });
   // 裁定 5(2026-07-17): コア自身が record-editor スロットに登録する(ドッグフーディング)。
   // モジュール(Phase 9)も同じ register 経路で操作・パネルを足す。
   slots.register("record-editor:toolbar", { id: "core.publish", order: 0, render: PublishToolbar });

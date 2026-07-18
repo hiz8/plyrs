@@ -44,3 +44,12 @@ export function assetUsageQueryOptions(adminApi: AdminApi, tenantId: string, ass
     staleTime: 0,
   });
 }
+
+export function modulesQueryOptions(adminApi: AdminApi, tenantId: string) {
+  return queryOptions({
+    queryKey: ["modules", tenantId],
+    queryFn: () => adminApi.listModules(tenantId),
+    // トグル直後の状態を確実に映す(設定ページは低頻度アクセスなのでキャッシュ不要)
+    staleTime: 0,
+  });
+}
