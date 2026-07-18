@@ -1,11 +1,31 @@
 import { env, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { moduleAlarmKind, moduleIdFromAlarmKind } from "../src/modules/module-alarms";
+import {
+  moduleAlarmKind,
+  moduleIdFromAlarmKind,
+  runModuleAlarmHandler,
+} from "../src/modules/module-alarms";
 import { registerAlarm } from "../src/do/alarms";
 import { upsertModuleEnablement } from "../src/modules/enablement";
+import type { ModuleManifest } from "../src/modules/manifest";
+import type { ModuleAlarmContext, ModuleDefinition } from "../src/modules/registry";
 
 function stub(name: string) {
   return env.TENANT_DO.get(env.TENANT_DO.idFromName(name));
+}
+
+// runModuleAlarmHandler へ直接注入するための最小フェイクマニフェスト(schema 検証は通さない
+// テスト fixture — module-redistribute.test.ts の ASSET_COLLISION_MANIFEST と同じ様式)。
+function fakeManifest(moduleId: string): ModuleManifest {
+  return {
+    moduleId,
+    version: 1,
+    name: moduleId,
+    contentTypes: [],
+    permissions: [],
+    typeWriteGuards: {},
+    publicWriteTypes: [],
+  };
 }
 
 describe("module alarm kind ヘルパー", () => {
@@ -84,6 +104,57 @@ describe("TenantDO.alarm() のモジュールディスパッチ (design-spec §9
         .toArray();
       expect(rows).toEqual([]); // 掃除済み
       expect(await state.storage.getAlarm()).toBeNull(); // 張り直し無し
+    });
+  });
+});
+
+describe("runModuleAlarmHandler の throw 隔離 (§15 冒頭掃除)", () => {
+  it("1 本目のハンドラが throw しても 2 本目は実行され、呼び出し自体も throw しない", async () => {
+    const tenant = stub("mod-alarm-isolate");
+    await tenant.ping();
+    const calls: string[] = [];
+    const throwingModule: ModuleDefinition = {
+      manifest: fakeManifest("fake-a"),
+      onAlarm: () => {
+        calls.push("fake-a");
+        throw new Error("boom");
+      },
+    };
+    const okModule: ModuleDefinition = {
+      manifest: fakeManifest("fake-b"),
+      onAlarm: () => {
+        calls.push("fake-b");
+      },
+    };
+    await runInDurableObject(tenant, async (_instance, state) => {
+      const ctx: ModuleAlarmContext = {
+        sql: state.storage.sql,
+        now: Date.now(),
+        schedule: () => {},
+        writeRecord: () => ({ ok: false, code: "unknown_type", message: "unused in test" }),
+      };
+      // 「2 モジュールぶんの alarm を登録し」の代わりに、同一 alarm() 起床内での連続ディスパッチを
+      // 直接シミュレートする(レジストリ注入シーム: module は呼び出し側が渡す)。
+      expect(() => runModuleAlarmHandler("fake-a", throwingModule, ctx)).not.toThrow();
+      expect(() => runModuleAlarmHandler("fake-b", okModule, ctx)).not.toThrow();
+    });
+    expect(calls).toEqual(["fake-a", "fake-b"]);
+  });
+
+  it("onAlarm が無いモジュール・module 未解決(undefined)は何もせず throw しない", async () => {
+    const tenant = stub("mod-alarm-no-handler");
+    await tenant.ping();
+    await runInDurableObject(tenant, async (_instance, state) => {
+      const ctx: ModuleAlarmContext = {
+        sql: state.storage.sql,
+        now: Date.now(),
+        schedule: () => {},
+        writeRecord: () => ({ ok: false, code: "unknown_type", message: "unused in test" }),
+      };
+      expect(() =>
+        runModuleAlarmHandler("no-handler", { manifest: fakeManifest("no-handler") }, ctx),
+      ).not.toThrow();
+      expect(() => runModuleAlarmHandler("missing", undefined, ctx)).not.toThrow();
     });
   });
 });

@@ -36,12 +36,37 @@ interface RawModuleRegistryRow extends Record<string, SqlStorageValue> {
   permissions: string;
 }
 
+// §15 Minor: JSON.parse 無防御対策。壊れた permissions 行(手動編集・移行漏れ等)が
+// 1 テナントの RPC(listModules/getContentType 経由の moduleWriteDenial 等)を丸ごと
+// throw させないよう、パース失敗・想定外シェイプは「権限なし」として空扱いする
+// (ensureEnabledModuleTypes と同じテナント全損回避の規律)。
+function safeParsePermissions(raw: string, moduleId: string): StoredModulePermissions {
+  const empty: StoredModulePermissions = { grants: {}, typeWriteGuards: {} };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    console.error(`module_registry: failed to parse permissions for '${moduleId}'`, error);
+    return empty;
+  }
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    !("grants" in parsed) ||
+    !("typeWriteGuards" in parsed)
+  ) {
+    console.error(`module_registry: permissions for '${moduleId}' has an unexpected shape`);
+    return empty;
+  }
+  return parsed as StoredModulePermissions;
+}
+
 function rowToModuleRegistryRow(row: RawModuleRegistryRow): ModuleRegistryRow {
   return {
     moduleId: row.module_id,
     enabled: row.enabled === 1,
     appliedVersion: row.applied_version,
-    permissions: JSON.parse(row.permissions) as StoredModulePermissions,
+    permissions: safeParsePermissions(row.permissions, row.module_id),
   };
 }
 

@@ -41,7 +41,14 @@ const ERROR_STATUS: Record<string, ContentfulStatusCode> = {
 };
 
 function statusFor(code: string): ContentfulStatusCode {
-  return ERROR_STATUS[code] ?? 400;
+  const mapped = ERROR_STATUS[code];
+  if (mapped !== undefined) {
+    return mapped;
+  }
+  // §15-4: モジュール拒否コード(`moduleId:reason`、例 booking:slot_full)は公開 write(409)と
+  // 揃える。公開 write 側(public-write.ts)は ':' 含みを一律 409 として扱っており、管理 API だけ
+  // 既定 400 のままだと同じ拒否理由なのに経路でステータスが割れる。
+  return code.includes(":") ? 409 : 400;
 }
 
 const writeBodySchema = z.object({

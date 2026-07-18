@@ -41,7 +41,11 @@ import {
   type EnableModuleResult,
   type ModuleSummary,
 } from "./modules/enablement";
-import { moduleAlarmKind, moduleIdFromAlarmKind } from "./modules/module-alarms";
+import {
+  moduleAlarmKind,
+  moduleIdFromAlarmKind,
+  runModuleAlarmHandler,
+} from "./modules/module-alarms";
 import { moduleById, moduleCatalog } from "./modules/registry";
 import {
   countUnsentModuleEvents,
@@ -841,10 +845,13 @@ export class TenantDO extends DurableObject<Env> {
       // sweepOutbox と同じ理由)。ハンドラが schedule() すれば次回が入り直す。
       clearAlarm(sql, moduleAlarmKind(moduleId));
       const module = moduleById(moduleId);
-      if (module?.onAlarm === undefined || !isModuleEnabled(sql, moduleId)) {
+      if (!isModuleEnabled(sql, moduleId)) {
         return;
       }
-      module.onAlarm({
+      // §15 Minor: onAlarm の throw が同一 alarm() 起床内の他モジュールの処理を止めないよう、
+      // 呼び出し自体は throw しない runModuleAlarmHandler 経由で実行する(隔離ロジックは
+      // module-alarms.ts に集約 — テストから直接注入して検証できる)。
+      runModuleAlarmHandler(moduleId, module, {
         sql,
         now: nowMs,
         schedule: (dueAtMs) => {

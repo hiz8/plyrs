@@ -8,12 +8,17 @@ import {
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker, { app } from "../src/index";
-import { BOOKING_RESERVATION_KEY } from "../src/modules/booking/manifest";
+import type { AuthContext } from "../src/do/authorize";
+import {
+  BOOKING_RESERVATION_KEY,
+  BOOKING_RESOURCE_KEY,
+  BOOKING_SLOT_KEY,
+} from "../src/modules/booking/manifest";
 import { BOOKING_PENDING_TTL_MS } from "../src/modules/booking/module";
 import type { ModuleQueueJob } from "../src/modules/events";
 import { moduleAlarmKind } from "../src/modules/module-alarms";
 import { TURNSTILE_VERIFY_URL } from "../src/modules/turnstile";
-import { asRecordSnapshot } from "../src/rpc-unwrap";
+import { asModuleSummaries, asRecordSnapshot } from "../src/rpc-unwrap";
 
 // Task 11(module-routes.test.ts)+ publish.test.ts の bootstrapTenant 様式・
 // Task 12(public-write.test.ts)の mockSiteverify / fakeLimiter / reservationBody 様式・
@@ -246,5 +251,92 @@ describe("モジュールシステム 一気通貫 (Phase 9)", () => {
       testEnv(),
     );
     expect(third.status).toBe(201);
+  });
+});
+
+describe("§15 冒頭掃除(実害系 3 件)", () => {
+  it("module_registry の壊れた permissions 行があっても listModules は throw しない", async () => {
+    const tenantId = crypto.randomUUID();
+    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    const owner: AuthContext = { userId: "u-owner", role: "owner", tenantId };
+    await stub.enableModule(tenantId, "booking", owner);
+    await runInDurableObject(stub, async (_instance, state) => {
+      state.storage.sql.exec(
+        "UPDATE module_registry SET permissions = 'not-json' WHERE module_id = 'booking'",
+      );
+    });
+    // 壊れた行があっても一覧 RPC は throw しない(permissions は空として扱う)
+    const modules = asModuleSummaries(await stub.listModules());
+    expect(Array.isArray(modules)).toBe(true);
+    expect(modules.find((m) => m.moduleId === "booking")?.enabled).toBe(true);
+  });
+
+  it("管理 API 経由の booking:slot_full(モジュール拒否コード)は 409 を返す", async () => {
+    const { tenantId, ownerToken } = await setupTenant();
+    cleanupTenantId = tenantId;
+    cleanupOwnerToken = ownerToken;
+    const authHeader = { authorization: `Bearer ${ownerToken}` };
+    const enabled = await app.request(
+      `/v1/t/${tenantId}/modules/booking/enable`,
+      { method: "POST", headers: authHeader },
+      env,
+    );
+    expect(enabled.status).toBe(200);
+
+    const resourceId = uuid(11);
+    const slotId = uuid(12);
+    await app.request(
+      `/v1/t/${tenantId}/records/${BOOKING_RESOURCE_KEY}/${resourceId}`,
+      { ...json({ input: { name: "会議室" } }, authHeader), method: "PUT" },
+      env,
+    );
+    await app.request(
+      `/v1/t/${tenantId}/records/${BOOKING_SLOT_KEY}/${slotId}`,
+      {
+        ...json(
+          {
+            input: {
+              resource: { type: BOOKING_RESOURCE_KEY, id: resourceId },
+              starts_at: "2026-08-01T10:00:00Z",
+              ends_at: "2026-08-01T11:00:00Z",
+              capacity: 1,
+            },
+          },
+          authHeader,
+        ),
+        method: "PUT",
+      },
+      env,
+    );
+
+    const reservationPut = (): RequestInit => ({
+      ...json(
+        {
+          input: {
+            slot: { type: BOOKING_SLOT_KEY, id: slotId },
+            name: "予約者",
+            email: "r@example.com",
+            state: "pending",
+          },
+        },
+        authHeader,
+      ),
+      method: "PUT",
+    });
+    const first = await app.request(
+      `/v1/t/${tenantId}/records/${BOOKING_RESERVATION_KEY}/${uuid(13)}`,
+      reservationPut(),
+      env,
+    );
+    expect(first.status).toBe(200);
+
+    const second = await app.request(
+      `/v1/t/${tenantId}/records/${BOOKING_RESERVATION_KEY}/${uuid(14)}`,
+      reservationPut(),
+      env,
+    );
+    // 期待: モジュール拒否(`booking:slot_full` 等の ':' 含みコード)は管理 API でも 409
+    expect(second.status).toBe(409);
+    expect(((await second.json()) as { code: string }).code).toBe("booking:slot_full");
   });
 });
