@@ -149,7 +149,7 @@ describe("アセットのアップロードとプレビュー (Phase 8 裁定 1,
   });
 
   it("viewer のアップロードは R2 put の前に 403 で拒否される", async () => {
-    const { tenantId, headers: ownerHeaders } = await setupTenant();
+    const { tenantId } = await setupTenant();
     // 同じテナントで viewer トークンを生成
     const viewerToken = await tokenFor(tenantId, "viewer");
     const res = await app.request(
