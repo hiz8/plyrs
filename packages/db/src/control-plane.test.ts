@@ -1,6 +1,15 @@
 import { getTableName } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { auditLogs, deadLetters, memberships, sessions, superAdmins, superSessions, tenants, users } from "./control-plane";
+import {
+  auditLogs,
+  deadLetters,
+  memberships,
+  sessions,
+  superAdmins,
+  superSessions,
+  tenants,
+  users,
+} from "./control-plane";
 
 describe("@plyrs/db control plane schema", () => {
   it("defines the four control-plane tables (design-spec §2)", () => {
@@ -19,18 +28,46 @@ describe("@plyrs/db control plane schema", () => {
   it("defines super admin tables separated from users", () => {
     expect(getTableName(superAdmins)).toBe("super_admins");
     expect(getTableName(superSessions)).toBe("super_sessions");
-    const columns = Object.keys(superAdmins);
-    expect(columns).toEqual(
-      expect.arrayContaining(["id", "email", "passwordHash", "totpSecret", "totpLastCounter", "createdAt"]),
+    // Verify actual DB column names via introspection of column objects
+    // Each column object has a _ property with name = the actual SQL column name
+    const superAdminsColumnNames = Object.values(superAdmins)
+      .map((col) => col?._?.name || col?.name)
+      .filter(Boolean);
+    expect(superAdminsColumnNames).toEqual(
+      expect.arrayContaining([
+        "id",
+        "email",
+        "password_hash",
+        "totp_secret",
+        "totp_last_counter",
+        "created_at",
+      ]),
     );
   });
 
   it("defines audit_logs and dead_letters", () => {
-    expect(Object.keys(auditLogs)).toEqual(
-      expect.arrayContaining(["id", "actorId", "action", "targetType", "targetId", "detail", "createdAt"]),
+    expect(getTableName(auditLogs)).toBe("audit_logs");
+    expect(getTableName(deadLetters)).toBe("dead_letters");
+    // Verify actual DB column names
+    const auditLogsColumnNames = Object.values(auditLogs)
+      .map((col) => col?._?.name || col?.name)
+      .filter(Boolean);
+    expect(auditLogsColumnNames).toEqual(
+      expect.arrayContaining([
+        "id",
+        "actor_id",
+        "action",
+        "target_type",
+        "target_id",
+        "detail",
+        "created_at",
+      ]),
     );
-    expect(Object.keys(deadLetters)).toEqual(
-      expect.arrayContaining(["id", "queue", "body", "failedAt", "replayedAt"]),
+    const deadLettersColumnNames = Object.values(deadLetters)
+      .map((col) => col?._?.name || col?.name)
+      .filter(Boolean);
+    expect(deadLettersColumnNames).toEqual(
+      expect.arrayContaining(["id", "queue", "body", "failed_at", "replayed_at"]),
     );
   });
 });

@@ -60,17 +60,12 @@
       "indexes": {
         "idx_audit_logs_created": {
           "name": "idx_audit_logs_created",
-          "columns": [
-            "created_at"
-          ],
+          "columns": ["created_at"],
           "isUnique": false
         },
         "idx_audit_logs_target": {
           "name": "idx_audit_logs_target",
-          "columns": [
-            "target_type",
-            "target_id"
-          ],
+          "columns": ["target_type", "target_id"],
           "isUnique": false
         }
       },
@@ -121,10 +116,7 @@
       "indexes": {
         "idx_dead_letters_queue": {
           "name": "idx_dead_letters_queue",
-          "columns": [
-            "queue",
-            "failed_at"
-          ],
+          "columns": ["queue", "failed_at"],
           "isUnique": false
         }
       },
@@ -168,19 +160,14 @@
       "indexes": {
         "idx_memberships_tenant": {
           "name": "idx_memberships_tenant",
-          "columns": [
-            "tenant_id"
-          ],
+          "columns": ["tenant_id"],
           "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "memberships_user_id_tenant_id_pk": {
-          "columns": [
-            "user_id",
-            "tenant_id"
-          ],
+          "columns": ["user_id", "tenant_id"],
           "name": "memberships_user_id_tenant_id_pk"
         }
       },
@@ -236,16 +223,12 @@
       "indexes": {
         "idx_sessions_token_hash": {
           "name": "idx_sessions_token_hash",
-          "columns": [
-            "token_hash"
-          ],
+          "columns": ["token_hash"],
           "isUnique": true
         },
         "idx_sessions_user": {
           "name": "idx_sessions_user",
-          "columns": [
-            "user_id"
-          ],
+          "columns": ["user_id"],
           "isUnique": false
         }
       },
@@ -304,9 +287,7 @@
       "indexes": {
         "idx_super_admins_email": {
           "name": "idx_super_admins_email",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         }
       },
@@ -364,16 +345,12 @@
       "indexes": {
         "idx_super_sessions_token_hash": {
           "name": "idx_super_sessions_token_hash",
-          "columns": [
-            "token_hash"
-          ],
+          "columns": ["token_hash"],
           "isUnique": true
         },
         "idx_super_sessions_admin": {
           "name": "idx_super_sessions_admin",
-          "columns": [
-            "admin_id"
-          ],
+          "columns": ["admin_id"],
           "isUnique": false
         }
       },
@@ -418,20 +395,14 @@
       "indexes": {
         "idx_tenant_modules_module": {
           "name": "idx_tenant_modules_module",
-          "columns": [
-            "module_id",
-            "enabled"
-          ],
+          "columns": ["module_id", "enabled"],
           "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "tenant_modules_tenant_id_module_id_pk": {
-          "columns": [
-            "tenant_id",
-            "module_id"
-          ],
+          "columns": ["tenant_id", "module_id"],
           "name": "tenant_modules_tenant_id_module_id_pk"
         }
       },
@@ -473,9 +444,7 @@
       "indexes": {
         "idx_tenants_slug": {
           "name": "idx_tenants_slug",
-          "columns": [
-            "slug"
-          ],
+          "columns": ["slug"],
           "isUnique": true
         }
       },
@@ -519,9 +488,7 @@
       "indexes": {
         "idx_users_email": {
           "name": "idx_users_email",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         }
       },
