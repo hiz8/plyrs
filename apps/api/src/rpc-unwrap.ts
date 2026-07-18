@@ -3,6 +3,7 @@ import type { ContentTypeRow, RegisterContentTypeResult } from "./do/content-typ
 import type { DeleteRecordResult } from "./do/delete-record";
 import type { PublicationState, PublishResult, UnpublishResult } from "./do/publish";
 import type { RecordSnapshot, WriteRecordResult } from "./do/types";
+import type { EnableModuleResult, ModuleSummary } from "./modules/enablement";
 import type { CatalogRow, ProjectionPayload } from "./projection/payload";
 
 // Cloudflare の Rpc.Result 型は Record<string, unknown>（RecordSnapshot.data）を
@@ -71,4 +72,12 @@ export function asOrphanIds(value: unknown): string[] {
 
 export function asAssetUsage(value: unknown): AssetUsageRow[] {
   return value as AssetUsageRow[];
+}
+
+export function asModuleSummaries(value: unknown): ModuleSummary[] {
+  return value as ModuleSummary[];
+}
+
+export function asEnableModuleResult(value: unknown): EnableModuleResult {
+  return value as EnableModuleResult;
 }

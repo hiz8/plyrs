@@ -8,6 +8,7 @@ import { requireOperation, type AuthContext } from "../do/authorize";
 import { loadContentTypeByKey, rowToDefinition } from "../do/content-types";
 import { deleteRecordCore } from "../do/delete-record";
 import { writeRecordCore } from "../do/write-record";
+import { moduleWriteDenial } from "../modules/enablement";
 import {
   currentServerSeq,
   loadAllContentTypes,
@@ -89,6 +90,17 @@ export function handlePush(
           code: "unknown_type",
           message: `unknown content type: ${change.typeKey}`,
         },
+      });
+      continue;
+    }
+
+    // §11.5: モジュール権限ガードは requireOperation と同じ「先頭」(no-op 判定・検証より前)
+    const moduleDenial = moduleWriteDenial(deps.sql, contentTypeRow, auth.role);
+    if (moduleDenial !== null) {
+      acks.push({
+        type: "ack",
+        changeId: change.changeId,
+        result: { ok: false, code: moduleDenial.code, message: moduleDenial.message },
       });
       continue;
     }

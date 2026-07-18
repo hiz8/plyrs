@@ -86,7 +86,10 @@ describe("content type registration", () => {
     expect(await stub.getContentType("post")).toBeNull();
   });
 
-  it("accepts a namespaced plugin type and returns null for unknown keys", async () => {
+  // Phase 9(§4.1): プラグイン名前空間はモジュールシステム専有。クライアント経由の
+  // registerContentType RPC は allowPlugin を渡さないため source='plugin' を forbidden で拒否する
+  // (以前はここで受理していたが、モジュール有効化時の固定 ID との衝突を防ぐため閉じた)。
+  it("rejects a namespaced plugin type via the client RPC", async () => {
     const stub = freshStub();
     const pluginType = {
       ...articleType(),
@@ -96,7 +99,7 @@ describe("content type registration", () => {
       pluginId: "booking",
     };
     const result = await stub.registerContentType(pluginType, auth("admin"));
-    expect(result.ok).toBe(true);
+    expect(result).toMatchObject({ ok: false, code: "forbidden" });
     expect(await stub.getContentType("no_such_type")).toBeNull();
   });
 

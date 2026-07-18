@@ -89,7 +89,7 @@ export function registerContentTypeCore(
   sql: SqlStorage,
   input: unknown,
   now: string,
-  options: { allowSystem?: boolean } = {},
+  options: { allowSystem?: boolean; allowPlugin?: boolean } = {},
 ): RegisterContentTypeResult {
   const parsed = contentTypeDefinitionSchema.safeParse(input);
   if (!parsed.success) {
@@ -105,6 +105,15 @@ export function registerContentTypeCore(
       ok: false,
       code: "forbidden",
       message: "system content types are managed by the platform",
+    };
+  }
+  // Phase 9: プラグイン名前空間はモジュールシステム専有(§4.1)。クライアント経由の登録を
+  // 許すと、モジュール有効化時の固定 ID と衝突して enable が type_conflict で恒久失敗する。
+  if (options.allowPlugin !== true && (def.source === "plugin" || prev?.source === "plugin")) {
+    return {
+      ok: false,
+      code: "forbidden",
+      message: "plugin content types are managed by modules",
     };
   }
   if (prev !== null && prev.id !== def.id) {

@@ -3,6 +3,9 @@ import { can, type Operation, type Role } from "../auth/permissions";
 export interface AuthContext {
   userId: string;
   role: Role;
+  // テナント境界を跨いで運ばれる場合のみ存在(HTTP ゲート / WS ソケット auth 由来)。
+  // Phase 9: module_events の排出先(do_config.tenant_id)を write 経路でも刻むために使う。
+  tenantId?: string;
 }
 
 // design-spec §11.5 第2段（型×操作）。Phase 2 申し送りにより beforeWrite パイプライン

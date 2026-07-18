@@ -30,6 +30,16 @@ import {
 } from "./do/content-types";
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
 import { ensureAssetContentType } from "./do/ensure-asset-type";
+import {
+  applyModuleTypes,
+  moduleRegistryRow,
+  moduleWriteDenial,
+  permissionsFromManifest,
+  upsertModuleEnablement,
+  type EnableModuleResult,
+  type ModuleSummary,
+} from "./modules/enablement";
+import { moduleById, moduleCatalog } from "./modules/registry";
 import { countUnsent, markOutboxSent, purgeSent, unsentOutbox } from "./do/outbox";
 import {
   loadProjectionPayload,
@@ -159,6 +169,78 @@ export class TenantDO extends DurableObject<Env> {
     return loadAllContentTypeRows(this.ctx.storage.sql);
   }
 
+  // design-spec §9.5: 有効化はテナントごと。型適用(§4.2)と権限展開(§11.5)を同一
+  // トランザクションで行い、applied version を刻む。
+  enableModule(tenantId: string, moduleId: string, auth: AuthContext): EnableModuleResult {
+    return this.setModuleEnabled(tenantId, moduleId, auth, true);
+  }
+
+  disableModule(tenantId: string, moduleId: string, auth: AuthContext): EnableModuleResult {
+    return this.setModuleEnabled(tenantId, moduleId, auth, false);
+  }
+
+  private setModuleEnabled(
+    tenantId: string,
+    moduleId: string,
+    auth: AuthContext,
+    enabled: boolean,
+  ): EnableModuleResult {
+    const denial = requireOperation(auth, "module:manage");
+    if (denial !== null) {
+      return denial;
+    }
+    const module = moduleById(moduleId);
+    if (module === undefined) {
+      return { ok: false, code: "unknown_module", message: `unknown module: ${moduleId}` };
+    }
+    const now = new Date().toISOString();
+    let typesChanged = false;
+    try {
+      this.ctx.storage.transactionSync(() => {
+        this.rememberTenant(tenantId);
+        if (enabled) {
+          typesChanged = applyModuleTypes(this.ctx.storage.sql, module.manifest, now);
+        }
+        // disable でも権限・applied version は最新へ更新して残す(型は残る = §9.5)
+        upsertModuleEnablement(this.ctx.storage.sql, {
+          moduleId,
+          enabled,
+          appliedVersion: enabled
+            ? module.manifest.version
+            : (moduleRegistryRow(this.ctx.storage.sql, moduleId)?.appliedVersion ?? 0),
+          permissions: permissionsFromManifest(module.manifest),
+          now,
+        });
+      });
+    } catch (error) {
+      // ユーザー型が plugin キーを先取りしていた等。トランザクションはロールバック済み。
+      return { ok: false, code: "type_conflict", message: String(error) };
+    }
+    if (typesChanged) {
+      this.broadcastAll({
+        type: "content-types",
+        contentTypes: loadAllContentTypes(this.ctx.storage.sql),
+      });
+    }
+    return { ok: true, module: this.moduleSummary(moduleId) };
+  }
+
+  private moduleSummary(moduleId: string): ModuleSummary {
+    const module = moduleById(moduleId);
+    const row = moduleRegistryRow(this.ctx.storage.sql, moduleId);
+    return {
+      moduleId,
+      name: module?.manifest.name ?? moduleId,
+      version: module?.manifest.version ?? 0,
+      enabled: row?.enabled ?? false,
+      appliedVersion: row?.appliedVersion ?? 0,
+    };
+  }
+
+  listModules(): ModuleSummary[] {
+    return moduleCatalog().map((module) => this.moduleSummary(module.manifest.moduleId));
+  }
+
   writeRecord(typeKey: string, params: WriteRecordInput, auth: AuthContext): WriteRecordResult {
     const denial = requireOperation(auth, "record:write");
     if (denial !== null) {
@@ -167,6 +249,10 @@ export class TenantDO extends DurableObject<Env> {
     const contentType = loadContentTypeByKey(this.ctx.storage.sql, typeKey);
     if (contentType === null) {
       return { ok: false, code: "unknown_type", message: `unknown content type: ${typeKey}` };
+    }
+    const moduleDenial = moduleWriteDenial(this.ctx.storage.sql, contentType, auth.role);
+    if (moduleDenial !== null) {
+      return { ok: false, ...moduleDenial };
     }
     const result = this.ctx.storage.transactionSync(() =>
       writeRecordCore(
@@ -245,6 +331,17 @@ export class TenantDO extends DurableObject<Env> {
     const denial = requireOperation(auth, "record:delete");
     if (denial !== null) {
       return denial;
+    }
+    // §11.5: モジュール型の削除も write ガードに従う(型は record から引く)
+    const target = loadRecord(this.ctx.storage.sql, recordId);
+    if (target !== null) {
+      const targetType = loadContentTypeByKey(this.ctx.storage.sql, target.type);
+      if (targetType !== null) {
+        const moduleDenial = moduleWriteDenial(this.ctx.storage.sql, targetType, auth.role);
+        if (moduleDenial !== null) {
+          return { ok: false, ...moduleDenial };
+        }
+      }
     }
     // setAlarm は transactionSync に参加し、ロールバックで巻き戻る（実証済み）。
     // クロージャ内では await できないので promise を掴み、トランザクションを出てから待つ。
