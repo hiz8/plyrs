@@ -414,6 +414,70 @@ export class TenantDO extends DurableObject<Env> {
     return result;
   }
 
+  // §11.7 第2段: 公開エンドポイントはマニフェストの publicWriteTypes 宣言の型だけを、
+  // 新規作成に限って書ける。beforeWrite フック(空き枠検証)は通常どおり通る。
+  async modulePublicWrite(
+    tenantId: string,
+    moduleId: string,
+    typeKey: string,
+    params: WriteRecordInput,
+  ): Promise<WriteRecordResult> {
+    const module = moduleById(moduleId);
+    if (module === undefined || !isModuleEnabled(this.ctx.storage.sql, moduleId)) {
+      return { ok: false, code: "forbidden", message: `module is not enabled: ${moduleId}` };
+    }
+    if (!module.manifest.publicWriteTypes.includes(typeKey)) {
+      return {
+        ok: false,
+        code: "forbidden",
+        message: `public write is not declared for '${typeKey}'`,
+      };
+    }
+    const contentType = loadContentTypeByKey(this.ctx.storage.sql, typeKey);
+    if (contentType === null) {
+      return { ok: false, code: "unknown_type", message: `unknown content type: ${typeKey}` };
+    }
+    if (loadRecord(this.ctx.storage.sql, params.recordId) !== null) {
+      return {
+        ok: false,
+        code: "forbidden",
+        message: "public write cannot modify existing records",
+      };
+    }
+    const armed: Promise<void>[] = [];
+    const result = this.ctx.storage.transactionSync(() => {
+      this.rememberTenant(tenantId);
+      const inner = writeRecordCore(
+        {
+          sql: this.ctx.storage.sql,
+          nextSeq: () => ++this.seq,
+          now: () => new Date().toISOString(),
+          newRelationId: () => uuidv7(),
+          newEventId: () => uuidv7(),
+          scheduleModuleAlarm: (id, dueAt) => {
+            const min = registerAlarm(this.ctx.storage.sql, moduleAlarmKind(id), dueAt);
+            armed.push(this.ctx.storage.setAlarm(min));
+          },
+        },
+        contentType,
+        { ...params, actor: `public:${moduleId}` },
+      );
+      if (inner.ok && inner.applied && countUnsentModuleEvents(this.ctx.storage.sql) > 0) {
+        armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
+      }
+      return inner;
+    });
+    await Promise.all(armed);
+    if (result.ok && result.applied) {
+      const stored = loadSyncRecord(this.ctx.storage.sql, params.recordId);
+      if (stored !== null) {
+        this.broadcastAll({ type: "change", record: stored });
+      }
+      await this.drainModuleEvents();
+    }
+    return result;
+  }
+
   getRecord(id: string): RecordSnapshot | null {
     return loadRecord(this.ctx.storage.sql, id);
   }

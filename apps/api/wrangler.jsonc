@@ -59,4 +59,16 @@
       },
     ],
   },
+  "unsafe": {
+    "bindings": [
+      // 論点W: 公開 write のレート制限。simple.limit/period はテナント×IP キーに対する値。
+      // period は 10 か 60 のみ許容(プラットフォーム制約)。
+      {
+        "name": "PUBLIC_WRITE_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "1001",
+        "simple": { "limit": 10, "period": 60 },
+      },
+    ],
+  },
 }

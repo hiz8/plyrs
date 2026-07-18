@@ -1,3 +1,5 @@
+import { uuidSchema } from "@plyrs/metamodel";
+import { z } from "zod";
 import type { BeforeWriteHook } from "../../do/hooks";
 import type { ModuleAlarmContext, ModuleDefinition, ModuleEventContext } from "../registry";
 import { loadRelationRefs } from "../../do/write-record";
@@ -103,6 +105,28 @@ function onAlarm(ctx: ModuleAlarmContext): void {
   }
 }
 
+// §9.7 / §11.7: モジュールが明示的に公開した write エンドポイントだけが DO に到達する。
+// recordId はサーバー生成 — 公開経路から既存 record を指すことはできない。
+const reservationEndpoint = {
+  typeKey: BOOKING_RESERVATION_KEY,
+  inputSchema: z.strictObject({
+    slot: uuidSchema,
+    name: z.string().min(1).max(200),
+    email: z.string().min(3).max(320),
+  }) as z.ZodType<Record<string, unknown>>,
+  buildWrite(input: Record<string, unknown>, ids: { newId(): string }) {
+    return {
+      recordId: ids.newId(),
+      input: {
+        slot: { type: BOOKING_SLOT_KEY, id: input["slot"] },
+        name: input["name"],
+        email: input["email"],
+        state: "pending",
+      },
+    };
+  },
+};
+
 export const bookingModule: ModuleDefinition = {
   manifest: BOOKING_MANIFEST,
   beforeWrite,
@@ -110,4 +134,5 @@ export const bookingModule: ModuleDefinition = {
     afterWrite: { types: [BOOKING_RESERVATION_KEY], handle: handleAfterWrite },
   },
   onAlarm,
+  publicEndpoints: { reservations: reservationEndpoint },
 };

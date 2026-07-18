@@ -19,6 +19,12 @@ interface EnvBindings {
   // 本番: `wrangler secret put JWT_SECRET`。ローカル dev: .dev.vars。テスト: vitest.config の miniflare.bindings。
   // wrangler.jsonc の vars には置かない（公知値が本番デフォルトになる事故を防ぐ）。
   JWT_SECRET: string;
+  // 論点W: 公開 write の濫用防止。Turnstile secret は JWT_SECRET と同じ扱い
+  // (テスト = vitest.config、dev = .dev.vars、本番 = wrangler secret)。
+  TURNSTILE_SECRET_KEY: string;
+  // Rate Limiting binding(open beta)。型は wrangler 生成に依存せず構造で持つ。
+  // 未構成は公開 write ルートが 503 で閉じる(fail-closed)。
+  PUBLIC_WRITE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
   // テスト専用: vitest.config の miniflare.bindings が注入する（本番には存在しない）
   TEST_MIGRATIONS: import("cloudflare:test").D1Migration[];
   TEST_PROJECTION_MIGRATIONS: import("cloudflare:test").D1Migration[];
