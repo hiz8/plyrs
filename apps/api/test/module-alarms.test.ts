@@ -65,4 +65,25 @@ describe("TenantDO.alarm() のモジュールディスパッチ (design-spec §9
       expect(rows).toEqual([]);
     });
   });
+
+  it("module: 接頭辞でも outbox_sweep でもない未知 kind も alarm() 側で掃除される", async () => {
+    const tenant = stub("mod-alarm-totally-unknown");
+    await tenant.ping();
+    await runInDurableObject(tenant, async (_instance, state) => {
+      // moduleIdFromAlarmKind が null を返す kind(runModuleAlarm には渡らない)。
+      // alarm() 本体の「未知 kind 掃除」分岐(console.error + clearAlarm)を直接踏む。
+      registerAlarm(state.storage.sql, "totally_unknown_kind", Date.now() - 1_000);
+      // 上の2テストと同じ理由で物理アラームは未来にする(過去だと workerd が自動発火してしまう)。
+      await state.storage.setAlarm(Date.now() + 60_000);
+    });
+    const ran = await runDurableObjectAlarm(tenant);
+    expect(ran).toBe(true);
+    await runInDurableObject(tenant, async (_instance, state) => {
+      const rows = state.storage.sql
+        .exec<{ kind: string }>("SELECT kind FROM alarm_registry")
+        .toArray();
+      expect(rows).toEqual([]); // 掃除済み
+      expect(await state.storage.getAlarm()).toBeNull(); // 張り直し無し
+    });
+  });
 });
