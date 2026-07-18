@@ -5,6 +5,7 @@ import { z } from "zod";
 import { v7 as uuidv7 } from "uuid";
 import { ASSET_TYPE_KEY, WORKFLOW_STATUSES } from "@plyrs/metamodel";
 import { sniffImageSize } from "../assets/image-size";
+import { assetKeyBelongsToTenant } from "../assets/ownership";
 import { authenticateTenantToken, tenantGate, type GateVariables } from "../middleware/tenant-gate";
 import {
   asAssetUsage,
@@ -141,7 +142,9 @@ export const tenantRoutes = new Hono<GateEnv>()
       return c.json({ error: "not_found" }, 404);
     }
     const r2Key = record.data["r2_key"];
-    if (typeof r2Key !== "string") {
+    // 最終レビュー指摘: assetGuardHook が働かないテナント(ownership.ts 冒頭コメント参照)では
+    // r2_key が任意の値になりうるため、ASSETS.get の前に必ずテナント所有権を確認する。
+    if (typeof r2Key !== "string" || !assetKeyBelongsToTenant(r2Key, c.req.param("tenantId"))) {
       return c.json({ error: "not_found" }, 404);
     }
     const object = await c.env.ASSETS.get(r2Key);
@@ -208,7 +211,9 @@ export const tenantRoutes = new Hono<GateEnv>()
     // GC 候補。同期 push 経由の削除はここを通らないため孤児が残る — 申し送りに記録済み)。
     if (result.ok && result.record.type === ASSET_TYPE_KEY) {
       const r2Key = result.record.data["r2_key"];
-      if (typeof r2Key === "string") {
+      // 最終レビュー指摘: 他テナント接頭辞の r2_key は削除しない(ownership.ts 冒頭コメント参照)。
+      // 該当しない場合はレコード削除自体はそのまま成立させ、R2 側の片付けだけをスキップする。
+      if (typeof r2Key === "string" && assetKeyBelongsToTenant(r2Key, c.req.param("tenantId"))) {
         try {
           await c.env.ASSETS.delete(r2Key);
         } catch {

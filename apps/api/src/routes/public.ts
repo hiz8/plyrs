@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { uuidSchema } from "@plyrs/metamodel";
+import { assetKeyBelongsToTenant } from "../assets/ownership";
 import { canonicalCacheUrl, withEdgeCache, type EdgeCacheContext } from "../public/cache";
 import { loadCatalog, type CatalogEntry } from "../public/catalog";
 import { encodeCursor } from "../public/cursor";
@@ -195,7 +196,9 @@ export const publicRoutes = new Hono<PublicEnv>()
       }
       const data = JSON.parse(row.data) as Record<string, unknown>;
       const r2Key = data["r2_key"];
-      if (typeof r2Key !== "string") {
+      // 最終レビュー指摘: assetGuardHook が働かないテナント(ownership.ts 冒頭コメント参照)では
+      // r2_key が任意の値になりうるため、ASSETS.get の前に必ずテナント所有権を確認する。
+      if (typeof r2Key !== "string" || !assetKeyBelongsToTenant(r2Key, tenantId)) {
         return c.json({ error: "not_found" }, 404);
       }
       const object = await c.env.ASSETS.get(r2Key);
