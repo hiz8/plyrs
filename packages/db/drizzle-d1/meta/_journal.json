@@ -15,6 +15,20 @@
       "when": 1784343724968,
       "tag": "0001_clever_magus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784387308816,
+      "tag": "0002_luxuriant_meltdown",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784387313167,
+      "tag": "0003_normalize-email-lowercase",
+      "breakpoints": true
     }
   ]
 }

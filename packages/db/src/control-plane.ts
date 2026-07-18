@@ -81,3 +81,66 @@ export const tenantModules = sqliteTable(
     index("idx_tenant_modules_module").on(table.moduleId, table.enabled),
   ],
 );
+
+// design-spec §11.6: 特権アカウントは通常 users と別テーブルで完全分離(「同じ扉に置かない」の物理表現)。
+// totp_last_counter は受理済み TOTP counter(以下の値のコードを拒否 = リプレイ防止)。
+export const superAdmins = sqliteTable(
+  "super_admins",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    totpSecret: text("totp_secret").notNull(),
+    totpLastCounter: integer("totp_last_counter").notNull().default(0),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [uniqueIndex("idx_super_admins_email").on(table.email)],
+);
+
+export const superSessions = sqliteTable(
+  "super_sessions",
+  {
+    id: text("id").primaryKey(),
+    tokenHash: text("token_hash").notNull(),
+    adminId: text("admin_id").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    createdAt: text("created_at").notNull(),
+    revokedAt: text("revoked_at"),
+  },
+  (table) => [
+    uniqueIndex("idx_super_sessions_token_hash").on(table.tokenHash),
+    index("idx_super_sessions_admin").on(table.adminId),
+  ],
+);
+
+// design-spec §11.6: 強い権限には記録を伴わせる。append-only(削除 API は作らない)。
+export const auditLogs = sqliteTable(
+  "audit_logs",
+  {
+    id: text("id").primaryKey(),
+    actorId: text("actor_id").notNull(),
+    action: text("action").notNull(), // 'tenant.create' | 'user.ban' | ... (apps/api 側 audit.ts が語彙の真実源)
+    targetType: text("target_type").notNull(),
+    targetId: text("target_id").notNull(),
+    detail: text("detail").notNull(), // JSON
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    index("idx_audit_logs_created").on(table.createdAt),
+    index("idx_audit_logs_target").on(table.targetType, table.targetId),
+  ],
+);
+
+// Phase 10 裁定: DLQ は「キュー内滞留」ではなく D1 へ退避(ack は durable insert 後)。
+// id は Queues の message.id(再配達の冪等キー)。queue は元キュー名(-dlq を剥いだもの)。
+export const deadLetters = sqliteTable(
+  "dead_letters",
+  {
+    id: text("id").primaryKey(),
+    queue: text("queue").notNull(),
+    body: text("body").notNull(), // ジョブ JSON
+    failedAt: text("failed_at").notNull(),
+    replayedAt: text("replayed_at"),
+  },
+  (table) => [index("idx_dead_letters_queue").on(table.queue, table.failedAt)],
+);
