@@ -140,7 +140,7 @@ export class TenantDO extends DurableObject<Env> {
     const result = this.ctx.storage.transactionSync(() =>
       registerContentTypeCore(this.ctx.storage.sql, input, now),
     );
-    if (result.ok) {
+    if (result.ok && result.applied) {
       // G1: content_types は seq を消費しない別チャネル。変更をコミット後に全接続へ配る。
       this.broadcastAll({
         type: "content-types",

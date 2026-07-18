@@ -19,7 +19,7 @@ export interface ContentTypeRow {
 }
 
 export type RegisterContentTypeResult =
-  | { ok: true; contentType: ContentTypeRow }
+  | { ok: true; contentType: ContentTypeRow; applied: boolean }
   | {
       ok: false;
       code: "validation_failed" | "id_mismatch" | "key_mismatch" | "forbidden";
@@ -124,6 +124,19 @@ export function registerContentTypeCore(
       message: `type id '${def.id}' is already registered under key '${existingKeyForId.key}' (renaming type keys is not supported)`,
     };
   }
+  // §5 軽微の消化: 同一定義の再登録は no-op(version を進めない)。ensure-asset-type.ts と
+  // 同じく、比較は zod 正規化後の値同士で行う(parsed.data は正規化済み・DB の prev.fields も
+  // 保存時に正規化済み)。冪等マニフェスト再配信(Phase 9)が「再適用で version が動かない」
+  // ことに依存する。
+  if (
+    prev !== null &&
+    prev.name === def.name &&
+    prev.source === def.source &&
+    prev.pluginId === (def.pluginId ?? null) &&
+    JSON.stringify(prev.fields) === JSON.stringify(def.fields)
+  ) {
+    return { ok: true, contentType: prev, applied: false };
+  }
   // version はサーバー管理（入力の version は無視する）
   const version = prev === null ? 1 : prev.version + 1;
   const fieldsJson = JSON.stringify(def.fields);
@@ -166,5 +179,6 @@ export function registerContentTypeCore(
       updatedAt: now,
       version,
     },
+    applied: true,
   };
 }
