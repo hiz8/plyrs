@@ -7,6 +7,7 @@ import type { ProjectionJob } from "./projection/jobs";
 import { authRoutes } from "./routes/auth";
 import { publicRoutes } from "./routes/public";
 import { publicWriteRoutes } from "./routes/public-write";
+import { superAuthRoutes } from "./routes/super-auth";
 import { tenantRoutes } from "./routes/tenant";
 import { tenantAdminRoutes } from "./routes/tenants";
 
@@ -14,12 +15,15 @@ export { TenantDO } from "./tenant-do";
 
 const app = new Hono<{ Bindings: Env }>();
 // §6: JWT_SECRET が短い(設定事故)場合は認証・テナント系を丸ごと fail-closed で閉じる。
-// /super-auth・/super/v1 は Task 6/7 の配線時に同じガードを併設する。
+// /super-auth も同じガード配下(super セッションは JWT を使わないが、設定事故時は道連れで閉じる)。
+// /super/v1(super 権限行使 API 本体)は Task 7 以降の配線時に併設する。
 app.use("/auth/*", requireSaneSecret);
 app.use("/v1/*", requireSaneSecret);
+app.use("/super-auth/*", requireSaneSecret);
 app.route("/auth", authRoutes);
 app.route("/v1/tenants", tenantAdminRoutes);
 app.route("/v1/t", tenantRoutes);
+app.route("/super-auth", superAuthRoutes);
 // §11.7(論点W): 公開 write。publicRoutes(GET のみ)より前に置く — メソッドが違うため衝突しない。
 // POST の 404 を read 側の notFound に食わせない順序。
 app.route("/public/v1", publicWriteRoutes);
