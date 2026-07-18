@@ -6,6 +6,7 @@ import { v7 as uuidv7 } from "uuid";
 import { ASSET_TYPE_KEY, WORKFLOW_STATUSES } from "@plyrs/metamodel";
 import { sniffImageSize } from "../assets/image-size";
 import { assetKeyBelongsToTenant } from "../assets/ownership";
+import { can } from "../auth/permissions";
 import { authenticateTenantToken, tenantGate, type GateVariables } from "../middleware/tenant-gate";
 import {
   asAssetUsage,
@@ -47,6 +48,7 @@ const writeBodySchema = z.object({
 // Phase 8 裁定 1: Worker 経由 PUT。CMS の画像用途に十分な上限(動画等の大容量は非目標)。
 const MAX_ASSET_SIZE_BYTES = 20 * 1024 * 1024;
 const MAX_ASSET_FILENAME_LENGTH = 256;
+const MAX_ASSET_CONTENT_TYPE_LENGTH = 256; // asset 型の content_type フィールド maxLength と一致
 
 type GateEnv = { Bindings: Env; Variables: GateVariables };
 
@@ -94,6 +96,12 @@ export const tenantRoutes = new Hono<GateEnv>()
       return c.json({ error: "too_large" }, 413);
     }
     const contentType = c.req.header("content-type") ?? "application/octet-stream";
+    // §14 Minor 消化: R2 put の前に役割を検証する(viewer の put → best-effort delete という
+    // 無駄な往復と、delete 失敗時の孤児バイナリを構造的に無くす)。DO 側の requireOperation は
+    // 防御の二層目としてそのまま残る。
+    if (!can(c.get("auth").role, "record:write")) {
+      return c.json({ ok: false, code: "forbidden", message: "role cannot upload assets" }, 403);
+    }
     const tenantId = c.req.param("tenantId");
     // ID はサーバー生成(uuidv7)。r2_key は `${tenantId}/${assetId}` 規約 — バイナリは不変
     // (差し替えは新しい asset)。寸法はサーバー側スニファで導出(クライアント申告を信用しない)。
@@ -107,7 +115,7 @@ export const tenantRoutes = new Hono<GateEnv>()
           recordId: assetId,
           input: {
             filename,
-            content_type: contentType.slice(0, MAX_ASSET_FILENAME_LENGTH),
+            content_type: contentType.slice(0, MAX_ASSET_CONTENT_TYPE_LENGTH),
             size: body.byteLength,
             r2_key: r2Key,
             ...(dimensions === null ? {} : { width: dimensions.width, height: dimensions.height }),

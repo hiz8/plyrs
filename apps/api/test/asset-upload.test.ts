@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { ASSET_TYPE_KEY } from "@plyrs/metamodel";
 import { app } from "../src/index";
+import { signTenantToken } from "../src/auth/jwt";
 
 // 共有ストレージ（--no-isolate）ではファイル間でも衝突しないよう、実行ごとのランダム接頭辞を混ぜる
 // (既存 HTTP e2e テストの様式: content-types-list.test.ts / publish.test.ts の bootstrapTenant に合わせる)
@@ -40,6 +41,10 @@ async function setupTenant(): Promise<{
   const issued = await app.request("/auth/token", json({ tenantId }, { cookie }), env);
   const { token } = (await issued.json()) as { token: string };
   return { tenantId, headers: { authorization: `Bearer ${token}` } };
+}
+
+async function tokenFor(tenantId: string, role: "owner" | "editor" | "viewer"): Promise<string> {
+  return signTenantToken(env.JWT_SECRET, { userId: unique("user"), tenantId, role });
 }
 
 const PNG_HEADER = Uint8Array.from([
@@ -141,5 +146,24 @@ describe("アセットのアップロードとプレビュー (Phase 8 裁定 1,
     );
     expect(del.status).toBe(200);
     expect(await env.ASSETS.get(`${tenantId}/${record.id}`)).toBeNull();
+  });
+
+  it("viewer のアップロードは R2 put の前に 403 で拒否される", async () => {
+    const { tenantId, headers: ownerHeaders } = await setupTenant();
+    // 同じテナントで viewer トークンを生成
+    const viewerToken = await tokenFor(tenantId, "viewer");
+    const res = await app.request(
+      `/v1/t/${tenantId}/assets?filename=a.png`,
+      {
+        method: "POST",
+        headers: { authorization: `Bearer ${viewerToken}`, "content-type": "image/png" },
+        body: new Uint8Array([1, 2, 3]),
+      },
+      env,
+    );
+    expect(res.status).toBe(403);
+    // R2 に孤児バイナリが作られていない(put 自体が走っていない)
+    const listed = await env.ASSETS.list({ prefix: `${tenantId}/` });
+    expect(listed.objects.length).toBe(0);
   });
 });
