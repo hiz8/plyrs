@@ -1,4 +1,11 @@
-import { index, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 // design-spec §2: コントロールプレーン（ID・認可）。テナントデータ本体（DO）の外側の中央 D1。
 // 「テナントのデータを開いてよいか」を、そのデータを開かずに判定するための真実源。
@@ -54,5 +61,23 @@ export const sessions = sqliteTable(
   (table) => [
     uniqueIndex("idx_sessions_token_hash").on(table.tokenHash),
     index("idx_sessions_user").on(table.userId),
+  ],
+);
+
+// Phase 9: モジュール有効化の control-plane ミラー。真実源は各テナント DO の module_registry
+// で、この表は型定義再配布(§4.2 の Queues 配信)が「どのテナントに配るか」を DO を起こさずに
+// 列挙するための派生。enable/disable の HTTP ルートが best-effort で書く(失敗しても DO 側の
+// 起床時遅延適用が安全網)。
+export const tenantModules = sqliteTable(
+  "tenant_modules",
+  {
+    tenantId: text("tenant_id").notNull(),
+    moduleId: text("module_id").notNull(),
+    enabled: integer("enabled").notNull().default(0),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.tenantId, table.moduleId] }),
+    index("idx_tenant_modules_module").on(table.moduleId, table.enabled),
   ],
 );

@@ -102,3 +102,30 @@ export const doConfig = sqliteTable("do_config", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
 });
+
+// design-spec §9.5 / §11.5: テナントごとのモジュール有効化レジストリ。適用済みマニフェスト
+// version(§4.2 の冪等再配布の適用状態)と、有効化時に展開した権限宣言(JSON:
+// { grants: {opKey: roles[]}, typeWriteGuards: {typeKey: opKey} })も同居させる。
+export const moduleRegistry = sqliteTable("module_registry", {
+  moduleId: text("module_id").primaryKey(),
+  enabled: integer("enabled").notNull().default(0), // 0 | 1
+  appliedVersion: integer("applied_version").notNull().default(0),
+  permissions: text("permissions").notNull().default("{}"),
+  updatedAt: text("updated_at").notNull(),
+});
+
+// design-spec §9.3 / §9.4 ステップ5: afterWrite / afterPublish イベントの outbox。
+// コミットと同一トランザクションで積み、Queues(plyrs-modules)へ排出する(§12.3 と同型)。
+export const moduleEvents = sqliteTable(
+  "module_events",
+  {
+    id: text("id").primaryKey(), // uuidv7
+    moduleId: text("module_id").notNull(),
+    event: text("event").notNull(), // 'afterWrite' | 'afterPublish'
+    recordId: text("record_id").notNull(),
+    type: text("type").notNull(),
+    enqueuedAt: text("enqueued_at").notNull(),
+    sent: integer("sent").notNull().default(0),
+  },
+  (table) => [index("idx_module_events_unsent").on(table.sent, table.enqueuedAt)],
+);

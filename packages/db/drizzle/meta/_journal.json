@@ -22,6 +22,13 @@
       "when": 1783955702785,
       "tag": "0002_glorious_lightspeed",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784343723501,
+      "tag": "0003_high_sersi",
+      "breakpoints": true
     }
   ]
 }

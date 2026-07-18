@@ -8,6 +8,13 @@
       "when": 1783893396049,
       "tag": "0000_mixed_smasher",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1784343724968,
+      "tag": "0001_clever_magus",
+      "breakpoints": true
     }
   ]
 }
