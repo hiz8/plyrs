@@ -84,7 +84,8 @@ Phase 2 の詳細計画で最終確定する。
 | 6b | `2026-07-17-phase6b-content-modeling-and-records.md` | 完了（2026-07-17 main へマージ） |
 | 7 | `2026-07-17-phase7-richtext.md` | 完了（2026-07-17 main へマージ） |
 | 8 | `2026-07-17-phase8-assets.md` | 完了（2026-07-18 main へマージ） |
-| 9〜10 | 各フェーズ着手時に作成 | 未着手 |
+| 9 | `2026-07-18-phase9-module-system.md` | 完了（2026-07-18 main へマージ） |
+| 10 | 着手時に作成 | 未着手 |
 
 ---
 
@@ -747,3 +748,96 @@ upload で R2 put が DO の役割検証より先（viewer でも put→best-eff
 3. 本文へのツールバー画像挿入 → 保存 → 公開側の assetImage ノード。
 4. orphan フィルタと削除ダイアログの使用箇所表示・削除後の R2 掃除。
 5. 6a/6b/7 からの手動確認バックログ(§11〜§13)は依然未実施。
+
+## 15. Phase 9 完了時の申し送り(最終レビュー 2026-07-18)
+
+Phase 9(モジュールシステム)完了。707 tests green(Phase 8 時点 653 → +54。内訳: metamodel 65 /
+db 14 / ui 38 / sync-protocol 15 / sync-client 62 / admin 130 / api 383)。typecheck /
+lint(警告 0)/ format:check clean。最終ブランチレビュー(最上位モデル)は Critical 1 件 +
+Important 1 件の修正(17ecc8d / db8fd66)後に「マージ可」。
+
+**裁定(2026-07-18、4 点):** 実証モジュール = 予約(論点W を本フェーズで消化)/ G6 マニフェスト =
+コード内静的レジストリ(zod 検証つき純データ + フック実装関数の TS オブジェクトを
+`MODULE_REGISTRY` に静的登録。テナント側は module_registry テーブルに有効化 + applied version +
+権限展開を持つ)/ 冒頭掃除 = 実害系 + Phase 9 隣接の 5 件のみ / 管理 UI(面3)= 有効化トグルのみ
+(論点P の独自ルート /modules/{id}/* と unpublish 前 usage 警告は Phase 10)。
+
+**最終レビューで検出・修正済み(Critical): push 経由 delete のモジュール write ガード迂回。**
+moduleWriteDenial はクライアント申告の typeKey から引いた型で判定するが、delete 分岐の
+deleteRecordCore は recordId だけで tombstone し実型を検査しないため、editor が typeKey を
+非ガード型に詐称した push delete で owner 限定型(booking.reservation 等)の record を削除できた
+(計画スニペット由来の穴。write 側は writeRecordCore の prev.type 検査で詐称が閉じるが delete に
+対がない)。修正: handlePush の delete 分岐で実 record の型に対しガードを再判定(HTTP
+deleteRecord と同型)+ 実 WS 経路の回帰テスト。**教訓: delete 系の新経路では typeKey 申告を
+信用せず、必ず実 record から型を引くこと。**
+
+**Important(修正済み):** constructor の遅延再適用(ensureEnabledModuleTypes)が
+applyModuleTypes の throw を捕捉せず、将来のマニフェスト version bump + 型衝突で有効化済み
+全テナントの DO が起床のたびに throw = テナント全損になり得た。モジュール単位 try/catch +
+skip(applied_version 据え置き)へ(ensureAssetContentType と同じテナント全損回避の規律)。
+
+**運用上の申し送り(Phase 10 で効く):**
+
+1. **型定義再配布のトリガーは未実装**(誰がいつ module_redistribute を積むか)。機構(ジョブ 2 種 +
+   D1 ミラー + DO 起床時遅延適用)は完成・テスト済み。特権テナント(Phase 10)の運用面で UI/API を作る。
+2. **本番デプロイ整備 3 点**: TURNSTILE_SECRET_KEY の `wrangler secret put`(未設定の公開 write は
+   503 fail-closed)/ ratelimit binding の namespace_id はプレースホルダ("1001" — アカウント内で
+   一意の値を割り当てる)/ plyrs-modules キューと plyrs-modules-dlq の作成(DLQ は projection と
+   同じ consumer なし park 運用)。
+3. disable 後の在庫 module_events は consumer で forbidden → retry 枯渇 → DLQ に落ちる(§9.5 の
+   趣旨なら「無効なら黙って ack」が整合的。DLQ 監視整備時に対処)。
+4. モジュール拒否コード(`booking:slot_full` 等)の HTTP ステータスが管理 API(既定 400)と
+   公開 write(409)で不一致。statusFor に「`:` 含みは 409」を足せば揃う。
+5. カスケード asset publish は afterPublish を emit しない(主 record のみ)。asset 型を購読する
+   モジュールが現れたら再訪。
+6. **無効モジュールの型はガード非適用**(§9.5「コードが走らない」の帰結として設計どおり)。
+   booking を無効化すると editor が booking.reservation を編集できるようになる点は運用で意識する。
+7. constructor 経路の applyModuleTypes は非トランザクション(マニフェスト途中 throw で部分適用が
+   残るが、同一定義 no-op の冪等再適用により次回起床で自己回復する。Queues 側 applyModuleManifest は
+   transactionSync で原子的)。Phase 10 の再配布トリガー実装時に transactionSync seam 化を検討。
+
+**技術的な確定事項・落とし穴:**
+
+- モジュールフックの拒否コードは `${moduleId}:${reason}` 名前空間必須(ModuleRejectionCode =
+  テンプレートリテラル型)。§7 で string のまま保たれてきた AckResult.code の受け皿を実装した。
+- イベント連鎖は 1 段まで(emitModuleEvents が actor `module:` を抑止)。通知の冪等は
+  booking.notification の unique(reservation_id) → 再配達の unique_violation を成功扱いに畳む。
+- **物理 setAlarm は「registerAlarm → レジストリ全体 min」経路の 5 箇所のみ**(armSweep /
+  armModuleEventsSweep / scheduleModuleAlarm 実装クロージャ / alarm() 末尾 / constructor 保険)。
+  モジュールコードには sql と schedule seam しか渡さない(§9 の effectiveNow 制約を構造的に維持)。
+- fetchMock(cloudflare:test)は vitest-pool-workers 0.18.4 で削除済み。外部 fetch のモックは
+  `vi.spyOn(globalThis, "fetch")`(test/public-write.test.ts が様式)。
+- フルスイート時の `[mf:warn] ... plyrs-modules-dlq` 移動警告は既知のテスト環境ノイズ(テスト
+  ブローカは send を自動 consume しない。実配達はテストが createMessageBatch + worker.queue で
+  手動駆動 — SELF.queue 破損と同根)。
+- module-redistribute.test.ts の fanout 厳密一致は共有 D1(--no-isolate)のリークに構造的に脆い。
+  **tenant_modules を書くテストは afterEach で必ず戻す**(test/module-flow.test.ts が様式)。
+- プラグイン名前空間はモジュールシステム専有化(registerContentTypeCore の allowPlugin ガード。
+  クライアント経由の source='plugin' 登録は forbidden — §4.1 の越境登録拒否)。
+- 同一定義の content_type 再登録は no-op(version 不変・`applied: false`)。RegisterContentTypeResult
+  の ok 枝に `applied` が増え、TenantDO は applied のときだけ型カタログを再配信する。
+- writeRecord / createAssetRecord RPC は async 化(モジュールイベントの drain のため。RPC 越しの
+  呼び出しは従来から await 済みで透過)。AuthContext に optional tenantId が増えた(HTTP ゲート /
+  WS ソケット由来のときのみ存在。module_events の宛先記録に使用)。
+
+**Minor 積み残し(Phase 10 の掃除候補・最終レビューでトリアージ済み。全件マージ非ブロッキング):**
+module_registry.permissions の JSON.parse 無防御(壊れた行で RPC throw)/ type_conflict message の
+内部 Error 直通し / metamodel の config 省略と config:{} 明示が正規化後も別物扱い(同一定義でも
+version bump し得る)/ writeRecord の emit(常時)と arm(tenantId 条件付き)の非対称 /
+runModuleAlarm のハンドラ throw 隔離(モジュール単位 try/catch)/ booking onAlarm の status
+デッドセレクト / module events drain 位置の経路間非対称(write 系は applied 内・他 4 経路は
+sibling)/ public-write テスト 6 本目の名前と実アサートの乖離(未有効モジュール経路の公開ルート
+検証なし)/ 再配布テストのブロードキャスト分岐未検証(registry 注入で再現可能)/ modules ページの
+a11y 束(role=alert なし・toggle.isPending 全行共有・isError 分岐テストなし — §13 の a11y 束と
+同束で 1 タスク化推奨)/ record-form 系 import 並び順 1 箇所。
+
+**手動確認が必要な項目(Phase 9 では実機確認を行っていない):**
+
+1. admin のモジュールページで booking を有効化 → content-types 一覧・record 編集 UI に booking
+   4 型が現れ、予約 record を汎用 UI で操作できること(editor の reservation 編集が forbidden に
+   なること)。
+2. 公開 write の実ブラウザ確認: 実 Turnstile ウィジェット + siteverify、レート制限の実挙動
+   (テストはフェイク limiter とモック siteverify のみ)。
+3. 予約フロー実機: 公開予約 → booking.notification の生成(Queues 実配信)→ 15 分放置で仮予約が
+   cancelled になること(alarm 実発火)。
+4. 6a〜8 からの手動確認バックログ(§11〜§14)は依然未実施。
