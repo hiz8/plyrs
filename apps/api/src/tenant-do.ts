@@ -32,6 +32,7 @@ import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
 import { ensureAssetContentType } from "./do/ensure-asset-type";
 import {
   applyModuleTypes,
+  ensureEnabledModuleTypes,
   isModuleEnabled,
   moduleRegistryRow,
   moduleWriteDenial,
@@ -101,7 +102,11 @@ export class TenantDO extends DurableObject<Env> {
       // hibernation 復帰で生きているソケットへ型カタログを配り直す(registerContentType RPC の
       // broadcast と同じ契約 — G1: content_types は seq を消費しない別チャネル)。
       const assetTypeChanged = ensureAssetContentType(ctx.storage.sql, new Date().toISOString());
-      if (assetTypeChanged) {
+      const moduleTypesChanged = ensureEnabledModuleTypes(
+        ctx.storage.sql,
+        new Date().toISOString(),
+      );
+      if (assetTypeChanged || moduleTypesChanged) {
         this.broadcastAll({
           type: "content-types",
           contentTypes: loadAllContentTypes(ctx.storage.sql),
@@ -249,6 +254,39 @@ export class TenantDO extends DurableObject<Env> {
 
   listModules(): ModuleSummary[] {
     return moduleCatalog().map((module) => this.moduleSummary(module.manifest.moduleId));
+  }
+
+  // §4.2: Queues 再配布の着地点。冪等(同一定義は Task 3 の no-op + applied_version 一致で
+  // 何もしない)。無効テナントには型を足さない。
+  applyModuleManifest(
+    moduleId: string,
+  ): { ok: true; applied: boolean } | { ok: false; code: "unknown_module"; message: string } {
+    const module = moduleById(moduleId);
+    if (module === undefined) {
+      return { ok: false, code: "unknown_module", message: `unknown module: ${moduleId}` };
+    }
+    if (!isModuleEnabled(this.ctx.storage.sql, moduleId)) {
+      return { ok: true, applied: false };
+    }
+    const now = new Date().toISOString();
+    let changed = false;
+    this.ctx.storage.transactionSync(() => {
+      changed = applyModuleTypes(this.ctx.storage.sql, module.manifest, now);
+      upsertModuleEnablement(this.ctx.storage.sql, {
+        moduleId,
+        enabled: true,
+        appliedVersion: module.manifest.version,
+        permissions: permissionsFromManifest(module.manifest),
+        now,
+      });
+    });
+    if (changed) {
+      this.broadcastAll({
+        type: "content-types",
+        contentTypes: loadAllContentTypes(this.ctx.storage.sql),
+      });
+    }
+    return { ok: true, applied: changed };
   }
 
   async writeRecord(

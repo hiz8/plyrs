@@ -1,6 +1,7 @@
 import { v7 as uuidv7 } from "uuid";
 import { asWriteResult } from "../rpc-unwrap";
 import { enabledModuleIds } from "./enablement";
+import { handleModuleSyncJob } from "./redistribute";
 import { MODULE_REGISTRY, type ModuleDefinition, type ModuleEventName } from "./registry";
 
 // §9.6 の多重化 kind(outbox_sweep と同格のシステム kind)
@@ -137,7 +138,6 @@ export async function handleModuleJob(
     }
     case "module_sync":
     case "module_redistribute": {
-      const { handleModuleSyncJob } = await import("./redistribute");
       await handleModuleSyncJob(env, job);
       return;
     }

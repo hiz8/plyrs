@@ -2,6 +2,7 @@ import type { Role } from "../auth/permissions";
 import { registerContentTypeCore, type ContentTypeRow } from "../do/content-types";
 import type { ModuleManifest } from "./manifest";
 import { moduleOperation } from "./manifest";
+import { MODULE_REGISTRY, type ModuleDefinition } from "./registry";
 
 export interface StoredModulePermissions {
   grants: Record<string, readonly Role[]>;
@@ -108,6 +109,36 @@ export function applyModuleTypes(sql: SqlStorage, manifest: ModuleManifest, now:
     if (result.applied) {
       changed = true;
     }
+  }
+  return changed;
+}
+
+// §4.2 の安全網: DO が起きたとき、有効モジュールの適用済み version がコード側と違えば
+// その場で追い付かせる(Queues の再配布を待たない。ensureAssetContentType と同じ思想)。
+export function ensureEnabledModuleTypes(
+  sql: SqlStorage,
+  now: string,
+  registry: Record<string, ModuleDefinition> = MODULE_REGISTRY,
+): boolean {
+  let changed = false;
+  for (const row of moduleRegistryRows(sql)) {
+    if (!row.enabled) {
+      continue;
+    }
+    const module = registry[row.moduleId];
+    if (module === undefined || module.manifest.version === row.appliedVersion) {
+      continue;
+    }
+    if (applyModuleTypes(sql, module.manifest, now)) {
+      changed = true;
+    }
+    upsertModuleEnablement(sql, {
+      moduleId: row.moduleId,
+      enabled: true,
+      appliedVersion: module.manifest.version,
+      permissions: permissionsFromManifest(module.manifest),
+      now,
+    });
   }
   return changed;
 }
