@@ -11,6 +11,7 @@ import { issuesToMessage, rowToDefinition, type ContentTypeRow } from "./content
 import { computeChangeSet } from "./diff";
 import { runBeforeWriteHooks, type BeforeWriteHook } from "./hooks";
 import { moduleBeforeWriteHooks } from "../modules/hooks";
+import { emitModuleEvents } from "../modules/events";
 import { uniqueCheckHook } from "./unique-check";
 import type { RecordSnapshot, WriteRecordParams, WriteRecordResult } from "./types";
 
@@ -244,6 +245,19 @@ export function writeRecordCore(
         ordinal,
       );
     });
+  }
+
+  // §9.4 ステップ5: afterWrite はコミットと同一トランザクションで積む(排出は呼び出し元)。
+  if (deps.newEventId !== undefined) {
+    emitModuleEvents(
+      deps.sql,
+      deps.newEventId,
+      now,
+      "afterWrite",
+      contentType.key,
+      params.recordId,
+      params.actor,
+    );
   }
 
   const record: RecordSnapshot = {

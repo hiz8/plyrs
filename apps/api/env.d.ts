@@ -9,6 +9,8 @@ interface EnvBindings {
   PROJECTION_DB: D1Database;
   // design-spec §12.3: アウトボックス排出先。DO からも Worker からも送る
   PROJECTION_QUEUE: Queue<import("./src/projection/jobs").ProjectionJob>;
+  // Phase 9 §9.4: モジュールイベント(afterWrite/afterPublish)の排出先。DO からのみ送る
+  MODULES_QUEUE: Queue<import("./src/modules/events").ModuleQueueJob>;
   BLOCKLIST: KVNamespace;
   // Phase 5b (G3): 公開 read の tenantSlug→tenantId 解決キャッシュ（公開経路は DO を起こさない）
   TENANT_SLUGS: KVNamespace;

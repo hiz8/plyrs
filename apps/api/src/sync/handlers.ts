@@ -52,6 +52,10 @@ export interface PushDeps {
   now: () => string;
   newRelationId: () => string;
   nextPublishSeq: () => number;
+  // Phase 9: writeRecordCore へそのまま渡る WriteDeps の追加 seam(afterWrite の emit と
+  // モジュール alarm 予約)。push 経路も writeRecordCore を通るため同じ seam を持つ。
+  newEventId?: () => string;
+  scheduleModuleAlarm?: (moduleId: string, dueAtMs: number) => void;
 }
 
 export interface PushOutcome {

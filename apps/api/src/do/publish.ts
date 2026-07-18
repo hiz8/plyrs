@@ -7,6 +7,7 @@ import {
   type PublishedSnapshot,
 } from "../projection/payload";
 import { loadContentTypeByKey } from "./content-types";
+import { emitModuleEvents } from "../modules/events";
 import { enqueueOutbox } from "./outbox";
 import type { RecordSnapshot } from "./types";
 import { loadRecord } from "./write-record";
@@ -203,7 +204,11 @@ export function publishRecordCore(
       ? { ...row, embed: buildAssetEmbed(deps.sql, tenantSlug, row.targetId) }
       : row,
   );
-  return { ok: true, snapshot: writeSnapshot(deps, record, frozen, actor) };
+  const snapshot = writeSnapshot(deps, record, frozen, actor);
+  // §9.4 ステップ5: afterPublish はコミットと同一トランザクションで積む(排出は呼び出し元)。
+  // unpublish には emit しない(スコープは afterWrite / afterPublish の 2 種)。
+  emitModuleEvents(deps.sql, deps.newId, deps.now(), "afterPublish", record.type, recordId, actor);
+  return { ok: true, snapshot };
 }
 
 export function unpublishRecordCore(deps: PublishDeps, recordId: string): UnpublishResult {

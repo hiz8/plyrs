@@ -42,6 +42,14 @@ import {
 } from "./modules/enablement";
 import { moduleAlarmKind, moduleIdFromAlarmKind } from "./modules/module-alarms";
 import { moduleById, moduleCatalog } from "./modules/registry";
+import {
+  countUnsentModuleEvents,
+  markModuleEventSent,
+  MODULE_EVENTS_SWEEP,
+  purgeSentModuleEvents,
+  unsentModuleEvents,
+  type ModuleEventJob,
+} from "./modules/events";
 import { countUnsent, markOutboxSent, purgeSent, unsentOutbox } from "./do/outbox";
 import {
   loadProjectionPayload,
@@ -243,7 +251,11 @@ export class TenantDO extends DurableObject<Env> {
     return moduleCatalog().map((module) => this.moduleSummary(module.manifest.moduleId));
   }
 
-  writeRecord(typeKey: string, params: WriteRecordInput, auth: AuthContext): WriteRecordResult {
+  async writeRecord(
+    typeKey: string,
+    params: WriteRecordInput,
+    auth: AuthContext,
+  ): Promise<WriteRecordResult> {
     const denial = requireOperation(auth, "record:write");
     if (denial !== null) {
       return denial;
@@ -256,23 +268,38 @@ export class TenantDO extends DurableObject<Env> {
     if (moduleDenial !== null) {
       return { ok: false, ...moduleDenial };
     }
-    const result = this.ctx.storage.transactionSync(() =>
-      writeRecordCore(
+    const armed: Promise<void>[] = [];
+    const result = this.ctx.storage.transactionSync(() => {
+      const inner = writeRecordCore(
         {
           sql: this.ctx.storage.sql,
           nextSeq: () => ++this.seq,
           now: () => new Date().toISOString(),
           newRelationId: () => uuidv7(),
+          newEventId: () => uuidv7(),
+          scheduleModuleAlarm: (moduleId, dueAt) => {
+            const min = registerAlarm(this.ctx.storage.sql, moduleAlarmKind(moduleId), dueAt);
+            armed.push(this.ctx.storage.setAlarm(min));
+          },
         },
         contentType,
         { ...params, actor: auth.userId },
-      ),
-    );
+      );
+      // module_events の宛先(do_config.tenant_id)は write 経路でも刻む(§14 の push 教訓と同型:
+      // 実際に積まれた時だけ)。auth.tenantId は HTTP ゲート由来のときのみ存在する。
+      if (countUnsentModuleEvents(this.ctx.storage.sql) > 0 && auth.tenantId !== undefined) {
+        this.rememberTenant(auth.tenantId);
+        armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
+      }
+      return inner;
+    });
+    await Promise.all(armed);
     if (result.ok && result.applied) {
       const stored = loadSyncRecord(this.ctx.storage.sql, params.recordId);
       if (stored !== null) {
         this.broadcastAll({ type: "change", record: stored });
       }
+      await this.drainModuleEvents();
     }
     return result;
   }
@@ -280,7 +307,7 @@ export class TenantDO extends DurableObject<Env> {
   // Phase 8 裁定 1: asset record の作成・システム管理フィールドの書き込みはアップロード API
   // 専用の経路。writeRecord と同じコアを systemWrite で通す(assetGuardHook だけが免除される —
   // unique 検証や validate-on-write は同じに掛かる)。
-  createAssetRecord(params: WriteRecordInput, auth: AuthContext): WriteRecordResult {
+  async createAssetRecord(params: WriteRecordInput, auth: AuthContext): Promise<WriteRecordResult> {
     const denial = requireOperation(auth, "record:write");
     if (denial !== null) {
       return denial;
@@ -289,19 +316,84 @@ export class TenantDO extends DurableObject<Env> {
     if (contentType === null) {
       return { ok: false, code: "unknown_type", message: "asset type is not registered" };
     }
-    const result = this.ctx.storage.transactionSync(() =>
-      writeRecordCore(
+    const armed: Promise<void>[] = [];
+    const result = this.ctx.storage.transactionSync(() => {
+      const inner = writeRecordCore(
         {
           sql: this.ctx.storage.sql,
           nextSeq: () => ++this.seq,
           now: () => new Date().toISOString(),
           newRelationId: () => uuidv7(),
+          newEventId: () => uuidv7(),
+          scheduleModuleAlarm: (moduleId, dueAt) => {
+            const min = registerAlarm(this.ctx.storage.sql, moduleAlarmKind(moduleId), dueAt);
+            armed.push(this.ctx.storage.setAlarm(min));
+          },
         },
         contentType,
         { ...params, actor: auth.userId },
         { systemWrite: true },
-      ),
-    );
+      );
+      if (countUnsentModuleEvents(this.ctx.storage.sql) > 0 && auth.tenantId !== undefined) {
+        this.rememberTenant(auth.tenantId);
+        armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
+      }
+      return inner;
+    });
+    await Promise.all(armed);
+    if (result.ok && result.applied) {
+      const stored = loadSyncRecord(this.ctx.storage.sql, params.recordId);
+      if (stored !== null) {
+        this.broadcastAll({ type: "change", record: stored });
+      }
+      await this.drainModuleEvents();
+    }
+    return result;
+  }
+
+  // §9.3: 非同期副作用フック(consumer)からの書き戻し経路。モジュールは自分の名前空間の型
+  // だけを書ける。actor は module:{id} — emitModuleEvents がこれを見て連鎖を 1 段で止める。
+  async moduleWrite(
+    tenantId: string,
+    moduleId: string,
+    typeKey: string,
+    params: WriteRecordInput,
+  ): Promise<WriteRecordResult> {
+    if (moduleById(moduleId) === undefined || !isModuleEnabled(this.ctx.storage.sql, moduleId)) {
+      return { ok: false, code: "forbidden", message: `module is not enabled: ${moduleId}` };
+    }
+    if (!typeKey.startsWith(`${moduleId}.`)) {
+      return {
+        ok: false,
+        code: "forbidden",
+        message: `type '${typeKey}' is outside module namespace`,
+      };
+    }
+    const contentType = loadContentTypeByKey(this.ctx.storage.sql, typeKey);
+    if (contentType === null) {
+      return { ok: false, code: "unknown_type", message: `unknown content type: ${typeKey}` };
+    }
+    const armed: Promise<void>[] = [];
+    const result = this.ctx.storage.transactionSync(() => {
+      this.rememberTenant(tenantId);
+      return writeRecordCore(
+        {
+          sql: this.ctx.storage.sql,
+          nextSeq: () => ++this.seq,
+          now: () => new Date().toISOString(),
+          newRelationId: () => uuidv7(),
+          newEventId: () => uuidv7(),
+          scheduleModuleAlarm: (id, dueAt) => {
+            const min = registerAlarm(this.ctx.storage.sql, moduleAlarmKind(id), dueAt);
+            armed.push(this.ctx.storage.setAlarm(min));
+          },
+        },
+        contentType,
+        { ...params, actor: `module:${moduleId}` },
+        { systemWrite: true },
+      );
+    });
+    await Promise.all(armed);
     if (result.ok && result.applied) {
       const stored = loadSyncRecord(this.ctx.storage.sql, params.recordId);
       if (stored !== null) {
@@ -347,7 +439,10 @@ export class TenantDO extends DurableObject<Env> {
     }
     // setAlarm は transactionSync に参加し、ロールバックで巻き戻る（実証済み）。
     // クロージャ内では await できないので promise を掴み、トランザクションを出てから待つ。
-    let armed: Promise<void> | null = null;
+    const armed: Promise<void>[] = [];
+    // outbox / module events それぞれ実際に積まれた時だけ drain するためのフラグ
+    // （どちらか一方だけ発生することが大半なので、共有の armed 配列とは別に持つ）。
+    let moduleEventsPending = false;
     const result = this.ctx.storage.transactionSync(() => {
       const inner = deleteRecordCore(
         {
@@ -363,19 +458,26 @@ export class TenantDO extends DurableObject<Env> {
       // MINOR fix（レビュー指摘）: 未公開レコードの削除は cascadeUnpublish が outbox に
       // 何も積まない。実際に outbox 行が積まれた時だけ sweep を張り、無駄な DO 起床を避ける。
       if (inner.ok && countUnsent(this.ctx.storage.sql) > 0) {
-        armed = this.armSweep(Date.now() + SWEEP_DELAY_MS);
+        armed.push(this.armSweep(Date.now() + SWEEP_DELAY_MS));
+      }
+      // §9.4: delete は自ら module event を積まないが、直前の操作の排出漏れを拾える経路として
+      // publish/unpublish と同型で足す(afterPublish の排出経路)。
+      if (countUnsentModuleEvents(this.ctx.storage.sql) > 0) {
+        moduleEventsPending = true;
+        armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
       }
       return inner;
     });
-    if (armed !== null) {
-      await armed;
-    }
+    await Promise.all(armed);
     if (result.ok) {
       const tombstone = loadSyncRecord(this.ctx.storage.sql, recordId);
       if (tombstone !== null) {
         this.broadcastAll({ type: "change", record: tombstone });
       }
       await this.drainOutbox();
+    }
+    if (moduleEventsPending) {
+      await this.drainModuleEvents();
     }
     return result;
   }
@@ -413,7 +515,8 @@ export class TenantDO extends DurableObject<Env> {
     }
     // setAlarm は transactionSync に参加し、ロールバックで巻き戻る（実証済み）。
     // クロージャ内では await できないので promise を掴み、トランザクションを出てから待つ。
-    let armed: Promise<void> | null = null;
+    const armed: Promise<void>[] = [];
+    let moduleEventsPending = false;
     const result = this.ctx.storage.transactionSync(() => {
       this.rememberTenant(tenantId);
       const inner = publishRecordCore(
@@ -428,15 +531,21 @@ export class TenantDO extends DurableObject<Env> {
         tenantSlug,
       );
       if (inner.ok) {
-        armed = this.armSweep(Date.now() + SWEEP_DELAY_MS);
+        armed.push(this.armSweep(Date.now() + SWEEP_DELAY_MS));
+      }
+      // §9.4: afterPublish が積まれた時だけ module events sweep も張る(outbox と同型)。
+      if (countUnsentModuleEvents(this.ctx.storage.sql) > 0) {
+        moduleEventsPending = true;
+        armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
       }
       return inner;
     });
-    if (armed !== null) {
-      await armed;
-    }
+    await Promise.all(armed);
     if (result.ok) {
       await this.drainOutbox();
+    }
+    if (moduleEventsPending) {
+      await this.drainModuleEvents();
     }
     return result;
   }
@@ -450,7 +559,8 @@ export class TenantDO extends DurableObject<Env> {
     if (denial !== null) {
       return denial;
     }
-    let armed: Promise<void> | null = null;
+    const armed: Promise<void>[] = [];
+    let moduleEventsPending = false;
     const result = this.ctx.storage.transactionSync(() => {
       this.rememberTenant(tenantId);
       const inner = unpublishRecordCore(
@@ -463,15 +573,22 @@ export class TenantDO extends DurableObject<Env> {
         recordId,
       );
       if (inner.ok) {
-        armed = this.armSweep(Date.now() + SWEEP_DELAY_MS);
+        armed.push(this.armSweep(Date.now() + SWEEP_DELAY_MS));
+      }
+      // §9.4: unpublish 自体は afterPublish を積まないが、直前の排出漏れを拾える経路として
+      // publish と同型で足す。
+      if (countUnsentModuleEvents(this.ctx.storage.sql) > 0) {
+        moduleEventsPending = true;
+        armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
       }
       return inner;
     });
-    if (armed !== null) {
-      await armed;
-    }
+    await Promise.all(armed);
     if (result.ok) {
       await this.drainOutbox();
+    }
+    if (moduleEventsPending) {
+      await this.drainModuleEvents();
     }
     return result;
   }
@@ -479,6 +596,12 @@ export class TenantDO extends DurableObject<Env> {
   // 登録して物理アラームを最小 due に張り直す（§9.6 の多重化）
   private armSweep(dueAt: number): Promise<void> {
     const min = registerAlarm(this.ctx.storage.sql, OUTBOX_SWEEP, dueAt);
+    return this.ctx.storage.setAlarm(min);
+  }
+
+  // module_events 版の armSweep(§9.6 の多重化 kind)
+  private armModuleEventsSweep(dueAt: number): Promise<void> {
+    const min = registerAlarm(this.ctx.storage.sql, MODULE_EVENTS_SWEEP, dueAt);
     return this.ctx.storage.setAlarm(min);
   }
 
@@ -525,6 +648,33 @@ export class TenantDO extends DurableObject<Env> {
     }
   }
 
+  // drainOutbox と同じ契約: コミット済みイベントのベストエフォート排出。失敗は sweeper が拾う。
+  private async drainModuleEvents(): Promise<void> {
+    const tenantId = this.tenantId();
+    if (tenantId === null) {
+      console.error("module events drain skipped: tenant id is unknown");
+      return;
+    }
+    for (const row of unsentModuleEvents(this.ctx.storage.sql, 50)) {
+      const job: ModuleEventJob = {
+        kind: "module_event",
+        eventId: row.id,
+        tenantId,
+        moduleId: row.moduleId,
+        event: row.event,
+        recordId: row.recordId,
+        typeKey: row.typeKey,
+      };
+      try {
+        await this.env.MODULES_QUEUE.send(job);
+        markModuleEventSent(this.ctx.storage.sql, row.id);
+      } catch (error) {
+        console.error("module event send failed", row.id, error);
+        return;
+      }
+    }
+  }
+
   // テスト用: 未送出件数
   pendingOutbox(): number {
     return countUnsent(this.ctx.storage.sql);
@@ -539,6 +689,10 @@ export class TenantDO extends DurableObject<Env> {
     for (const kind of dueKinds(this.ctx.storage.sql, now)) {
       if (kind === OUTBOX_SWEEP) {
         await this.sweepOutbox();
+        continue;
+      }
+      if (kind === MODULE_EVENTS_SWEEP) {
+        await this.sweepModuleEvents();
         continue;
       }
       const moduleId = moduleIdFromAlarmKind(kind);
@@ -626,6 +780,17 @@ export class TenantDO extends DurableObject<Env> {
     }
     // 全行送出済み → 登録を消して no-op で終わる（§12.3）
     purgeSent(this.ctx.storage.sql);
+  }
+
+  // module_events 版の sweepOutbox。多重化・再アーム方針は完全に同型(§9.6)。
+  private async sweepModuleEvents(): Promise<void> {
+    await this.drainModuleEvents();
+    clearAlarm(this.ctx.storage.sql, MODULE_EVENTS_SWEEP);
+    if (countUnsentModuleEvents(this.ctx.storage.sql) > 0) {
+      registerAlarm(this.ctx.storage.sql, MODULE_EVENTS_SWEEP, Date.now() + SWEEP_RETRY_MS);
+      return;
+    }
+    purgeSentModuleEvents(this.ctx.storage.sql);
   }
 
   // Queues consumer が投影ペイロードを取りに来る経路（メッセージ本体にデータを載せない）
@@ -781,8 +946,10 @@ export class TenantDO extends DurableObject<Env> {
       // コミット済みの unpublish が outbox に永遠に取り残される（公開停止したはずのレコードが
       // 投影に残り続ける）。setAlarm は transactionSync に参加し、ロールバックで巻き戻る
       // （実証済み）。クロージャ内では await できないので promise を掴み、トランザクションを
-      // 出てから待つ。
-      let armed: Promise<void> | null = null;
+      // 出てから待つ。module events(afterWrite)も同じ制約を持つため同じ armed 配列に相乗りする。
+      const armed: Promise<void>[] = [];
+      let outboxPending = false;
+      let moduleEventsPending = false;
       try {
         // 変異はトランザクション内。ブロードキャストはコミット後（未コミットの seq を見せない）。
         outcome = this.ctx.storage.transactionSync(() => {
@@ -793,13 +960,26 @@ export class TenantDO extends DurableObject<Env> {
               now: () => new Date().toISOString(),
               newRelationId: () => uuidv7(),
               nextPublishSeq: () => this.nextPublishSeq(),
+              newEventId: () => uuidv7(),
+              scheduleModuleAlarm: (moduleId, dueAt) => {
+                const min = registerAlarm(this.ctx.storage.sql, moduleAlarmKind(moduleId), dueAt);
+                armed.push(this.ctx.storage.setAlarm(min));
+              },
             },
             parsed.changes,
             { userId: auth.userId, role: auth.role },
           );
           // 実際に outbox 行が積まれた時だけ張る（大半の push は upsert のみで outbox に触れない）。
           if (countUnsent(this.ctx.storage.sql) > 0) {
-            armed = this.armSweep(Date.now() + SWEEP_DELAY_MS);
+            outboxPending = true;
+            armed.push(this.armSweep(Date.now() + SWEEP_DELAY_MS));
+          }
+          // module_events も同様に、実際に積まれた時だけ張る。SocketAuth は tenantId を常に
+          // 持つため rememberTenant はここで無条件に呼べる。
+          if (countUnsentModuleEvents(this.ctx.storage.sql) > 0) {
+            moduleEventsPending = true;
+            this.rememberTenant(auth.tenantId);
+            armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
           }
           return inner;
         });
@@ -816,9 +996,7 @@ export class TenantDO extends DurableObject<Env> {
         }
         return;
       }
-      if (armed !== null) {
-        await armed;
-      }
+      await Promise.all(armed);
       for (const ackMessage of outcome.acks) {
         this.send(ws, ackMessage);
       }
@@ -829,12 +1007,16 @@ export class TenantDO extends DurableObject<Env> {
       // 呼ばれないため、型登録とレコード書き込みしかしていないテナントには do_config に
       // tenant_id が無い。drainOutbox() を毎 push 無条件に呼ぶと、そのテナントの push（同期の
       // 最も高頻度な経路）が毎回 tenant id 不明のエラーログを吐く。outbox に実際に行が積まれて
-      // sweep を張った時（armed !== null）だけ排出を試みる ―― drainOutbox 自身の
+      // sweep を張った時（outboxPending）だけ排出を試みる ―― drainOutbox 自身の
       // 「tenant unknown → ログして return」はそれでも保険として残す。
-      if (armed !== null) {
+      if (outboxPending) {
         // drainOutbox はコミット後のベストエフォート排出。ack/broadcast は既に送信済みなので、
         // 失敗しても例外を投げず、拾い直しは sweeper に任せる（drainOutbox 自身の契約）。
         await this.drainOutbox();
+      }
+      // module events を積んだときのみ排出する(drainOutbox と同じ理由・同じベストエフォート契約)。
+      if (moduleEventsPending) {
+        await this.drainModuleEvents();
       }
     }
   }

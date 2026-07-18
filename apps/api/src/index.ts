@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { handleModuleJob, type ModuleQueueJob } from "./modules/events";
 import { handleProjectionJob } from "./projection/consumer";
 import type { ProjectionJob } from "./projection/jobs";
 import { authRoutes } from "./routes/auth";
@@ -20,18 +21,29 @@ export { app };
 
 export default {
   fetch: app.fetch,
-  // design-spec §12.3: 投影 consumer。冪等なので at-least-once 配信をそのまま受ける。
-  // ExportedHandlerQueueHandler は ctx を第3引数として渡す（テストの worker.queue(batch, env, ctx) 呼び出しに対応）。
-  async queue(batch: MessageBatch<ProjectionJob>, env: Env, _ctx: ExecutionContext): Promise<void> {
+  // design-spec §12.3 / Phase 9 §9.4: projection と module events の 2 キューを 1 ハンドラで
+  // 受ける（wrangler.jsonc の consumers はどちらもこの queue() を指す）。冪等なので
+  // at-least-once 配信をそのまま受ける。ExportedHandlerQueueHandler は ctx を第3引数として
+  // 渡す（テストの worker.queue(batch, env, ctx) 呼び出しに対応）。
+  async queue(
+    batch: MessageBatch<ProjectionJob | ModuleQueueJob>,
+    env: Env,
+    _ctx: ExecutionContext,
+  ): Promise<void> {
     const nowMs = Date.now();
     for (const message of batch.messages) {
       try {
-        await handleProjectionJob(env, message.body, nowMs);
+        if (batch.queue === "plyrs-modules") {
+          // batch.queue で判別済み。メッセージ型はキューごとに閉じている(境界 cast)。
+          await handleModuleJob(env, message.body as ModuleQueueJob);
+        } else {
+          await handleProjectionJob(env, message.body as ProjectionJob, nowMs);
+        }
         message.ack();
       } catch (error) {
-        console.error("projection job failed", message.body, error);
+        console.error("queue job failed", batch.queue, message.body, error);
         message.retry();
       }
     }
   },
-} satisfies ExportedHandler<Env, ProjectionJob>;
+} satisfies ExportedHandler<Env, ProjectionJob | ModuleQueueJob>;

@@ -31,7 +31,11 @@
     { "binding": "ASSETS", "bucket_name": "plyrs-assets" },
   ],
   "queues": {
-    "producers": [{ "binding": "PROJECTION_QUEUE", "queue": "plyrs-projection" }],
+    "producers": [
+      { "binding": "PROJECTION_QUEUE", "queue": "plyrs-projection" },
+      // Phase 9 §9.4: モジュールイベント(afterWrite/afterPublish)の排出先
+      { "binding": "MODULES_QUEUE", "queue": "plyrs-modules" },
+    ],
     "consumers": [
       {
         "queue": "plyrs-projection",
@@ -44,6 +48,14 @@
         // DLQ に park させ、運用者が手動で確認・再投入できるようにする。意図的に consumer は
         // 付けない（付けるとメッセージが黙って ack されてしまい park の意味が無くなる）。
         "dead_letter_queue": "plyrs-projection-dlq",
+      },
+      {
+        "queue": "plyrs-modules",
+        "max_batch_timeout": 0,
+        "max_batch_size": 10,
+        "max_retries": 5,
+        // projection と同じ方針: リトライ枯渇分は park させ運用者が手動確認(consumer は付けない)
+        "dead_letter_queue": "plyrs-modules-dlq",
       },
     ],
   },
