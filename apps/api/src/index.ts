@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { purgeExpiredSessions } from "./auth/session";
 import { requireSaneSecret } from "./middleware/sane-secret";
 import { handleModuleJob, type ModuleQueueJob } from "./modules/events";
+import { parkDeadLetter } from "./ops/dead-letters";
 import { handleProjectionJob } from "./projection/consumer";
 import type { ProjectionJob } from "./projection/jobs";
 import { authRoutes } from "./routes/auth";
@@ -54,6 +55,20 @@ export default {
     env: Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
+    if (batch.queue.endsWith("-dlq")) {
+      // DLQ consumer: D1 に退避できたものだけ ack する。insert 失敗は retry
+      // (DLQ の DLQ は無い — max_retries 10 を使い切ると喪失するリスクは許容し console.error に残す)。
+      for (const message of batch.messages) {
+        try {
+          await parkDeadLetter(env, batch.queue, { id: message.id, body: message.body });
+          message.ack();
+        } catch (error) {
+          console.error("dlq park failed", batch.queue, error);
+          message.retry();
+        }
+      }
+      return;
+    }
     const nowMs = Date.now();
     for (const message of batch.messages) {
       try {

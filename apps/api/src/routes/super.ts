@@ -1,17 +1,19 @@
 import { zValidator } from "@hono/zod-validator";
-import { asc, count, eq, like } from "drizzle-orm";
+import { asc, count, desc, eq, like } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
 import { v7 as uuidv7 } from "uuid";
 import { z } from "zod";
-import { memberships, tenants, users } from "@plyrs/db/control-plane";
+import { deadLetters, memberships, tenants, users } from "@plyrs/db/control-plane";
 import { assetKeyBelongsToTenant } from "../assets/ownership";
 import { writeAudit } from "../audit";
 import { banUserEverywhere, revokeMembership } from "../auth/ban";
 import { unblockUser } from "../auth/blocklist";
 import { normalizeEmail } from "../auth/email";
+import type { ModuleQueueJob } from "../modules/events";
 import { deleteTenantCascade } from "../ops/tenant-delete";
 import { superGate, type SuperGateVariables } from "../middleware/super-gate";
+import type { ProjectionJob } from "../projection/jobs";
 import { asHealthReport, asStringArray } from "../rpc-unwrap";
 import { TENANT_SLUG_MAX_LENGTH, TENANT_SLUG_PATTERN } from "./tenants";
 
@@ -250,4 +252,51 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       });
       return c.json({ ok: true, deleted: keys.length });
     },
-  );
+  )
+  // Phase 10: DLQ は D1 退避(dead_letters)。一覧は failed_at 降順・最大 200 件。
+  .get("/dead-letters", async (c) => {
+    const rows = await drizzle(c.env.DB)
+      .select()
+      .from(deadLetters)
+      .orderBy(desc(deadLetters.failedAt))
+      .limit(200);
+    return c.json({ deadLetters: rows });
+  })
+  .post("/dead-letters/:id/replay", async (c) => {
+    const id = c.req.param("id");
+    const row = (
+      await drizzle(c.env.DB).select().from(deadLetters).where(eq(deadLetters.id, id)).limit(1)
+    )[0];
+    if (row === undefined) {
+      return c.json({ error: "not_found" }, 404);
+    }
+    // producer binding は環境ローカル(env 分割後もこの判定は名前の前方一致で安定)
+    const producer: Queue<ProjectionJob | ModuleQueueJob> = row.queue.startsWith("plyrs-modules")
+      ? c.env.MODULES_QUEUE
+      : c.env.PROJECTION_QUEUE;
+    // row.body は parkDeadLetter が自前で serialize した値なので信頼できる境界(cast)
+    await producer.send(JSON.parse(row.body) as ProjectionJob | ModuleQueueJob);
+    await drizzle(c.env.DB)
+      .update(deadLetters)
+      .set({ replayedAt: new Date().toISOString() })
+      .where(eq(deadLetters.id, id));
+    await writeAudit(c.env.DB, {
+      actorId: c.get("superAdmin").adminId,
+      action: "dlq.replay",
+      targetType: "dead_letter",
+      targetId: id,
+      detail: { queue: row.queue },
+    });
+    return c.json({ ok: true });
+  })
+  .delete("/dead-letters/:id", async (c) => {
+    const id = c.req.param("id");
+    await drizzle(c.env.DB).delete(deadLetters).where(eq(deadLetters.id, id));
+    await writeAudit(c.env.DB, {
+      actorId: c.get("superAdmin").adminId,
+      action: "dlq.discard",
+      targetType: "dead_letter",
+      targetId: id,
+    });
+    return c.json({ ok: true });
+  });
