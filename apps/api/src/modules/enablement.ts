@@ -36,57 +36,97 @@ interface RawModuleRegistryRow extends Record<string, SqlStorageValue> {
   permissions: string;
 }
 
+// grants / typeWriteGuards が両方ともオブジェクト(null は除く)であることまで見る形状検証
+// (レビュー Minor: 値の型までは見ていなかった)。
+function hasValidPermissionsShape(value: unknown): value is StoredModulePermissions {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  if (!("grants" in value) || !("typeWriteGuards" in value)) {
+    return false;
+  }
+  return (
+    typeof value.grants === "object" &&
+    value.grants !== null &&
+    typeof value.typeWriteGuards === "object" &&
+    value.typeWriteGuards !== null
+  );
+}
+
 // §15 Minor: JSON.parse 無防御対策。壊れた permissions 行(手動編集・移行漏れ等)が
 // 1 テナントの RPC(listModules/getContentType 経由の moduleWriteDenial 等)を丸ごと
-// throw させないよう、パース失敗・想定外シェイプは「権限なし」として空扱いする
-// (ensureEnabledModuleTypes と同じテナント全損回避の規律)。
-function safeParsePermissions(raw: string, moduleId: string): StoredModulePermissions {
-  const empty: StoredModulePermissions = { grants: {}, typeWriteGuards: {} };
+// throw させないよう保護する。
+//
+// ユーザー裁定(2026-07-18): パース失敗・想定外シェイプのフォールバックは「権限なし」への
+// fail-open ではなく、MODULE_REGISTRY(コード内静的マニフェスト = 権限の真実源)から
+// permissionsFromManifest で再導出する。DB 行が壊れていてもガードの実効性を保つため。
+// moduleId が registry に無ければ(未知モジュール行)安全側で空 grants を返す。
+function safeParsePermissions(
+  raw: string,
+  moduleId: string,
+  registry: Record<string, ModuleDefinition>,
+): StoredModulePermissions {
+  const reDeriveOrEmpty = (): StoredModulePermissions => {
+    const module = registry[moduleId];
+    return module === undefined
+      ? { grants: {}, typeWriteGuards: {} }
+      : permissionsFromManifest(module.manifest);
+  };
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    console.error(`module_registry: failed to parse permissions for '${moduleId}'`, error);
-    return empty;
+    console.error(
+      `module_registry: failed to parse permissions for '${moduleId}', re-deriving from manifest`,
+      error,
+    );
+    return reDeriveOrEmpty();
   }
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    !("grants" in parsed) ||
-    !("typeWriteGuards" in parsed)
-  ) {
-    console.error(`module_registry: permissions for '${moduleId}' has an unexpected shape`);
-    return empty;
+  if (!hasValidPermissionsShape(parsed)) {
+    console.error(
+      `module_registry: permissions for '${moduleId}' has an unexpected shape, re-deriving from manifest`,
+    );
+    return reDeriveOrEmpty();
   }
-  return parsed as StoredModulePermissions;
+  return parsed;
 }
 
-function rowToModuleRegistryRow(row: RawModuleRegistryRow): ModuleRegistryRow {
+function rowToModuleRegistryRow(
+  row: RawModuleRegistryRow,
+  registry: Record<string, ModuleDefinition>,
+): ModuleRegistryRow {
   return {
     moduleId: row.module_id,
     enabled: row.enabled === 1,
     appliedVersion: row.applied_version,
-    permissions: safeParsePermissions(row.permissions, row.module_id),
+    permissions: safeParsePermissions(row.permissions, row.module_id, registry),
   };
 }
 
-export function moduleRegistryRow(sql: SqlStorage, moduleId: string): ModuleRegistryRow | null {
+export function moduleRegistryRow(
+  sql: SqlStorage,
+  moduleId: string,
+  registry: Record<string, ModuleDefinition> = MODULE_REGISTRY,
+): ModuleRegistryRow | null {
   const row = sql
     .exec<RawModuleRegistryRow>(
       "SELECT module_id, enabled, applied_version, permissions FROM module_registry WHERE module_id = ?",
       moduleId,
     )
     .toArray()[0];
-  return row === undefined ? null : rowToModuleRegistryRow(row);
+  return row === undefined ? null : rowToModuleRegistryRow(row, registry);
 }
 
-export function moduleRegistryRows(sql: SqlStorage): ModuleRegistryRow[] {
+export function moduleRegistryRows(
+  sql: SqlStorage,
+  registry: Record<string, ModuleDefinition> = MODULE_REGISTRY,
+): ModuleRegistryRow[] {
   return sql
     .exec<RawModuleRegistryRow>(
       "SELECT module_id, enabled, applied_version, permissions FROM module_registry ORDER BY module_id",
     )
     .toArray()
-    .map(rowToModuleRegistryRow);
+    .map((row) => rowToModuleRegistryRow(row, registry));
 }
 
 export function isModuleEnabled(sql: SqlStorage, moduleId: string): boolean {
@@ -152,7 +192,7 @@ export function ensureEnabledModuleTypes(
   registry: Record<string, ModuleDefinition> = MODULE_REGISTRY,
 ): boolean {
   let changed = false;
-  for (const row of moduleRegistryRows(sql)) {
+  for (const row of moduleRegistryRows(sql, registry)) {
     if (!row.enabled) {
       continue;
     }

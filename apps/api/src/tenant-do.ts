@@ -837,49 +837,64 @@ export class TenantDO extends DurableObject<Env> {
   // §9.6: モジュール alarm のディスパッチ。ハンドラはトランザクション内で走り、
   // schedule はレジストリ登録のみ(物理再アームは alarm() 末尾の minDueAt 経路が担う —
   // §9 申し送り: モジュールに ctx.storage.setAlarm を触らせない)。
+  //
+  // Important fix(レビュー指摘): try/catch は transactionSync の**外側**、モジュール単位で
+  // 行う。runModuleAlarmHandler(module-alarms.ts)は throw を素通しする契約なので、onAlarm が
+  // throw すると transactionSync のクロージャごと throw し、clearAlarm を含む書き込みが
+  // 丸ごとロールバックされる(= 次回起床でリトライされ、alarm 再武装が失われない)。ここで
+  // catch して console.error するだけに留め、他モジュールの alarm 実行・末尾の物理 setAlarm
+  // 再アームは呼び出し元(alarm())の for ループで継続させる(ensureAssetContentType /
+  // ensureEnabledModuleTypes と同じテナント全損回避の規律)。
   private runModuleAlarm(moduleId: string, nowMs: number): void {
     const written: string[] = [];
-    this.ctx.storage.transactionSync(() => {
-      const sql = this.ctx.storage.sql;
-      // 消してから走らせる(MIN() 意味論の registerAlarm では過去 due を前倒しできない —
-      // sweepOutbox と同じ理由)。ハンドラが schedule() すれば次回が入り直す。
-      clearAlarm(sql, moduleAlarmKind(moduleId));
-      const module = moduleById(moduleId);
-      if (!isModuleEnabled(sql, moduleId)) {
-        return;
-      }
-      // §15 Minor: onAlarm の throw が同一 alarm() 起床内の他モジュールの処理を止めないよう、
-      // 呼び出し自体は throw しない runModuleAlarmHandler 経由で実行する(隔離ロジックは
-      // module-alarms.ts に集約 — テストから直接注入して検証できる)。
-      runModuleAlarmHandler(moduleId, module, {
-        sql,
-        now: nowMs,
-        schedule: (dueAtMs) => {
-          registerAlarm(sql, moduleAlarmKind(moduleId), dueAtMs);
-        },
-        writeRecord: (typeKey, params) => {
-          const contentType = loadContentTypeByKey(sql, typeKey);
-          if (contentType === null) {
-            return { ok: false, code: "unknown_type", message: `unknown content type: ${typeKey}` };
-          }
-          const result = writeRecordCore(
-            {
-              sql,
-              nextSeq: () => ++this.seq,
-              now: () => new Date().toISOString(),
-              newRelationId: () => uuidv7(),
-              newEventId: () => uuidv7(),
-            },
-            contentType,
-            { ...params, actor: `module:${moduleId}` },
-          );
-          if (result.ok && result.applied) {
-            written.push(params.recordId);
-          }
-          return result;
-        },
+    try {
+      this.ctx.storage.transactionSync(() => {
+        const sql = this.ctx.storage.sql;
+        // 消してから走らせる(MIN() 意味論の registerAlarm では過去 due を前倒しできない —
+        // sweepOutbox と同じ理由)。ハンドラが schedule() すれば次回が入り直す。throw したら
+        // このクロージャごとロールバックされるので、clearAlarm も巻き戻る。
+        clearAlarm(sql, moduleAlarmKind(moduleId));
+        const module = moduleById(moduleId);
+        if (!isModuleEnabled(sql, moduleId)) {
+          return;
+        }
+        runModuleAlarmHandler(moduleId, module, {
+          sql,
+          now: nowMs,
+          schedule: (dueAtMs) => {
+            registerAlarm(sql, moduleAlarmKind(moduleId), dueAtMs);
+          },
+          writeRecord: (typeKey, params) => {
+            const contentType = loadContentTypeByKey(sql, typeKey);
+            if (contentType === null) {
+              return {
+                ok: false,
+                code: "unknown_type",
+                message: `unknown content type: ${typeKey}`,
+              };
+            }
+            const result = writeRecordCore(
+              {
+                sql,
+                nextSeq: () => ++this.seq,
+                now: () => new Date().toISOString(),
+                newRelationId: () => uuidv7(),
+                newEventId: () => uuidv7(),
+              },
+              contentType,
+              { ...params, actor: `module:${moduleId}` },
+            );
+            if (result.ok && result.applied) {
+              written.push(params.recordId);
+            }
+            return result;
+          },
+        });
       });
-    });
+    } catch (error) {
+      console.error("module alarm handler failed", moduleId, error);
+      return; // ロールバック済み。written も巻き戻り対象なので配信しない。
+    }
     // コミット後に同期チャネルへ配る(writeRecord RPC と同じ契約)
     for (const recordId of written) {
       const stored = loadSyncRecord(this.ctx.storage.sql, recordId);

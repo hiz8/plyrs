@@ -16,13 +16,15 @@ export function moduleIdFromAlarmKind(kind: string): string | null {
   return kind.slice(MODULE_ALARM_PREFIX.length);
 }
 
-// §15 Minor: モジュール alarm ハンドラの throw 隔離。TenantDO.alarm() は 1 回の起床で複数の
-// module: kind をまとめて処理しうるため、1 モジュールの onAlarm が throw すると
-// (この関数でキャッチしないと)呼び出し元の for ループごと中断し、以降の due kind も
-// 末尾の物理 setAlarm 再アームも走らなくなる ―― ensureAssetContentType /
-// ensureEnabledModuleTypes と同じテナント全損回避の規律をここにも適用する。
-// module は呼び出し側が解決して渡す(レジストリ注入シーム: 本番は registry.moduleById、
-// テストはフェイクの ModuleDefinition を直接注入できる)。契約として、この関数自体は throw しない。
+// §15 Minor: モジュール alarm ハンドラ呼び出しのレジストリ注入シーム。module は呼び出し側が
+// 解決して渡す(本番は registry.moduleById、テストはフェイクの ModuleDefinition を直接注入できる)。
+//
+// Important fix(レビュー指摘): 当初はこの関数自身が try/catch していたが、それだと呼び出し元の
+// TenantDO#runModuleAlarm の transactionSync クロージャが throw しなくなり、(1) ハンドラ途中までの
+// 部分書き込みがそのまま commit され、(2) clearAlarm も commit 済みで ctx.schedule() に到達できない
+// ため当該モジュールの alarm 再武装が永久に失われる、という regression があった。throw の隔離
+// (transactionSync 全体のロールバック + 他モジュール継続)は呼び出し側の責務とし、この関数自体は
+// throw を素通しする契約にする。
 export function runModuleAlarmHandler(
   moduleId: string,
   module: ModuleDefinition | undefined,
@@ -31,9 +33,5 @@ export function runModuleAlarmHandler(
   if (module?.onAlarm === undefined) {
     return;
   }
-  try {
-    module.onAlarm(ctx);
-  } catch (error) {
-    console.error("module alarm handler failed", moduleId, error);
-  }
+  module.onAlarm(ctx);
 }

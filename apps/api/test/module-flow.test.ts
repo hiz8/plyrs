@@ -18,7 +18,7 @@ import { BOOKING_PENDING_TTL_MS } from "../src/modules/booking/module";
 import type { ModuleQueueJob } from "../src/modules/events";
 import { moduleAlarmKind } from "../src/modules/module-alarms";
 import { TURNSTILE_VERIFY_URL } from "../src/modules/turnstile";
-import { asModuleSummaries, asRecordSnapshot } from "../src/rpc-unwrap";
+import { asModuleSummaries, asRecordSnapshot, asWriteResult } from "../src/rpc-unwrap";
 
 // Task 11(module-routes.test.ts)+ publish.test.ts の bootstrapTenant 様式・
 // Task 12(public-write.test.ts)の mockSiteverify / fakeLimiter / reservationBody 様式・
@@ -265,10 +265,44 @@ describe("§15 冒頭掃除(実害系 3 件)", () => {
         "UPDATE module_registry SET permissions = 'not-json' WHERE module_id = 'booking'",
       );
     });
-    // 壊れた行があっても一覧 RPC は throw しない(permissions は空として扱う)
+    // 壊れた行があっても一覧 RPC は throw しない(permissions は MODULE_REGISTRY から再導出される)
     const modules = asModuleSummaries(await stub.listModules());
     expect(Array.isArray(modules)).toBe(true);
     expect(modules.find((m) => m.moduleId === "booking")?.enabled).toBe(true);
+  });
+
+  it("壊れた permissions 行は MODULE_REGISTRY から再導出され、editor の owner 限定型書き込みは forbidden のまま", async () => {
+    // ユーザー裁定(2026-07-18): 壊れた permissions 行のフォールバックは fail-open(空 grants)ではなく、
+    // コード内静的マニフェスト(MODULE_REGISTRY)を真実源として再導出する。ガードの実効性が
+    // 保たれていることを、editor が owner 限定型(booking.reservation)へ書けないことで固定する。
+    const tenantId = crypto.randomUUID();
+    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    const owner: AuthContext = { userId: "u-owner", role: "owner", tenantId };
+    const editor: AuthContext = { userId: "u-editor", role: "editor", tenantId };
+    await stub.enableModule(tenantId, "booking", owner);
+    await runInDurableObject(stub, async (_instance, state) => {
+      state.storage.sql.exec(
+        "UPDATE module_registry SET permissions = 'not-json' WHERE module_id = 'booking'",
+      );
+    });
+    const result = asWriteResult(
+      await stub.writeRecord(
+        BOOKING_RESERVATION_KEY,
+        {
+          recordId: crypto.randomUUID(),
+          input: {
+            slot: { type: BOOKING_SLOT_KEY, id: crypto.randomUUID() },
+            name: "x",
+            email: "x@example.com",
+            state: "pending",
+          },
+        },
+        editor,
+      ),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe("forbidden");
   });
 
   it("管理 API 経由の booking:slot_full(モジュール拒否コード)は 409 を返す", async () => {
