@@ -102,20 +102,12 @@ describe("ログインフロー", () => {
     );
   });
 
-  it("creates a tenant and refreshes the list", async () => {
-    const created = { id: "t9", slug: "new-blog", name: "New Blog", role: "owner" };
-    let tenantRows: unknown[] = [];
-    const tenants = vi.fn(() => jsonResponse(200, { tenants: tenantRows }));
-    const create = vi.fn(() => {
-      tenantRows = [created];
-      return jsonResponse(201, { tenantId: "t9" });
-    });
-    renderAt("/tenants", { "/auth/tenants": tenants, "/v1/tenants": create });
-    const user = userEvent.setup();
-    await user.type(await screen.findByLabelText("テナント名"), "New Blog");
-    await user.type(screen.getByLabelText("slug"), "new-blog");
-    await user.click(screen.getByRole("button", { name: "作成" }));
-    expect(await screen.findByRole("link", { name: /New Blog/ })).toBeInTheDocument();
-    expect(create).toHaveBeenCalledTimes(1);
+  it("shows an empty state with no self-serve creation form when there are no tenants", async () => {
+    const tenants = vi.fn(() => jsonResponse(200, { tenants: [] }));
+    renderAt("/tenants", { "/auth/tenants": tenants });
+    expect(await screen.findByText("テナントは運営者が発行します")).toBeInTheDocument();
+    expect(screen.queryByLabelText("テナント名")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("slug")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "作成" })).not.toBeInTheDocument();
   });
 });

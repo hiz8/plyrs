@@ -76,13 +76,8 @@ export function createApiClient(fetchImpl: typeof fetch = (...args) => fetch(...
       const { tenants } = await requestJson<{ tenants: TenantSummary[] }>("/auth/tenants");
       return tenants;
     },
-    createTenant(name: string, slug: string): Promise<{ tenantId: string }> {
-      return requestJson("/v1/tenants", {
-        method: "POST",
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ name, slug }),
-      });
-    },
+    // createTenant（POST /v1/tenants）は Task 13 で撤去: self-serve 作成廃止(裁定 9)により
+    // 対応ルートが api Worker 側から消えている。作成は super コンソール専用(super-api.ts)。
     issueToken(tenantId: string): Promise<{ token: string; expiresIn: number }> {
       return requestJson("/auth/token", {
         method: "POST",

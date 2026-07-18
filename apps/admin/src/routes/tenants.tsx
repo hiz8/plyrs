@@ -1,7 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
-import { Button, TextField } from "@plyrs/ui";
+import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { ApiError } from "../lib/api-client";
 import { tenantsQueryOptions } from "../lib/queries";
@@ -38,9 +37,6 @@ const styles = stylex.create({
     textDecoration: "none",
   },
   role: { color: colors.textMuted, fontSize: typography.sizeSm, marginLeft: spacing.sm },
-  form: { display: "flex", flexDirection: "column", gap: spacing.sm },
-  subtitle: { fontSize: typography.sizeLg, marginBottom: 0 },
-  error: { color: colors.danger, fontSize: typography.sizeSm, margin: 0 },
   muted: { color: colors.textMuted, fontSize: typography.sizeMd },
   footer: { display: "flex", justifyContent: "flex-end" },
 });
@@ -67,30 +63,6 @@ function TenantsPage() {
   const { api, queryClient, tokens } = Route.useRouteContext();
   const tenants = Route.useLoaderData();
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function createTenant() {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.createTenant(name, slug);
-      setName("");
-      setSlug("");
-      await queryClient.invalidateQueries({ queryKey: ["tenants"] });
-      await router.invalidate();
-    } catch (cause) {
-      setError(
-        cause instanceof ApiError && cause.code === "slug_taken"
-          ? "この slug は既に使われています"
-          : "テナントを作成できませんでした（slug は小文字英数字とハイフン）",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function logout() {
     try {
@@ -107,9 +79,7 @@ function TenantsPage() {
     <main {...stylex.props(styles.page)}>
       <h1 {...stylex.props(styles.title)}>テナントを選択</h1>
       {tenants.length === 0 ? (
-        <p {...stylex.props(styles.muted)}>
-          所属テナントがありません。下のフォームから作成できます。
-        </p>
+        <p {...stylex.props(styles.muted)}>テナントは運営者が発行します</p>
       ) : (
         <ul {...stylex.props(styles.list)}>
           {tenants.map((tenant) => (
@@ -128,27 +98,6 @@ function TenantsPage() {
           ))}
         </ul>
       )}
-      <section>
-        <h2 {...stylex.props(styles.subtitle)}>新しいテナント</h2>
-        <form
-          {...stylex.props(styles.form)}
-          onSubmit={(event) => {
-            event.preventDefault();
-            void createTenant();
-          }}
-        >
-          <TextField label="テナント名" value={name} onChange={setName} isRequired />
-          <TextField label="slug" value={slug} onChange={setSlug} isRequired />
-          {error !== null ? (
-            <p {...stylex.props(styles.error)} role="alert">
-              {error}
-            </p>
-          ) : null}
-          <Button type="submit" isDisabled={busy}>
-            作成
-          </Button>
-        </form>
-      </section>
       <div {...stylex.props(styles.footer)}>
         <Button variant="secondary" onPress={() => void logout()}>
           ログアウト
