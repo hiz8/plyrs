@@ -13,3 +13,7 @@ coverage/
 .superpowers/
 .claude/worktrees/
 .claude/settings.local.json
+apps/e2e/test-results/
+apps/e2e/playwright-report/
+# helpers/setup.ts が spec 間で super 管理者の totp secret を橋渡しするための実行時キャッシュ
+apps/e2e/.state/

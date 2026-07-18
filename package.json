@@ -6,7 +6,7 @@
     "format": "oxfmt --ignore-path=.gitignore --ignore-path=.oxfmtignore .",
     "format:check": "oxfmt --check --ignore-path=.gitignore --ignore-path=.oxfmtignore .",
     "typecheck": "pnpm -r run typecheck",
-    "test": "pnpm -r run test"
+    "test": "pnpm -r --filter '!@plyrs/e2e' run test"
   },
   "devDependencies": {
     "oxfmt": "0.58.0",

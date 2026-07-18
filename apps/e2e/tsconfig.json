@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // globalSetup / helpers が node:fs 等を直接 import するため(他パッケージは node: を
+    // 直接使わず types:[] のままで足りている — e2e だけ明示的に node を含める)。
+    "types": ["node"]
+  },
+  "include": ["*.ts", "tests", "helpers"]
+}

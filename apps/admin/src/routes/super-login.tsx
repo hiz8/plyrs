@@ -135,7 +135,10 @@ function SuperLoginPage() {
             <p {...stylex.props(styles.totpInfoNote)}>
               認証アプリに登録してからコードを入力してください
             </p>
-            <p {...stylex.props(styles.totpInfoValue)}>{totpInfo.totpSecret}</p>
+            {/* data-testid: E2E(apps/e2e)が totp secret を読み取るためのフック。表示ロジックは変更しない */}
+            <p {...stylex.props(styles.totpInfoValue)} data-testid="totp-secret">
+              {totpInfo.totpSecret}
+            </p>
             <p {...stylex.props(styles.totpInfoValue)}>{totpInfo.otpauthUri}</p>
           </div>
         )}
