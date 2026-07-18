@@ -176,4 +176,22 @@ describe("auth routes", () => {
     const denied = await app.request("/auth/tenants", { headers: { cookie } }, testEnv);
     expect(denied.status).toBe(403);
   });
+
+  it("rejects login for a globally blocked user", async () => {
+    const email = `${unique("blocked")}@example.com`;
+    const signup = await app.request(
+      "/auth/signup",
+      json({ email, password: "hunter2hunter2" }),
+      testEnv,
+    );
+    const { userId } = (await signup.json()) as { userId: string };
+    await blockUser(env.BLOCKLIST, userId);
+    const denied = await app.request(
+      "/auth/login",
+      json({ email, password: "hunter2hunter2" }),
+      testEnv,
+    );
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({ error: "blocked" });
+  });
 });

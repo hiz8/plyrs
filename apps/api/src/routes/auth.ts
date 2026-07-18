@@ -6,7 +6,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { v7 as uuidv7 } from "uuid";
 import { z } from "zod";
 import { memberships, tenants, users } from "@plyrs/db/control-plane";
-import { isBlocked } from "../auth/blocklist";
+import { isBlocked, isMembershipBlocked } from "../auth/blocklist";
 import { normalizeEmail } from "../auth/email";
 import { signTenantToken, TOKEN_TTL } from "../auth/jwt";
 import { hashPassword, verifyPassword } from "../auth/password";
@@ -106,6 +106,9 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
     if (row === undefined || !(await verifyPassword(password, row.passwordHash))) {
       return c.json({ error: "invalid_credentials" }, 401);
     }
+    if (await isBlocked(c.env.BLOCKLIST, row.id)) {
+      return c.json({ error: "blocked" }, 403);
+    }
     const now = new Date();
     const { token } = await createSession(c.env.DB, row.id, now);
     setCookie(c, SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
@@ -140,6 +143,9 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
     )[0];
     if (membership === undefined || !isRole(membership.role)) {
       return c.json({ error: "not_a_member" }, 403);
+    }
+    if (await isMembershipBlocked(c.env.BLOCKLIST, session.userId, tenantId)) {
+      return c.json({ error: "blocked" }, 403);
     }
     const jwt = await signTenantToken(c.env.JWT_SECRET, {
       userId: session.userId,

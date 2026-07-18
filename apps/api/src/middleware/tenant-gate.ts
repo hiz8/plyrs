@@ -1,5 +1,5 @@
 import { createMiddleware } from "hono/factory";
-import { isBlocked } from "../auth/blocklist";
+import { isBlocked, isMembershipBlocked } from "../auth/blocklist";
 import { verifyTenantToken } from "../auth/jwt";
 import type { AuthContext } from "../do/authorize";
 import type { SocketAuth } from "../sync/session";
@@ -27,6 +27,9 @@ export async function authenticateTenantToken(
     return { ok: false, failure: { code: "wrong_tenant", status: 403 } };
   }
   if (await isBlocked(env.BLOCKLIST, claims.userId)) {
+    return { ok: false, failure: { code: "blocked", status: 403 } };
+  }
+  if (await isMembershipBlocked(env.BLOCKLIST, claims.userId, tenantId)) {
     return { ok: false, failure: { code: "blocked", status: 403 } };
   }
   return {
