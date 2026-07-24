@@ -51,18 +51,20 @@ export function createApiClient(fetchImpl: typeof fetch = (...args) => fetch(...
     return (await response.json()) as T;
   }
   return {
-    signup(email: string, password: string): Promise<{ userId: string }> {
+    // turnstileToken は §6 の任意検証用。未指定なら JSON.stringify が undefined プロパティを
+    // 落とすので body は従来と同一(AUTH_TURNSTILE_SECRET_KEY 未設定環境向けの後方互換)。
+    signup(email: string, password: string, turnstileToken?: string): Promise<{ userId: string }> {
       return requestJson("/auth/signup", {
         method: "POST",
         headers: JSON_HEADERS,
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, turnstileToken }),
       });
     },
-    login(email: string, password: string): Promise<{ userId: string }> {
+    login(email: string, password: string, turnstileToken?: string): Promise<{ userId: string }> {
       return requestJson("/auth/login", {
         method: "POST",
         headers: JSON_HEADERS,
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, turnstileToken }),
       });
     },
     async logout(): Promise<void> {
@@ -71,6 +73,10 @@ export function createApiClient(fetchImpl: typeof fetch = (...args) => fetch(...
         headers: JSON_HEADERS,
         body: "{}",
       });
+    },
+    // §6: siteKey が null なら Turnstile 無効(フロントは従来 UI のまま何もしない)
+    turnstileConfig(): Promise<{ siteKey: string | null }> {
+      return requestJson("/auth/turnstile-config");
     },
     async listTenants(): Promise<TenantSummary[]> {
       const { tenants } = await requestJson<{ tenants: TenantSummary[] }>("/auth/tenants");

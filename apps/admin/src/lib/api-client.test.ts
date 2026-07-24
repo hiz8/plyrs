@@ -23,6 +23,36 @@ describe("api client (same-origin 相対パス・fetch 注入)", () => {
     });
   });
 
+  it("includes the turnstile token in /auth/signup when provided", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(201, { userId: "u1" }));
+    const api = createApiClient(fetchImpl);
+    await api.signup("a@example.com", "hunter2hunter2", "tok-1");
+    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toStrictEqual({
+      email: "a@example.com",
+      password: "hunter2hunter2",
+      turnstileToken: "tok-1",
+    });
+  });
+
+  it("omits the turnstile token from /auth/login when not provided", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { userId: "u1" }));
+    const api = createApiClient(fetchImpl);
+    await api.login("a@example.com", "hunter2hunter2");
+    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toStrictEqual({
+      email: "a@example.com",
+      password: "hunter2hunter2",
+    });
+  });
+
+  it("fetches the turnstile site key from GET /auth/turnstile-config", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { siteKey: "site-xyz" }));
+    const api = createApiClient(fetchImpl);
+    expect(await api.turnstileConfig()).toStrictEqual({ siteKey: "site-xyz" });
+    expect(fetchImpl.mock.calls[0]?.[0]).toBe("/auth/turnstile-config");
+  });
+
   it("unwraps the tenants list from GET /auth/tenants", async () => {
     const tenants = [{ id: "t1", slug: "blog", name: "Blog", role: "owner" }];
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { tenants }));

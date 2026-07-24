@@ -3,6 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button, TextField } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
+import { TurnstileWidget } from "../components/turnstile-widget";
 import { ApiError } from "../lib/api-client";
 
 const styles = stylex.create({
@@ -31,11 +32,26 @@ const styles = stylex.create({
   alt: { fontSize: typography.sizeSm, color: colors.textMuted },
 });
 
-export const Route = createFileRoute("/signup")({ component: SignupPage });
+export const Route = createFileRoute("/signup")({
+  // §6: siteKey は公開情報。defaultSsr: false なのでこの loader はクライアント専用(super-login.tsx と同型)。
+  loader: async ({ context }) => {
+    return context.queryClient.fetchQuery({
+      queryKey: ["turnstile-config"],
+      queryFn: () => context.api.turnstileConfig(),
+    });
+  },
+  component: SignupPage,
+});
 
 function messageFor(cause: unknown): string {
   if (cause instanceof ApiError && cause.code === "email_taken") {
     return "このメールアドレスは既に登録されています";
+  }
+  if (
+    cause instanceof ApiError &&
+    (cause.code === "turnstile_required" || cause.code === "turnstile_failed")
+  ) {
+    return "認証確認に失敗しました。もう一度お試しください";
   }
   if (cause instanceof ApiError && cause.status === 400) {
     return "入力内容を確認してください（パスワードは 12 文字以上）";
@@ -45,9 +61,11 @@ function messageFor(cause: unknown): string {
 
 function SignupPage() {
   const { api } = Route.useRouteContext();
+  const { siteKey } = Route.useLoaderData();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -55,10 +73,13 @@ function SignupPage() {
     setBusy(true);
     setError(null);
     try {
-      await api.signup(email, password);
+      await api.signup(email, password, token ?? undefined);
       await navigate({ to: "/tenants" });
     } catch (cause) {
       setError(messageFor(cause));
+      // Turnstile トークンは検証で消費され再利用不可(email_taken 等の後続失敗でも同様)。
+      // 失敗時は毎回クリアし、siteKey ありの場合は送信ボタンの disable ガードで再取得を強制する。
+      setToken(null);
     } finally {
       setBusy(false);
     }
@@ -91,12 +112,13 @@ function SignupPage() {
           isRequired
           minLength={12}
         />
+        {siteKey !== null ? <TurnstileWidget siteKey={siteKey} onToken={setToken} /> : null}
         {error !== null ? (
           <p {...stylex.props(styles.error)} role="alert">
             {error}
           </p>
         ) : null}
-        <Button type="submit" isDisabled={busy}>
+        <Button type="submit" isDisabled={busy || (siteKey !== null && token === null)}>
           サインアップ
         </Button>
         <span {...stylex.props(styles.alt)}>

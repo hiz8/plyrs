@@ -47,6 +47,9 @@ const blogTenant = { id: "t1", slug: "blog", name: "Blog", role: "owner" };
 
 function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, Handler> {
   return {
+    // 未認証時は /login に落ちる。その loader が無条件で叩くため、ここでの関心事でなくても
+    // 常に無効(siteKey: null)を用意しておく。
+    "/auth/turnstile-config": vi.fn(() => jsonResponse(200, { siteKey: null })),
     "/auth/tenants": vi.fn(() => jsonResponse(200, { tenants: [blogTenant] })),
     "/auth/token": vi.fn(() => jsonResponse(200, { token: "jwt-abc", expiresIn: 900 })),
     "/v1/t/t1/content-types": vi.fn(() =>
