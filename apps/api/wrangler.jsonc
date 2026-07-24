@@ -99,6 +99,8 @@
   "env": {
     "preview": {
       "name": "plyrs-api-preview",
+      // 公開値(secret ではない)。設定時のみ /auth/turnstile-config が siteKey を返し signup/login で検証必須化
+      "vars": { "AUTH_TURNSTILE_SITE_KEY": "0x4AAAAAAD80uG0GCAIRGlqo" },
       "durable_objects": {
         "bindings": [{ "name": "TENANT_DO", "class_name": "TenantDO" }],
       },
