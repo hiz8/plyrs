@@ -18,6 +18,9 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",
   timeout: 60_000,
+  // defaultSsr: false 化(src/start.ts)で初回描画がクライアント側になり、dev の
+  // コールドコンパイルでは最初の要素表示まで約 8 秒かかる(実測)。既定 5s では不足。
+  expect: { timeout: 15_000 },
   retries: process.env.CI ? 1 : 0,
   workers: 1, // 共有 dev サーバー + 共有ローカル D1 のため直列
   use: { baseURL: "http://localhost:5199" },
