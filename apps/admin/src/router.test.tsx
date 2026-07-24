@@ -2,6 +2,7 @@ import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { createAppContext, getRouter } from "./router";
+import { startInstance } from "./start";
 
 function stubFetch(status: number, body: unknown): typeof fetch {
   return async () =>
@@ -21,8 +22,8 @@ describe("router scaffold", () => {
     expect(await screen.findByRole("heading", { name: "ログイン" })).toBeInTheDocument();
   });
 
-  it("has defaultSsr set to false", () => {
-    const router = getRouter();
-    expect(router.options.defaultSsr).toBe(false);
+  it("has defaultSsr set to false via the start instance", async () => {
+    const options = await startInstance.getOptions();
+    expect(options.defaultSsr).toBe(false);
   });
 });
