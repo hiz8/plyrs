@@ -20,4 +20,9 @@ describe("router scaffold", () => {
     render(<RouterProvider router={router} />);
     expect(await screen.findByRole("heading", { name: "ログイン" })).toBeInTheDocument();
   });
+
+  it("has defaultSsr set to false", () => {
+    const router = getRouter();
+    expect(router.options.defaultSsr).toBe(false);
+  });
 });

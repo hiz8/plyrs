@@ -101,6 +101,10 @@ export function getRouter(options?: { context?: RouterContext; history?: RouterH
     context: options?.context ?? createAppContext(),
     defaultPreload: "intent",
     defaultErrorComponent: ErrorScreen,
+    // workerd の SSR は相対 URL fetch を解決できないため、
+    // loader/beforeLoad をクライアント専用化する。シェル配信(server.ts)が主防御で、
+    // これは SSR ハンドラに落ちた場合の二次防御。
+    defaultSsr: false,
     ...(options?.history ? { history: options.history } : {}),
   });
 }
