@@ -106,20 +106,19 @@
         {
           "binding": "DB",
           "database_name": "plyrs-control-plane-preview",
-          // database_id は docs/deploy.md §1 の手順で作成後に実値へ差し替える(それまでダミー)
-          "database_id": "10000000-0000-0000-0000-000000000000",
+          "database_id": "8899f9c1-98be-4093-bfc7-caf817b36e0f",
           "migrations_dir": "../../packages/db/drizzle-d1",
         },
         {
           "binding": "PROJECTION_DB",
           "database_name": "plyrs-projection-preview",
-          "database_id": "10000000-0000-0000-0000-000000000001",
+          "database_id": "d41f800d-5471-43fc-9355-489223a2a1e8",
           "migrations_dir": "../../packages/db/drizzle-projection",
         },
       ],
       "kv_namespaces": [
-        { "binding": "BLOCKLIST", "id": "10000000000000000000000000000000" },
-        { "binding": "TENANT_SLUGS", "id": "10000000000000000000000000000001" },
+        { "binding": "BLOCKLIST", "id": "d767b0a5273f4ebb844f5fcbdb3a1d2b" },
+        { "binding": "TENANT_SLUGS", "id": "fe36d0e9a0e4431e8568b33a6e89d34b" },
       ],
       "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "plyrs-assets-preview" }],
       "queues": {
