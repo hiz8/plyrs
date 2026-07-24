@@ -9,17 +9,22 @@
   // 裁定 10(2026-07-18): /public/v1 の dev 限定転送スイッチ。既定は無効(本番挙動)。
   // ローカル E2E は apps/admin/.dev.vars で "1" に上書きする(.dev.vars.example 参照)。
   "vars": { "DEV_PROXY_PUBLIC": "0" },
+  // SPA シェル配信(防御 A): server.ts が _shell.html を fetch するための assets
+  // binding。directory は @cloudflare/vite-plugin がビルド出力から自動注入するため書かない。
+  "assets": { "binding": "ASSETS" },
   // Task 15: preview/production 環境分割。素の `wrangler deploy`(--env なし)は禁止。
   "env": {
     "preview": {
       "name": "plyrs-admin-preview",
       "services": [{ "binding": "API", "service": "plyrs-api-preview" }],
       "vars": { "DEV_PROXY_PUBLIC": "0" },
+      "assets": { "binding": "ASSETS" },
     },
     "production": {
       "name": "plyrs-admin",
       "services": [{ "binding": "API", "service": "plyrs-api" }],
       "vars": { "DEV_PROXY_PUBLIC": "0" },
+      "assets": { "binding": "ASSETS" },
     },
   },
 }

@@ -1,22 +1,27 @@
 import handler, { createServerEntry } from "@tanstack/react-start/server-entry";
 import { env } from "cloudflare:workers";
-import { isApiPath } from "./lib/api-paths";
+import { resolveServerRoute } from "./lib/server-routing";
 
-// WebSocket（/v1/t/:tenantId/sync）の upgrade もこの転送に乗る。
+// SPA シェル配信(防御 A): TanStack Start の SPA モードは「404 を _shell.html へ
+// リライトする」静的ホスティング前提(Netlify _redirects 等)。Workers にはこのリライト層が
+// ないため、判定を resolveServerRoute に切り出し薄い接着層としてここで振り分ける。
+// WebSocket（/v1/t/:tenantId/sync）の upgrade は isApiPath 経由で "api" に乗る。
 export default createServerEntry({
-  fetch(request) {
-    const { pathname } = new URL(request.url);
-    if (isApiPath(pathname)) {
+  async fetch(request) {
+    const route = resolveServerRoute(request, { devProxyPublic: env.DEV_PROXY_PUBLIC === "1" });
+    if (route === "api") {
       return env.API.fetch(request);
     }
-    // 裁定 10(2026-07-18): E2E がコアジャーニー(publish → 公開 read)を検証するための
-    // dev 限定転送。本番は 6a 裁定どおり /public/v1 を admin から配信しない。
-    if (
-      env.DEV_PROXY_PUBLIC === "1" &&
-      (pathname === "/public/v1" || pathname.startsWith("/public/v1/"))
-    ) {
-      return env.API.fetch(request);
+    if (route === "shell") {
+      // dev には _shell.html が存在しない(prerender はビルド時のみ)ため、ASSETS 未定義
+      // または非 ok は下の handler.fetch にフォールバック = dev の従来挙動を維持
+      // (既存 E2E 3 本が dev SSR 前提のため必須)。
+      const shellResponse = await env.ASSETS?.fetch(new URL("/_shell.html", request.url));
+      if (shellResponse?.ok) {
+        return new Response(shellResponse.body, { headers: shellResponse.headers, status: 200 });
+      }
     }
+    // "ssr" ルート、および shell フォールバックはここに合流する。
     return handler.fetch(request);
   },
 });
