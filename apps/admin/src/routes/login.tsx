@@ -63,6 +63,8 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState<string | null>(null);
+  // ウィジェットの key。失敗のたびに増やして TurnstileWidget を強制再マウントする(下記コメント参照)。
+  const [failureCount, setFailureCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -74,9 +76,13 @@ function LoginPage() {
       await navigate({ to: "/tenants" });
     } catch (cause) {
       setError(messageFor(cause));
-      // Turnstile トークンは検証で消費され再利用不可(invalid_credentials 等の後続失敗でも同様)。
-      // 失敗時は毎回クリアし、siteKey ありの場合は送信ボタンの disable ガードで再取得を強制する。
+      // 失敗理由を問わずトークンを使い捨て扱いにする(auth.ts はレート制限チェックの方が
+      // turnstile 検証より先に走るため rate_limited 等は未消費で返ることもあるが、区別せず
+      // 一律クリアする)。TurnstileWidget 自体は成功状態のまま新しいイベントを発火しないため、
+      // key を更新して強制再マウントし、Cloudflare の自動リフレッシュ(~300 秒)を待たず
+      // 新しいトークンをすぐ取得できるようにする。
       setToken(null);
+      setFailureCount((count) => count + 1);
     } finally {
       setBusy(false);
     }
@@ -108,7 +114,9 @@ function LoginPage() {
           onChange={setPassword}
           isRequired
         />
-        {siteKey !== null ? <TurnstileWidget siteKey={siteKey} onToken={setToken} /> : null}
+        {siteKey !== null ? (
+          <TurnstileWidget key={failureCount} siteKey={siteKey} onToken={setToken} />
+        ) : null}
         {error !== null ? (
           <p {...stylex.props(styles.error)} role="alert">
             {error}

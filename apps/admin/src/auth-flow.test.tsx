@@ -234,4 +234,80 @@ describe("Turnstile 統合", () => {
     );
     expect(screen.getByRole("button", { name: "ログイン" })).toBeDisabled();
   });
+
+  it("remounts the turnstile widget after a login failure so a fresh token can be issued", async () => {
+    const login: Handler = vi.fn();
+    login.mockImplementationOnce(() => jsonResponse(401, { error: "invalid_credentials" }));
+    login.mockImplementationOnce(() => jsonResponse(200, { userId: "u1" }));
+    const tenants = vi.fn(() => jsonResponse(200, { tenants: [] }));
+    renderAt("/login", {
+      "/auth/login": login,
+      "/auth/tenants": tenants,
+      "/auth/turnstile-config": turnstileEnabled(),
+    });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("メールアドレス"), "a@example.com");
+    await user.type(screen.getByLabelText("パスワード"), "wrong-password-x");
+    await waitFor(() => expect(renderMock).toHaveBeenCalled());
+    const rendersBeforeFailure = renderMock.mock.calls.length;
+    lastRenderParams()?.callback?.("tok-first");
+    await waitFor(() => expect(screen.getByRole("button", { name: "ログイン" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "ログイン" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "メールアドレスまたはパスワードが違います",
+    );
+    // 失敗のたびにウィジェットが強制再マウントされ、Cloudflare の自動リフレッシュ(~300 秒)を
+    // 待たずに新しい render 呼び出し(=新しいトークン取得の機会)が発生するはず。
+    await waitFor(() => expect(renderMock.mock.calls.length).toBeGreaterThan(rendersBeforeFailure));
+    expect(screen.getByRole("button", { name: "ログイン" })).toBeDisabled();
+    lastRenderParams()?.callback?.("tok-second");
+    await waitFor(() => expect(screen.getByRole("button", { name: "ログイン" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "ログイン" }));
+    expect(await screen.findByRole("heading", { name: "テナントを選択" })).toBeInTheDocument();
+    expect(login).toHaveBeenCalledTimes(2);
+    const secondInit = login.mock.calls[1]?.[0];
+    const body = JSON.parse(String((secondInit as RequestInit).body));
+    expect(body).toStrictEqual({
+      email: "a@example.com",
+      password: "wrong-password-x",
+      turnstileToken: "tok-second",
+    });
+  });
+
+  it("remounts the turnstile widget after a signup failure so a fresh token can be issued", async () => {
+    const signup: Handler = vi.fn();
+    signup.mockImplementationOnce(() => jsonResponse(409, { error: "email_taken" }));
+    signup.mockImplementationOnce(() => jsonResponse(201, { userId: "u1" }));
+    const tenants = vi.fn(() => jsonResponse(200, { tenants: [] }));
+    renderAt("/signup", {
+      "/auth/signup": signup,
+      "/auth/tenants": tenants,
+      "/auth/turnstile-config": turnstileEnabled(),
+    });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("メールアドレス"), "new@example.com");
+    await user.type(screen.getByLabelText("パスワード"), "hunter2hunter2");
+    await waitFor(() => expect(renderMock).toHaveBeenCalled());
+    const rendersBeforeFailure = renderMock.mock.calls.length;
+    lastRenderParams()?.callback?.("tok-first");
+    await waitFor(() => expect(screen.getByRole("button", { name: "サインアップ" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "サインアップ" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "このメールアドレスは既に登録されています",
+    );
+    await waitFor(() => expect(renderMock.mock.calls.length).toBeGreaterThan(rendersBeforeFailure));
+    expect(screen.getByRole("button", { name: "サインアップ" })).toBeDisabled();
+    lastRenderParams()?.callback?.("tok-second");
+    await waitFor(() => expect(screen.getByRole("button", { name: "サインアップ" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "サインアップ" }));
+    expect(await screen.findByRole("heading", { name: "テナントを選択" })).toBeInTheDocument();
+    expect(signup).toHaveBeenCalledTimes(2);
+    const secondInit = signup.mock.calls[1]?.[0];
+    const body = JSON.parse(String((secondInit as RequestInit).body));
+    expect(body).toStrictEqual({
+      email: "new@example.com",
+      password: "hunter2hunter2",
+      turnstileToken: "tok-second",
+    });
+  });
 });
