@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi, type Mock } from "vitest";
 import type { TurnstileApi, TurnstileRenderParams } from "./lib/turnstile";
@@ -173,7 +173,13 @@ function findTurnstileScript(): HTMLScriptElement | null {
 // 汚染しないよう、残った script は failure させて loadPromise を null に戻しておく。
 describe("Turnstile ロード失敗", () => {
   afterEach(() => {
+    // グローバルの afterEach(cleanup)がこの後に走る保証はない(hook 実行順に依存しない
+    // ようにするため、ここでも明示的に・冪等に呼ぶ)。マウントされたままだと script の
+    // failure が widget の再マウント(新しい script 注入)を誘発し、後始末できないまま
+    // 後続の describe(window.turnstile を stub する)に漏れてしまう。
+    cleanup();
     findTurnstileScript()?.dispatchEvent(new Event("error"));
+    vi.unstubAllGlobals();
   });
 
   it("shows a message when the turnstile script fails to load on the login page", async () => {
@@ -194,6 +200,66 @@ describe("Turnstile ロード失敗", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "認証ウィジェットの読み込みに失敗しました。再試行するか、ページを再読み込みしてください。",
     );
+  });
+
+  it("retries the turnstile script up to 3 times after load failures, then stops re-injecting", async () => {
+    renderAt("/login", { "/auth/turnstile-config": turnstileEnabled() });
+    await screen.findByLabelText("メールアドレス");
+
+    const seenScripts = new Set<HTMLScriptElement>();
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const script = await waitFor(() => {
+        const found = findTurnstileScript();
+        if (found === null || seenScripts.has(found)) {
+          throw new Error("waiting for a fresh script instance");
+        }
+        return found;
+      });
+      seenScripts.add(script);
+      script.dispatchEvent(new Event("error"));
+    }
+    expect(seenScripts.size).toBe(4); // 初回 + 上限 3 回分の自動再試行
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "認証ウィジェットの読み込みに失敗しました。再試行するか、ページを再読み込みしてください。",
+    );
+    // 上限到達後は remount されず、新しい script も注入されない
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(findTurnstileScript()).toBeNull();
+  });
+
+  it("clears the load-failure message once a retried widget issues a token", async () => {
+    renderAt("/login", { "/auth/turnstile-config": turnstileEnabled() });
+    await screen.findByLabelText("メールアドレス");
+
+    const firstScript = await waitFor(() => {
+      const found = findTurnstileScript();
+      if (found === null) throw new Error("script not injected");
+      return found;
+    });
+    firstScript.dispatchEvent(new Event("error"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "認証ウィジェットの読み込みに失敗しました。再試行するか、ページを再読み込みしてください。",
+    );
+
+    const secondScript = await waitFor(() => {
+      const found = findTurnstileScript();
+      if (found === null || found === firstScript) {
+        throw new Error("waiting for the retried script");
+      }
+      return found;
+    });
+    const onloadName = new URL(secondScript.src).searchParams.get("onload");
+    if (onloadName === null) throw new Error("onload param missing");
+    const renderMock: RenderMock = vi.fn(() => "widget-retry");
+    const api: TurnstileApi = { render: renderMock, reset: vi.fn(), remove: vi.fn() };
+    vi.stubGlobal("turnstile", api);
+    (window as unknown as Record<string, (() => void) | undefined>)[onloadName]?.();
+
+    await waitFor(() => expect(renderMock).toHaveBeenCalledTimes(1));
+    renderMock.mock.calls[0]?.[1]?.callback?.("tok-retry");
+
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 });
 

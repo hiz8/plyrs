@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button, TextField } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { TurnstileWidget } from "../components/turnstile-widget";
@@ -70,14 +70,34 @@ function SignupPage() {
   const [failureCount, setFailureCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // ロード失敗の自動再試行回数(submit 失敗経由の failureCount 増加とは別枠でカウントする)。
+  // プライバシー系ブロッカーやオフラインでは script の error がほぼ即時発火し続けるため、
+  // 上限なしでは無限ループになる。
+  const loadFailuresRef = useRef(0);
+  // 直近の error が「ロード失敗」由来かどうか。トークン取得時にこの由来のメッセージだけを
+  // 消す(submit 失敗のメッセージを誤って消さないため)。
+  const loadErrorRef = useRef(false);
 
   // ウィジェットの script ロード失敗時。理由を表示しつつ、submit 失敗時と同じ導線
-  // (failureCount インクリメント → 再マウント)で自動的に再試行する。
+  // (failureCount インクリメント → 再マウント)で自動的に再試行するが、最大 3 回まで。
   function handleTurnstileLoadError() {
     setError(
       "認証ウィジェットの読み込みに失敗しました。再試行するか、ページを再読み込みしてください。",
     );
-    setFailureCount((count) => count + 1);
+    loadErrorRef.current = true;
+    loadFailuresRef.current += 1;
+    if (loadFailuresRef.current <= 3) {
+      setFailureCount((count) => count + 1);
+    }
+  }
+
+  // ロード失敗からの再試行でトークンが取れたら、そのメッセージだけを消す。
+  function handleTurnstileToken(newToken: string | null) {
+    setToken(newToken);
+    if (newToken !== null && loadErrorRef.current) {
+      loadErrorRef.current = false;
+      setError(null);
+    }
   }
 
   async function submit() {
@@ -131,7 +151,7 @@ function SignupPage() {
           <TurnstileWidget
             key={failureCount}
             siteKey={siteKey}
-            onToken={setToken}
+            onToken={handleTurnstileToken}
             onLoadError={handleTurnstileLoadError}
           />
         ) : null}
