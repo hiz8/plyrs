@@ -42,9 +42,11 @@ describe("super user management", () => {
     const e = superEnv();
     const tag = crypto.randomUUID();
     const aliceEmail = `aaa-${tag}@x.com`;
+    const carolEmail = `ccc-${tag}@x.com`; // どのテナントにも属さない(membershipCount=0)
     const zebraEmail = `zzz-${tag}@x.com`;
     const bobEmail = `bob-${crypto.randomUUID()}@other.com`;
     const aliceId = await insertUser(aliceEmail);
+    const carolId = await insertUser(carolEmail);
     const zebraId = await insertUser(zebraEmail);
     await insertUser(bobEmail);
 
@@ -62,11 +64,45 @@ describe("super user management", () => {
     const { users: rows } = (await res.json()) as {
       users: { id: string; email: string; createdAt: string; membershipCount: number }[];
     };
-    // bob は q に一致しないので除外され、email 昇順で alice → zebra の 2 件のみ
+    // bob は q に一致しないので除外され、email 昇順で alice → carol(0件でも一覧に出る)→ zebra
     expect(rows).toMatchObject([
       { id: aliceId, email: aliceEmail, membershipCount: 2 },
+      { id: carolId, email: carolEmail, membershipCount: 0 },
       { id: zebraId, email: zebraEmail, membershipCount: 1 },
     ]);
+  });
+
+  // Minor 掃除(§16-4): LIKE の特殊文字(% _)を検索語からそのままパターンへ埋め込むと、
+  // ユーザーが入力した % や _ がワイルドカードとして働いてしまい、意図しない過剰一致を招く。
+  it("treats % and _ in the search term as literal characters, not LIKE wildcards", async () => {
+    const { cookie } = await superLogin();
+    const e = superEnv();
+    const tag = crypto.randomUUID();
+    const percentEmail = `pct100%off-${tag}@x.com`; // 検索語 "100%" に文字どおり一致するべき
+    const noPercentEmail = `pct100xoff-${tag}@x.com`; // 検索語をワイルドカード扱いすると誤って一致してしまう
+    const percentId = await insertUser(percentEmail);
+    await insertUser(noPercentEmail);
+
+    const percentRes = await app.request(
+      `/super/v1/users?q=${encodeURIComponent(`100%off-${tag}`)}`,
+      { headers: { cookie } },
+      e,
+    );
+    const { users: percentRows } = (await percentRes.json()) as { users: { id: string }[] };
+    expect(percentRows.map((r) => r.id)).toEqual([percentId]);
+
+    const underscoreEmail = `us_score-${tag}@x.com`; // 検索語 "us_score" に文字どおり一致するべき
+    const noUnderscoreEmail = `usXscore-${tag}@x.com`; // ワイルドカード扱いだと "_" が任意の 1 文字に一致してしまう
+    const underscoreId = await insertUser(underscoreEmail);
+    await insertUser(noUnderscoreEmail);
+
+    const underscoreRes = await app.request(
+      `/super/v1/users?q=${encodeURIComponent(`us_score-${tag}`)}`,
+      { headers: { cookie } },
+      e,
+    );
+    const { users: underscoreRows } = (await underscoreRes.json()) as { users: { id: string }[] };
+    expect(underscoreRows.map((r) => r.id)).toEqual([underscoreId]);
   });
 
   it("bans and unbans a user", async () => {

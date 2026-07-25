@@ -1,11 +1,15 @@
 import { env } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { app } from "../src/index";
 import { blockUser } from "../src/auth/blocklist";
 import { verifyTenantToken } from "../src/auth/jwt";
 import { SESSION_COOKIE } from "../src/auth/session";
 import { insertTenantWithOwner } from "./create-tenant";
 import { fakeLimiter } from "./rate-limit-helper";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 // 共有ストレージ（--no-isolate）ではファイル間でも衝突しないよう、実行ごとのランダム接頭辞を混ぜる
 const RUN_ID = crypto.randomUUID().slice(0, 8);
@@ -88,6 +92,24 @@ describe("auth routes", () => {
       testEnv,
     );
     expect(res.status).toBe(400);
+  });
+
+  // Minor 掃除(§16-1): 空文字の turnstileToken は siteverify まで進ませず zod で早期に 400 拒否する
+  // (以前は "" が optional の非 undefined 値として通り、siteverify 失敗の 403 turnstile_failed になっていた)。
+  it("rejects an empty turnstileToken with 400 before reaching siteverify", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const request = new Request(input, init);
+      throw new Error(`turnstile should not be reached: ${request.method} ${request.url}`);
+    });
+    const turnstileEnv: Env = { ...testEnv, AUTH_TURNSTILE_SECRET_KEY: "test-secret" };
+    const email = `${unique("empty-turnstile")}@example.com`;
+    const res = await app.request(
+      "/auth/signup",
+      json({ email, password: "hunter2hunter2", turnstileToken: "" }),
+      turnstileEnv,
+    );
+    expect(res.status).toBe(400);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it("revokes the session on logout", async () => {

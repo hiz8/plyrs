@@ -14,12 +14,15 @@ export async function banUserEverywhere(
     .select({ tenantId: memberships.tenantId })
     .from(memberships)
     .where(eq(memberships.userId, userId));
-  let disconnected = 0;
-  for (const row of rows) {
-    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(row.tenantId));
-    disconnected += await stub.disconnectUser(userId);
-  }
-  return { disconnected };
+  // 加入テナントごとの disconnect は互いに独立しているので並列実行する(失敗時の挙動は
+  // 逐次 await と同じ fail-fast — いずれかが reject すれば Promise.all も即座に reject する)。
+  const counts = await Promise.all(
+    rows.map((row) => {
+      const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(row.tenantId));
+      return stub.disconnectUser(userId);
+    }),
+  );
+  return { disconnected: counts.reduce((sum, n) => sum + n, 0) };
 }
 
 export async function revokeMembership(

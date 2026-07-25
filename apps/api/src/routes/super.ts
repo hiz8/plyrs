@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { asc, count, desc, eq, like } from "drizzle-orm";
+import { asc, count, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
 import { v7 as uuidv7 } from "uuid";
@@ -25,6 +25,19 @@ import { superGate, type SuperGateVariables } from "../middleware/super-gate";
 import type { ProjectionJob } from "../projection/jobs";
 import { asHealthReport, asReprojectResult, asStringArray } from "../rpc-unwrap";
 import { TENANT_SLUG_MAX_LENGTH, TENANT_SLUG_PATTERN } from "./tenants";
+
+// Minor 掃除(§16-3): precheck の SELECT と INSERT の間で同じ slug が挿入される TOCTOU レース
+// (idx_tenants_slug の UNIQUE 違反)を素の 500 にせず 409 slug_taken へ畳むための判定。
+function isUniqueConstraintError(err: unknown): boolean {
+  const cause = err instanceof Error ? err.cause : undefined;
+  return cause instanceof Error && cause.message.includes("UNIQUE constraint failed");
+}
+
+// Minor 掃除(§16-4): LIKE のワイルドカード(% _)と ESCAPE 文字自身(\)を検索語からそのまま
+// 埋め込むと、ユーザー入力がパターンとして解釈されて過剰一致する。ESCAPE '\' 前提でエスケープする。
+function likePattern(q: string): string {
+  return `%${q.replace(/[\\%_]/g, "\\$&")}%`;
+}
 
 const createTenantSchema = z.object({
   name: z.string().min(1).max(100),
@@ -80,8 +93,17 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
     const tenantId = uuidv7();
     // db.batch の型引数は可変長配列だと煩雑になる(要素数が ownerId の有無で変わる)ため、
     // 作成は低頻度・一意索引(idx_tenants_slug)が原子性を守ることから逐次 await に分解する
-    // (ブリーフ注記どおり)。
-    await db.insert(tenants).values({ id: tenantId, slug, name, createdAt: now });
+    // (ブリーフ注記どおり)。上の SELECT precheck はよくある事故を早期に弾くだけで、
+    // 並行リクエストの TOCTOU までは防げない — その場合は INSERT 自体が UNIQUE 制約違反で
+    // 落ちるので、素の 500 にせず catch して 409 slug_taken に畳む。
+    try {
+      await db.insert(tenants).values({ id: tenantId, slug, name, createdAt: now });
+    } catch (err) {
+      if (isUniqueConstraintError(err)) {
+        return c.json({ error: "slug_taken" }, 409);
+      }
+      throw err;
+    }
     if (ownerId !== null) {
       await db
         .insert(memberships)
@@ -165,7 +187,7 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       })
       .from(users)
       .leftJoin(memberships, eq(memberships.userId, users.id))
-      .where(q === "" ? undefined : like(users.email, `%${q}%`))
+      .where(q === "" ? undefined : sql`${users.email} LIKE ${likePattern(q)} ESCAPE '\\'`)
       .groupBy(users.id)
       .orderBy(asc(users.email))
       .limit(100);

@@ -48,6 +48,11 @@ function statusFor(code: string): ContentfulStatusCode {
   // §15-4: モジュール拒否コード(`moduleId:reason`、例 booking:slot_full)は公開 write(409)と
   // 揃える。公開 write 側(public-write.ts)は ':' 含みを一律 409 として扱っており、管理 API だけ
   // 既定 400 のままだと同じ拒否理由なのに経路でステータスが割れる。
+  // Minor 掃除(§16-2)申し送り: この判定は「':' を含むか」だけを見る部分文字列チェックで、
+  // moduleId が MODULE_REGISTRY に実在するかまでは検証しない(実際に ':' 付きコードを
+  // 返すのは現状 booking モジュールのみ — module-flow.test.ts の
+  // 「管理 API 経由の booking:slot_full は 409 を返す」が現行挙動を固定)。狭める効用より
+  // 挙動変更のリスクが上回るため、意図的にこのまま残す。
   return code.includes(":") ? 409 : 400;
 }
 

@@ -97,6 +97,7 @@ describe("super tenant CRUD", () => {
       e,
     );
     expect(dup.status).toBe(409);
+    expect(await dup.json()).toEqual({ error: "slug_taken" });
 
     const listed = (await (
       await app.request("/super/v1/tenants", { headers: { cookie } }, e)
@@ -115,6 +116,32 @@ describe("super tenant CRUD", () => {
       await drizzle(env.DB).select({ action: auditLogs.action }).from(auditLogs)
     ).map((r) => r.action);
     expect(actions).toEqual(expect.arrayContaining(["tenant.create", "tenant.rename"]));
+  });
+
+  // Minor 掃除(§16-3): precheck の SELECT 通過後に UNIQUE 制約違反が起きても素の 500 に
+  // ならず 409 slug_taken を返すことを、同一 slug への並行作成(TOCTOU)で検証する
+  // (super-auth.test.ts の「並行 bootstrap は片方だけ成立」と同じ真の並行発火の様式 —
+  // 逐次「直接 insert してから作成」では precheck の SELECT だけで 409 になり、
+  // catch(SqliteError) の経路を通らない)。
+  it("returns 409 slug_taken instead of 500 when two creates race on the same slug", async () => {
+    const { cookie } = await superLogin();
+    const e = superEnv();
+    const slug = `sup-race-${crypto.randomUUID()}`;
+    const [r1, r2] = await Promise.all([
+      app.request(
+        jsonReq("POST", "/super/v1/tenants", cookie, { name: "Race1", slug }),
+        undefined,
+        e,
+      ),
+      app.request(
+        jsonReq("POST", "/super/v1/tenants", cookie, { name: "Race2", slug }),
+        undefined,
+        e,
+      ),
+    ]);
+    expect([r1.status, r2.status].toSorted()).toEqual([201, 409]);
+    const loser = r1.status === 409 ? r1 : r2;
+    expect(await loser.json()).toEqual({ error: "slug_taken" });
   });
 
   it("deletes a tenant with full cascade", async () => {

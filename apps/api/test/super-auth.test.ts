@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { afterAll, describe, expect, it } from "vitest";
 import { auditLogs, superAdmins, superSessions } from "@plyrs/db/control-plane";
+import { createSuperSession, SUPER_SESSION_COOKIE } from "../src/auth/super-session";
 import { generateTotpCode } from "../src/auth/totp";
 import { app } from "../src/index";
 import { fakeLimiter } from "./rate-limit-helper";
@@ -131,6 +132,36 @@ describe("super auth", () => {
       await drizzle(env.DB).select({ action: auditLogs.action }).from(auditLogs)
     ).map((r) => r.action);
     expect(actions).toEqual(expect.arrayContaining(["super.bootstrap", "super.login"]));
+  });
+
+  // Minor 掃除(§16-6): admin 行が(手動 SQL 等の運用操作で)削除された後もセッションだけが
+  // 残っているケースの挙動を固定する。挙動は現状維持 — email は null を返す
+  // (admin UI は me.email ?? me.adminId 表示で対応済み)。
+  it("/super-auth/me returns adminId with a null email once the admin row is deleted", async () => {
+    const e = testEnv();
+    const db = drizzle(env.DB);
+    const adminId = crypto.randomUUID();
+    const now = new Date();
+    await db.insert(superAdmins).values({
+      id: adminId,
+      email: `ghost+${crypto.randomUUID()}@x.com`,
+      passwordHash: "h",
+      totpSecret: "JBSWY3DPEHPK3PXP",
+      totpLastCounter: 0,
+      createdAt: now.toISOString(),
+    });
+    const { token } = await createSuperSession(env.DB, adminId, now);
+    await db.delete(superAdmins).where(eq(superAdmins.id, adminId));
+
+    const me = await app.request(
+      "/super-auth/me",
+      { headers: { cookie: `${SUPER_SESSION_COOKIE}=${token}` } },
+      e,
+    );
+    expect(me.status).toBe(200);
+    expect(await me.json()).toEqual({ adminId, email: null });
+
+    await db.delete(superSessions).where(eq(superSessions.adminId, adminId));
   });
 
   it("rejects an unknown totp and rate-limits login", async () => {
