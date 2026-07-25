@@ -123,4 +123,54 @@ describe("super login", () => {
       await screen.findByRole("heading", { name: "運営コンソールへログイン" }),
     ).toBeInTheDocument();
   });
+
+  // Minor 掃除(§16): beforeLoad は 401 だけ /super-login へリダイレクトし、それ以外
+  // (500 等)の SuperApiError はそのまま再送出して defaultErrorComponent(ErrorScreen)に委ねる。
+  it("re-throws (does not redirect on) a non-401 error from the /super-auth/me check", async () => {
+    const status: Handler = vi.fn(() => jsonResponse(200, { bootstrapped: true }));
+    const me: Handler = vi.fn(() => jsonResponse(500, { error: "server_error" }));
+    renderAt("/super", { "/super-auth/status": status, "/super-auth/me": me });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("エラーが発生しました");
+    expect(screen.getByRole("alert")).toHaveTextContent("super api 500: server_error");
+    expect(
+      screen.queryByRole("heading", { name: "運営コンソールへログイン" }),
+    ).not.toBeInTheDocument();
+  });
+
+  // Minor 掃除(§16): ログアウトボタン → /super-login へ遷移し、queryClient がクリアされる
+  // (超一覧ページで乗っていたテナント一覧キャッシュが消えていることで確認)ことを検証する。
+  it("logs out, clears the query cache, and returns to /super-login", async () => {
+    const me: Handler = vi.fn(() =>
+      jsonResponse(200, { adminId: "a1", email: "admin@example.com" }),
+    );
+    const listTenants: Handler = vi.fn(() => jsonResponse(200, { tenants: [] }));
+    const logout: Handler = vi.fn(() => jsonResponse(200, { ok: true }));
+    const status: Handler = vi.fn(() => jsonResponse(200, { bootstrapped: true }));
+    const context = createAppContext(
+      stubFetch({
+        "/super-auth/me": me,
+        "/super/v1/tenants": listTenants,
+        "/super-auth/logout": logout,
+        "/super-auth/status": status,
+      }),
+    );
+    const router = getRouter({
+      context,
+      history: createMemoryHistory({ initialEntries: ["/super"] }),
+    });
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByRole("button", { name: "ログアウト" })).toBeInTheDocument();
+    expect(context.queryClient.getQueryData(["super", "tenants"])).toBeDefined();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "ログアウト" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "運営コンソールへログイン" }),
+    ).toBeInTheDocument();
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(context.queryClient.getQueryData(["super", "tenants"])).toBeUndefined();
+  });
 });

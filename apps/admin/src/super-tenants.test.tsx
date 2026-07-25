@@ -106,6 +106,82 @@ describe("super tenant management", () => {
     expect(listTenants).toHaveBeenCalledTimes(2);
   });
 
+  // Minor 掃除(§16-5): ownerEmail 省略時、body に "" ではなくキー自体が入らないことの専用テスト
+  // (admin 側に追加 — apps/api 側は複数テストで ownerEmail 省略の作成自体は通しているが、
+  // UI が組み立てる送信 body の形そのものを専用に確認したテストはなかった)。
+  it("creates a tenant without sending an ownerEmail key when the field is left blank", async () => {
+    const me = meHandler();
+    const created = {
+      id: "t9",
+      slug: "solo",
+      name: "Solo",
+      createdAt: "2026-07-20T00:00:00Z",
+      memberCount: 0,
+    };
+    const listTenants: Handler = vi
+      .fn()
+      .mockReturnValueOnce(jsonResponse(200, { tenants: [] }))
+      .mockReturnValue(jsonResponse(200, { tenants: [created] }));
+    const createTenant: Handler = vi.fn(() => jsonResponse(201, { tenantId: "t9" }));
+    renderAt("/super", {
+      "GET /super-auth/me": me,
+      "GET /super/v1/tenants": listTenants,
+      "POST /super/v1/tenants": createTenant,
+    });
+
+    expect(await screen.findByRole("heading", { name: "テナント" })).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("テナント名"), "Solo");
+    await user.type(screen.getByLabelText("slug"), "solo");
+    await user.click(screen.getByRole("button", { name: "作成" }));
+
+    expect(createTenant).toHaveBeenCalledTimes(1);
+    const createInit = createTenant.mock.calls[0]?.[1];
+    expect(JSON.parse(String((createInit as RequestInit).body))).toStrictEqual({
+      name: "Solo",
+      slug: "solo",
+    });
+    expect(await screen.findByText("Solo")).toBeInTheDocument();
+  });
+
+  // Minor 掃除(§16-5): rename の PATCH body・応答反映の専用テスト(admin 側に追加 —
+  // apps/api 側は status 200 と監査ログのみ確認しており、UI からの送信 body は未検証だった)。
+  it("renames a tenant", async () => {
+    const me = meHandler();
+    const renamed = { ...blog, name: "Blog Renamed" };
+    const listTenants: Handler = vi
+      .fn()
+      .mockReturnValueOnce(jsonResponse(200, { tenants: [blog] }))
+      .mockReturnValue(jsonResponse(200, { tenants: [renamed] }));
+    const renameTenant: Handler = vi.fn(() => jsonResponse(200, { ok: true }));
+    renderAt("/super", {
+      "GET /super-auth/me": me,
+      "GET /super/v1/tenants": listTenants,
+      "PATCH /super/v1/tenants/t1": renameTenant,
+    });
+
+    expect(await screen.findByText("Blog")).toBeInTheDocument();
+    const user = userEvent.setup();
+    const row = screen.getByText("Blog").closest("tr");
+    if (row === null) {
+      throw new Error("row not found");
+    }
+    await user.click(within(row).getByRole("button", { name: "名称変更" }));
+    const nameInput = screen.getByLabelText("名前");
+    await user.clear(nameInput);
+    await user.type(nameInput, "Blog Renamed");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(renameTenant).toHaveBeenCalledTimes(1);
+    const renameInit = renameTenant.mock.calls[0]?.[1];
+    expect(JSON.parse(String((renameInit as RequestInit).body))).toStrictEqual({
+      name: "Blog Renamed",
+    });
+    // mutation 成功 → invalidateQueries → 一覧の再取得で新しい名前が反映される
+    expect(await screen.findByText("Blog Renamed")).toBeInTheDocument();
+    expect(listTenants).toHaveBeenCalledTimes(2);
+  });
+
   it("deletes a tenant only after slug confirmation", async () => {
     const me = meHandler();
     const listTenants = vi.fn(() => jsonResponse(200, { tenants: [blog, shop] }));
@@ -191,5 +267,30 @@ describe("super tenant management", () => {
     await user.click(screen.getByRole("button", { name: "BAN を確定" }));
 
     expect(banUser).toHaveBeenCalledTimes(1);
+  });
+
+  // Minor 掃除(§16-5): unban の送信 body(なし)・応答反映の専用テスト(admin 側に追加 —
+  // apps/api 側は既に status/body/isBlocked/監査ログまで確認済みだが、UI からの送信内容の
+  // 専用テストはなかった)。
+  it("unbans a user", async () => {
+    const me = meHandler();
+    const alice = { id: "u1", email: "alice@example.com", createdAt: "", membershipCount: 2 };
+    const listUsers: Handler = vi.fn(() => jsonResponse(200, { users: [alice] }));
+    const unbanUser: Handler = vi.fn(() => jsonResponse(200, { ok: true }));
+    renderAt("/super/users", {
+      "GET /super-auth/me": me,
+      "GET /super/v1/users": listUsers,
+      "POST /super/v1/users/u1/unban": unbanUser,
+    });
+
+    expect(await screen.findByText("alice@example.com")).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "BAN 解除" }));
+    await user.click(screen.getByRole("button", { name: "解除を確定" }));
+
+    expect(unbanUser).toHaveBeenCalledTimes(1);
+    const unbanInit = unbanUser.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(unbanInit?.body).toBeUndefined();
+    expect(listUsers).toHaveBeenCalledTimes(2);
   });
 });
