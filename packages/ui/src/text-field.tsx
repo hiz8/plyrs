@@ -3,6 +3,7 @@ import {
   FieldError,
   Input,
   Label,
+  Text,
   TextField as RacTextField,
   type InputRenderProps,
   type TextFieldProps as RacTextFieldProps,
@@ -32,24 +33,41 @@ const styles = stylex.create({
     outline: "none",
   },
   inputFocused: { borderColor: colors.focusRing },
+  description: { fontSize: typography.sizeSm, color: colors.textMuted },
   error: { fontSize: typography.sizeSm, color: colors.danger },
 });
 
 export interface TextFieldProps extends Omit<RacTextFieldProps, "className" | "style"> {
   label: string;
+  /** 入力欄の空欄時に薄く表示する記入例(react-aria の Input へそのまま渡る)。 */
+  placeholder?: string;
+  /** ラベル直下に表示する短い補足説明(react-aria の description スロット経由)。 */
+  description?: string;
   errorMessage?: string | ((validation: ValidationResult) => string);
 }
 
-export function TextField({ label, errorMessage, ...props }: TextFieldProps) {
+export function TextField({
+  label,
+  placeholder,
+  description,
+  errorMessage,
+  ...props
+}: TextFieldProps) {
   return (
     <RacTextField {...props} className={stylex.props(styles.field).className ?? ""}>
       <Label className={stylex.props(styles.label).className ?? ""}>{label}</Label>
       <Input
+        placeholder={placeholder}
         className={stylexRenderProps<InputRenderProps>((state) => [
           styles.input,
           state.isFocused && styles.inputFocused,
         ])}
       />
+      {description !== undefined && (
+        <Text slot="description" className={stylex.props(styles.description).className ?? ""}>
+          {description}
+        </Text>
+      )}
       <FieldError className={stylex.props(styles.error).className ?? ""}>{errorMessage}</FieldError>
     </RacTextField>
   );

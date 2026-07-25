@@ -50,8 +50,21 @@ describe("resolveServerRoute", () => {
     expect(resolveServerRoute(request, { devProxyPublic: false })).toBe("ssr");
   });
 
+  it("forwards the exact /public/v1 path (no trailing segment) to api only when devProxyPublic is true", () => {
+    const request = new Request("https://admin.example.com/public/v1");
+    expect(resolveServerRoute(request, { devProxyPublic: true })).toBe("api");
+    expect(resolveServerRoute(request, { devProxyPublic: false })).toBe("ssr");
+  });
+
   it("routes non-API POST requests to ssr", () => {
     const request = new Request("https://admin.example.com/tenants", { method: "POST" });
+    expect(resolveServerRoute(request, { devProxyPublic: false })).toBe("ssr");
+  });
+
+  it("falls through to ssr for a bare GET request with neither Sec-Fetch-Dest nor Accept headers", () => {
+    const request = new Request("https://admin.example.com/tenants");
+    expect(request.headers.get("Sec-Fetch-Dest")).toBeNull();
+    expect(request.headers.get("Accept")).toBeNull();
     expect(resolveServerRoute(request, { devProxyPublic: false })).toBe("ssr");
   });
 });

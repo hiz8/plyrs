@@ -21,6 +21,18 @@ describe("TextField (react-aria-components + StyleX)", () => {
     expect(screen.queryByText("12文字以上にしてください")).not.toBeInTheDocument();
   });
 
+  it("renders a placeholder and a description hint when provided", () => {
+    render(
+      <TextField
+        label="日時"
+        placeholder="2026-10-01T00:20:00Z"
+        description="UTC の Z 終端 ISO 8601 形式で入力してください"
+      />,
+    );
+    expect(screen.getByPlaceholderText("2026-10-01T00:20:00Z")).toBeInTheDocument();
+    expect(screen.getByText("UTC の Z 終端 ISO 8601 形式で入力してください")).toBeInTheDocument();
+  });
+
   it("surfaces validate-derived errors when errorMessage is omitted", async () => {
     render(
       <form>

@@ -411,6 +411,10 @@ function FieldInput({
           value={typeof value === "string" ? value : ""}
           onChange={onChange}
           // design-spec §5: 格納は UTC ISO8601('Z' 終端)。表示層の TZ 変換は将来課題。
+          // バリデーションエラーは metamodel 側の「Invalid input」のみで形式が伝わらないため、
+          // placeholder と description で期待形式を補足する(バリデーション自体は変更しない)。
+          placeholder="2026-10-01T00:20:00Z"
+          description="UTC の Z 終端 ISO 8601 形式のみ受け付けます(例: 2026-10-01T00:20:00Z)"
           isInvalid={error !== undefined}
           errorMessage={error}
           isDisabled={locked}

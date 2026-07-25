@@ -172,6 +172,41 @@ describe("RecordForm", () => {
   });
 });
 
+describe("datetime フィールドの形式ヒント", () => {
+  const eventType: ContentTypeDefinition = {
+    id: "018f2b6a-7a0a-7000-8000-000000000020",
+    key: "event",
+    name: "イベント",
+    source: "user",
+    version: 1,
+    fields: [{ key: "starts_at", type: "datetime" }],
+  };
+
+  function buildEventRegistry(): CollectionRegistry {
+    const engine = new SyncEngine({ connect: pendingConnect });
+    const registry = new CollectionRegistry(engine);
+    registry.sync([eventType]);
+    registry.markReady();
+    return registry;
+  }
+
+  it("shows a UTC 'Z'-terminated ISO 8601 example as placeholder and description", () => {
+    render(
+      <RecordForm
+        contentType={eventType}
+        types={[eventType]}
+        registry={buildEventRegistry()}
+        record={null}
+        submitLabel="保存"
+        onSubmit={async () => {}}
+      />,
+    );
+    const input = screen.getByRole("textbox", { name: "starts_at" });
+    expect(input).toHaveAttribute("placeholder", "2026-10-01T00:20:00Z");
+    expect(screen.getByText(/Z 終端/)).toBeInTheDocument();
+  });
+});
+
 describe("labelForRecord", () => {
   it("uses the first text field value and falls back to the id", () => {
     expect(labelForRecord(types, author("a1", "山田"))).toBe("山田");
