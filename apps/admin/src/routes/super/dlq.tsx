@@ -104,7 +104,7 @@ function SuperDlqPage() {
                   <span {...stylex.props(superStyles.actions)}>
                     <Button
                       variant="secondary"
-                      isDisabled={replayMutation.isPending}
+                      isDisabled={replayMutation.isPending && replayMutation.variables === row.id}
                       onPress={() => void replay(row.id)}
                     >
                       再投入

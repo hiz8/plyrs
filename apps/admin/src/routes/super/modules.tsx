@@ -79,7 +79,10 @@ function SuperModulesPage() {
                 <td {...stylex.props(superStyles.cell)}>
                   <Button
                     variant="secondary"
-                    isDisabled={redistributeMutation.isPending}
+                    isDisabled={
+                      redistributeMutation.isPending &&
+                      redistributeMutation.variables === row.moduleId
+                    }
                     onPress={() => void redistribute(row.moduleId)}
                   >
                     型定義を再配布

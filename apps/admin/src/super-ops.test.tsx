@@ -205,8 +205,11 @@ describe("super operations pages", () => {
     expect(discard).toHaveBeenCalledTimes(1);
   });
 
-  // Minor 掃除(§16): 再投入クリック後、応答が返るまで再投入ボタンを disable し二重発火を防ぐ。
-  it("disables the DLQ replay button while the replay request is pending", async () => {
+  // Minor 掃除(§16 レビュー Important): replayMutation はページ単位の単一 useMutation
+  // インスタンスのため、isPending だけで disable すると無関係な他の行のボタンまで
+  // disable されてしまう。2 行以上のフィクスチャで、実行中の行だけが disable され
+  // 他の行は enabled のままであることを固定する。
+  it("disables only the replaying row's button while its replay request is pending", async () => {
     const me = meHandler();
     const listDeadLetters = vi.fn(() =>
       jsonResponse(200, {
@@ -216,6 +219,13 @@ describe("super operations pages", () => {
             queue: "plyrs-projection",
             body: "{}",
             failedAt: "2026-07-15T00:00:00Z",
+            replayedAt: null,
+          },
+          {
+            id: "dlq-2",
+            queue: "plyrs-modules",
+            body: "{}",
+            failedAt: "2026-07-16T00:00:00Z",
             replayedAt: null,
           },
         ],
@@ -231,12 +241,19 @@ describe("super operations pages", () => {
 
     expect(await screen.findByText("plyrs-projection")).toBeInTheDocument();
     const user = userEvent.setup();
-    const replayButton = screen.getByRole("button", { name: "再投入" });
-    await user.click(replayButton);
+    const row1 = screen.getByText("plyrs-projection").closest("tr");
+    const row2 = screen.getByText("plyrs-modules").closest("tr");
+    if (row1 === null || row2 === null) {
+      throw new Error("row not found");
+    }
+    const replayButton1 = within(row1).getByRole("button", { name: "再投入" });
+    const replayButton2 = within(row2).getByRole("button", { name: "再投入" });
+    await user.click(replayButton1);
 
-    expect(replayButton).toBeDisabled();
+    expect(replayButton1).toBeDisabled();
+    expect(replayButton2).toBeEnabled();
     resolveReplay(jsonResponse(200, { ok: true }));
-    await waitFor(() => expect(replayButton).toBeEnabled());
+    await waitFor(() => expect(replayButton1).toBeEnabled());
   });
 
   it("shows the audit log", async () => {
@@ -291,12 +308,18 @@ describe("super operations pages", () => {
     expect(redistribute).toHaveBeenCalledTimes(1);
   });
 
-  // Minor 掃除(§16): 再配布クリック後、応答が返るまで再配布ボタンを disable し二重発火を防ぐ。
-  it("disables the module redistribute button while the request is pending", async () => {
+  // Minor 掃除(§16 レビュー Important): redistributeMutation もページ単位の単一
+  // useMutation インスタンスのため、isPending だけで disable すると無関係な他の行の
+  // ボタンまで disable されてしまう。2 行以上のフィクスチャで、実行中の行だけが
+  // disable され他の行は enabled のままであることを固定する。
+  it("disables only the redistributing row's button while its request is pending", async () => {
     const me = meHandler();
     const listModules = vi.fn(() =>
       jsonResponse(200, {
-        modules: [{ moduleId: "booking", version: 2, name: "予約", enabledTenants: 3 }],
+        modules: [
+          { moduleId: "booking", version: 2, name: "予約", enabledTenants: 3 },
+          { moduleId: "crm", version: 1, name: "CRM", enabledTenants: 1 },
+        ],
       }),
     );
     const { promise: redistributePromise, resolve: resolveRedistribute } = deferred<Response>();
@@ -309,11 +332,18 @@ describe("super operations pages", () => {
 
     expect(await screen.findByText("booking")).toBeInTheDocument();
     const user = userEvent.setup();
-    const redistributeButton = screen.getByRole("button", { name: "型定義を再配布" });
-    await user.click(redistributeButton);
+    const row1 = screen.getByText("booking").closest("tr");
+    const row2 = screen.getByText("crm").closest("tr");
+    if (row1 === null || row2 === null) {
+      throw new Error("row not found");
+    }
+    const redistributeButton1 = within(row1).getByRole("button", { name: "型定義を再配布" });
+    const redistributeButton2 = within(row2).getByRole("button", { name: "型定義を再配布" });
+    await user.click(redistributeButton1);
 
-    expect(redistributeButton).toBeDisabled();
+    expect(redistributeButton1).toBeDisabled();
+    expect(redistributeButton2).toBeEnabled();
     resolveRedistribute(jsonResponse(202, { ok: true }));
-    await waitFor(() => expect(redistributeButton).toBeEnabled());
+    await waitFor(() => expect(redistributeButton1).toBeEnabled());
   });
 });
