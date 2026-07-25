@@ -3,12 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button, TextField } from "@plyrs/ui";
-import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
+import { spacing } from "@plyrs/ui/tokens.stylex";
+import { superStyles } from "./-styles";
 
 const styles = stylex.create({
-  title: { fontSize: typography.sizeXl, marginTop: 0 },
-  muted: { color: colors.textMuted },
-  banner: { color: colors.danger, fontSize: typography.sizeMd, margin: 0 },
   form: {
     display: "flex",
     alignItems: "flex-end",
@@ -17,37 +15,6 @@ const styles = stylex.create({
     maxWidth: "480px",
   },
   formField: { flex: 1 },
-  table: { borderCollapse: "collapse", width: "100%", fontSize: typography.sizeMd },
-  caption: {
-    captionSide: "top",
-    textAlign: "left",
-    color: colors.textMuted,
-    fontSize: typography.sizeSm,
-    paddingBottom: spacing.xs,
-  },
-  cell: {
-    textAlign: "left",
-    padding: spacing.sm,
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: colors.border,
-    verticalAlign: "middle",
-  },
-  actions: { display: "flex", gap: spacing.sm },
-  dialog: {
-    marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: "6px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: colors.danger,
-    backgroundColor: colors.surface,
-    display: "flex",
-    flexDirection: "column",
-    gap: spacing.sm,
-    maxWidth: "480px",
-  },
-  dialogTitle: { fontSize: typography.sizeMd, fontWeight: 600, margin: 0 },
 });
 
 interface UserRow {
@@ -121,7 +88,7 @@ function SuperUsersPage() {
 
   return (
     <>
-      <h1 {...stylex.props(styles.title)}>ユーザー</h1>
+      <h1 {...stylex.props(superStyles.title)}>ユーザー</h1>
       <form
         {...stylex.props(styles.form)}
         noValidate
@@ -136,33 +103,33 @@ function SuperUsersPage() {
         <Button type="submit">検索</Button>
       </form>
       {usersQuery.isError ? (
-        <p role="alert" {...stylex.props(styles.banner)}>
+        <p role="alert" {...stylex.props(superStyles.banner)}>
           ユーザー一覧を取得できませんでした
         </p>
       ) : null}
       {usersQuery.isPending ? (
-        <p {...stylex.props(styles.muted)}>読み込み中…</p>
+        <p {...stylex.props(superStyles.muted)}>読み込み中…</p>
       ) : rows.length === 0 ? (
-        <p {...stylex.props(styles.muted)}>該当するユーザーがいません</p>
+        <p {...stylex.props(superStyles.muted)}>該当するユーザーがいません</p>
       ) : (
-        <table {...stylex.props(styles.table)}>
-          <caption {...stylex.props(styles.caption)}>ユーザーの一覧</caption>
+        <table {...stylex.props(superStyles.table)}>
+          <caption {...stylex.props(superStyles.caption)}>ユーザーの一覧</caption>
           <thead>
             <tr>
-              <th {...stylex.props(styles.cell)}>メール</th>
-              <th {...stylex.props(styles.cell)}>所属数</th>
-              <th {...stylex.props(styles.cell)}>登録日</th>
-              <th {...stylex.props(styles.cell)}>操作</th>
+              <th {...stylex.props(superStyles.cell)}>メール</th>
+              <th {...stylex.props(superStyles.cell)}>所属数</th>
+              <th {...stylex.props(superStyles.cell)}>登録日</th>
+              <th {...stylex.props(superStyles.cell)}>操作</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
-                <td {...stylex.props(styles.cell)}>{row.email}</td>
-                <td {...stylex.props(styles.cell)}>{row.membershipCount}</td>
-                <td {...stylex.props(styles.cell)}>{row.createdAt}</td>
-                <td {...stylex.props(styles.cell)}>
-                  <span {...stylex.props(styles.actions)}>
+                <td {...stylex.props(superStyles.cell)}>{row.email}</td>
+                <td {...stylex.props(superStyles.cell)}>{row.membershipCount}</td>
+                <td {...stylex.props(superStyles.cell)}>{row.createdAt}</td>
+                <td {...stylex.props(superStyles.cell)}>
+                  <span {...stylex.props(superStyles.actions)}>
                     <Button variant="secondary" onPress={() => startAction("ban", row)}>
                       BAN
                     </Button>
@@ -180,18 +147,18 @@ function SuperUsersPage() {
         <div
           role="alertdialog"
           aria-label={pendingAction.kind === "ban" ? "ユーザーの BAN" : "BAN の解除"}
-          {...stylex.props(styles.dialog)}
+          {...stylex.props(superStyles.dialog)}
         >
-          <h2 {...stylex.props(styles.dialogTitle)}>
+          <h2 {...stylex.props(superStyles.dialogTitle)}>
             {pendingAction.user.email} を{pendingAction.kind === "ban" ? "BAN" : "BAN 解除"}
             しますか?
           </h2>
           {actionError !== null ? (
-            <p role="alert" {...stylex.props(styles.banner)}>
+            <p role="alert" {...stylex.props(superStyles.banner)}>
               {actionError}
             </p>
           ) : null}
-          <span {...stylex.props(styles.actions)}>
+          <span {...stylex.props(superStyles.actions)}>
             <Button variant="secondary" onPress={() => void confirmAction()}>
               {pendingAction.kind === "ban" ? "BAN を確定" : "解除を確定"}
             </Button>

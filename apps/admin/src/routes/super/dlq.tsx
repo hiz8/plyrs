@@ -3,44 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@plyrs/ui";
-import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
-
-const styles = stylex.create({
-  title: { fontSize: typography.sizeXl, marginTop: 0 },
-  muted: { color: colors.textMuted },
-  banner: { color: colors.danger, fontSize: typography.sizeMd, margin: 0 },
-  table: { borderCollapse: "collapse", width: "100%", fontSize: typography.sizeMd },
-  caption: {
-    captionSide: "top",
-    textAlign: "left",
-    color: colors.textMuted,
-    fontSize: typography.sizeSm,
-    paddingBottom: spacing.xs,
-  },
-  cell: {
-    textAlign: "left",
-    padding: spacing.sm,
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: colors.border,
-    verticalAlign: "middle",
-  },
-  actions: { display: "flex", gap: spacing.sm },
-  dialog: {
-    marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: "6px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: colors.danger,
-    backgroundColor: colors.surface,
-    display: "flex",
-    flexDirection: "column",
-    gap: spacing.sm,
-    maxWidth: "480px",
-  },
-  dialogTitle: { fontSize: typography.sizeMd, fontWeight: 600, margin: 0 },
-});
+import { superStyles } from "./-styles";
 
 interface DeadLetterRow {
   id: string;
@@ -110,36 +73,40 @@ function SuperDlqPage() {
 
   return (
     <>
-      <h1 {...stylex.props(styles.title)}>DLQ</h1>
+      <h1 {...stylex.props(superStyles.title)}>DLQ</h1>
       {dlq.isError ? (
-        <p role="alert" {...stylex.props(styles.banner)}>
+        <p role="alert" {...stylex.props(superStyles.banner)}>
           デッドレター一覧を取得できませんでした
         </p>
       ) : null}
       {dlq.isPending ? (
-        <p {...stylex.props(styles.muted)}>読み込み中…</p>
+        <p {...stylex.props(superStyles.muted)}>読み込み中…</p>
       ) : rows.length === 0 ? (
-        <p {...stylex.props(styles.muted)}>デッドレターはありません</p>
+        <p {...stylex.props(superStyles.muted)}>デッドレターはありません</p>
       ) : (
-        <table {...stylex.props(styles.table)}>
-          <caption {...stylex.props(styles.caption)}>デッドレターの一覧</caption>
+        <table {...stylex.props(superStyles.table)}>
+          <caption {...stylex.props(superStyles.caption)}>デッドレターの一覧</caption>
           <thead>
             <tr>
-              <th {...stylex.props(styles.cell)}>キュー</th>
-              <th {...stylex.props(styles.cell)}>失敗日時</th>
-              <th {...stylex.props(styles.cell)}>再投入日時</th>
-              <th {...stylex.props(styles.cell)}>操作</th>
+              <th {...stylex.props(superStyles.cell)}>キュー</th>
+              <th {...stylex.props(superStyles.cell)}>失敗日時</th>
+              <th {...stylex.props(superStyles.cell)}>再投入日時</th>
+              <th {...stylex.props(superStyles.cell)}>操作</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
-                <td {...stylex.props(styles.cell)}>{row.queue}</td>
-                <td {...stylex.props(styles.cell)}>{row.failedAt}</td>
-                <td {...stylex.props(styles.cell)}>{row.replayedAt ?? "-"}</td>
-                <td {...stylex.props(styles.cell)}>
-                  <span {...stylex.props(styles.actions)}>
-                    <Button variant="secondary" onPress={() => void replay(row.id)}>
+                <td {...stylex.props(superStyles.cell)}>{row.queue}</td>
+                <td {...stylex.props(superStyles.cell)}>{row.failedAt}</td>
+                <td {...stylex.props(superStyles.cell)}>{row.replayedAt ?? "-"}</td>
+                <td {...stylex.props(superStyles.cell)}>
+                  <span {...stylex.props(superStyles.actions)}>
+                    <Button
+                      variant="secondary"
+                      isDisabled={replayMutation.isPending}
+                      onPress={() => void replay(row.id)}
+                    >
                       再投入
                     </Button>
                     <Button variant="secondary" onPress={() => startDiscard(row)}>
@@ -153,19 +120,23 @@ function SuperDlqPage() {
         </table>
       )}
       {replayError !== null ? (
-        <p role="alert" {...stylex.props(styles.banner)}>
+        <p role="alert" {...stylex.props(superStyles.banner)}>
           {replayError}
         </p>
       ) : null}
       {discardTarget !== null && (
-        <div role="alertdialog" aria-label="デッドレターの破棄" {...stylex.props(styles.dialog)}>
-          <h2 {...stylex.props(styles.dialogTitle)}>このデッドレターを破棄しますか?</h2>
+        <div
+          role="alertdialog"
+          aria-label="デッドレターの破棄"
+          {...stylex.props(superStyles.dialog)}
+        >
+          <h2 {...stylex.props(superStyles.dialogTitle)}>このデッドレターを破棄しますか?</h2>
           {discardError !== null ? (
-            <p role="alert" {...stylex.props(styles.banner)}>
+            <p role="alert" {...stylex.props(superStyles.banner)}>
               {discardError}
             </p>
           ) : null}
-          <span {...stylex.props(styles.actions)}>
+          <span {...stylex.props(superStyles.actions)}>
             <Button
               variant="secondary"
               isDisabled={discardMutation.isPending}

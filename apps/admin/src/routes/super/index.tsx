@@ -3,48 +3,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button, TextField } from "@plyrs/ui";
-import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
+import { colors, spacing } from "@plyrs/ui/tokens.stylex";
 import { SuperApiError } from "../../lib/super-api";
+import { superStyles } from "./-styles";
 
 const styles = stylex.create({
-  title: { fontSize: typography.sizeXl, marginTop: 0 },
-  muted: { color: colors.textMuted },
-  banner: { color: colors.danger, fontSize: typography.sizeMd, margin: 0 },
-  table: { borderCollapse: "collapse", width: "100%", fontSize: typography.sizeMd },
-  caption: {
-    captionSide: "top",
-    textAlign: "left",
-    color: colors.textMuted,
-    fontSize: typography.sizeSm,
-    paddingBottom: spacing.xs,
-  },
-  cell: {
-    textAlign: "left",
-    padding: spacing.sm,
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: colors.border,
-    verticalAlign: "middle",
-  },
   link: { color: colors.accent },
-  actions: { display: "flex", gap: spacing.sm },
-  section: { marginTop: spacing.xl },
-  subtitle: { fontSize: typography.sizeLg, marginBottom: spacing.sm },
   form: { display: "flex", flexDirection: "column", gap: spacing.sm, maxWidth: "480px" },
-  dialog: {
-    marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: "6px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: colors.danger,
-    backgroundColor: colors.surface,
-    display: "flex",
-    flexDirection: "column",
-    gap: spacing.sm,
-    maxWidth: "480px",
-  },
-  dialogTitle: { fontSize: typography.sizeMd, fontWeight: 600, margin: 0 },
 });
 
 interface TenantRow {
@@ -165,32 +130,32 @@ function SuperTenantsPage() {
 
   return (
     <>
-      <h1 {...stylex.props(styles.title)}>テナント</h1>
+      <h1 {...stylex.props(superStyles.title)}>テナント</h1>
       {tenants.isError ? (
-        <p role="alert" {...stylex.props(styles.banner)}>
+        <p role="alert" {...stylex.props(superStyles.banner)}>
           テナント一覧を取得できませんでした
         </p>
       ) : null}
       {tenants.isPending ? (
-        <p {...stylex.props(styles.muted)}>読み込み中…</p>
+        <p {...stylex.props(superStyles.muted)}>読み込み中…</p>
       ) : rows.length === 0 ? (
-        <p {...stylex.props(styles.muted)}>テナントはまだありません</p>
+        <p {...stylex.props(superStyles.muted)}>テナントはまだありません</p>
       ) : (
-        <table {...stylex.props(styles.table)}>
-          <caption {...stylex.props(styles.caption)}>登録済みテナントの一覧</caption>
+        <table {...stylex.props(superStyles.table)}>
+          <caption {...stylex.props(superStyles.caption)}>登録済みテナントの一覧</caption>
           <thead>
             <tr>
-              <th {...stylex.props(styles.cell)}>名前</th>
-              <th {...stylex.props(styles.cell)}>slug</th>
-              <th {...stylex.props(styles.cell)}>メンバー数</th>
-              <th {...stylex.props(styles.cell)}>作成日</th>
-              <th {...stylex.props(styles.cell)}>操作</th>
+              <th {...stylex.props(superStyles.cell)}>名前</th>
+              <th {...stylex.props(superStyles.cell)}>slug</th>
+              <th {...stylex.props(superStyles.cell)}>メンバー数</th>
+              <th {...stylex.props(superStyles.cell)}>作成日</th>
+              <th {...stylex.props(superStyles.cell)}>操作</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((tenant) => (
               <tr key={tenant.id}>
-                <td {...stylex.props(styles.cell)}>
+                <td {...stylex.props(superStyles.cell)}>
                   {renamingId === tenant.id ? (
                     <TextField label="名前" value={renameDraft} onChange={setRenameDraft} />
                   ) : (
@@ -203,11 +168,11 @@ function SuperTenantsPage() {
                     </Link>
                   )}
                 </td>
-                <td {...stylex.props(styles.cell)}>{tenant.slug}</td>
-                <td {...stylex.props(styles.cell)}>{tenant.memberCount}</td>
-                <td {...stylex.props(styles.cell)}>{tenant.createdAt}</td>
-                <td {...stylex.props(styles.cell)}>
-                  <span {...stylex.props(styles.actions)}>
+                <td {...stylex.props(superStyles.cell)}>{tenant.slug}</td>
+                <td {...stylex.props(superStyles.cell)}>{tenant.memberCount}</td>
+                <td {...stylex.props(superStyles.cell)}>{tenant.createdAt}</td>
+                <td {...stylex.props(superStyles.cell)}>
+                  <span {...stylex.props(superStyles.actions)}>
                     {renamingId === tenant.id ? (
                       <>
                         <Button
@@ -236,15 +201,15 @@ function SuperTenantsPage() {
         </table>
       )}
       {renameError !== null ? (
-        <p role="alert" {...stylex.props(styles.banner)}>
+        <p role="alert" {...stylex.props(superStyles.banner)}>
           {renameError}
         </p>
       ) : null}
 
       {deleteTarget !== null && (
-        <div role="alertdialog" aria-label="テナントの削除" {...stylex.props(styles.dialog)}>
-          <h2 {...stylex.props(styles.dialogTitle)}>「{deleteTarget.name}」を削除しますか?</h2>
-          <p {...stylex.props(styles.muted)}>
+        <div role="alertdialog" aria-label="テナントの削除" {...stylex.props(superStyles.dialog)}>
+          <h2 {...stylex.props(superStyles.dialogTitle)}>「{deleteTarget.name}」を削除しますか?</h2>
+          <p {...stylex.props(superStyles.muted)}>
             この操作は取り消せません。確認のため slug「{deleteTarget.slug}
             」を入力してください。
           </p>
@@ -254,11 +219,11 @@ function SuperTenantsPage() {
             onChange={setDeleteConfirmText}
           />
           {deleteError !== null ? (
-            <p role="alert" {...stylex.props(styles.banner)}>
+            <p role="alert" {...stylex.props(superStyles.banner)}>
               {deleteError}
             </p>
           ) : null}
-          <span {...stylex.props(styles.actions)}>
+          <span {...stylex.props(superStyles.actions)}>
             <Button
               variant="secondary"
               isDisabled={deleteConfirmText !== deleteTarget.slug || deleteMutation.isPending}
@@ -273,8 +238,8 @@ function SuperTenantsPage() {
         </div>
       )}
 
-      <section {...stylex.props(styles.section)}>
-        <h2 {...stylex.props(styles.subtitle)}>新しいテナント</h2>
+      <section {...stylex.props(superStyles.section)}>
+        <h2 {...stylex.props(superStyles.subtitle)}>新しいテナント</h2>
         <form
           {...stylex.props(styles.form)}
           noValidate
@@ -292,7 +257,7 @@ function SuperTenantsPage() {
             onChange={setOwnerEmail}
           />
           {createError !== null ? (
-            <p role="alert" {...stylex.props(styles.banner)}>
+            <p role="alert" {...stylex.props(superStyles.banner)}>
               {createError}
             </p>
           ) : null}

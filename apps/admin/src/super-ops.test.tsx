@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { createAppContext, getRouter } from "./router";
@@ -13,7 +13,18 @@ function jsonResponse(status: number, body: unknown): Response {
 
 // super-tenants.test.tsx と同じ様式: 同一パスに複数メソッドがぶら下がるため
 // `${method} ${path}` キーで振り分け、完全な URL も渡してクエリ文字列を検証可能にする。
-type Handler = Mock<(url: string, init?: RequestInit) => Response>;
+// 戻り値を Response | Promise<Response> にしているのは isPending disable テストが
+// 応答タイミングを手動制御する deferred な Response を返す必要があるため。
+type Handler = Mock<(url: string, init?: RequestInit) => Response | Promise<Response>>;
+
+// isPending 中の二重発火防止テスト用: 応答タイミングを手動で握るための小さな deferred。
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
 
 function stubFetch(routes: Record<string, Handler>): typeof fetch {
   return async (input, init) => {
@@ -194,6 +205,40 @@ describe("super operations pages", () => {
     expect(discard).toHaveBeenCalledTimes(1);
   });
 
+  // Minor 掃除(§16): 再投入クリック後、応答が返るまで再投入ボタンを disable し二重発火を防ぐ。
+  it("disables the DLQ replay button while the replay request is pending", async () => {
+    const me = meHandler();
+    const listDeadLetters = vi.fn(() =>
+      jsonResponse(200, {
+        deadLetters: [
+          {
+            id: "dlq-1",
+            queue: "plyrs-projection",
+            body: "{}",
+            failedAt: "2026-07-15T00:00:00Z",
+            replayedAt: null,
+          },
+        ],
+      }),
+    );
+    const { promise: replayPromise, resolve: resolveReplay } = deferred<Response>();
+    const replay: Handler = vi.fn(() => replayPromise);
+    renderAt("/super/dlq", {
+      "GET /super-auth/me": me,
+      "GET /super/v1/dead-letters": listDeadLetters,
+      "POST /super/v1/dead-letters/dlq-1/replay": replay,
+    });
+
+    expect(await screen.findByText("plyrs-projection")).toBeInTheDocument();
+    const user = userEvent.setup();
+    const replayButton = screen.getByRole("button", { name: "再投入" });
+    await user.click(replayButton);
+
+    expect(replayButton).toBeDisabled();
+    resolveReplay(jsonResponse(200, { ok: true }));
+    await waitFor(() => expect(replayButton).toBeEnabled());
+  });
+
   it("shows the audit log", async () => {
     const me = meHandler();
     const listAuditLogs = vi.fn(() =>
@@ -244,5 +289,31 @@ describe("super operations pages", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "型定義を再配布" }));
     expect(redistribute).toHaveBeenCalledTimes(1);
+  });
+
+  // Minor 掃除(§16): 再配布クリック後、応答が返るまで再配布ボタンを disable し二重発火を防ぐ。
+  it("disables the module redistribute button while the request is pending", async () => {
+    const me = meHandler();
+    const listModules = vi.fn(() =>
+      jsonResponse(200, {
+        modules: [{ moduleId: "booking", version: 2, name: "予約", enabledTenants: 3 }],
+      }),
+    );
+    const { promise: redistributePromise, resolve: resolveRedistribute } = deferred<Response>();
+    const redistribute: Handler = vi.fn(() => redistributePromise);
+    renderAt("/super/modules", {
+      "GET /super-auth/me": me,
+      "GET /super/v1/modules": listModules,
+      "POST /super/v1/modules/booking/redistribute": redistribute,
+    });
+
+    expect(await screen.findByText("booking")).toBeInTheDocument();
+    const user = userEvent.setup();
+    const redistributeButton = screen.getByRole("button", { name: "型定義を再配布" });
+    await user.click(redistributeButton);
+
+    expect(redistributeButton).toBeDisabled();
+    resolveRedistribute(jsonResponse(202, { ok: true }));
+    await waitFor(() => expect(redistributeButton).toBeEnabled());
   });
 });

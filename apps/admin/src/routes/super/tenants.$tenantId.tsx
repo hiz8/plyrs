@@ -4,45 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button, Checkbox } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
+import { superStyles } from "./-styles";
 
 const styles = stylex.create({
+  // タイトルだけ marginBottom: 0 を足す独自版(超一覧ページなどの title とは異なる)。
   title: { fontSize: typography.sizeXl, marginTop: 0, marginBottom: 0 },
   slug: { color: colors.textMuted, fontSize: typography.sizeMd, marginTop: 0 },
-  muted: { color: colors.textMuted },
-  banner: { color: colors.danger, fontSize: typography.sizeMd, margin: 0 },
-  section: { marginTop: spacing.xl },
-  subtitle: { fontSize: typography.sizeLg, marginBottom: spacing.sm },
-  table: { borderCollapse: "collapse", width: "100%", fontSize: typography.sizeMd },
-  caption: {
-    captionSide: "top",
-    textAlign: "left",
-    color: colors.textMuted,
-    fontSize: typography.sizeSm,
-    paddingBottom: spacing.xs,
-  },
-  cell: {
-    textAlign: "left",
-    padding: spacing.sm,
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: colors.border,
-    verticalAlign: "middle",
-  },
-  dialog: {
-    marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: "6px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: colors.danger,
-    backgroundColor: colors.surface,
-    display: "flex",
-    flexDirection: "column",
-    gap: spacing.sm,
-    maxWidth: "480px",
-  },
-  dialogTitle: { fontSize: typography.sizeMd, fontWeight: 600, margin: 0 },
-  actions: { display: "flex", gap: spacing.sm },
   opBlock: { marginTop: spacing.lg },
   opTitle: { fontSize: typography.sizeMd, fontWeight: 600, marginBottom: spacing.xs },
   notice: { color: colors.text, fontSize: typography.sizeMd, fontWeight: 600 },
@@ -222,35 +189,35 @@ function TenantDetailPage() {
       <h1 {...stylex.props(styles.title)}>{tenant?.name ?? "テナント詳細"}</h1>
       <p {...stylex.props(styles.slug)}>{tenant?.slug ?? tenantId}</p>
 
-      <section {...stylex.props(styles.section)}>
-        <h2 {...stylex.props(styles.subtitle)}>メンバー</h2>
+      <section {...stylex.props(superStyles.section)}>
+        <h2 {...stylex.props(superStyles.subtitle)}>メンバー</h2>
         {members.isError ? (
-          <p role="alert" {...stylex.props(styles.banner)}>
+          <p role="alert" {...stylex.props(superStyles.banner)}>
             メンバー一覧を取得できませんでした
           </p>
         ) : null}
         {members.isPending ? (
-          <p {...stylex.props(styles.muted)}>読み込み中…</p>
+          <p {...stylex.props(superStyles.muted)}>読み込み中…</p>
         ) : memberRows.length === 0 ? (
-          <p {...stylex.props(styles.muted)}>メンバーはいません</p>
+          <p {...stylex.props(superStyles.muted)}>メンバーはいません</p>
         ) : (
-          <table {...stylex.props(styles.table)}>
-            <caption {...stylex.props(styles.caption)}>所属メンバーの一覧</caption>
+          <table {...stylex.props(superStyles.table)}>
+            <caption {...stylex.props(superStyles.caption)}>所属メンバーの一覧</caption>
             <thead>
               <tr>
-                <th {...stylex.props(styles.cell)}>メール</th>
-                <th {...stylex.props(styles.cell)}>役割</th>
-                <th {...stylex.props(styles.cell)}>参加日</th>
-                <th {...stylex.props(styles.cell)}>操作</th>
+                <th {...stylex.props(superStyles.cell)}>メール</th>
+                <th {...stylex.props(superStyles.cell)}>役割</th>
+                <th {...stylex.props(superStyles.cell)}>参加日</th>
+                <th {...stylex.props(superStyles.cell)}>操作</th>
               </tr>
             </thead>
             <tbody>
               {memberRows.map((member) => (
                 <tr key={member.userId}>
-                  <td {...stylex.props(styles.cell)}>{member.email}</td>
-                  <td {...stylex.props(styles.cell)}>{member.role}</td>
-                  <td {...stylex.props(styles.cell)}>{member.createdAt}</td>
-                  <td {...stylex.props(styles.cell)}>
+                  <td {...stylex.props(superStyles.cell)}>{member.email}</td>
+                  <td {...stylex.props(superStyles.cell)}>{member.role}</td>
+                  <td {...stylex.props(superStyles.cell)}>{member.createdAt}</td>
+                  <td {...stylex.props(superStyles.cell)}>
                     <Button variant="secondary" onPress={() => startRevoke(member)}>
                       剥奪
                     </Button>
@@ -261,16 +228,16 @@ function TenantDetailPage() {
           </table>
         )}
         {revokeTarget !== null && (
-          <div role="alertdialog" aria-label="メンバーの剥奪" {...stylex.props(styles.dialog)}>
-            <h3 {...stylex.props(styles.dialogTitle)}>
+          <div role="alertdialog" aria-label="メンバーの剥奪" {...stylex.props(superStyles.dialog)}>
+            <h3 {...stylex.props(superStyles.dialogTitle)}>
               {revokeTarget.email} をこのテナントから外しますか?
             </h3>
             {revokeError !== null ? (
-              <p role="alert" {...stylex.props(styles.banner)}>
+              <p role="alert" {...stylex.props(superStyles.banner)}>
                 {revokeError}
               </p>
             ) : null}
-            <span {...stylex.props(styles.actions)}>
+            <span {...stylex.props(superStyles.actions)}>
               <Button variant="secondary" onPress={() => void confirmRevoke()}>
                 剥奪を確定
               </Button>
@@ -282,8 +249,8 @@ function TenantDetailPage() {
         )}
       </section>
 
-      <section {...stylex.props(styles.section)}>
-        <h2 {...stylex.props(styles.subtitle)}>運用</h2>
+      <section {...stylex.props(superStyles.section)}>
+        <h2 {...stylex.props(superStyles.subtitle)}>運用</h2>
 
         <div {...stylex.props(styles.opBlock)}>
           <h3 {...stylex.props(styles.opTitle)}>健全性チェック</h3>
@@ -295,60 +262,66 @@ function TenantDetailPage() {
             健全性チェックを実行
           </Button>
           {healthError !== null ? (
-            <p role="alert" {...stylex.props(styles.banner)}>
+            <p role="alert" {...stylex.props(superStyles.banner)}>
               {healthError}
             </p>
           ) : null}
           {healthReport !== null && (
             <>
               {healthReport.archivedPublished.length === 0 ? (
-                <p {...stylex.props(styles.muted)}>archived かつ公開中のレコードはありません</p>
+                <p {...stylex.props(superStyles.muted)}>
+                  archived かつ公開中のレコードはありません
+                </p>
               ) : (
-                <table {...stylex.props(styles.table)}>
-                  <caption {...stylex.props(styles.caption)}>archived かつ公開中のレコード</caption>
+                <table {...stylex.props(superStyles.table)}>
+                  <caption {...stylex.props(superStyles.caption)}>
+                    archived かつ公開中のレコード
+                  </caption>
                   <thead>
                     <tr>
-                      <th {...stylex.props(styles.cell)}>レコードID</th>
-                      <th {...stylex.props(styles.cell)}>型</th>
-                      <th {...stylex.props(styles.cell)}>公開日時</th>
+                      <th {...stylex.props(superStyles.cell)}>レコードID</th>
+                      <th {...stylex.props(superStyles.cell)}>型</th>
+                      <th {...stylex.props(superStyles.cell)}>公開日時</th>
                     </tr>
                   </thead>
                   <tbody>
                     {healthReport.archivedPublished.map((row) => (
                       <tr key={row.recordId}>
-                        <td {...stylex.props(styles.cell)}>{row.recordId}</td>
-                        <td {...stylex.props(styles.cell)}>{row.type}</td>
-                        <td {...stylex.props(styles.cell)}>{row.publishedAt}</td>
+                        <td {...stylex.props(superStyles.cell)}>{row.recordId}</td>
+                        <td {...stylex.props(superStyles.cell)}>{row.type}</td>
+                        <td {...stylex.props(superStyles.cell)}>{row.publishedAt}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               )}
               {healthReport.legacyAssetType ? (
-                <p role="alert" {...stylex.props(styles.banner)}>
+                <p role="alert" {...stylex.props(superStyles.banner)}>
                   旧形式の asset 型が検出されました
                 </p>
               ) : null}
               {healthReport.legacyRichtextRecords.length === 0 ? (
-                <p {...stylex.props(styles.muted)}>旧形式の richtext を含むレコードはありません</p>
+                <p {...stylex.props(superStyles.muted)}>
+                  旧形式の richtext を含むレコードはありません
+                </p>
               ) : (
-                <table {...stylex.props(styles.table)}>
-                  <caption {...stylex.props(styles.caption)}>
+                <table {...stylex.props(superStyles.table)}>
+                  <caption {...stylex.props(superStyles.caption)}>
                     旧形式の richtext を含むレコード
                   </caption>
                   <thead>
                     <tr>
-                      <th {...stylex.props(styles.cell)}>レコードID</th>
-                      <th {...stylex.props(styles.cell)}>型</th>
-                      <th {...stylex.props(styles.cell)}>フィールド</th>
+                      <th {...stylex.props(superStyles.cell)}>レコードID</th>
+                      <th {...stylex.props(superStyles.cell)}>型</th>
+                      <th {...stylex.props(superStyles.cell)}>フィールド</th>
                     </tr>
                   </thead>
                   <tbody>
                     {healthReport.legacyRichtextRecords.map((row) => (
                       <tr key={`${row.recordId}:${row.fieldKey}`}>
-                        <td {...stylex.props(styles.cell)}>{row.recordId}</td>
-                        <td {...stylex.props(styles.cell)}>{row.type}</td>
-                        <td {...stylex.props(styles.cell)}>{row.fieldKey}</td>
+                        <td {...stylex.props(superStyles.cell)}>{row.recordId}</td>
+                        <td {...stylex.props(superStyles.cell)}>{row.type}</td>
+                        <td {...stylex.props(superStyles.cell)}>{row.fieldKey}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -368,27 +341,27 @@ function TenantDetailPage() {
             孤児アセットを走査
           </Button>
           {orphanError !== null ? (
-            <p role="alert" {...stylex.props(styles.banner)}>
+            <p role="alert" {...stylex.props(superStyles.banner)}>
               {orphanError}
             </p>
           ) : null}
           {orphans !== null &&
             (orphans.length === 0 ? (
-              <p {...stylex.props(styles.muted)}>孤児アセットはありません</p>
+              <p {...stylex.props(superStyles.muted)}>孤児アセットはありません</p>
             ) : (
               <>
-                <table {...stylex.props(styles.table)}>
-                  <caption {...stylex.props(styles.caption)}>孤児アセットの一覧</caption>
+                <table {...stylex.props(superStyles.table)}>
+                  <caption {...stylex.props(superStyles.caption)}>孤児アセットの一覧</caption>
                   <thead>
                     <tr>
-                      <th {...stylex.props(styles.cell)}>キー</th>
-                      <th {...stylex.props(styles.cell)}>サイズ</th>
+                      <th {...stylex.props(superStyles.cell)}>キー</th>
+                      <th {...stylex.props(superStyles.cell)}>サイズ</th>
                     </tr>
                   </thead>
                   <tbody>
                     {orphans.map((row) => (
                       <tr key={row.key}>
-                        <td {...stylex.props(styles.cell)}>
+                        <td {...stylex.props(superStyles.cell)}>
                           <Checkbox
                             isSelected={selectedKeys.has(row.key)}
                             onChange={(isSelected) => toggleOrphanKey(row.key, isSelected)}
@@ -396,7 +369,7 @@ function TenantDetailPage() {
                             {row.key}
                           </Checkbox>
                         </td>
-                        <td {...stylex.props(styles.cell)}>{row.size}</td>
+                        <td {...stylex.props(superStyles.cell)}>{row.size}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -414,17 +387,17 @@ function TenantDetailPage() {
             <div
               role="alertdialog"
               aria-label="孤児アセットの削除"
-              {...stylex.props(styles.dialog)}
+              {...stylex.props(superStyles.dialog)}
             >
-              <h3 {...stylex.props(styles.dialogTitle)}>
+              <h3 {...stylex.props(superStyles.dialogTitle)}>
                 選択した {selectedKeys.size} 件を削除しますか?
               </h3>
               {orphanDeleteError !== null ? (
-                <p role="alert" {...stylex.props(styles.banner)}>
+                <p role="alert" {...stylex.props(superStyles.banner)}>
                   {orphanDeleteError}
                 </p>
               ) : null}
-              <span {...stylex.props(styles.actions)}>
+              <span {...stylex.props(superStyles.actions)}>
                 <Button
                   variant="secondary"
                   isDisabled={orphanDeleteMutation.isPending}
@@ -449,14 +422,14 @@ function TenantDetailPage() {
             <p {...stylex.props(styles.notice)}>再投影を開始しました(epoch: {reprojectEpoch})</p>
           ) : null}
           {reprojectConfirm && (
-            <div role="alertdialog" aria-label="再投影の確認" {...stylex.props(styles.dialog)}>
-              <h3 {...stylex.props(styles.dialogTitle)}>このテナントを再投影しますか?</h3>
+            <div role="alertdialog" aria-label="再投影の確認" {...stylex.props(superStyles.dialog)}>
+              <h3 {...stylex.props(superStyles.dialogTitle)}>このテナントを再投影しますか?</h3>
               {reprojectError !== null ? (
-                <p role="alert" {...stylex.props(styles.banner)}>
+                <p role="alert" {...stylex.props(superStyles.banner)}>
                   {reprojectError}
                 </p>
               ) : null}
-              <span {...stylex.props(styles.actions)}>
+              <span {...stylex.props(superStyles.actions)}>
                 <Button
                   variant="secondary"
                   isDisabled={reprojectMutation.isPending}
