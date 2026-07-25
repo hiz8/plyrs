@@ -871,7 +871,7 @@ export class TenantDO extends DurableObject<Env> {
         if (!isModuleEnabled(sql, moduleId)) {
           return;
         }
-        runModuleAlarmHandler(moduleId, module, {
+        runModuleAlarmHandler(module, {
           sql,
           now: nowMs,
           schedule: (dueAtMs) => {

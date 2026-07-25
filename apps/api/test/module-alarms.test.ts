@@ -121,6 +121,12 @@ describe("TenantDO.alarm() のモジュールディスパッチ (design-spec §9
   });
 });
 
+describe("runModuleAlarmHandler の未使用引数除去 (Minor 掃除)", () => {
+  it("本体で使わない moduleId は引数から外れている", () => {
+    expect(runModuleAlarmHandler.length).toBe(2);
+  });
+});
+
 describe("runModuleAlarmHandler(レジストリ注入シーム) (§15 冒頭掃除)", () => {
   // Important fix(レビュー指摘): 当初 runModuleAlarmHandler 自身が try/catch していたが、
   // それだと呼び出し元の transactionSync クロージャが throw しなくなり、ハンドラ途中までの
@@ -152,8 +158,8 @@ describe("runModuleAlarmHandler(レジストリ注入シーム) (§15 冒頭掃�
         schedule: () => {},
         writeRecord: () => ({ ok: false, code: "unknown_type", message: "unused in test" }),
       };
-      expect(() => runModuleAlarmHandler("fake-a", throwingModule, ctx)).toThrow("boom");
-      expect(() => runModuleAlarmHandler("fake-b", okModule, ctx)).not.toThrow();
+      expect(() => runModuleAlarmHandler(throwingModule, ctx)).toThrow("boom");
+      expect(() => runModuleAlarmHandler(okModule, ctx)).not.toThrow();
     });
     expect(calls).toEqual(["fake-a", "fake-b"]);
   });
@@ -169,9 +175,9 @@ describe("runModuleAlarmHandler(レジストリ注入シーム) (§15 冒頭掃�
         writeRecord: () => ({ ok: false, code: "unknown_type", message: "unused in test" }),
       };
       expect(() =>
-        runModuleAlarmHandler("no-handler", { manifest: fakeManifest("no-handler") }, ctx),
+        runModuleAlarmHandler({ manifest: fakeManifest("no-handler") }, ctx),
       ).not.toThrow();
-      expect(() => runModuleAlarmHandler("missing", undefined, ctx)).not.toThrow();
+      expect(() => runModuleAlarmHandler(undefined, ctx)).not.toThrow();
     });
   });
 });

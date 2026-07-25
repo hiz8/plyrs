@@ -1,12 +1,19 @@
-import { createExecutionContext, createMessageBatch, env } from "cloudflare:test";
+import {
+  createExecutionContext,
+  createMessageBatch,
+  env,
+  runInDurableObject,
+} from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { afterEach, describe, expect, it } from "vitest";
 import { auditLogs, deadLetters } from "@plyrs/db/control-plane";
+import type { AuthContext } from "../src/do/authorize";
 import worker, { app } from "../src/index";
+import type { ModuleQueueJob } from "../src/modules/events";
 import type { ProjectionJob } from "../src/projection/jobs";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
-import { asPublishResult } from "./rpc-unwrap";
+import { asModuleSummaries, asPublishResult } from "./rpc-unwrap";
 import { resetSuperAdmins, superEnv, superLogin } from "./super-login";
 
 afterEach(async () => {
@@ -184,7 +191,7 @@ describe("dead letter park & replay", () => {
     expect(discardedAgain.status).toBe(404);
   });
 
-  it("parks from env-suffixed dlq names and routes suffixed module queues", async () => {
+  it("parks from env-suffixed dlq names", async () => {
     const batch = createMessageBatch<ProjectionJob>("plyrs-projection-preview-dlq", [
       {
         id: "msg-env",
@@ -198,5 +205,50 @@ describe("dead letter park & replay", () => {
       await drizzle(env.DB).select().from(deadLetters).where(eq(deadLetters.id, "msg-env"))
     )[0];
     expect(row?.queue).toBe("plyrs-projection-preview");
+  });
+
+  // Task 15 の命名規約(`plyrs-<用途>[-環境]`、DLQ は末尾 `-dlq`)どおり、queue() の判別
+  // (endsWith("-dlq") 優先 → startsWith("plyrs-modules"))が env サフィックス付きの
+  // modules キュー名でも正しく働くことの直接テスト(既存テストは非サフィックスの
+  // "plyrs-modules" か handleModuleJob 直呼びのみで、この経路は未検証だった)。
+  it("routes env-suffixed module queues, and their -dlq variant takes priority over the modules prefix", async () => {
+    const tenantId = "env-suffix-modules";
+    const tenant = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    const owner: AuthContext = { userId: "u-owner", role: "owner", tenantId };
+    await tenant.enableModule(tenantId, "booking", owner);
+    await runInDurableObject(tenant, async (_instance, state) => {
+      state.storage.sql.exec(
+        "UPDATE module_registry SET applied_version = 0 WHERE module_id = 'booking'",
+      );
+    });
+
+    // plyrs-modules-preview: startsWith("plyrs-modules") で module ジョブとして配送される
+    const modulesBatch = createMessageBatch<ModuleQueueJob>("plyrs-modules-preview", [
+      {
+        id: "mod-env",
+        timestamp: new Date(),
+        attempts: 1,
+        body: { kind: "module_sync", tenantId, moduleId: "booking" },
+      },
+    ]);
+    await worker.queue(modulesBatch, env, createExecutionContext());
+    const modules = asModuleSummaries(await tenant.listModules());
+    expect(modules[0]).toMatchObject({ moduleId: "booking", appliedVersion: 1 });
+
+    // plyrs-modules-preview-dlq: "plyrs-modules" 接頭辞と衝突しても endsWith("-dlq") が優先され、
+    // module ハンドラは通らず DLQ 退避になる。
+    const modulesDlqBatch = createMessageBatch<ModuleQueueJob>("plyrs-modules-preview-dlq", [
+      {
+        id: "mod-dlq-env",
+        timestamp: new Date(),
+        attempts: 5,
+        body: { kind: "module_sync", tenantId, moduleId: "booking" },
+      },
+    ]);
+    await worker.queue(modulesDlqBatch, env, createExecutionContext());
+    const dlqRow = (
+      await drizzle(env.DB).select().from(deadLetters).where(eq(deadLetters.id, "mod-dlq-env"))
+    )[0];
+    expect(dlqRow?.queue).toBe("plyrs-modules-preview");
   });
 });

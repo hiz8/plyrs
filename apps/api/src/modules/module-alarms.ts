@@ -26,7 +26,6 @@ export function moduleIdFromAlarmKind(kind: string): string | null {
 // (transactionSync 全体のロールバック + 他モジュール継続)は呼び出し側の責務とし、この関数自体は
 // throw を素通しする契約にする。
 export function runModuleAlarmHandler(
-  moduleId: string,
   module: ModuleDefinition | undefined,
   ctx: ModuleAlarmContext,
 ): void {

@@ -10,11 +10,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker, { app } from "../src/index";
 import type { AuthContext } from "../src/do/authorize";
 import {
+  BOOKING_MANIFEST,
   BOOKING_RESERVATION_KEY,
   BOOKING_RESOURCE_KEY,
   BOOKING_SLOT_KEY,
 } from "../src/modules/booking/manifest";
 import { BOOKING_PENDING_TTL_MS } from "../src/modules/booking/module";
+import { moduleRegistryRow, permissionsFromManifest } from "../src/modules/enablement";
 import type { ModuleQueueJob } from "../src/modules/events";
 import { moduleAlarmKind } from "../src/modules/module-alarms";
 import { TURNSTILE_VERIFY_URL } from "../src/modules/turnstile";
@@ -376,5 +378,25 @@ describe("§15 冒頭掃除(実害系 3 件)", () => {
     // 期待: モジュール拒否(`booking:slot_full` 等の ':' 含みコード)は管理 API でも 409
     expect(second.status).toBe(409);
     expect(((await second.json()) as { code: string }).code).toBe("booking:slot_full");
+  });
+});
+
+describe("Minor 掃除: hasValidPermissionsShape は配列を不正扱いする", () => {
+  it("grants が配列に壊れた permissions 行は shape 不正として再導出される", async () => {
+    const tenantId = crypto.randomUUID();
+    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    const owner: AuthContext = { userId: "u-owner", role: "owner", tenantId };
+    await stub.enableModule(tenantId, "booking", owner);
+    await runInDurableObject(stub, async (_instance, state) => {
+      // grants だけを配列に破壊する(typeWriteGuards は正しいマニフェスト由来のまま)。
+      // 修正前は object 扱いで通り、grants:[] のまま使われて owner の manage 権限まで消える。
+      const corrupted = { ...permissionsFromManifest(BOOKING_MANIFEST), grants: [] };
+      state.storage.sql.exec(
+        "UPDATE module_registry SET permissions = ? WHERE module_id = 'booking'",
+        JSON.stringify(corrupted),
+      );
+      const row = moduleRegistryRow(state.storage.sql, "booking");
+      expect(row?.permissions.grants).toEqual(permissionsFromManifest(BOOKING_MANIFEST).grants);
+    });
   });
 });

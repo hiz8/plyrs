@@ -39,7 +39,10 @@ interface RawModuleRegistryRow extends Record<string, SqlStorageValue> {
 // grants / typeWriteGuards が両方ともオブジェクト(null は除く)であることまで見る形状検証
 // (レビュー Minor: 値の型までは見ていなかった)。
 function hasValidPermissionsShape(value: unknown): value is StoredModulePermissions {
-  if (typeof value !== "object" || value === null) {
+  // Minor fix(レビュー指摘): typeof は配列も "object" を返すため、素の typeof/null 判定だけ
+  // では配列が通ってしまう(grants/typeWriteGuards が配列でも「object かつ non-null」は満たす)。
+  // Array.isArray で配列を全閉する。
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }
   if (!("grants" in value) || !("typeWriteGuards" in value)) {
@@ -48,8 +51,10 @@ function hasValidPermissionsShape(value: unknown): value is StoredModulePermissi
   return (
     typeof value.grants === "object" &&
     value.grants !== null &&
+    !Array.isArray(value.grants) &&
     typeof value.typeWriteGuards === "object" &&
-    value.typeWriteGuards !== null
+    value.typeWriteGuards !== null &&
+    !Array.isArray(value.typeWriteGuards)
   );
 }
 

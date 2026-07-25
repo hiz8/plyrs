@@ -46,10 +46,10 @@ export default {
   ): Promise<void> {
     await purgeExpiredSessions(env.DB, new Date());
   },
-  // design-spec §12.3 / Phase 9 §9.4: projection と module events の 2 キューを 1 ハンドラで
-  // 受ける（wrangler.jsonc の consumers はどちらもこの queue() を指す）。冪等なので
-  // at-least-once 配信をそのまま受ける。ExportedHandlerQueueHandler は ctx を第3引数として
-  // 渡す（テストの worker.queue(batch, env, ctx) 呼び出しに対応）。
+  // design-spec §12.3 / Phase 9 §9.4: projection と module events、それぞれの DLQ を合わせた
+  // 4 つの queue consumer を 1 ハンドラで受ける（wrangler.jsonc の consumers は全てこの
+  // queue() を指す）。冪等なので at-least-once 配信をそのまま受ける。ExportedHandlerQueueHandler
+  // は ctx を第3引数として渡す（テストの worker.queue(batch, env, ctx) 呼び出しに対応）。
   async queue(
     batch: MessageBatch<ProjectionJob | ModuleQueueJob>,
     env: Env,

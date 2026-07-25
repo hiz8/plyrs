@@ -29,9 +29,9 @@ describe("@plyrs/db control plane schema", () => {
     expect(getTableName(superAdmins)).toBe("super_admins");
     expect(getTableName(superSessions)).toBe("super_sessions");
     // Verify actual DB column names via introspection of column objects
-    // Each column object has a _ property with name = the actual SQL column name
+    // (Column#name holds the real SQL column name — there is no `_` wrapper to fall back to).
     const superAdminsColumnNames = Object.values(superAdmins)
-      .map((col) => col?._?.name || col?.name)
+      .map((col) => col?.name)
       .filter(Boolean);
     expect(superAdminsColumnNames).toEqual(
       expect.arrayContaining([
@@ -50,7 +50,7 @@ describe("@plyrs/db control plane schema", () => {
     expect(getTableName(deadLetters)).toBe("dead_letters");
     // Verify actual DB column names
     const auditLogsColumnNames = Object.values(auditLogs)
-      .map((col) => col?._?.name || col?.name)
+      .map((col) => col?.name)
       .filter(Boolean);
     expect(auditLogsColumnNames).toEqual(
       expect.arrayContaining([
@@ -64,7 +64,7 @@ describe("@plyrs/db control plane schema", () => {
       ]),
     );
     const deadLettersColumnNames = Object.values(deadLetters)
-      .map((col) => col?._?.name || col?.name)
+      .map((col) => col?.name)
       .filter(Boolean);
     expect(deadLettersColumnNames).toEqual(
       expect.arrayContaining(["id", "queue", "body", "failed_at", "replayed_at"]),
