@@ -68,6 +68,8 @@ wrangler secret put AUTH_TURNSTILE_SECRET_KEY --env <env> -c apps/api/wrangler.j
 
 `AUTH_TURNSTILE_SITE_KEY` はシークレットではなく公開値なので `vars`(`wrangler.jsonc` またはダッシュボード設定)で設定する(任意 — 未設定なら `/auth/turnstile-config` が `{ siteKey: null }` を返す)。
 
+**`AUTH_TURNSTILE_SECRET_KEY` と `AUTH_TURNSTILE_SITE_KEY` は必ずペアで設定・解除すること。** secret だけ設定して site key を未設定(または解除忘れ)のままにすると、admin 側は `/auth/turnstile-config` の `siteKey: null` を見て Turnstile ウィジェットを表示しない一方、api 側は secret が設定済みなので `turnstileToken` を必須とみなし、ウィジェットが出ないまま全 `/auth/signup`・`/auth/login` が `turnstile_required`(400)で失敗する。
+
 `wrangler secret put` は上記のとおり `pnpm exec` を介さず直接 `wrangler`(ローカル PATH またはグローバルインストール)を使ってもよいし、`pnpm exec wrangler secret put ...` でも同じ結果になる。対話的にシークレット値を求められる(パイプで渡す場合は `echo -n '<value>' | wrangler secret put JWT_SECRET --env <env> -c apps/api/wrangler.jsonc`)。
 
 ## 3. デプロイ
