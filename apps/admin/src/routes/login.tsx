@@ -68,6 +68,15 @@ function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // ウィジェットの script ロード失敗時。理由を表示しつつ、submit 失敗時と同じ導線
+  // (failureCount インクリメント → 再マウント)で自動的に再試行する。
+  function handleTurnstileLoadError() {
+    setError(
+      "認証ウィジェットの読み込みに失敗しました。再試行するか、ページを再読み込みしてください。",
+    );
+    setFailureCount((count) => count + 1);
+  }
+
   async function submit() {
     setBusy(true);
     setError(null);
@@ -115,7 +124,12 @@ function LoginPage() {
           isRequired
         />
         {siteKey !== null ? (
-          <TurnstileWidget key={failureCount} siteKey={siteKey} onToken={setToken} />
+          <TurnstileWidget
+            key={failureCount}
+            siteKey={siteKey}
+            onToken={setToken}
+            onLoadError={handleTurnstileLoadError}
+          />
         ) : null}
         {error !== null ? (
           <p {...stylex.props(styles.error)} role="alert">

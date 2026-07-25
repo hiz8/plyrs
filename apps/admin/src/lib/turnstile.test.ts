@@ -78,4 +78,38 @@ describe("loadTurnstile", () => {
     script.dispatchEvent(new Event("error"));
     await expect(promise).rejects.toThrow();
   });
+
+  it("resets state on failure so a subsequent call injects a new script", async () => {
+    const { loadTurnstile } = await import("./turnstile");
+    const first = loadTurnstile();
+    const firstScript = findInjectedScript();
+    if (firstScript === null) throw new Error("script not injected");
+    const onloadName = new URL(firstScript.src).searchParams.get("onload") ?? "";
+    firstScript.dispatchEvent(new Event("error"));
+    await expect(first).rejects.toThrow();
+    // 失敗した script は DOM から除去され、onload グローバルも残っていないはず
+    expect(findInjectedScript()).toBeNull();
+    expect((window as unknown as Record<string, (() => void) | undefined>)[onloadName]).toBe(
+      undefined,
+    );
+
+    const second = loadTurnstile();
+    expect(second).not.toBe(first); // rejected promise を再利用しない
+    expect(document.querySelectorAll(SCRIPT_SELECTOR)).toHaveLength(1); // 新しい script が 1 本注入される
+    expect(findInjectedScript()).not.toBe(firstScript);
+  });
+
+  it("deletes the onload global once the load succeeds", async () => {
+    const { loadTurnstile } = await import("./turnstile");
+    const promise = loadTurnstile();
+    const script = findInjectedScript();
+    if (script === null) throw new Error("script not injected");
+    const onloadName = new URL(script.src).searchParams.get("onload") ?? "";
+    const api = fakeApi();
+    triggerOnload(script, api);
+    await expect(promise).resolves.toBe(api);
+    expect((window as unknown as Record<string, (() => void) | undefined>)[onloadName]).toBe(
+      undefined,
+    );
+  });
 });

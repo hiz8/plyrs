@@ -1,7 +1,7 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterAll, beforeAll, describe, expect, it, vi, type Mock } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi, type Mock } from "vitest";
 import type { TurnstileApi, TurnstileRenderParams } from "./lib/turnstile";
 import { createAppContext, getRouter } from "./router";
 
@@ -160,6 +160,42 @@ type RenderMock = Mock<(el: HTMLElement, params: TurnstileRenderParams) => strin
 function turnstileEnabled(): Handler {
   return vi.fn(() => jsonResponse(200, { siteKey: "site-xyz" }));
 }
+
+function findTurnstileScript(): HTMLScriptElement | null {
+  return document.querySelector<HTMLScriptElement>(
+    'script[src^="https://challenges.cloudflare.com/turnstile/v0/api.js"]',
+  );
+}
+
+// window.turnstile を stub していない状態でロード失敗を再現する(実 script 注入が必要なため)。
+// このファイルは静的 import のみで vi.resetModules が効かず、lib/turnstile.ts の
+// loadPromise はファイル内で共有される。以降の describe(window.turnstile を stub する)を
+// 汚染しないよう、残った script は failure させて loadPromise を null に戻しておく。
+describe("Turnstile ロード失敗", () => {
+  afterEach(() => {
+    findTurnstileScript()?.dispatchEvent(new Event("error"));
+  });
+
+  it("shows a message when the turnstile script fails to load on the login page", async () => {
+    renderAt("/login", { "/auth/turnstile-config": turnstileEnabled() });
+    await screen.findByLabelText("メールアドレス");
+    await waitFor(() => expect(findTurnstileScript()).not.toBeNull());
+    findTurnstileScript()?.dispatchEvent(new Event("error"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "認証ウィジェットの読み込みに失敗しました。再試行するか、ページを再読み込みしてください。",
+    );
+  });
+
+  it("shows a message when the turnstile script fails to load on the signup page", async () => {
+    renderAt("/signup", { "/auth/turnstile-config": turnstileEnabled() });
+    await screen.findByLabelText("メールアドレス");
+    await waitFor(() => expect(findTurnstileScript()).not.toBeNull());
+    findTurnstileScript()?.dispatchEvent(new Event("error"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "認証ウィジェットの読み込みに失敗しました。再試行するか、ページを再読み込みしてください。",
+    );
+  });
+});
 
 // window.turnstile を偽装(vi.stubGlobal)。lib/turnstile.ts の loadTurnstile はモジュール
 // スコープの Promise を使い回す(idempotent)ため、このファイル内で最初にウィジェットが

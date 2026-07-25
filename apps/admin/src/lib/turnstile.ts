@@ -41,20 +41,27 @@ export function loadTurnstile(): Promise<TurnstileApi> {
   loadPromise = new Promise((resolve, reject) => {
     // onload のコールバック名は動的なグローバルプロパティなので、Window の型を汚さないよう
     // 境界だけ unknown 経由でキャストする(vitest.setup.ts の DOMRectList キャストと同じ方針)。
-    const globalScope = window as unknown as Record<string, () => void>;
-    globalScope[ONLOAD_CALLBACK_NAME] = () => {
-      if (window.turnstile === undefined) {
-        reject(new Error("turnstile script loaded but window.turnstile is missing"));
-        return;
-      }
-      resolve(window.turnstile);
-    };
+    const globalScope = window as unknown as Record<string, (() => void) | undefined>;
     const script = document.createElement("script");
     script.src = `${SCRIPT_SRC}?render=explicit&onload=${ONLOAD_CALLBACK_NAME}`;
     script.async = true;
-    script.addEventListener("error", () =>
-      reject(new Error("failed to load the turnstile script")),
-    );
+    // 失敗時は script を除去し loadPromise を null に戻す。rejected Promise をキャッシュした
+    // ままだと、次回呼び出し(再マウント等)がずっと同じ失敗を返し再試行できなくなるため。
+    const fail = (error: Error) => {
+      delete globalScope[ONLOAD_CALLBACK_NAME];
+      script.remove();
+      loadPromise = null;
+      reject(error);
+    };
+    globalScope[ONLOAD_CALLBACK_NAME] = () => {
+      if (window.turnstile === undefined) {
+        fail(new Error("turnstile script loaded but window.turnstile is missing"));
+        return;
+      }
+      delete globalScope[ONLOAD_CALLBACK_NAME];
+      resolve(window.turnstile);
+    };
+    script.addEventListener("error", () => fail(new Error("failed to load the turnstile script")));
     document.head.appendChild(script);
   });
   return loadPromise;
