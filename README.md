@@ -17,7 +17,7 @@ Cloudflare 上で動くマルチテナント CMS/BaaS。コンテンツの型を
 
 ## 開発
 
-前提: Node.js 22、pnpm 10
+前提: Node.js 24 以上、pnpm 10
 
 ```bash
 pnpm install

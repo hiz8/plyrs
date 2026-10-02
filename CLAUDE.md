@@ -15,7 +15,7 @@ plyrs は Cloudflare 上のマルチテナント CMS/BaaS(kintone 的に「型�
 
 ## コマンド
 
-pnpm workspaces(pnpm 10、Node 22)。依存バージョンは `pnpm-workspace.yaml` の `catalog:` で一元管理する(各 package.json は `"catalog:"` 指定)。
+pnpm workspaces(pnpm 10、Node 24 以上。`package.json` の `engines` と `.node-version` で指定)。依存バージョンは `pnpm-workspace.yaml` の `catalog:` で一元管理する(各 package.json は `"catalog:"` 指定)。
 
 ```bash
 pnpm lint            # oxlint
