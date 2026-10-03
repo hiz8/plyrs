@@ -235,6 +235,24 @@
 
 pnpm の `overrides` と renovate(または手動)で管理。RC/beta を2つ(Start・oxfmt)抱えるが、いずれも「壊れても影響がビルド/フォーマットに閉じる」層であり、データ層・同期層には安定版のみを置く、という危険度の傾斜をつけている。
 
+### 3.1 依存の自動更新(Renovate)
+
+設定は `.github/renovate.json5`。週 1 回(月曜朝 JST)に PR を作り、自動マージは CI(`check` / `e2e`)が緑であることを条件に Renovate 自身が行う(`platformAutomerge: false`。ブランチ保護の有無に依存させない)。
+
+| 更新種別 | 扱い |
+| --- | --- |
+| patch(0.x を含む) | 自動マージ(非メジャーを 1 PR にまとめる) |
+| minor(1.0 以上) | 自動マージ(同上) |
+| minor(0.x) | 個別 PR・手動マージ |
+| major | 個別 PR・手動マージ |
+| exact pin 対象(TanStack Start / Router・oxfmt) | 更新種別によらず PR のみ・手動マージ |
+| lockfile メンテナンス(推移的依存) | 自動マージ |
+
+- **0.x の minor を手動にする理由**: semver では 0.x の minor は破壊的変更を許す。実際 `@tanstack/db` の 0.x minor 更新では購読・GC の挙動変化への追従が必要だった。
+- **公開後 3 日待機**(`minimumReleaseAge`): 乗っ取られた版や即日取り下げられる版を取り込まないためのサプライチェーン対策。脆弱性修正の PR は待機・スケジュールの対象外(GitHub の Dependabot alerts を有効にしておく必要がある)。
+- **自動マージ後の安全網**: CI で拾えない実機差異(SPA シェル配信など)は、main push で走る preview デプロイで検知する。production は従来どおり手動 + 必須レビュー。
+- `engines` の Node 要件と `.node-version` のメジャー(24)は方針として手動で上げる(Renovate は `.node-version` を次メジャー到達時のみ提案する)。
+
 ---
 
 ## 4. 保留事項(実装フェーズで判断)

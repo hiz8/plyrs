@@ -1,0 +1,86 @@
+// 依存更新の方針(docs/tech-selection.md §3.1)
+//   patch          : 自動マージ(0.x を含む)
+//   minor (>=1.0)  : 自動マージ
+//   minor (0.x)    : PR のみ・手動マージ(semver 上 0.x の minor は破壊的変更を許す)
+//   major          : PR のみ・手動マージ
+//   exact pin 対象 : PR のみ・手動マージ(TanStack Start / Router・oxfmt。§3 の計画的更新)
+// 自動マージは CI(check / e2e)が緑であることが条件。公開から 3 日経過した版のみ取り込む。
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:recommended", ":timezone(Asia/Tokyo)"],
+  // 週 1 回(月曜朝)にまとめて PR を作る
+  schedule: ["* 0-8 * * 1"],
+  // サプライチェーン対策: 公開直後の版(乗っ取り・取り下げ)を避ける
+  minimumReleaseAge: "3 days",
+  // catalog の宣言バージョンも実際の解決バージョンへ追従させる(exact pin は exact のまま)
+  rangeStrategy: "bump",
+  postUpdateOptions: ["pnpmDedupe"],
+  labels: ["dependencies"],
+  // GitHub ネイティブの auto-merge はブランチ保護の必須チェックが無いと CI を待たずにマージしうるため、
+  // Renovate 自身が CI 結果を確認してからマージする方式にする
+  platformAutomerge: false,
+  automergeType: "pr",
+  // 脆弱性修正(GitHub の Dependabot alerts が情報源)はスケジュール・待機期間を無視して即時に PR を作る
+  vulnerabilityAlerts: {
+    schedule: ["at any time"],
+    minimumReleaseAge: null,
+  },
+  lockFileMaintenance: {
+    enabled: true,
+    automerge: true,
+    schedule: ["* 0-8 * * 1"],
+  },
+  packageRules: [
+    {
+      description: "engines の Node 要件はプロジェクト方針として手動で上げる",
+      matchDepTypes: ["engines"],
+      enabled: false,
+    },
+    {
+      description: ".node-version はメジャー指定(24)で運用するため、範囲外(次のメジャー)になったときだけ書き換える",
+      matchManagers: ["nodenv"],
+      rangeStrategy: "replace",
+    },
+    {
+      description: "patch は自動マージ(0.x を含む)",
+      matchUpdateTypes: ["patch", "digest", "pin"],
+      matchPackageNames: ["!@tanstack/react-router", "!@tanstack/react-start", "!oxfmt"],
+      groupName: "non-major dependencies",
+      automerge: true,
+    },
+    {
+      description: "1.0 以上の minor は自動マージ",
+      matchUpdateTypes: ["minor"],
+      matchCurrentVersion: "!/^[~^]?0\\./",
+      matchPackageNames: ["!@tanstack/react-router", "!@tanstack/react-start", "!oxfmt"],
+      groupName: "non-major dependencies",
+      automerge: true,
+    },
+    {
+      description: "0.x の minor は破壊的変更を含みうるため個別 PR・手動マージ",
+      matchUpdateTypes: ["minor"],
+      matchCurrentVersion: "/^[~^]?0\\./",
+      addLabels: ["manual-merge"],
+      automerge: false,
+    },
+    {
+      description: "major は個別 PR・手動マージ",
+      matchUpdateTypes: ["major"],
+      addLabels: ["manual-merge"],
+      automerge: false,
+    },
+    {
+      description: "TanStack Start / Router は exact pin・リリースノート確認の上で計画的に更新(同時リリースのため 1 PR にまとめる)",
+      matchPackageNames: ["@tanstack/react-router", "@tanstack/react-start"],
+      groupName: "TanStack Start / Router",
+      addLabels: ["manual-merge"],
+      automerge: false,
+    },
+    {
+      description: "oxfmt は beta のため exact pin・フォーマット差分を確認して更新",
+      matchPackageNames: ["oxfmt"],
+      addLabels: ["manual-merge"],
+      automerge: false,
+    },
+  ],
+}
