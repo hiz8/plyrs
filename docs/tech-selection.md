@@ -235,6 +235,31 @@
 
 pnpm の `overrides` と renovate(または手動)で管理。RC/beta を2つ(Start・oxfmt)抱えるが、いずれも「壊れても影響がビルド/フォーマットに閉じる」層であり、データ層・同期層には安定版のみを置く、という危険度の傾斜をつけている。
 
+### 3.1 依存の自動更新(Renovate)
+
+設定は `.github/renovate.json5`。週 1 回(月曜朝 JST)に PR を作る。`main` は ruleset「main 保護」で PR + 必須チェック `check` / `e2e` を課しているため、Renovate の更新も必ず PR と CI を経る。自動マージは Renovate 自身が CI 結果を確認して行う(`platformAutomerge: false`)。
+
+| 更新種別 | 扱い |
+| --- | --- |
+| patch(0.x を含む) | 自動マージ(非メジャーを 1 PR にまとめる) |
+| minor(1.0 以上) | 自動マージ(同上) |
+| minor(0.x) | 個別 PR・手動マージ |
+| major | 個別 PR・手動マージ |
+| exact pin されている依存(catalog / package.json の値が `x.y.z`) | 更新種別によらず PR のみ・手動マージ |
+| lockfile メンテナンス(推移的依存) | 自動マージ |
+
+- **exact pin の判定は値ベース**(`matchCurrentValue: /^\d+\.\d+\.\d+$/`)。2026-10 時点の対象は TanStack Start / Router・`@tanstack/db`・`@stylexjs/stylex` / `@stylexjs/unplugin`・oxfmt。catalog で `^` を外せば自動で手動マージ扱いになり、`^` を付ければ自動マージ対象に戻る。例外として `packageManager`(`pnpm@x.y.z`)は書式上 exact しか書けないため対象外とし、patch / minor は自動マージする。
+- **同時に上げる必要がある依存はグループ化**: TanStack Start / Router、`@stylexjs/*`(全更新種別)、`@tiptap/*` と React(`react` / `react-dom` / `@types/react` / `@types/react-dom`)は major のみ 1 PR にまとめる。`group:monorepos` には stylex のプリセットが無く、react のプリセットは `@types/*` を含まないため明示している。
+- **0.x の minor を手動にする理由**: semver では 0.x の minor は破壊的変更を許す。実際 `@tanstack/db` の 0.x minor 更新では購読・GC の挙動変化への追従が必要だった。
+- **公開後 7 日待機(Renovate と pnpm の二段構え)**: 乗っ取られた版は数日で取り下げられることが多いため、取り込むまでの安全マージンとして 1 週間置く。乗っ取られた版は推移的依存として入り込むことが多いので、直接依存だけでなく推移的依存にも同じ待機をかける。
+  - **Renovate**(`.github/renovate.json5` の `minimumReleaseAge: "7 days"`): 直接依存の更新 PR を、公開から 7 日経つまで作らない。pnpm では推移的依存に強制されない(強制されるのは npm の `--before` のみ)。
+  - **pnpm**(`pnpm-workspace.yaml` の `minimumReleaseAge: 10080`、分単位): 公開から 7 日経っていない版は、推移的依存も含めて解決しない。lockfile maintenance や Renovate の更新 PR での lockfile 再生成もこの制約の下で行われる。
+  - 手元での `pnpm add` / `pnpm update` も 7 日以内の版を選ばない(例: 最新が当日公開の版でも、7 日前までに公開された版が入る)。公開直後の版がどうしても必要なときは、`pnpm-workspace.yaml` の `minimumReleaseAgeExclude` に対象を明示して追加する。
+  - 脆弱性修正の PR は待機・スケジュールの対象外。Renovate は脆弱性修正の更新に限り、`minimumReleaseAgeExclude` へ対象の版を自動で追記する(GitHub の Dependabot alerts を有効にしておく必要がある)。
+- **Cloudflare トークンに触れる依存も特別扱いしない**: `deploy.yml` はジョブ全体の env にトークンを置いており、`pnpm install`・admin ビルド(vite と全プラグイン)・wrangler の実行中に読み込まれる依存は、推移的依存も含めてすべてトークンを読める。`wrangler` / `@cloudflare/*` / vite プラグインだけを名前で手動マージにしても守れる範囲は限られ、差分の目視で悪意のあるコードを見抜くことも現実的ではない。一方で wrangler と workers-types はほぼ毎日更新されるため、手動にすると更新が滞る。対策は Renovate と pnpm による 7 日待機(推移的依存を含む)、Environment secret を `main` からのデプロイに限定すること、production の必須レビューで受け持つ。露出をさらに減らすなら、トークンを wrangler を実行するステップの env に限定する(install / build から外す)のが効果的。
+- **自動マージ後の安全網**: CI で拾えない実機差異(SPA シェル配信など)は、main push で走る preview デプロイで検知する。production は従来どおり手動 + 必須レビュー。
+- `engines` の Node 要件と `.node-version` のメジャー(24)は方針として手動で上げる(Renovate は `.node-version` を次メジャー到達時のみ提案する)。
+
 ---
 
 ## 4. 保留事項(実装フェーズで判断)

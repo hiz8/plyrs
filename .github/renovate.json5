@@ -1,0 +1,112 @@
+// 依存更新の方針(docs/tech-selection.md §3.1)
+//   patch          : 自動マージ(0.x を含む)
+//   minor (>=1.0)  : 自動マージ
+//   minor (0.x)    : PR のみ・手動マージ(semver 上 0.x の minor は破壊的変更を許す)
+//   major          : PR のみ・手動マージ
+//   exact pin      : 更新種別によらず PR のみ・手動マージ(catalog / package.json の値が x.y.z のもの)
+// 自動マージは CI(check / e2e)が緑であることが条件。公開から 7 日経過した版のみ取り込む。
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:recommended", ":timezone(Asia/Tokyo)"],
+  // 週 1 回(月曜朝)にまとめて PR を作る
+  schedule: ["* 0-8 * * 1"],
+  // サプライチェーン対策: 公開直後の版(乗っ取り・取り下げ)を避ける。これは直接依存のみが対象で、
+  // 推移的依存は pnpm-workspace.yaml の minimumReleaseAge(同じ 7 日)で守る
+  minimumReleaseAge: "7 days",
+  // catalog の宣言バージョンも実際の解決バージョンへ追従させる(exact pin は exact のまま)
+  rangeStrategy: "bump",
+  postUpdateOptions: ["pnpmDedupe"],
+  labels: ["dependencies"],
+  // GitHub ネイティブの auto-merge はブランチ保護の必須チェックが無いと CI を待たずにマージしうるため、
+  // Renovate 自身が CI 結果を確認してからマージする方式にする
+  platformAutomerge: false,
+  automergeType: "pr",
+  // 脆弱性修正(GitHub の Dependabot alerts が情報源)はスケジュール・待機期間を無視して即時に PR を作る
+  vulnerabilityAlerts: {
+    schedule: ["at any time"],
+    minimumReleaseAge: null,
+  },
+  lockFileMaintenance: {
+    enabled: true,
+    automerge: true,
+    schedule: ["* 0-8 * * 1"],
+  },
+  packageRules: [
+    {
+      description: "engines の Node 要件はプロジェクト方針として手動で上げる",
+      matchDepTypes: ["engines"],
+      enabled: false,
+    },
+    {
+      description: ".node-version はメジャー指定(24)で運用するため、範囲外(次のメジャー)になったときだけ書き換える",
+      matchManagers: ["nodenv"],
+      rangeStrategy: "replace",
+    },
+    {
+      description: "patch は自動マージ(0.x を含む)",
+      matchUpdateTypes: ["patch", "digest", "pin"],
+      matchCurrentValue: "!/^\\d+\\.\\d+\\.\\d+$/",
+      groupName: "non-major dependencies",
+      automerge: true,
+    },
+    {
+      description: "1.0 以上の minor は自動マージ",
+      matchUpdateTypes: ["minor"],
+      matchCurrentVersion: "!/^[~^]?0\\./",
+      matchCurrentValue: "!/^\\d+\\.\\d+\\.\\d+$/",
+      groupName: "non-major dependencies",
+      automerge: true,
+    },
+    {
+      description: "0.x の minor は破壊的変更を含みうるため個別 PR・手動マージ",
+      matchUpdateTypes: ["minor"],
+      matchCurrentVersion: "/^[~^]?0\\./",
+      addLabels: ["manual-merge"],
+      automerge: false,
+    },
+    {
+      description: "major は個別 PR・手動マージ",
+      matchUpdateTypes: ["major"],
+      addLabels: ["manual-merge"],
+      automerge: false,
+    },
+    {
+      description: "exact pin(値が x.y.z)は計画的に更新する方針のため、更新種別によらず手動マージ。pin の追加・解除に設定が追従する",
+      matchCurrentValue: "/^\\d+\\.\\d+\\.\\d+$/",
+      // packageManager(pnpm@x.y.z)は書式上 exact しか書けず、方針としての pin ではないため除外
+      matchDepTypes: ["!packageManager"],
+      addLabels: ["manual-merge"],
+      automerge: false,
+    },
+    {
+      description: "packageManager(pnpm)の patch / minor は他の依存と同じく自動マージ(値ベースの exact 判定で自動マージ対象から外れるため戻す)",
+      matchDepTypes: ["packageManager"],
+      matchUpdateTypes: ["patch", "minor"],
+      groupName: "non-major dependencies",
+      automerge: true,
+    },
+    // 以降は一緒に上げないと壊れる依存のグループ化。groupName が他のルールで上書きされないよう末尾に置く
+    {
+      description: "TanStack Start / Router は同時リリースのため 1 PR にまとめる",
+      matchPackageNames: ["@tanstack/react-router", "@tanstack/react-start"],
+      groupName: "TanStack Start / Router",
+    },
+    {
+      description: "stylex と unplugin はバージョンを揃える必要がある(group:monorepos に stylex のプリセットは無い)",
+      matchPackageNames: ["@stylexjs/*"],
+      groupName: "StyleX",
+    },
+    {
+      description: "Tiptap の major は全パッケージを揃えて上げる",
+      matchPackageNames: ["@tiptap/*"],
+      matchUpdateTypes: ["major"],
+      groupName: "Tiptap",
+    },
+    {
+      description: "React の major は型定義も含めて揃えて上げる(group:monorepos の react は @types/* を含まない)",
+      matchPackageNames: ["react", "react-dom", "@types/react", "@types/react-dom"],
+      matchUpdateTypes: ["major"],
+      groupName: "React",
+    },
+  ],
+}
