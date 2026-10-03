@@ -3,7 +3,9 @@
 ## 0. 前提と警告
 
 - **素の `wrangler deploy`(`--env` なし)は禁止**。`apps/api/wrangler.jsonc` / `apps/admin/wrangler.jsonc` のトップレベルブロックは dev/vitest 用(`@cloudflare/vitest-plugin` が `configPath` で読む)であり、`database_id` や KV `id` はすべてダミー値。必ず `--env preview` か `--env production` を付けてデプロイする。
-- GitHub Secrets(リポジトリまたは各 Environment に設定): `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`。
+- GitHub Secrets: `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` は **`preview` / `production` の各 Environment secret として設定し、リポジトリレベルには置かない**。`deploy.yml` のジョブは `environment:` を指定しているので Environment secret が解決される。トークンは環境ごとに別々に発行し、失効・ローテーションを個別に行えるようにする(ただし同一 Cloudflare アカウント内では Workers / D1 の編集権限がアカウント単位のため、preview 用トークンでも production のリソースを操作できる。完全に隔離するには preview 用に別アカウントが必要)。
+- 両 Environment の Deployment branches は **`main` のみ**に制限する(Settings → Environments → 各環境 → Deployment branches and tags → Selected branches)。他ブランチの workflow から Environment secret を読ませないため。
+- `main` は ruleset「main 保護」で保護する(Settings → Rules → Rulesets): 削除・force push 禁止、PR 必須(承認数 0)、必須ステータスチェック `check` / `e2e`(GitHub Actions)。リポジトリ管理者は bypass 可(main への直接 push 運用を維持するため)。依存更新の bot など管理者以外は PR + CI 通過を経ないと main に入れない。
 - GitHub の `production` Environment には **必須レビュアー(Required reviewers)を設定する**(Settings → Environments → production → Deployment protection rules)。`.github/workflows/deploy.yml` の `workflow_dispatch` はこの Environment 保護を経由するため、レビュー承認なしに本番へは出ない。`preview` Environment はレビュー不要のまま(push のたびに自動デプロイするため)。
 - 初回リソース作成(§1)と ID 転記が完了するまで、main push の preview デプロイは失敗する(想定内)。
 
