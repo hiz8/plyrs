@@ -6,7 +6,7 @@ import { TURNSTILE_VERIFY_URL } from "../src/modules/turnstile";
 import { asRecordSnapshot } from "../src/rpc-unwrap";
 
 // design-spec §11.7(論点W)のブリーフは Turnstile の siteverify を `fetchMock`(cloudflare:test)で
-// モックする想定だったが、このワークスペースの @cloudflare/vitest-pool-workers は
+// モックする想定だったが、このワークスペースの @cloudflare/vitest-pool-workers(現 @cloudflare/vitest-plugin)は
 // `import { fetchMock } from "cloudflare:test"` を既に撤去済み(公式 CHANGELOG: 「This has been
 // removed. Instead, mock globalThis.fetch ...」)。ここでは公式が示す代替
 // (vi.spyOn(globalThis, "fetch"))で siteverify だけを差し替える。テストの意図(Turnstile

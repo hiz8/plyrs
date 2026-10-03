@@ -2,7 +2,7 @@
 
 ## 0. 前提と警告
 
-- **素の `wrangler deploy`(`--env` なし)は禁止**。`apps/api/wrangler.jsonc` / `apps/admin/wrangler.jsonc` のトップレベルブロックは dev/vitest 用(`vitest-pool-workers` が `configPath` で読む)であり、`database_id` や KV `id` はすべてダミー値。必ず `--env preview` か `--env production` を付けてデプロイする。
+- **素の `wrangler deploy`(`--env` なし)は禁止**。`apps/api/wrangler.jsonc` / `apps/admin/wrangler.jsonc` のトップレベルブロックは dev/vitest 用(`@cloudflare/vitest-plugin` が `configPath` で読む)であり、`database_id` や KV `id` はすべてダミー値。必ず `--env preview` か `--env production` を付けてデプロイする。
 - GitHub Secrets(リポジトリまたは各 Environment に設定): `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`。
 - GitHub の `production` Environment には **必須レビュアー(Required reviewers)を設定する**(Settings → Environments → production → Deployment protection rules)。`.github/workflows/deploy.yml` の `workflow_dispatch` はこの Environment 保護を経由するため、レビュー承認なしに本番へは出ない。`preview` Environment はレビュー不要のまま(push のたびに自動デプロイするため)。
 - 初回リソース作成(§1)と ID 転記が完了するまで、main push の preview デプロイは失敗する(想定内)。

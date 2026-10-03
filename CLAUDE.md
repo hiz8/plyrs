@@ -82,8 +82,8 @@ pnpm --filter @plyrs/db generate:projection  # 公開投影 D1(drizzle-projectio
 
 ## テスト
 
-- api のテストは `@cloudflare/vitest-pool-workers`(workerd 上で実行)。`vitest.config.ts` が D1 マイグレーションをバインディングとして注入し、`test/apply-migrations.ts` で適用する。DO は `env.TENANT_DO.get(env.TENANT_DO.idFromName(<一意な名前>))` でテストごとに分離する
-- `cloudflare:test` の `fetchMock` は pool-workers 0.18 で削除済み。外部 fetch のモックは `vi.spyOn(globalThis, "fetch")`(`test/public-write.test.ts` が様式)
+- api のテストは `@cloudflare/vitest-plugin`(workerd 上で実行。旧名 `@cloudflare/vitest-pool-workers`)。`vitest.config.ts` が D1 マイグレーションをバインディングとして注入し、`test/apply-migrations.ts` で適用する。DO は `env.TENANT_DO.get(env.TENANT_DO.idFromName(<一意な名前>))` でテストごとに分離する
+- `cloudflare:test` の `fetchMock` は pool-workers 0.18 で削除済み(後継の vitest-plugin でも無し)。外部 fetch のモックは `vi.spyOn(globalThis, "fetch")`(`test/public-write.test.ts` が様式)
 - admin / ui は jsdom + Testing Library
 
 ## ローカル開発・デプロイの注意

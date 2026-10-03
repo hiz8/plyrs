@@ -3,7 +3,7 @@ import { SYNC_SUBPROTOCOL } from "@plyrs/sync-protocol";
 import type { SocketAuth } from "../src/sync/session";
 import { AUTH_HEADER } from "../src/sync/session";
 
-// vitest-pool-workers: stub.fetch が返す Response.webSocket のクライアント端は
+// vitest-plugin: stub.fetch が返す Response.webSocket のクライアント端は
 // 自動 accept されない（ブラウザの WebSocket と違う）。明示的に accept する。
 // Worker 経由の経路は `app.request` で別途テストするため、ヘルパーは DO 直結・
 // 検証済みヘッダ注入とする。

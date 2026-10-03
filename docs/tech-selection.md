@@ -78,13 +78,13 @@
 ### 1.5 テスト: Vitest + React Testing Library — 採用(+ 追加1点)
 
 - **現状**: Vitest は VoidZero 製で Vite ネイティブ。oxc 系ツールチェーンと同じ開発元で相性・継続性ともに良い。
-- **追加選定: `@cloudflare/vitest-pool-workers`**(Cloudflare 公式)。Vitest のテストを **workerd ランタイム上で実行**でき、DO・D1・Queues・R2 をローカルでバインドしてテストできる。本プロジェクトのコア(DO 内の書き込み経路・フック・アウトボックス・投影 consumer)は Workers ランタイム依存が強く、Node 上のユニットテストだけでは検証できないため必須。
+- **追加選定: `@cloudflare/vitest-plugin`**(Cloudflare 公式。1.0.0 で `@cloudflare/vitest-pool-workers` から改名)。Vitest のテストを **workerd ランタイム上で実行**でき、DO・D1・Queues・R2 をローカルでバインドしてテストできる。本プロジェクトのコア(DO 内の書き込み経路・フック・アウトボックス・投影 consumer)は Workers ランタイム依存が強く、Node 上のユニットテストだけでは検証できないため必須。
 - **テスト構成**:
   - **ユニット(Node)**: メタモデルのバリデーション、Zod スキーマ生成、AST → relations 抽出、競合判定ロジック等の純関数。
-  - **統合(vitest-pool-workers)**: DO 書き込み経路(beforeWrite → commit → outbox)、publish → 投影 consumer、認可2段、alarm 多重化。
+  - **統合(vitest-plugin)**: DO 書き込み経路(beforeWrite → commit → outbox)、publish → 投影 consumer、認可2段、alarm 多重化。
   - **コンポーネント(RTL + jsdom/happy-dom)**: 管理画面 UI。
   - **E2E(Playwright)**: 導入は後回し可。同期(WebSocket)を含むクリティカルパスのみ薄く。
-- **リスクと注意**: vitest-pool-workers が要求する Vitest のバージョンレンジに引きずられることがある。Vitest のメジャーアップは pool-workers の対応を確認してから。
+- **リスクと注意**: vitest-plugin が要求する Vitest のバージョンレンジに引きずられることがある。Vitest のメジャーアップは vitest-plugin の対応を確認してから(2026-10 時点で vitest-plugin 1.3.6 は `vitest ^4.1.0` のみ対応、Vitest 5 は未対応)。
 
 ### 1.6 日付: date-fns — 採用(v4 + タイムゾーン拡張)
 
@@ -266,7 +266,7 @@ pnpm の `overrides` と renovate(または手動)で管理。RC/beta を2つ(St
 | WebSocket        | Hibernation API 直 + partysocket(client)                          |
 | 日付             | date-fns v4 + @date-fns/tz                                        |
 | Lint / Format    | oxlint / oxfmt                                                    |
-| テスト           | Vitest + RTL + @cloudflare/vitest-pool-workers(+ Playwright 後日) |
+| テスト           | Vitest + RTL + @cloudflare/vitest-plugin(+ Playwright 後日)       |
 | 濫用防止         | Turnstile + Rate Limiting                                         |
 | パッケージ管理   | pnpm workspaces(モノレポ)                                         |
 | ビルド・デプロイ | Vite + @cloudflare/vite-plugin + Wrangler                         |
