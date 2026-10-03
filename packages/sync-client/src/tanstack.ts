@@ -5,7 +5,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { SyncEngine } from "./engine";
 import type { StoreChange } from "./store";
 
-// @tanstack/db は BETA（0.6.x）。破壊的変更の影響をこの1ファイルに閉じ込める。
+// @tanstack/db は BETA（0.x）。破壊的変更の影響をこの1ファイルに閉じ込める。
 // エンジンコア（engine/store/outbox）は tanstack-db に一切依存しない。
 
 interface SyncHandles {
@@ -153,6 +153,11 @@ export class CollectionRegistry {
       // CollectionRegistry は購読者の有無に関わらずエンジンのイベントを即座に反映する必要がある
       // ため、明示的に true にする（ブリーフには無かった指定）。
       startSync: true,
+      // 自動 GC を無効にする。@tanstack/db は購読者の居ないコレクションを gcTime(既定 5 分)後に
+      // cleanup し、0.9.1 以降は購読が一度も無いまま startSync したものも対象になる。cleanup されると
+      // sync のハンドルが外れ、以降のストア変更が黙って捨てられる。レジストリはテナント接続の間
+      // 全型のコレクションを保持し続ける前提なので、GC させない。
+      gcTime: 0,
       sync: {
         rowUpdateMode: "full",
         sync: (handles) => {

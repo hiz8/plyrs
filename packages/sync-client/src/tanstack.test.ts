@@ -107,6 +107,55 @@ describe("CollectionRegistry", () => {
     expect(collection?.status).not.toBe("loading");
   });
 
+  // @tanstack/db 0.9.1 以降は購読者の居ないコレクションも gcTime(既定 5 分)で回収する。
+  // 回収されると sync のハンドルが外れ、以降のストア変更が黙って捨てられる。
+  it("keeps collections alive without subscribers (no automatic GC)", async () => {
+    vi.useFakeTimers();
+    try {
+      registry.sync([articleType]);
+      registry.markReady();
+      registry.applyStoreChange({ kind: "upsert", record: record() });
+      // 購読→解除のケース(画面を離れた後)も同じく回収されてはならない
+      registry
+        .get("article")
+        ?.subscribeChanges(() => undefined)
+        .unsubscribe();
+
+      // GC はマイクロタスク経由でタイマーを張り、さらにアイドルコールバックで回収するため非同期で進める
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+
+      const collection = registry.get("article");
+      expect(collection?.status).toBe("ready");
+      registry.applyStoreChange({ kind: "upsert", record: record({ id: "r2" }) });
+      expect(collection?.get("r1")).toBeDefined();
+      expect(collection?.get("r2")).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("notifies an existing subscriber when a pre-existing record is tombstoned", () => {
+    registry.sync([articleType]);
+    registry.markReady();
+    registry.applyStoreChange({ kind: "upsert", record: record() });
+    const collection = registry.get("article");
+    const deleted: string[] = [];
+    // use-collection.ts と同じ購読形(includeInitialState: true)
+    const subscription = collection?.subscribeChanges(
+      (changes) => {
+        for (const change of changes) {
+          if (change.type === "delete") {
+            deleted.push(String(change.key));
+          }
+        }
+      },
+      { includeInitialState: true },
+    );
+    registry.applyStoreChange({ kind: "delete", recordId: "r1", typeKey: "article" });
+    subscription?.unsubscribe();
+    expect(deleted).toEqual(["r1"]);
+  });
+
   it("removes a record from the collection on a tombstone", () => {
     registry.sync([articleType]);
     registry.markReady();

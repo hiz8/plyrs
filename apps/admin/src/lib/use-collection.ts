@@ -3,9 +3,11 @@ import type { SyncRecord } from "@plyrs/sync-protocol";
 import type { Collection } from "@tanstack/db";
 import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
 
-// @tanstack/react-db は採用しない(@tanstack/db 0.6.16 固定依存で catalog の 0.6.14 と
-// 二重インスタンス化するため)。subscribeChanges + useState の素朴な購読で足りる。
-// collection.toArray は楽観的オーバーレイ込みの見え方(編集の即時反映がここで効く)。
+// @tanstack/react-db は採用していない(導入当時は @tanstack/db の固定依存が catalog とずれて
+// 二重インスタンス化したため)。subscribeChanges + useState の素朴な購読で足りる。
+// collection.toArray は楽観的オーバーレイ込みの見え方(編集の即時反映はこれで実現する)。
+// 購読は includeInitialState: true で張る。@tanstack/db は購読者ごとに「受け取り済みの行」を
+// 追跡し、初期状態を受け取っていない購読者には購読前から在る行の変更・削除を届けない。
 export function useCollectionRows(
   collection: Collection<SyncRecord, string> | undefined,
 ): SyncRecord[] {
@@ -18,7 +20,9 @@ export function useCollectionRows(
       return;
     }
     setRows(collection.toArray);
-    const subscription = collection.subscribeChanges(() => setRows(collection.toArray));
+    const subscription = collection.subscribeChanges(() => setRows(collection.toArray), {
+      includeInitialState: true,
+    });
     return () => subscription.unsubscribe();
   }, [collection]);
   return rows;
@@ -50,7 +54,7 @@ export function useRelationCandidates(
       );
     recompute();
     const subscriptions = collections.map((collection) =>
-      collection.subscribeChanges(() => recompute()),
+      collection.subscribeChanges(() => recompute(), { includeInitialState: true }),
     );
     return () => {
       for (const subscription of subscriptions) {
