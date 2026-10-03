@@ -3,15 +3,15 @@
 //   minor (>=1.0)  : 自動マージ
 //   minor (0.x)    : PR のみ・手動マージ(semver 上 0.x の minor は破壊的変更を許す)
 //   major          : PR のみ・手動マージ
-//   exact pin 対象 : PR のみ・手動マージ(TanStack Start / Router・oxfmt。§3 の計画的更新)
-// 自動マージは CI(check / e2e)が緑であることが条件。公開から 3 日経過した版のみ取り込む。
+//   exact pin      : 更新種別によらず PR のみ・手動マージ(catalog / package.json の値が x.y.z のもの)
+// 自動マージは CI(check / e2e)が緑であることが条件。公開から 7 日経過した版のみ取り込む。
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: ["config:recommended", ":timezone(Asia/Tokyo)"],
   // 週 1 回(月曜朝)にまとめて PR を作る
   schedule: ["* 0-8 * * 1"],
   // サプライチェーン対策: 公開直後の版(乗っ取り・取り下げ)を避ける
-  minimumReleaseAge: "3 days",
+  minimumReleaseAge: "7 days",
   // catalog の宣言バージョンも実際の解決バージョンへ追従させる(exact pin は exact のまま)
   rangeStrategy: "bump",
   postUpdateOptions: ["pnpmDedupe"],
@@ -44,7 +44,7 @@
     {
       description: "patch は自動マージ(0.x を含む)",
       matchUpdateTypes: ["patch", "digest", "pin"],
-      matchPackageNames: ["!@tanstack/react-router", "!@tanstack/react-start", "!oxfmt"],
+      matchCurrentValue: "!/^\\d+\\.\\d+\\.\\d+$/",
       groupName: "non-major dependencies",
       automerge: true,
     },
@@ -52,7 +52,7 @@
       description: "1.0 以上の minor は自動マージ",
       matchUpdateTypes: ["minor"],
       matchCurrentVersion: "!/^[~^]?0\\./",
-      matchPackageNames: ["!@tanstack/react-router", "!@tanstack/react-start", "!oxfmt"],
+      matchCurrentValue: "!/^\\d+\\.\\d+\\.\\d+$/",
       groupName: "non-major dependencies",
       automerge: true,
     },
@@ -70,17 +70,42 @@
       automerge: false,
     },
     {
-      description: "TanStack Start / Router は exact pin・リリースノート確認の上で計画的に更新(同時リリースのため 1 PR にまとめる)",
-      matchPackageNames: ["@tanstack/react-router", "@tanstack/react-start"],
-      groupName: "TanStack Start / Router",
+      description: "exact pin(値が x.y.z)は計画的に更新する方針のため、更新種別によらず手動マージ。pin の追加・解除に設定が追従する",
+      matchCurrentValue: "/^\\d+\\.\\d+\\.\\d+$/",
+      // packageManager(pnpm@x.y.z)は書式上 exact しか書けず、方針としての pin ではないため除外
+      matchDepTypes: ["!packageManager"],
       addLabels: ["manual-merge"],
       automerge: false,
     },
     {
-      description: "oxfmt は beta のため exact pin・フォーマット差分を確認して更新",
-      matchPackageNames: ["oxfmt"],
-      addLabels: ["manual-merge"],
-      automerge: false,
+      description: "packageManager(pnpm)の patch / minor は他の依存と同じく自動マージ(値ベースの exact 判定で自動マージ対象から外れるため戻す)",
+      matchDepTypes: ["packageManager"],
+      matchUpdateTypes: ["patch", "minor"],
+      groupName: "non-major dependencies",
+      automerge: true,
+    },
+    // 以降は一緒に上げないと壊れる依存のグループ化。groupName が他のルールで上書きされないよう末尾に置く
+    {
+      description: "TanStack Start / Router は同時リリースのため 1 PR にまとめる",
+      matchPackageNames: ["@tanstack/react-router", "@tanstack/react-start"],
+      groupName: "TanStack Start / Router",
+    },
+    {
+      description: "stylex と unplugin はバージョンを揃える必要がある(group:monorepos に stylex のプリセットは無い)",
+      matchPackageNames: ["@stylexjs/*"],
+      groupName: "StyleX",
+    },
+    {
+      description: "Tiptap の major は全パッケージを揃えて上げる",
+      matchPackageNames: ["@tiptap/*"],
+      matchUpdateTypes: ["major"],
+      groupName: "Tiptap",
+    },
+    {
+      description: "React の major は型定義も含めて揃えて上げる(group:monorepos の react は @types/* を含まない)",
+      matchPackageNames: ["react", "react-dom", "@types/react", "@types/react-dom"],
+      matchUpdateTypes: ["major"],
+      groupName: "React",
     },
   ],
 }

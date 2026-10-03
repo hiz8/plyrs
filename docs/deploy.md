@@ -7,7 +7,7 @@
 - 両 Environment の Deployment branches は **`main` のみ**に制限する(Settings → Environments → 各環境 → Deployment branches and tags → Selected branches)。他ブランチの workflow から Environment secret を読ませないため。
 - `main` は ruleset「main 保護」で保護する(Settings → Rules → Rulesets): 削除・force push 禁止、PR 必須(承認数 0)、必須ステータスチェック `check` / `e2e`(GitHub Actions)。リポジトリ管理者は bypass 可(main への直接 push 運用を維持するため)。依存更新の bot など管理者以外は PR + CI 通過を経ないと main に入れない。
 - GitHub の `production` Environment には **必須レビュアー(Required reviewers)を設定する**(Settings → Environments → production → Deployment protection rules)。`.github/workflows/deploy.yml` の `workflow_dispatch` はこの Environment 保護を経由するため、レビュー承認なしに本番へは出ない。`preview` Environment はレビュー不要のまま(push のたびに自動デプロイするため)。
-- 依存の自動更新には [Renovate GitHub App](https://github.com/apps/renovate) をこのリポジトリにインストールする(設定は `.github/renovate.json5`、方針は `docs/tech-selection.md` §3.1)。自動マージされた更新も main push として preview に自動デプロイされる。
+- 依存の自動更新には [Renovate GitHub App](https://github.com/apps/renovate) をインストールする。インストール時のリポジトリ選択は **Only select repositories で plyrs のみ**を選ぶ(全リポジトリへの書き込み権限を渡さない)。設定は `.github/renovate.json5`、方針は `docs/tech-selection.md` §3.1。自動マージされた更新も main push として preview に自動デプロイされる。
 - 初回リソース作成(§1)と ID 転記が完了するまで、main push の preview デプロイは失敗する(想定内)。
 
 ## 1. 初回リソース作成(環境ごと)
