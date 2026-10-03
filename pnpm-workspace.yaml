@@ -45,6 +45,11 @@ catalog:
   wrangler: ^4.147.0
   zod: ^4.6.5
 
+# 公開から 7 日(分単位)経過していない版は解決しない。推移的依存にも適用される
+# (Renovate の minimumReleaseAge は直接依存にしか効果がないため、lockfile maintenance 等の推移的依存はここで守る。
+#  docs/tech-selection.md §3.1)
+minimumReleaseAge: 10080
+
 onlyBuiltDependencies:
   - esbuild
   - sharp

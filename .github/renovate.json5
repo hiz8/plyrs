@@ -10,7 +10,8 @@
   extends: ["config:recommended", ":timezone(Asia/Tokyo)"],
   // 週 1 回(月曜朝)にまとめて PR を作る
   schedule: ["* 0-8 * * 1"],
-  // サプライチェーン対策: 公開直後の版(乗っ取り・取り下げ)を避ける
+  // サプライチェーン対策: 公開直後の版(乗っ取り・取り下げ)を避ける。これは直接依存のみが対象で、
+  // 推移的依存は pnpm-workspace.yaml の minimumReleaseAge(同じ 7 日)で守る
   minimumReleaseAge: "7 days",
   // catalog の宣言バージョンも実際の解決バージョンへ追従させる(exact pin は exact のまま)
   rangeStrategy: "bump",
