@@ -1,0 +1,65 @@
+name: Dependabot auto-merge
+
+# Dependabot PR のマージ方針(判定ロジックは .github/scripts/dependabot-merge-policy.mjs):
+# - patch: 自動マージ
+# - minor: 1.0 以上かつ exact pin でなければ自動マージ。0.x 系と exact pin 対象は手動
+# - major: PR 作成まで。マージは手動
+# 「自動マージ」は GitHub の auto-merge を有効化するだけで、実際のマージは main の必須ステータスチェック
+# (CI の check / e2e)が通った時点で GitHub が行う。前提となるリポジトリ設定は docs/deploy.md §6。
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # exact pin の判定は更新前(base)の pnpm-workspace.yaml / package.json を正とする
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - id: policy
+        env:
+          UPDATED_DEPENDENCIES_JSON: ${{ steps.metadata.outputs.updated-dependencies-json }}
+        run: node .github/scripts/dependabot-merge-policy.mjs
+
+      - name: Enable auto-merge
+        if: steps.policy.outputs.decision == 'auto'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"
+
+      # 再作成(synchronize)で手動対象に変わった場合に、以前の auto-merge を確実に外す
+      - name: Disable auto-merge
+        if: steps.policy.outputs.decision == 'manual'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --disable-auto "$PR_URL" || true
+
+      - name: Comment manual merge reason
+        if: steps.policy.outputs.decision == 'manual' && github.event.action == 'opened'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          REASON: ${{ steps.policy.outputs.reason }}
+        run: |
+          printf '%s\n\n%s\n' "この PR は手動マージ対象のため auto-merge を有効化していません。" "$REASON" \
+            | gh pr comment "$PR_URL" --body-file -

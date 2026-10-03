@@ -1,0 +1,60 @@
+# 依存の自動更新。マージ可否の判定は .github/workflows/dependabot-auto-merge.yml が行う。
+#
+# - cooldown: 公開から 7 日経過したバージョンだけを提案する(サプライチェーン攻撃・即日撤回リリース対策)。
+#   セキュリティ更新(Dependabot alerts 起点)には cooldown は適用されず、即時に PR が作られる。
+# - グループ化は「一緒に上げないと壊れるもの」と patch の束ねに限る。マイナー以上は原則個別 PR にして、
+#   0.x / exact pin の判定を依存単位で効かせる(グループ内に 1 つでも手動対象があればグループ全体が手動)。
+version: 2
+updates:
+  - package-ecosystem: npm # pnpm(pnpm-lock.yaml / catalog)もこのエコシステムで扱われる
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      # Router と Start はバージョンが連動しているため必ず同時に上げる
+      tanstack-start:
+        patterns:
+          - "@tanstack/react-router"
+          - "@tanstack/react-start"
+      stylex:
+        patterns:
+          - "@stylexjs/*"
+      tiptap:
+        patterns:
+          - "@tiptap/*"
+      react:
+        patterns:
+          - react
+          - react-dom
+          - "@types/react"
+          - "@types/react-dom"
+      # 上記以外の patch 更新は 1 PR に束ねる
+      patch:
+        update-types:
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ci
+    groups:
+      actions-patch-minor:
+        update-types:
+          - minor
+          - patch

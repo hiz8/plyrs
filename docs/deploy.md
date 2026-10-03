@@ -122,3 +122,27 @@ pnpm exec wrangler d1 execute DB --remote -c apps/api/wrangler.jsonc --env <env>
 
 - `apps/api/.dev.vars` の `JWT_SECRET` は **32 字以上**に更新が必要(Phase 10 の `requireSaneSecret` 導入以降。短いままだと `/auth/*` `/v1/*` `/super-auth/*` `/super/v1/*` が丸ごと 500 になる)。
 - `apps/e2e`(Task 16 で追加予定)のテストは `apps/api/.wrangler` / `apps/admin/.wrangler`(ローカル永続化ディレクトリ)を **毎回削除する**運用になる(super 管理者の bootstrap が「空のときのみ」条件のため、また tenant slug の一意制約を毎回クリーンな状態から検証するため)。開発中にローカルで貯めたデータは E2E 実行のたびに消える点に注意する。
+
+## 6. 依存の自動更新(Dependabot)
+
+`.github/dependabot.yml`(npm / github-actions を週次で確認)と `.github/workflows/dependabot-auto-merge.yml` で運用する。
+
+| 更新種別 | 扱い |
+| --- | --- |
+| patch | auto-merge(CI 通過後に自動マージ) |
+| minor(更新前が 1.0 以上、かつ exact pin でない) | auto-merge |
+| minor(0.x 系、または `pnpm-workspace.yaml` の catalog / `package.json` で exact pin されている依存) | PR 作成のみ。手動マージ |
+| major | PR 作成のみ。手動マージ |
+
+- グループ PR(`tanstack-start` / `stylex` / `tiptap` / `react` / `patch`)は、含まれる全依存が auto の条件を満たすときだけ auto-merge する。手動になった PR には理由をコメントする。
+- `cooldown.default-days: 7` により、公開から 7 日経過したバージョンだけが提案される。セキュリティ更新(Dependabot alerts 起点)には cooldown が適用されず即時に PR が作られる。
+- exact pin の判定は `.github/scripts/dependabot-merge-policy.mjs` が base ブランチのファイルから動的に行う(pin を外せば自動で minor も auto-merge 対象になる)。
+
+前提となるリポジトリ設定(初回のみ):
+
+1. Settings → General → Pull Requests → **Allow auto-merge** を有効化する。
+2. Settings → Rules(または Branches)で `main` に **必須ステータスチェック** として CI の `check` と `e2e` を設定する。**これが無いと auto-merge が CI を待たずに即マージする**。
+3. Settings → Code security → **Dependabot security updates** を有効化する(脆弱性更新を cooldown なしで受け取るため)。
+4. `main` に必須レビューを課している場合は auto-merge がレビュー待ちで止まる。Dependabot PR を自動で通すなら、必須レビューを外すか承認ステップの追加が必要。
+
+注意: `GITHUB_TOKEN` で有効化した auto-merge によるマージは `push` ワークフローを起動しないため、自動マージされた依存更新では `deploy.yml` の preview 自動デプロイは走らない(次の人手による main への push でまとめてデプロイされる)。都度デプロイしたい場合は GitHub App トークンに切り替える。
