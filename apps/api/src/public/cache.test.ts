@@ -18,6 +18,18 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+async function produceOkWithEtag(): Promise<Response> {
+  const response = jsonResponse({ v: 1 });
+  response.headers.set("etag", 'W/"7"');
+  return response;
+}
+
+async function produceNotFoundWithEtag(): Promise<Response> {
+  const response = jsonResponse({ error: "not_found" }, 404);
+  response.headers.set("etag", 'W/"9"');
+  return response;
+}
+
 describe("canonicalCacheUrl", () => {
   it("sorts keys and values so param order cannot split the cache", () => {
     const a = canonicalCacheUrl("t1", "records/post", {
@@ -72,17 +84,12 @@ describe("withEdgeCache (裁定 2026-07-14: Cache API + 短 TTL・パージな�
 
   it("answers 304 when If-None-Match matches the response etag", async () => {
     const url = canonicalCacheUrl(crypto.randomUUID(), "records/post/id/r2", {});
-    const produce = async () => {
-      const response = jsonResponse({ v: 1 });
-      response.headers.set("etag", 'W/"7"');
-      return response;
-    };
-    const first = await withEdgeCache(fakeContext(), url, produce);
+    const first = await withEdgeCache(fakeContext(), url, produceOkWithEtag);
     expect(first.status).toBe(200);
     const revalidated = await withEdgeCache(
       fakeContext({ "if-none-match": 'W/"7"' }),
       url,
-      produce,
+      produceOkWithEtag,
     );
     expect(revalidated.status).toBe(304);
     expect(await revalidated.text()).toBe("");
@@ -92,12 +99,11 @@ describe("withEdgeCache (裁定 2026-07-14: Cache API + 短 TTL・パージな�
     // 非 200 は 304 に化けてはならない: 304 は「キャッシュ可能な表現が変わっていない」ことの
     // 表明であり、404 等のエラーに etag が付いていてもエラーのステータスをそのまま返すべき。
     const url = canonicalCacheUrl(crypto.randomUUID(), "records/post/id/gone", {});
-    const produce = async () => {
-      const response = jsonResponse({ error: "not_found" }, 404);
-      response.headers.set("etag", 'W/"9"');
-      return response;
-    };
-    const result = await withEdgeCache(fakeContext({ "if-none-match": 'W/"9"' }), url, produce);
+    const result = await withEdgeCache(
+      fakeContext({ "if-none-match": 'W/"9"' }),
+      url,
+      produceNotFoundWithEtag,
+    );
     expect(result.status).toBe(404);
   });
 });

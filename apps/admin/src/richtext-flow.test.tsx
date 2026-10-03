@@ -223,37 +223,37 @@ describe("richtext のワイヤレベル編集(/t/$tenantSlug/records/$typeKey/$
   });
 });
 
-describe("本文競合の手動解決(裁定 3)", () => {
-  async function conflictSetup(harness: ReturnType<typeof socketHarness>) {
-    renderEditor(harness);
-    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
-    await bootstrapped(harness.latest(), [article()]);
-    const user = userEvent.setup();
-    await toggleHeadingAndSave(user);
-    await vi.waitFor(() => expect(pushes(harness.latest()).length).toBe(1));
-    const change = pushes(harness.latest())[0];
-    if (change === undefined) throw new Error("expected a pushed change");
-    // 実サーバーの順序どおり: 他者の change を配信してから conflict ack を返す
-    const theirs = article({
-      input: { title: "旧タイトル", body: bodyEnvelope("他者の本文") },
-      fieldVersions: { title: 1, body: 2 },
-      seq: 11,
-      version: 2,
-    });
-    harness.latest().deliver({ type: "change", record: theirs });
-    harness.latest().deliver({
-      type: "ack",
-      changeId: change.changeId,
-      result: {
-        ok: false,
-        code: "conflict",
-        message: "field conflicts: body",
-        conflicts: [{ fieldKey: "body", baseVersion: 1, currentVersion: 2 }],
-      },
-    });
-    return { user, change };
-  }
+async function conflictSetup(harness: ReturnType<typeof socketHarness>) {
+  renderEditor(harness);
+  await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
+  await bootstrapped(harness.latest(), [article()]);
+  const user = userEvent.setup();
+  await toggleHeadingAndSave(user);
+  await vi.waitFor(() => expect(pushes(harness.latest()).length).toBe(1));
+  const change = pushes(harness.latest())[0];
+  if (change === undefined) throw new Error("expected a pushed change");
+  // 実サーバーの順序どおり: 他者の change を配信してから conflict ack を返す
+  const theirs = article({
+    input: { title: "旧タイトル", body: bodyEnvelope("他者の本文") },
+    fieldVersions: { title: 1, body: 2 },
+    seq: 11,
+    version: 2,
+  });
+  harness.latest().deliver({ type: "change", record: theirs });
+  harness.latest().deliver({
+    type: "ack",
+    changeId: change.changeId,
+    result: {
+      ok: false,
+      code: "conflict",
+      message: "field conflicts: body",
+      conflicts: [{ fieldKey: "body", baseVersion: 1, currentVersion: 2 }],
+    },
+  });
+  return { user, change };
+}
 
+describe("本文競合の手動解決(裁定 3)", () => {
   it("adopting the server version resets the editor without a second push", async () => {
     const harness = socketHarness();
     const { user } = await conflictSetup(harness);

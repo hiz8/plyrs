@@ -110,16 +110,16 @@ describe("toDraftValues", () => {
   });
 });
 
-describe("fromDraftValues", () => {
-  const fullDraft = () =>
-    toDraftValues(contentType, {
-      title: "hello",
-      count: 3,
-      featured: false,
-      tags: ["tech"],
-      authors: [authorRef],
-    });
+const fullDraft = () =>
+  toDraftValues(contentType, {
+    title: "hello",
+    count: 3,
+    featured: false,
+    tags: ["tech"],
+    authors: [authorRef],
+  });
 
+describe("fromDraftValues", () => {
   it("converts drafts back into a valid input", () => {
     const result = fromDraftValues(contentType, fullDraft(), {});
     expect(result.ok).toBe(true);
