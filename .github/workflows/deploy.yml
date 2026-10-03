@@ -22,8 +22,9 @@ jobs:
     # GitHub の environment 保護(production に必須レビュアーを設定)は docs/deploy.md §0 の初期設定に含む
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'preview' }}
     # Cloudflare のトークンはジョブ全体ではなく wrangler を実行するステップにだけ渡す。
-    # pnpm install や admin ビルド(vite と全プラグイン)で動く依存からトークンを見えなくするため
-    # (docs/deploy.md §0)。admin ビルドは Cloudflare API を呼ばないのでトークン不要
+    # pnpm install や admin ビルド(vite と全プラグイン)で動く依存が、実行中に環境変数からトークンを
+    # 読み取れないようにするため。後続ステップの乗っ取り(node_modules 改ざん・$GITHUB_PATH 追記)は
+    # 防げない(docs/deploy.md §0)。admin ビルドは Cloudflare API を呼ばないのでトークン不要
     env:
       DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'preview' }}
     steps:
