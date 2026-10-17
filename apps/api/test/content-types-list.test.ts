@@ -160,3 +160,59 @@ describe("GET /v1/t/:tenantId/records/:recordId/publication (Phase 6b)", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("DELETE /v1/t/:tenantId/content-types/:key (案 E 5.4)", () => {
+  it("deletes an empty type, returns 409 while records exist and 404 for unknown keys", async () => {
+    const { tenantId, bearer } = await bootstrapTenant();
+    const headers = { "content-type": "application/json", authorization: bearer };
+    await app.request(
+      `/v1/t/${tenantId}/content-types`,
+      { method: "PUT", headers, body: JSON.stringify(articleType()) },
+      env,
+    );
+    const recordId = crypto.randomUUID();
+    await app.request(
+      `/v1/t/${tenantId}/records/article/${recordId}`,
+      { method: "PUT", headers, body: JSON.stringify({ input: validArticleInput() }) },
+      env,
+    );
+
+    const refused = await app.request(
+      `/v1/t/${tenantId}/content-types/article`,
+      { method: "DELETE", headers: { authorization: bearer } },
+      env,
+    );
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ ok: false, code: "type_not_empty" });
+
+    await app.request(
+      `/v1/t/${tenantId}/records/${recordId}`,
+      { method: "DELETE", headers: { authorization: bearer } },
+      env,
+    );
+    const deleted = await app.request(
+      `/v1/t/${tenantId}/content-types/article`,
+      { method: "DELETE", headers: { authorization: bearer } },
+      env,
+    );
+    expect(deleted.status).toBe(200);
+    expect(await deleted.json()).toStrictEqual({ ok: true, key: "article" });
+
+    const missing = await app.request(
+      `/v1/t/${tenantId}/content-types/article`,
+      { method: "DELETE", headers: { authorization: bearer } },
+      env,
+    );
+    expect(missing.status).toBe(404);
+  });
+
+  it("requires authentication", async () => {
+    const { tenantId } = await bootstrapTenant();
+    const res = await app.request(
+      `/v1/t/${tenantId}/content-types/article`,
+      { method: "DELETE" },
+      env,
+    );
+    expect(res.status).toBe(401);
+  });
+});

@@ -191,3 +191,51 @@ export function registerContentTypeCore(
     applied: true,
   };
 }
+
+export type DeleteContentTypeResult =
+  | { ok: true; key: string }
+  | { ok: false; code: "not_found" | "forbidden" | "type_not_empty"; message: string };
+
+// 案 E 5.4: コンテンツが 0 件の型だけを削除できる(コンテンツごと消す操作は設けない)。
+// 削除済みのコンテンツ(トゥームストーン)は同期の削除伝搬に要るため残し、件数にも数えない。
+// 公開版は削除時に cascadeUnpublish で消えるが、念のため残っていれば拒否する。
+// 他の型の relation が allowedTypes でこの key を指していても、関係はソフト参照のため妨げない。
+export function deleteContentTypeCore(sql: SqlStorage, key: string): DeleteContentTypeResult {
+  const prev = loadContentTypeByKey(sql, key);
+  if (prev === null) {
+    return { ok: false, code: "not_found", message: `content type not found: ${key}` };
+  }
+  if (prev.source !== "user") {
+    return {
+      ok: false,
+      code: "forbidden",
+      message:
+        prev.source === "system"
+          ? "system content types are managed by the platform"
+          : "plugin content types are managed by modules",
+    };
+  }
+  const live = sql
+    .exec<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM records WHERE type = ? AND deleted_at IS NULL",
+      key,
+    )
+    .one().count;
+  const published = sql
+    .exec<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM published_snapshots WHERE type = ?",
+      key,
+    )
+    .one().count;
+  if (live > 0 || published > 0) {
+    return {
+      ok: false,
+      code: "type_not_empty",
+      message: `content type '${key}' still has ${live} records (${published} published)`,
+    };
+  }
+  // 型ごとに作った生成列とインデックスを片付けてから行を消す
+  applyIndexDdl(sql, key, prev.fields, []);
+  sql.exec("DELETE FROM content_types WHERE id = ?", prev.id);
+  return { ok: true, key };
+}
