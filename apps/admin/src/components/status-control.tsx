@@ -6,6 +6,7 @@ import { WORKFLOW_STATUSES, type WorkflowStatus } from "@plyrs/metamodel";
 import { Button, Select } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { WORKFLOW_STATUS_LABELS } from "../lib/labels";
+import { useCan } from "../lib/permissions";
 import { publicationQueryOptions } from "../lib/queries";
 import { useTenantSync } from "../lib/sync-context";
 import { useCollectionRows } from "../lib/use-collection";
@@ -45,7 +46,7 @@ export function StatusControl({ typeKey, recordId }: { typeKey: string; recordId
   const publication = useQuery(publicationQueryOptions(adminApi, tenant.id, recordId));
   const [pendingArchive, setPendingArchive] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const canWrite = tenant.role !== "viewer";
+  const canWrite = useCan("record:write");
   // §7 の archive 警告は公開状態が既知であることが前提 — 解決まで操作を保留(通常ミリ秒)
   const publicationKnown = publication.data !== undefined;
 
