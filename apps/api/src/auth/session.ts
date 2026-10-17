@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { sessions, superSessions } from "@plyrs/db/control-plane";
 import { v7 as uuidv7 } from "uuid";
@@ -68,6 +68,27 @@ export async function revokeSession(d1: D1Database, token: string, now: Date): P
     .update(sessions)
     .set({ revokedAt: now.toISOString() })
     .where(eq(sessions.tokenHash, await sha256Hex(token)));
+}
+
+// 案 G 6.2: パスワード変更時に、操作した端末以外のセッションをすべて失効させる。
+// 発行済みの短命 JWT(最大 15 分)は対象外 — /auth/token での再発行ができなくなる時点で止まる。
+export async function revokeOtherSessions(
+  d1: D1Database,
+  userId: string,
+  keepToken: string,
+  now: Date,
+): Promise<number> {
+  const result = await drizzle(d1)
+    .update(sessions)
+    .set({ revokedAt: now.toISOString() })
+    .where(
+      and(
+        eq(sessions.userId, userId),
+        isNull(sessions.revokedAt),
+        ne(sessions.tokenHash, await sha256Hex(keepToken)),
+      ),
+    );
+  return result.meta.changes;
 }
 
 // §6: 期限切れ・失効済みセッションの掃除(cron から呼ぶ)。

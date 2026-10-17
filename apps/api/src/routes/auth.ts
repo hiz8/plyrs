@@ -12,7 +12,13 @@ import { signTenantToken, TOKEN_TTL } from "../auth/jwt";
 import { hashPassword, verifyPassword } from "../auth/password";
 import { isRole } from "../auth/permissions";
 import { checkAuthRateLimit } from "../auth/rate-limit";
-import { createSession, lookupSession, revokeSession, SESSION_COOKIE } from "../auth/session";
+import {
+  createSession,
+  lookupSession,
+  revokeOtherSessions,
+  revokeSession,
+  SESSION_COOKIE,
+} from "../auth/session";
 import { verifyTurnstile } from "../modules/turnstile";
 
 const credentialsSchema = z.object({
@@ -123,6 +129,57 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
     deleteCookie(c, SESSION_COOKIE, { path: "/", secure: true });
     return c.json({ ok: true });
   })
+  // 案 G 6.2: パスワードの変更。現在のパスワードを確かめ、操作した端末以外のセッションを失効させる。
+  // 現在のパスワードの総当たりを防ぐため、ログインと同じレート制限をかける
+  .post(
+    "/password",
+    zValidator(
+      "json",
+      z.object({
+        currentPassword: z.string().min(1).max(128),
+        newPassword: credentialsSchema.shape.password,
+      }),
+    ),
+    async (c) => {
+      const token = getCookie(c, SESSION_COOKIE);
+      const now = new Date();
+      const session = token === undefined ? null : await lookupSession(c.env.DB, token, now);
+      if (token === undefined || session === null) {
+        return c.json({ error: "unauthenticated" }, 401);
+      }
+      const decision = await checkAuthRateLimit(c.env, c.req.header("cf-connecting-ip"));
+      if (decision !== "ok") {
+        return decision === "limited"
+          ? c.json({ error: "rate_limited" }, 429)
+          : c.json({ error: "rate_limiter_unavailable" }, 503);
+      }
+      if (await isBlocked(c.env.BLOCKLIST, session.userId)) {
+        return c.json({ error: "blocked" }, 403);
+      }
+      const db = drizzle(c.env.DB);
+      const row = (
+        await db
+          .select({ passwordHash: users.passwordHash })
+          .from(users)
+          .where(eq(users.id, session.userId))
+          .limit(1)
+      )[0];
+      const { currentPassword, newPassword } = c.req.valid("json");
+      if (row === undefined) {
+        return c.json({ error: "unauthenticated" }, 401);
+      }
+      // 401 は管理画面がログイン切れとして扱うため、パスワードの誤りは 403 で返す
+      if (!(await verifyPassword(currentPassword, row.passwordHash))) {
+        return c.json({ error: "wrong_password" }, 403);
+      }
+      await db
+        .update(users)
+        .set({ passwordHash: await hashPassword(newPassword) })
+        .where(eq(users.id, session.userId));
+      const revokedSessions = await revokeOtherSessions(c.env.DB, session.userId, token, now);
+      return c.json({ ok: true, revokedSessions });
+    },
+  )
   // G5: セッション cookie（D1 真実源）を提示して短命 JWT を再発行する
   .post("/token", zValidator("json", z.object({ tenantId: z.uuid() })), async (c) => {
     const token = getCookie(c, SESSION_COOKIE);

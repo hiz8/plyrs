@@ -200,3 +200,80 @@ describe("auth routes", () => {
     expect(await denied.json()).toMatchObject({ error: "blocked" });
   });
 });
+
+// 案 G 6.2: パスワードの変更(T14)
+async function signupWithEmail(): Promise<{ email: string; cookie: string }> {
+  const email = `${unique("pw")}@example.com`;
+  const res = await app.request(
+    "/auth/signup",
+    json({ email, password: "hunter2hunter2" }),
+    testEnv,
+  );
+  return { email, cookie: cookieFrom(res) };
+}
+
+async function loginCookie(email: string, password: string): Promise<Response> {
+  return app.request("/auth/login", json({ email, password }), testEnv);
+}
+
+async function tenantsStatus(cookie: string): Promise<number> {
+  return (await app.request("/auth/tenants", { headers: { cookie } }, testEnv)).status;
+}
+
+describe("POST /auth/password", () => {
+  it("changes the password and revokes every other session", async () => {
+    const { email, cookie } = await signupWithEmail();
+    const other = cookieFrom(await loginCookie(email, "hunter2hunter2"));
+    expect(await tenantsStatus(other)).toBe(200);
+    const res = await app.request(
+      "/auth/password",
+      json({ currentPassword: "hunter2hunter2", newPassword: "correct horse battery" }, cookie),
+      testEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toStrictEqual({ ok: true, revokedSessions: 1 });
+    // 操作した端末は残り、他の端末はログアウトされる
+    expect(await tenantsStatus(cookie)).toBe(200);
+    expect(await tenantsStatus(other)).toBe(401);
+    expect((await loginCookie(email, "hunter2hunter2")).status).toBe(401);
+    expect((await loginCookie(email, "correct horse battery")).status).toBe(200);
+  });
+
+  it("rejects a wrong current password with 403 and keeps the old one", async () => {
+    const { email, cookie } = await signupWithEmail();
+    const res = await app.request(
+      "/auth/password",
+      json({ currentPassword: "not-my-password", newPassword: "correct horse battery" }, cookie),
+      testEnv,
+    );
+    expect(res.status).toBe(403);
+    expect(await res.json()).toStrictEqual({ error: "wrong_password" });
+    expect((await loginCookie(email, "hunter2hunter2")).status).toBe(200);
+  });
+
+  it("requires a session and a new password of 12 characters or more", async () => {
+    const { cookie } = await signupWithEmail();
+    const anonymous = await app.request(
+      "/auth/password",
+      json({ currentPassword: "hunter2hunter2", newPassword: "correct horse battery" }),
+      testEnv,
+    );
+    expect(anonymous.status).toBe(401);
+    const short = await app.request(
+      "/auth/password",
+      json({ currentPassword: "hunter2hunter2", newPassword: "short" }, cookie),
+      testEnv,
+    );
+    expect(short.status).toBe(400);
+  });
+
+  it("is rate limited like login", async () => {
+    const { cookie } = await signupWithEmail();
+    const res = await app.request(
+      "/auth/password",
+      json({ currentPassword: "hunter2hunter2", newPassword: "correct horse battery" }, cookie),
+      { ...env, AUTH_LIMITER: fakeLimiter(false) },
+    );
+    expect(res.status).toBe(429);
+  });
+});
