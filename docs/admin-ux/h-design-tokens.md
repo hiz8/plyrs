@@ -139,33 +139,56 @@
 ## 4. テーマ
 
 - テーマはライトとダークの 2 つ。セマンティックトークンの色(3.1)だけを切り替える
-- 既定(ライト)は、セマンティックトークンの定義そのものに持たせる。ダークは、その割り当てを上書きするテーマとして作る
-- テーマの適用は画面の最上位(ルートの要素)で行う
-- 切り替えは「自動(OS の設定に従う)/ ライト / ダーク」の 3 択とし、既定は「自動」にする。現在の挙動(`prefers-color-scheme` への追従)は「自動」として引き継ぐ。選択はブラウザに記憶し、アカウント設定([案 G](./g-settings-account.md) 6.2)に切り替えの項目を置く
-- 将来、テナントごとのアクセント色(現在の `tokens.stylex.ts` のコメントで予告済み)を入れる場合は、テーマと同じ仕組みで `accent.*` だけを上書きする
+- ライトとダークの値の対を、セマンティックトークンの定義そのものに持たせる。値は `light-dark(ライトのプリミティブ, ダークのプリミティブ)` で書き、どちらを使うかはルートの要素の `color-scheme` で切り替える(`light dark` = 自動、`light`、`dark`)。割り当てが 1 か所に収まり、「自動」が CSS だけで成り立ち、フォーム部品やスクロールバーなどブラウザ既定の UI の配色も一緒に切り替わる
+- `createTheme` は、テナントごとのアクセント色など、割り当ての組を差し替える用途に限る(ライトとダークの切り替えには使わない)
+- 切り替えは「自動(OS の設定に従う)/ ライト / ダーク」の 3 択とし、既定は「自動」にする。現在の挙動(`prefers-color-scheme` への追従)は「自動」として引き継ぐ。選択はブラウザに記憶し、アカウント設定([案 G](./g-settings-account.md) 6.2)に切り替えの項目を置く。JS の実行前に記憶した選択と違う配色で一瞬描画されないよう、`/_shell` の `<head>` に小さなインラインスクリプトを置き、記憶した選択を `document.documentElement.style.colorScheme` に書く
+- 将来、テナントごとのアクセント色(現在の `tokens.stylex.ts` のコメントで予告済み)を入れる場合は、`createTheme` で `accent.*` だけを上書きする。値は同じく `light-dark()` で書く
 
 ## 5. StyleX での実装
 
-- 3 層それぞれを `.stylex.ts` ファイルの `defineVars` として定義する(例: `primitives.stylex.ts`、`semantic.stylex.ts`)。テーマは `createTheme` で作る。現在のコメントにあるとおり、`defineVars` は `.stylex.ts` ファイルの名前付き export でなければならず、消費側は index.ts を経由せず直接 import する
-- セマンティックトークンの値にプリミティブトークンの変数を書くこと、`createTheme` の値に別の変数を書くことは、どちらもできる(5.1)。生成スクリプトによる値の展開は使わない
+- プリミティブとセマンティックは `.stylex.ts` ファイルの `defineVars` として定義する(例: `primitives.stylex.ts`、`semantic.stylex.ts`)。テーマ(割り当ての組の差し替え)は `createTheme` で作る。現在のコメントにあるとおり、`defineVars` は `.stylex.ts` ファイルの名前付き export でなければならず、消費側は index.ts を経由せず直接 import する
+- セマンティックトークンの値にプリミティブトークンの変数や `light-dark()` を書くこと、`createTheme` の値に別の変数を書くことは、どれもできる(5.1)。生成スクリプトによる値の展開は使わない
+- StyleX のプラグインが CSS の後処理に使う lightningcss は、対象ブラウザによっては `light-dark()` を `--lightningcss-light` などを使う代替表現に書き換える。この代替表現は同じ処理の中に `color-scheme` の宣言が無いと働かず、ダークの色が壊れる。`apps/admin/vite.config.ts` の `stylex.vite()` に `lightningcssOptions: { exclude: Features.LightDark }` を指定する(V1 で `light-dark()` を使い始めるときに入れる。`light-dark()` は 2024 年に主要ブラウザが対応済み)
 - 現在の `colors` / `spacing` / `typography` を使っている部品は、セマンティックトークンへ置き換える。置き換えが終わるまでは、現在の名前をセマンティックトークンの別名として残し、段階的に移行する
 - 部品に直書きされている値(角丸の 4px / 8px、罫線の 1px など)も、置き換えの対象とする
 
 ### 5.1 変数の参照の検証結果(2026-10-17、ロードマップ T1)
 
-`@stylexjs/stylex` / `@stylexjs/unplugin` 0.19.1 で、別ファイルの `defineVars` を参照する 3 層の構成を `packages/ui` に仮に置き、`pnpm --filter @plyrs/admin build` のビルド出力(`dist/client/assets/*.css`)を確認した。型検査(`tsc --noEmit`)も通る。
+`@stylexjs/stylex` / `@stylexjs/unplugin` 0.19.1 で確認した。検証に使った最小のトークン構成を `apps/admin/src/test-utils/stylex-tokens/` に残し、`apps/admin/src/stylex-tokens.test.ts` がそれを Vite でビルドして出力の CSS を確かめる。StyleX の版を上げたときは、このテストが通ることで同じ書き方が使えると判断できる。
 
-| 確認したこと                                                                 | 結果 | ビルド出力                                                                   |
-| ---------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------- |
-| `defineVars` の値に別ファイルの `defineVars` の変数を書く                    | 可   | `:root, .x… { --semantic: var(--primitive); }`                               |
-| 上の値を `@media (prefers-color-scheme: dark)` の条件付きで書く              | 可   | `@media (…dark) { :root, .x… { --semantic: var(--primitive); } }`            |
-| `createTheme` の値に別ファイルの `defineVars` の変数を書く                   | 可   | `.x….x…, .x….x…:root { --semantic: var(--primitive); }`                      |
-| `createTheme` を `.stylex.ts` ファイルに置き、別パッケージ(admin)から適用する | 可   | `stylex.props(theme, …)` でテーマのクラスが要素に付く                        |
+フィクスチャのソース(抜粋):
+
+```ts
+// primitives.stylex.ts
+export const primitives = stylex.defineVars({ white: "#ffffff", gray950: "#0b1220" });
+// semantic.stylex.ts
+export const semantic = stylex.defineVars({
+  bgCanvas: `light-dark(${primitives.white}, ${primitives.gray950})`,
+  textPrimary: primitives.gray950,
+});
+// accent-theme.stylex.ts
+export const accentTheme = stylex.createTheme(semantic, {
+  bgCanvas: `light-dark(${primitives.gray950}, ${primitives.white})`,
+  textPrimary: primitives.white,
+});
+```
+
+| 確認したこと                                                                   | 結果 | ビルド出力                                                       |
+| ------------------------------------------------------------------------------ | ---- | ---------------------------------------------------------------- |
+| `defineVars` の値に別ファイルの `defineVars` の変数を書く                      | 可   | `:root, .x… { --semantic: var(--primitive); }`                   |
+| `defineVars` の値に `light-dark()` と別ファイルの変数を組み合わせて書く        | 可   | `:root, .x… { --semantic: light-dark(var(--a), var(--b)); }`     |
+| `createTheme` の値に別ファイルの `defineVars` の変数を書く                     | 可   | `.x….x…, .x….x…:root { --semantic: var(--primitive); }`          |
+| `createTheme` を `.stylex.ts` ファイルに置き、別パッケージ(admin)から適用する | 可   | `stylex.props(theme, …)` でテーマのクラスが要素に付く            |
+| lightningcss の既定の対象ブラウザのまま `light-dark()` を書く                  | 不可 | `var(--lightningcss-light, …) var(--lightningcss-dark, …)` になる |
+
+最後の行は 5 章のとおり `exclude: Features.LightDark` で避ける(テストもこの指定でビルドしている)。
 
 実装時の注意:
 
-- CSS のカスタムプロパティの `var()` は、そのプロパティを宣言した要素で解決され、子孫へは解決後の値が継承される。セマンティックトークンは `:root` で宣言されるため、子孫の要素でプリミティブトークンだけを上書きしても、セマンティックトークンには反映されない。テーマ(およびテナントごとのアクセント色)は、4 章のとおりセマンティックトークンを上書きする形で作る
-- `createTheme` の出力は二重のクラスで詳細度を上げている(`.x….x…`)。テーマを入れ子にした場合は、内側の要素に付けたテーマが優先される
+- CSS のカスタムプロパティの `var()` は、そのプロパティを宣言した要素で解決され、子孫へは解決後の値が継承される。セマンティックトークンは `:root` で宣言されるため、子孫の要素でプリミティブトークンだけを上書きしても、セマンティックトークンには反映されない。テナントごとのアクセント色などは、4 章のとおりセマンティックトークンを上書きする形で作る
+- 一方 `light-dark()` は、値を使う要素の `color-scheme` で選ばれる。`color-scheme` は継承されるため、ルートの要素で切り替えれば全体に反映される
+- `createTheme` の出力が二重のクラス(`.x….x…`)になっているのは、`:root` に宣言された `defineVars` より詳細度を上げ、同じ要素(ルートの要素など)に付けたときにも上書きを成り立たせるため。これは StyleX の `useCSSLayers` が無効(現在の設定)のときの出力で、有効にすると `@layer` による優先順位に変わる
+- テーマを入れ子にした場合に内側が優先されるのは、カスタムプロパティの継承による(内側の要素で宣言した値が子孫に継承される)。二重クラスの詳細度とは別の仕組み
 
 ## 6. 未決事項
 
