@@ -38,6 +38,14 @@ export interface ModuleSummary {
   appliedVersion: number;
 }
 
+// apps/api の routes/tenant-settings.ts の返す形(HTTP 契約)。role は文字列のまま受け、表示側で判定する
+export interface MemberSummary {
+  userId: string;
+  email: string;
+  role: string;
+  createdAt: string;
+}
+
 const JSON_HEADERS = { "content-type": "application/json" } as const;
 
 export function createAdminApi(
@@ -154,6 +162,38 @@ export function createAdminApi(
         { method: "POST" },
       );
       return module;
+    },
+    // 案 G 3・4 章: サイト名の変更とメンバーの管理(owner のみ)
+    async renameSite(tenantId: string, name: string): Promise<string> {
+      const result = await requestJson<{ ok: true; name: string }>(tenantId, "/site", {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ name }),
+      });
+      return result.name;
+    },
+    async listMembers(tenantId: string): Promise<MemberSummary[]> {
+      const { members } = await requestJson<{ members: MemberSummary[] }>(tenantId, "/members");
+      return members;
+    },
+    async addMember(tenantId: string, email: string, role: string): Promise<MemberSummary> {
+      const { member } = await requestJson<{ member: MemberSummary }>(tenantId, "/members", {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ email, role }),
+      });
+      return member;
+    },
+    async changeMemberRole(tenantId: string, userId: string, role: string): Promise<MemberSummary> {
+      const { member } = await requestJson<{ member: MemberSummary }>(
+        tenantId,
+        `/members/${userId}`,
+        { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify({ role }) },
+      );
+      return member;
+    },
+    async removeMember(tenantId: string, userId: string): Promise<void> {
+      await requestJson<{ ok: true }>(tenantId, `/members/${userId}`, { method: "DELETE" });
     },
   };
 }

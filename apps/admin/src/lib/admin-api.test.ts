@@ -211,3 +211,47 @@ describe("asset endpoints (Phase 8)", () => {
     ]);
   });
 });
+
+describe("site settings endpoints (案 G 3・4 章)", () => {
+  it("renames the site and manages members on the expected paths", async () => {
+    const calls: string[] = [];
+    const member = { userId: "u2", email: "e@x.com", role: "editor", createdAt: "" };
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const method = init?.method ?? "GET";
+      calls.push(
+        `${method} ${String(input)} ${typeof init?.body === "string" ? init.body : ""}`.trim(),
+      );
+      if (String(input).endsWith("/site")) {
+        return jsonResponse(200, { ok: true, name: "新しい名前" });
+      }
+      if (method === "GET") {
+        return jsonResponse(200, { members: [member] });
+      }
+      if (method === "DELETE") {
+        return jsonResponse(200, { ok: true, disconnected: 0 });
+      }
+      return jsonResponse(method === "POST" ? 201 : 200, { member });
+    };
+    const api = createAdminApi(manager(), fetchImpl);
+    expect(await api.renameSite("t1", "新しい名前")).toBe("新しい名前");
+    expect(await api.listMembers("t1")).toStrictEqual([member]);
+    expect(await api.addMember("t1", "e@x.com", "editor")).toStrictEqual(member);
+    expect(await api.changeMemberRole("t1", "u2", "editor")).toStrictEqual(member);
+    await api.removeMember("t1", "u2");
+    expect(calls).toStrictEqual([
+      'PATCH /v1/t/t1/site {"name":"新しい名前"}',
+      "GET /v1/t/t1/members",
+      'POST /v1/t/t1/members {"email":"e@x.com","role":"editor"}',
+      'PATCH /v1/t/t1/members/u2 {"role":"editor"}',
+      "DELETE /v1/t/t1/members/u2",
+    ]);
+  });
+
+  it("surfaces the last-owner rejection as an ApiError", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(409, { error: "last_owner" }));
+    const api = createAdminApi(manager(), fetchImpl);
+    const error = await api.removeMember("t1", "u1").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).code).toBe("last_owner");
+  });
+});
