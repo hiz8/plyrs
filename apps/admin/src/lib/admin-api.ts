@@ -21,6 +21,13 @@ export type PublicationState =
   | { published: false }
   | { published: true; publishedAt: string; publishedBy: string; sourceVersion: number };
 
+// apps/api/src/do/publish.ts の PublicationSummary と構造一致(HTTP 契約。案 D 9 章)
+export interface PublicationSummary {
+  recordId: string;
+  publishedAt: string;
+  sourceVersion: number;
+}
+
 // apps/api/src/do/asset-usage.ts の AssetUsageRow と構造一致(HTTP 契約)
 export interface AssetUsageEntry {
   sourceId: string;
@@ -101,6 +108,15 @@ export function createAdminApi(
     },
     getPublication(tenantId: string, recordId: string): Promise<PublicationState> {
       return requestJson<PublicationState>(tenantId, `/records/${recordId}/publication`);
+    },
+    // type を省略すると全型分(ホームの集計用)
+    async listPublications(tenantId: string, type?: string): Promise<PublicationSummary[]> {
+      const query = type === undefined ? "" : `?type=${encodeURIComponent(type)}`;
+      const { publications } = await requestJson<{ publications: PublicationSummary[] }>(
+        tenantId,
+        `/publications${query}`,
+      );
+      return publications;
     },
     async uploadAsset(tenantId: string, file: File): Promise<{ id: string }> {
       const response = await authedFetch(

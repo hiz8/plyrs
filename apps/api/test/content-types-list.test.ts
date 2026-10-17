@@ -160,3 +160,129 @@ describe("GET /v1/t/:tenantId/records/:recordId/publication (Phase 6b)", () => {
     expect(res.status).toBe(401);
   });
 });
+
+async function putType(tenantId: string, bearer: string, type: unknown): Promise<void> {
+  const res = await app.request(
+    `/v1/t/${tenantId}/content-types`,
+    {
+      method: "PUT",
+      headers: { "content-type": "application/json", authorization: bearer },
+      body: JSON.stringify(type),
+    },
+    env,
+  );
+  expect(res.status).toBe(200);
+}
+
+async function writeRecord(
+  tenantId: string,
+  bearer: string,
+  typeKey: string,
+  recordId: string,
+  slug: string,
+): Promise<void> {
+  const res = await app.request(
+    `/v1/t/${tenantId}/records/${typeKey}/${recordId}`,
+    {
+      method: "PUT",
+      headers: { "content-type": "application/json", authorization: bearer },
+      body: JSON.stringify({ input: { ...validArticleInput(), slug } }),
+    },
+    env,
+  );
+  expect(res.status).toBe(200);
+}
+
+async function publish(tenantId: string, bearer: string, recordId: string): Promise<void> {
+  const res = await app.request(
+    `/v1/t/${tenantId}/records/${recordId}/publish`,
+    { method: "POST", headers: { authorization: bearer } },
+    env,
+  );
+  expect(res.status).toBe(200);
+}
+
+async function listPublications(tenantId: string, bearer: string, query = "") {
+  const res = await app.request(
+    `/v1/t/${tenantId}/publications${query}`,
+    { headers: { authorization: bearer } },
+    env,
+  );
+  expect(res.status).toBe(200);
+  return (
+    (await res.json()) as {
+      publications: { recordId: string; publishedAt: string; sourceVersion: number }[];
+    }
+  ).publications;
+}
+
+describe("GET /v1/t/:tenantId/publications (案 D 9 章)", () => {
+  it("returns published records per type (or all types) without the snapshot body", async () => {
+    const { tenantId, bearer } = await bootstrapTenant();
+    await putType(tenantId, bearer, articleType());
+    await putType(tenantId, bearer, {
+      ...articleType(),
+      id: crypto.randomUUID(),
+      key: "news",
+      name: "お知らせ",
+    });
+    const articleA = crypto.randomUUID();
+    const articleB = crypto.randomUUID();
+    const draft = crypto.randomUUID();
+    const news = crypto.randomUUID();
+    await writeRecord(tenantId, bearer, "article", articleA, "a");
+    await writeRecord(tenantId, bearer, "article", articleB, "b");
+    await writeRecord(tenantId, bearer, "article", draft, "draft");
+    await writeRecord(tenantId, bearer, "news", news, "n");
+    await publish(tenantId, bearer, articleA);
+    await publish(tenantId, bearer, articleB);
+    await publish(tenantId, bearer, news);
+
+    const articles = await listPublications(tenantId, bearer, "?type=article");
+    expect(articles.map((p) => p.recordId).toSorted()).toStrictEqual(
+      [articleA, articleB].toSorted(),
+    );
+    for (const publication of articles) {
+      expect(Object.keys(publication).toSorted()).toStrictEqual([
+        "publishedAt",
+        "recordId",
+        "sourceVersion",
+      ]);
+      expect(publication.sourceVersion).toBe(1);
+      expect(Number.isNaN(Date.parse(publication.publishedAt))).toBe(false);
+    }
+
+    const all = await listPublications(tenantId, bearer);
+    expect(all.map((p) => p.recordId).toSorted()).toStrictEqual(
+      [articleA, articleB, news].toSorted(),
+    );
+    // 並びは record_id の昇順
+    expect(all.map((p) => p.recordId)).toStrictEqual(all.map((p) => p.recordId).toSorted());
+    expect(await listPublications(tenantId, bearer, "?type=")).toStrictEqual(all);
+  });
+
+  it("drops a record after unpublish and returns an empty list for unknown types", async () => {
+    const { tenantId, bearer } = await bootstrapTenant();
+    await putType(tenantId, bearer, articleType());
+    const recordId = crypto.randomUUID();
+    await writeRecord(tenantId, bearer, "article", recordId, "x");
+    await publish(tenantId, bearer, recordId);
+    expect(
+      (await listPublications(tenantId, bearer, "?type=article")).map((p) => p.recordId),
+    ).toStrictEqual([recordId]);
+    const unpublished = await app.request(
+      `/v1/t/${tenantId}/records/${recordId}/unpublish`,
+      { method: "POST", headers: { authorization: bearer } },
+      env,
+    );
+    expect(unpublished.status).toBe(200);
+    expect(await listPublications(tenantId, bearer, "?type=article")).toStrictEqual([]);
+    expect(await listPublications(tenantId, bearer, "?type=nope")).toStrictEqual([]);
+  });
+
+  it("requires authentication", async () => {
+    const { tenantId } = await bootstrapTenant();
+    const res = await app.request(`/v1/t/${tenantId}/publications`, {}, env);
+    expect(res.status).toBe(401);
+  });
+});

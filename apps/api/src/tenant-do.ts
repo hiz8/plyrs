@@ -59,11 +59,13 @@ import {
 import { countUnsent, markOutboxSent, purgeSent, unsentOutbox } from "./do/outbox";
 import {
   loadProjectionPayload,
+  loadPublications,
   loadPublicationState,
   loadPublishedPage,
   publishRecordCore,
   unpublishRecordCore,
   type PublicationState,
+  type PublicationSummary,
   type PublishResult,
   type UnpublishResult,
 } from "./do/publish";
@@ -535,6 +537,11 @@ export class TenantDO extends DurableObject<Env> {
   // Phase 6b: 公開状態の読み取り（読み取り系は getRecord と同じく role 不問 — authorize.ts 冒頭コメント参照）
   getPublication(recordId: string): PublicationState {
     return loadPublicationState(this.ctx.storage.sql, recordId);
+  }
+
+  // 案 D 9 章: 公開状態の一括取得(読み取り系のため getPublication と同じく role 不問)
+  listPublications(type?: string): PublicationSummary[] {
+    return loadPublications(this.ctx.storage.sql, type);
   }
 
   // Phase 8 裁定 6: 読み取り系は getRecord と同じく role 不問(authorize.ts 冒頭コメントの既存規律)

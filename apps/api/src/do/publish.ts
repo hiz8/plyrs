@@ -292,6 +292,35 @@ export type PublicationState =
   | { published: false }
   | { published: true; publishedAt: string; publishedBy: string; sourceVersion: number };
 
+// 案 D 9 章: 一覧・ホーム向けの公開状態の一括取得。公開版の本文は返さない
+// (未反映の変更の判定に要るのは sourceVersion だけ)。並びは record_id(UUIDv7 = 作成順)。
+export interface PublicationSummary {
+  recordId: string;
+  publishedAt: string;
+  sourceVersion: number;
+}
+
+export function loadPublications(sql: SqlStorage, type?: string): PublicationSummary[] {
+  const rows =
+    type === undefined
+      ? sql
+          .exec<{ record_id: string; published_at: string; source_version: number }>(
+            "SELECT record_id, published_at, source_version FROM published_snapshots ORDER BY record_id",
+          )
+          .toArray()
+      : sql
+          .exec<{ record_id: string; published_at: string; source_version: number }>(
+            "SELECT record_id, published_at, source_version FROM published_snapshots WHERE type = ? ORDER BY record_id",
+            type,
+          )
+          .toArray();
+  return rows.map((row) => ({
+    recordId: row.record_id,
+    publishedAt: row.published_at,
+    sourceVersion: row.source_version,
+  }));
+}
+
 export function loadPublicationState(sql: SqlStorage, recordId: string): PublicationState {
   const row = sql
     .exec<{ published_at: string; published_by: string; source_version: number }>(

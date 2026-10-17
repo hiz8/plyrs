@@ -17,6 +17,7 @@ import {
   asModuleSummaries,
   asOrphanIds,
   asPublicationState,
+  asPublicationSummaries,
   asPublishResult,
   asRecordSnapshot,
   asRegisterResult,
@@ -237,6 +238,14 @@ export const tenantRoutes = new Hono<GateEnv>()
       ),
     );
     return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
+  })
+  // 案 D 9 章: 一覧・ホームが公開状態をレコード 1 件ずつ取らずに済むよう、型ごと(省略で全型)にまとめて返す
+  .get("/:tenantId/publications", async (c) => {
+    const type = c.req.query("type");
+    const publications = asPublicationSummaries(
+      await stubFor(c).listPublications(type === undefined || type === "" ? undefined : type),
+    );
+    return c.json({ publications });
   })
   .get("/:tenantId/records/:recordId/publication", async (c) => {
     const state = asPublicationState(await stubFor(c).getPublication(c.req.param("recordId")));
