@@ -239,7 +239,7 @@ A〜H のすべてを再構築の対象として採用する(2026-10-17 合意)�
 | D. コンテンツ一覧の公開状態とフィルタ | [d-content-list.md](./d-content-list.md)               |
 | E. コンテンツタイプの設計画面         | [e-content-type-design.md](./e-content-type-design.md) |
 | F. メディアライブラリ                 | [f-media-library.md](./f-media-library.md)             |
-| G. テナント設定とアカウント           | [g-settings-account.md](./g-settings-account.md)       |
+| G. サイト設定とアカウント             | [g-settings-account.md](./g-settings-account.md)       |
 | H. 共通の表層                         | [h-common-surface.md](./h-common-surface.md)           |
 
 - 案 E のメタモデル変更(フィールドの表示名など)と、案 G のテナント owner によるメンバー管理は、いずれも今回のスコープに含める
