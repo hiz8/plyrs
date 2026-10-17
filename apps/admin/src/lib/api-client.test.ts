@@ -61,6 +61,14 @@ describe("api client (same-origin 相対パス・fetch 注入)", () => {
     expect(fetchImpl.mock.calls[0]?.[0]).toBe("/auth/tenants");
   });
 
+  it("getMe returns the signed-in user from /auth/me", async () => {
+    const me = { userId: "0190a1b2-0000-7000-8000-000000000001", email: "me@example.com" };
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, me));
+    const api = createApiClient(fetchImpl);
+    expect(await api.getMe()).toStrictEqual(me);
+    expect(fetchImpl.mock.calls[0]?.[0]).toBe("/auth/me");
+  });
+
   it("throws ApiError carrying the server error code", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(401, { error: "unauthenticated" }));
     const api = createApiClient(fetchImpl);

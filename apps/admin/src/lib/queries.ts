@@ -12,6 +12,15 @@ export function tenantsQueryOptions(api: ApiClient) {
   });
 }
 
+// 自分の情報はセッションの間は変わらない。ログアウト時は queryClient.clear() で消える。
+export function meQueryOptions(api: ApiClient) {
+  return queryOptions({
+    queryKey: ["me"],
+    queryFn: () => api.getMe(),
+    staleTime: Infinity,
+  });
+}
+
 export function contentTypesQueryOptions(adminApi: AdminApi, tenantId: string) {
   return queryOptions({
     queryKey: ["content-types", tenantId],

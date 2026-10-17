@@ -182,6 +182,41 @@ describe("auth routes", () => {
     expect(denied.status).toBe(403);
   });
 
+  it("returns the signed-in user's id and email on /auth/me", async () => {
+    const email = `${unique("Me")}@Example.com`;
+    const signup = await app.request(
+      "/auth/signup",
+      json({ email, password: "hunter2hunter2" }),
+      testEnv,
+    );
+    const { userId } = (await signup.json()) as { userId: string };
+    const res = await app.request("/auth/me", { headers: { cookie: cookieFrom(signup) } }, testEnv);
+    expect(res.status).toBe(200);
+    // 保存時に正規化されたメールアドレスを返す(パスワードのハッシュ等は含めない)
+    expect(await res.json()).toStrictEqual({ userId, email: email.toLowerCase() });
+  });
+
+  it("rejects anonymous, logged-out and blocked users on /auth/me", async () => {
+    const anon = await app.request("/auth/me", {}, testEnv);
+    expect(anon.status).toBe(401);
+    expect(await anon.json()).toMatchObject({ error: "unauthenticated" });
+
+    const loggedOut = await signupAndLogin();
+    await app.request("/auth/logout", json({}, loggedOut.cookie), testEnv);
+    const revoked = await app.request(
+      "/auth/me",
+      { headers: { cookie: loggedOut.cookie } },
+      testEnv,
+    );
+    expect(revoked.status).toBe(401);
+
+    const { userId, cookie } = await signupAndLogin();
+    await blockUser(env.BLOCKLIST, userId);
+    const denied = await app.request("/auth/me", { headers: { cookie } }, testEnv);
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({ error: "blocked" });
+  });
+
   it("rejects login for a globally blocked user", async () => {
     const email = `${unique("blocked")}@example.com`;
     const signup = await app.request(

@@ -173,6 +173,29 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
       .orderBy(asc(tenants.slug));
     return c.json({ tenants: rows });
   })
+  // 案 B 3 章 / 案 A: 管理画面が「自分」を判定し、アカウントメニューにメールアドレスを出すための
+  // 自分の情報。ログイン応答の userId は再読み込みで失われるため、セッション cookie から引き直す。
+  .get("/me", async (c) => {
+    const token = getCookie(c, SESSION_COOKIE);
+    const session = token === undefined ? null : await lookupSession(c.env.DB, token, new Date());
+    if (session === null) {
+      return c.json({ error: "unauthenticated" }, 401);
+    }
+    if (await isBlocked(c.env.BLOCKLIST, session.userId)) {
+      return c.json({ error: "blocked" }, 403);
+    }
+    const row = (
+      await drizzle(c.env.DB)
+        .select({ userId: users.id, email: users.email })
+        .from(users)
+        .where(eq(users.id, session.userId))
+        .limit(1)
+    )[0];
+    if (row === undefined) {
+      return c.json({ error: "unauthenticated" }, 401);
+    }
+    return c.json(row);
+  })
   // §6: フロントエンドが signup/login フォームに Turnstile ウィジェットを出すかどうかの判定材料。
   // secret key と違い site key は公開情報(未設定なら Turnstile 無効の合図として null)。
   .get("/turnstile-config", (c) => c.json({ siteKey: c.env.AUTH_TURNSTILE_SITE_KEY ?? null }));
