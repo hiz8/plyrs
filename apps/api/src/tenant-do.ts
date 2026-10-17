@@ -66,6 +66,7 @@ import {
   unpublishRecordCore,
   type PublicationState,
   type PublicationSummary,
+  type PublicationsQuery,
   type PublishResult,
   type UnpublishResult,
 } from "./do/publish";
@@ -540,8 +541,11 @@ export class TenantDO extends DurableObject<Env> {
   }
 
   // 案 D 9 章: 公開状態の一括取得(読み取り系のため getPublication と同じく role 不問)
-  listPublications(type?: string): PublicationSummary[] {
-    return loadPublications(this.ctx.storage.sql, type);
+  listPublications(query: PublicationsQuery): {
+    publications: PublicationSummary[];
+    nextCursor: string | null;
+  } {
+    return loadPublications(this.ctx.storage.sql, query);
   }
 
   // Phase 8 裁定 6: 読み取り系は getRecord と同じく role 不問(authorize.ts 冒頭コメントの既存規律)

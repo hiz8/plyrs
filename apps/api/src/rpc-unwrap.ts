@@ -72,8 +72,11 @@ export function asPublicationState(value: unknown): PublicationState {
   return value as PublicationState;
 }
 
-export function asPublicationSummaries(value: unknown): PublicationSummary[] {
-  return value as PublicationSummary[];
+export function asPublicationsPage(value: unknown): {
+  publications: PublicationSummary[];
+  nextCursor: string | null;
+} {
+  return value as { publications: PublicationSummary[]; nextCursor: string | null };
 }
 
 export function asOrphanIds(value: unknown): string[] {

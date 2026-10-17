@@ -109,14 +109,24 @@ export function createAdminApi(
     getPublication(tenantId: string, recordId: string): Promise<PublicationState> {
       return requestJson<PublicationState>(tenantId, `/records/${recordId}/publication`);
     },
-    // type を省略すると全型分(ホームの集計用)
+    // type を省略すると全型分(ホームの集計用)。一覧のタブ件数は全件が要るため、
+    // record_id カーソルのページを最後まで辿って連結する
     async listPublications(tenantId: string, type?: string): Promise<PublicationSummary[]> {
-      const query = type === undefined ? "" : `?type=${encodeURIComponent(type)}`;
-      const { publications } = await requestJson<{ publications: PublicationSummary[] }>(
-        tenantId,
-        `/publications${query}`,
-      );
-      return publications;
+      const all: PublicationSummary[] = [];
+      let cursor: string | null = null;
+      do {
+        const params = new URLSearchParams();
+        if (type !== undefined) params.set("type", type);
+        if (cursor !== null) params.set("cursor", cursor);
+        const query = params.size === 0 ? "" : `?${params.toString()}`;
+        const page = await requestJson<{
+          publications: PublicationSummary[];
+          nextCursor: string | null;
+        }>(tenantId, `/publications${query}`);
+        all.push(...page.publications);
+        cursor = page.nextCursor;
+      } while (cursor !== null);
+      return all;
     },
     async uploadAsset(tenantId: string, file: File): Promise<{ id: string }> {
       const response = await authedFetch(

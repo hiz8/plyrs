@@ -293,32 +293,55 @@ export type PublicationState =
   | { published: true; publishedAt: string; publishedBy: string; sourceVersion: number };
 
 // 案 D 9 章: 一覧・ホーム向けの公開状態の一括取得。公開版の本文は返さない
-// (未反映の変更の判定に要るのは sourceVersion だけ)。並びは record_id(UUIDv7 = 作成順)。
+// (未反映の変更の判定に要るのは sourceVersion だけ)。並びは record_id 昇順の安定順序で、
+// これをそのままカーソルに使う(loadPublishedPage と同じ方式)。作成順の表示は created_at に任せる
+// (ID はクライアント生成で、サーバーは UUIDv7 であることを検証していない)。
 export interface PublicationSummary {
   recordId: string;
   publishedAt: string;
   sourceVersion: number;
 }
 
-export function loadPublications(sql: SqlStorage, type?: string): PublicationSummary[] {
-  const rows =
-    type === undefined
-      ? sql
-          .exec<{ record_id: string; published_at: string; source_version: number }>(
-            "SELECT record_id, published_at, source_version FROM published_snapshots ORDER BY record_id",
-          )
-          .toArray()
-      : sql
-          .exec<{ record_id: string; published_at: string; source_version: number }>(
-            "SELECT record_id, published_at, source_version FROM published_snapshots WHERE type = ? ORDER BY record_id",
-            type,
-          )
-          .toArray();
-  return rows.map((row) => ({
+export interface PublicationsQuery {
+  // 未指定・空文字は全型(ホームの集計用)。正規化はここ 1 か所で行う
+  type?: string;
+  cursor?: string | null;
+  limit: number;
+}
+
+export function loadPublications(
+  sql: SqlStorage,
+  query: PublicationsQuery,
+): { publications: PublicationSummary[]; nextCursor: string | null } {
+  const conditions: string[] = [];
+  const params: SqlStorageValue[] = [];
+  if (query.type !== undefined && query.type !== "") {
+    conditions.push("type = ?");
+    params.push(query.type);
+  }
+  if (query.cursor !== undefined && query.cursor !== null && query.cursor !== "") {
+    conditions.push("record_id > ?");
+    params.push(query.cursor);
+  }
+  // 条件は固定文字列の組み合わせのみ(値はすべてバインド)。`?1 IS NULL OR type = ?1` の形に
+  // 畳むと SQLite が idx_published_snapshots_type を使えずフルスキャンになるため、句ごと出し分ける
+  const where = conditions.length === 0 ? "" : ` WHERE ${conditions.join(" AND ")}`;
+  const rows = sql
+    .exec<Pick<RawSnapshotRow, "record_id" | "published_at" | "source_version">>(
+      `SELECT record_id, published_at, source_version FROM published_snapshots${where} ORDER BY record_id LIMIT ?`,
+      ...params,
+      query.limit,
+    )
+    .toArray();
+  const publications = rows.map((row) => ({
     recordId: row.record_id,
     publishedAt: row.published_at,
     sourceVersion: row.source_version,
   }));
+  const last = publications[publications.length - 1];
+  const nextCursor =
+    publications.length === query.limit && last !== undefined ? last.recordId : null;
+  return { publications, nextCursor };
 }
 
 export function loadPublicationState(sql: SqlStorage, recordId: string): PublicationState {
