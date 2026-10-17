@@ -219,6 +219,12 @@
 - **採用**: GitHub Actions。`oxlint` → `oxfmt --check` → `tsc --noEmit` → `vitest`(unit + pool-workers)→ `wrangler deploy`(cloudflare/wrangler-action)。preview 環境は Workers の preview URL / 環境分割で。
 - **根拠**: リポジトリホストの標準経路。個人開発で専用 CD 基盤は過剰。
 
+### 2.14 アイコン: Lucide(lucide-react)
+
+- **採用**: 管理画面のアイコンは **Lucide**(`lucide-react`)。線幅 2 のストロークアイコン、ISC ライセンス、1 アイコン 1 コンポーネントで tree-shaking が効率よく働く。使い方の決まりは [admin-ux/h-common-surface.md](./admin-ux/h-common-surface.md) 12 章
+- **根拠**: 管理画面 UX 再構築の D1(2026-10-17)で、サイドバー・バッジ・空状態に当てて確認した。system-ui 系の本文フォントと線の太さが釣り合い、必要な意味(公開・再試行・警告など)が一通り揃う
+- **代替案**: Phosphor(太さを選べるが既定が細く字面と合わない)、Heroicons(種類が少ない)、Tabler(線が太く 16px で潰れやすい)
+
 ---
 
 ## 3. バージョン方針
@@ -286,6 +292,7 @@ pnpm の `overrides` と renovate(または手動)で管理。RC/beta を2つ(St
 | ORM              | Drizzle ORM(durable-sqlite / D1)+ drizzle-kit                     |
 | バリデーション   | Zod v4(zod/mini 選択可)                                           |
 | リッチテキスト   | Tiptap v3(ProseMirror JSON AST)                                   |
+| アイコン         | Lucide(lucide-react)                                              |
 | 認証             | jose + WebCrypto(自作)/ 特権は passkey・TOTP                      |
 | ID               | uuid(UUIDv7)                                                      |
 | WebSocket        | Hibernation API 直 + partysocket(client)                          |

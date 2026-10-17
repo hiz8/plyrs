@@ -128,7 +128,20 @@
 - トーストは `role="status"` で読み上げる。エラーのトーストは `role="alert"`
 - 色だけで状態を伝えない。公開状態のバッジは文字も併記する
 
-## 12. 未決事項
+## 12. アイコン
 
-- アイコンセットを導入するか、どれを使うか(サイドバー、バッジ、空状態で使う)。導入する場合は `docs/tech-selection.md` に追記する
+Lucide(`lucide-react`)を使う(D1 で確定、2026-10-17。[tech-selection.md](../tech-selection.md) 2.14)。
+
+- 大きさ: 本文・ボタン・バッジの中は 16px、サイドバー・メニューは 20px、空状態は 32〜40px。線幅は 2(32px 以上では 1.75)
+- 色は常に `currentColor` で、置かれた文字と同じトークンを継ぐ
+- 公開状態のバッジは 6px の点を基本とし、アイコン付きは公開ボックスの大きい表示でだけ使う
+- 主な対応: house(ホーム)/ newspaper(お知らせ)/ file-text(型の既定)/ image(メディア)/ layout-grid(コンテンツタイプ)/ users(メンバー)/ settings(サイトの設定)/ globe(公開)/ pencil / copy / trash-2 / rotate-cw(再試行)/ triangle-alert / circle-check / circle-alert / ellipsis
+- アイコンのみのボタンは `aria-label` を必須にし、ツールチップで同じ文言を出す
+
+## 13. 未決事項
+
 - 権限の対応表を API と管理画面で共有するパッケージに移すか
+
+## 14. 決定ログ
+
+- 2026-10-17: D1(キャンバス https://claude.ai/artifact/K57TVUfpefMuiPxhZXyAnU)で 3 章の部品 22 種(既存 7 + 新規 15)の見た目と状態を確定。部品の一覧は変更なし。ボタンは塗り / 枠線 / 危険 / テキストリンクの 4 種に、アイコンのみの「ゴースト」(閉じる・その他)を加えた。アイコンセットは Lucide(12 章)
