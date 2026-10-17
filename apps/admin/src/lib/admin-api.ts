@@ -37,6 +37,9 @@ export interface AssetUsageEntry {
 export interface ModuleSummary {
   moduleId: string;
   name: string;
+  // 案 G 5 章の説明文と、案 A 3.2 のサイドバーに出す型の key
+  description: string | null;
+  navTypes: string[];
   version: number;
   enabled: boolean;
   appliedVersion: number;

@@ -14,7 +14,12 @@ export const moduleManifestSchema = z
     moduleId: z.string().regex(PLUGIN_ID_PATTERN),
     version: z.number().int().positive(),
     name: z.string().min(1),
+    // 案 G 5 章: 設定 › モジュールに出す説明文(有効化すると何が増えるか)
+    description: z.string().min(1).max(500).optional(),
     contentTypes: z.array(contentTypeDefinitionSchema),
+    // 案 A 3.2: サイドバーに出す型。省略時はモジュールの全型を出す。内部用の型(例: 予約通知)を
+    // 隠すときに、出す型だけを列挙する
+    navTypes: z.array(z.string()).optional(),
     // 操作キーは `${moduleId}:${key}` に展開される(§11.3 のモジュール独自権限)
     permissions: z.array(
       z.strictObject({
@@ -65,6 +70,15 @@ export const moduleManifestSchema = z
         });
       }
     }
+    for (const typeKey of manifest.navTypes ?? []) {
+      if (!typeKeys.has(typeKey)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["navTypes"],
+          message: `unknown type: ${typeKey}`,
+        });
+      }
+    }
     for (const typeKey of manifest.publicWriteTypes) {
       if (!typeKeys.has(typeKey)) {
         ctx.addIssue({
@@ -77,6 +91,16 @@ export const moduleManifestSchema = z
   });
 
 export type ModuleManifest = z.infer<typeof moduleManifestSchema>;
+
+// サイドバーに出す型の key(navTypes 省略時はモジュールの全型、マニフェストの並び順)
+export function moduleNavTypes(manifest: ModuleManifest): string[] {
+  const all = manifest.contentTypes.map((ct) => ct.key);
+  if (manifest.navTypes === undefined) {
+    return all;
+  }
+  const shown = new Set(manifest.navTypes);
+  return all.filter((key) => shown.has(key));
+}
 
 export function moduleOperation(moduleId: string, permKey: string): string {
   return `${moduleId}:${permKey}`;

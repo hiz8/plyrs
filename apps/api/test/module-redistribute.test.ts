@@ -6,6 +6,7 @@ import type { ModuleManifest } from "../src/modules/manifest";
 import type { ModuleDefinition } from "../src/modules/registry";
 import { asModuleSummaries } from "../src/rpc-unwrap";
 import type { AuthContext } from "../src/do/authorize";
+import { BOOKING_MANIFEST } from "../src/modules/booking/manifest";
 
 function stub(name: string) {
   return env.TENANT_DO.get(env.TENANT_DO.idFromName(name));
@@ -56,7 +57,10 @@ describe("型定義再配布 (design-spec §4.2)", () => {
     const job: ModuleQueueJob = { kind: "module_sync", tenantId, moduleId: "booking" };
     await handleModuleJob(env, job);
     const modules = asModuleSummaries(await tenant.listModules());
-    expect(modules[0]).toMatchObject({ moduleId: "booking", appliedVersion: 1 });
+    expect(modules[0]).toMatchObject({
+      moduleId: "booking",
+      appliedVersion: BOOKING_MANIFEST.version,
+    });
   });
 
   it("module_redistribute が D1 ミラーの有効テナントへ module_sync をファンアウトする", async () => {
@@ -112,7 +116,7 @@ describe("型定義再配布 (design-spec §4.2)", () => {
     await evictDurableObject(tenant);
     await tenant.ping(); // constructor の ensureEnabledModuleTypes が走る
     const modules = asModuleSummaries(await tenant.listModules());
-    expect(modules[0]).toMatchObject({ appliedVersion: 1 });
+    expect(modules[0]).toMatchObject({ appliedVersion: BOOKING_MANIFEST.version });
   });
 });
 

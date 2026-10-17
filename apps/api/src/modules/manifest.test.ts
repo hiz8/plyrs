@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { moduleManifestSchema, moduleOperation } from "./manifest";
+import {
+  moduleManifestSchema,
+  moduleNavTypes,
+  moduleOperation,
+  type ModuleManifest,
+} from "./manifest";
 import { BOOKING_MANIFEST } from "./booking/manifest";
 
 function minimalManifest() {
@@ -58,6 +63,13 @@ describe("moduleManifestSchema", () => {
     expect(moduleManifestSchema.safeParse(bad).success).toBe(false);
   });
 
+  it("description と navTypes は任意で、navTypes はマニフェスト内の型だけを指せる", () => {
+    const described = { ...minimalManifest(), description: "デモの説明", navTypes: ["demo.item"] };
+    expect(moduleManifestSchema.safeParse(described).success).toBe(true);
+    const badNav = { ...minimalManifest(), navTypes: ["demo.ghost"] };
+    expect(moduleManifestSchema.safeParse(badNav).success).toBe(false);
+  });
+
   it("moduleOperation は名前空間つき操作キーを作る", () => {
     expect(moduleOperation("booking", "manage")).toBe("booking:manage");
   });
@@ -78,5 +90,40 @@ describe("BOOKING_MANIFEST", () => {
       "booking.reservation": "manage",
       "booking.notification": "manage",
     });
+  });
+});
+
+describe("moduleNavTypes (案 A 3.2)", () => {
+  it("navTypes 省略時はモジュールの全型を出す", () => {
+    const manifest = moduleManifestSchema.parse(minimalManifest()) as ModuleManifest;
+    expect(moduleNavTypes(manifest)).toEqual(["demo.item"]);
+  });
+
+  it("navTypes があれば、その型だけをマニフェストの並び順で出す", () => {
+    expect(
+      moduleNavTypes({ ...BOOKING_MANIFEST, navTypes: ["booking.slot", "booking.resource"] }),
+    ).toEqual(["booking.resource", "booking.slot"]);
+  });
+
+  it("予約モジュールは内部用の予約通知をサイドバーに出さない", () => {
+    expect(moduleNavTypes(BOOKING_MANIFEST)).toEqual([
+      "booking.resource",
+      "booking.slot",
+      "booking.reservation",
+    ]);
+  });
+});
+
+describe("BOOKING_MANIFEST の表示項目 (案 E 2 章 / G 5 章)", () => {
+  it("モジュールの説明と、型の説明・全フィールドの表示名を持つ", () => {
+    expect(BOOKING_MANIFEST.description).toBeTruthy();
+    for (const type of BOOKING_MANIFEST.contentTypes.filter(
+      (t) => t.key !== "booking.notification",
+    )) {
+      expect(type.description, type.key).toBeTruthy();
+      for (const field of type.fields) {
+        expect(field.label, `${type.key}.${field.key}`).toBeTruthy();
+      }
+    }
   });
 });

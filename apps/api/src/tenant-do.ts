@@ -47,6 +47,7 @@ import {
   moduleIdFromAlarmKind,
   runModuleAlarmHandler,
 } from "./modules/module-alarms";
+import { moduleNavTypes } from "./modules/manifest";
 import { moduleById, moduleCatalog } from "./modules/registry";
 import {
   countUnsentModuleEvents,
@@ -251,6 +252,8 @@ export class TenantDO extends DurableObject<Env> {
     return {
       moduleId,
       name: module?.manifest.name ?? moduleId,
+      description: module?.manifest.description ?? null,
+      navTypes: module === undefined ? [] : moduleNavTypes(module.manifest),
       version: module?.manifest.version ?? 0,
       enabled: row?.enabled ?? false,
       appliedVersion: row?.appliedVersion ?? 0,
