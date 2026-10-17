@@ -112,7 +112,7 @@ function routesWith(
 function renderEditor(harness: ReturnType<typeof socketHarness>, routes: Record<string, Handler>) {
   const router = getRouter({
     context: createAppContext(stubFetch(routes), { connect: () => harness.connect }),
-    history: createMemoryHistory({ initialEntries: [`/t/blog/records/article/${RECORD_1}`] }),
+    history: createMemoryHistory({ initialEntries: [`/t/blog/content/article/${RECORD_1}`] }),
   });
   render(<RouterProvider router={router} />);
   return router;

@@ -138,10 +138,10 @@ describe("ログインフロー", () => {
     );
     renderAt("/tenants", { "/auth/tenants": tenants });
     const link = await screen.findByRole("link", { name: /Blog/ });
-    expect(link).toHaveAttribute("href", "/t/blog/content-types");
+    expect(link).toHaveAttribute("href", "/t/blog/settings/content-types");
     expect(screen.getByRole("link", { name: /Shop/ })).toHaveAttribute(
       "href",
-      "/t/shop/content-types",
+      "/t/shop/settings/content-types",
     );
   });
 

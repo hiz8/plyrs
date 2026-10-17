@@ -117,7 +117,7 @@ async function bootstrapped(socket: FakeSocket, records: SyncRecord[]) {
 function renderEditor(harness: ReturnType<typeof socketHarness>) {
   const router = getRouter({
     context: createAppContext(stubFetch(authedRoutes()), { connect: () => harness.connect }),
-    history: createMemoryHistory({ initialEntries: [`/t/blog/records/article/${RECORD_1}`] }),
+    history: createMemoryHistory({ initialEntries: [`/t/blog/content/article/${RECORD_1}`] }),
   });
   render(<RouterProvider router={router} />);
   return router;
@@ -149,7 +149,7 @@ async function toggleHeadingAndSave(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "保存" }));
 }
 
-describe("richtext のワイヤレベル編集(/t/$tenantSlug/records/$typeKey/$recordId)", () => {
+describe("richtext のワイヤレベル編集(/t/$tenantSlug/content/$typeKey/$recordId)", () => {
   it("pushes only the body with its base version and the schemaVersion envelope", async () => {
     const harness = socketHarness();
     renderEditor(harness);
