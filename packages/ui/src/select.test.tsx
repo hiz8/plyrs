@@ -30,4 +30,38 @@ describe("Select", () => {
     );
     expect(screen.getByRole("button", { name: /(未設定)/ })).toBeInTheDocument();
   });
+
+  it("選択中の候補に check のアイコンを付け、他の候補は付けない", async () => {
+    const user = userEvent.setup();
+    render(
+      <Select
+        label="型"
+        items={[
+          { value: "news", label: "お知らせ" },
+          { value: "event", label: "イベント" },
+        ]}
+        selectedValue="news"
+        onChange={() => {}}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /型/ }));
+    const selected = await screen.findByRole("option", { name: "お知らせ" });
+    expect(selected.querySelector("svg.lucide-check")).not.toBeNull();
+    expect(
+      screen.getByRole("option", { name: "イベント" }).querySelector("svg.lucide-check"),
+    ).toBeNull();
+  });
+
+  it("エラー文をアイコン付きで出す", () => {
+    render(
+      <Select
+        label="型"
+        items={[]}
+        selectedValue=""
+        onChange={() => {}}
+        errorMessage="型を選んでください"
+      />,
+    );
+    expect(screen.getByText("型を選んでください").querySelector("svg")).not.toBeNull();
+  });
 });

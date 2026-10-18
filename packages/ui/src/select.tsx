@@ -1,60 +1,94 @@
 import * as stylex from "@stylexjs/stylex";
+import { Check, ChevronsUpDown } from "lucide-react";
 import {
   Button as RacButton,
-  Label,
   ListBox,
   ListBoxItem,
   Popover,
   Select as RacSelect,
   SelectValue,
-  Text,
   type ListBoxItemRenderProps,
 } from "react-aria-components";
 import { stylexRenderProps } from "./compose";
-import { colors, spacing, typography } from "./tokens.stylex";
+import { FieldErrorText, FieldLabel, fieldClassName } from "./field";
+import { ICON_SIZE } from "./icon";
+import {
+  accent,
+  bg,
+  border,
+  elevation,
+  focus,
+  font,
+  layer,
+  radius,
+  size,
+  space,
+  status,
+  stroke,
+  text,
+} from "./semantic.stylex";
 
+// D1 ボード 3b。候補の一覧は浮いた面(bg.raised + 枠線 + elevation.menu)
 const styles = stylex.create({
-  field: {
-    display: "flex",
-    flexDirection: "column",
-    gap: spacing.xs,
-    fontFamily: typography.fontFamily,
-  },
-  label: { fontSize: typography.sizeSm, color: colors.textMuted },
   trigger: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: spacing.sm,
-    fontSize: typography.sizeMd,
-    paddingBlock: spacing.xs,
-    paddingInline: spacing.sm,
-    borderRadius: "6px",
-    borderWidth: "1px",
+    gap: space.sm,
+    height: size.control,
+    paddingInline: space.inset,
+    fontFamily: font.family,
+    fontSize: font.body,
+    color: text.default,
+    backgroundColor: bg.canvas,
+    borderWidth: stroke.default,
     borderStyle: "solid",
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
-    color: colors.text,
+    borderColor: border.default,
+    borderRadius: radius.control,
     cursor: "pointer",
+    outline: "none",
+    textAlign: "start",
   },
+  triggerHovered: { borderColor: border.hover },
+  triggerInvalid: { borderColor: status.danger },
+  triggerFocused: {
+    outlineWidth: stroke.focus,
+    outlineStyle: "solid",
+    outlineColor: focus.ring,
+    outlineOffset: stroke.focus,
+  },
+  triggerDisabled: { opacity: 0.5, backgroundColor: bg.surface, cursor: "not-allowed" },
+  chevron: { color: text.muted, flexShrink: 0 },
   popover: {
-    backgroundColor: colors.bg,
-    borderWidth: "1px",
+    minWidth: "var(--trigger-width)",
+    padding: space.xs,
+    backgroundColor: bg.raised,
+    borderWidth: stroke.default,
     borderStyle: "solid",
-    borderColor: colors.border,
-    borderRadius: "6px",
-    minWidth: "180px",
+    borderColor: border.default,
+    borderRadius: radius.container,
+    boxShadow: elevation.menu,
+    zIndex: layer.dropdown,
+    outline: "none",
   },
+  listBox: { outline: "none" },
   item: {
-    padding: spacing.sm,
-    fontSize: typography.sizeMd,
-    fontFamily: typography.fontFamily,
-    color: colors.text,
+    display: "flex",
+    alignItems: "center",
+    gap: space.sm,
+    minHeight: size.control,
+    paddingInline: space.inset,
+    borderRadius: radius.item,
+    fontFamily: font.family,
+    fontSize: font.body,
+    color: text.default,
     cursor: "pointer",
     outline: "none",
   },
-  itemFocused: { backgroundColor: colors.surface },
-  error: { fontSize: typography.sizeSm, color: colors.danger },
+  itemFocused: { backgroundColor: bg.hover },
+  // 選択中は文字と check で示し、地は塗らない(D1 ボード 3b)
+  itemSelected: { color: accent.default, fontWeight: font.weightMedium },
+  checkSlot: { display: "inline-flex", width: "16px", flexShrink: 0 },
 });
 
 export interface SelectProps {
@@ -77,41 +111,63 @@ export function Select({
   isDisabled,
   errorMessage,
 }: SelectProps) {
+  const isInvalid = errorMessage !== undefined;
   return (
     <RacSelect
       selectedKey={selectedValue === "" ? null : selectedValue}
       onSelectionChange={(key) => onChange(key === null ? "" : String(key))}
       isDisabled={isDisabled ?? false}
+      isInvalid={isInvalid}
       placeholder={placeholder ?? "選択してください"}
-      className={stylex.props(styles.field).className ?? ""}
+      className={fieldClassName()}
     >
-      <Label className={stylex.props(styles.label).className ?? ""}>{label}</Label>
-      <RacButton className={stylex.props(styles.trigger).className ?? ""}>
-        <SelectValue />
-        <span aria-hidden="true">▾</span>
-      </RacButton>
-      {errorMessage !== undefined && (
-        <Text slot="errorMessage" className={stylex.props(styles.error).className ?? ""}>
-          {errorMessage}
-        </Text>
+      {({ isOpen, isFocusVisible, isDisabled: disabled }) => (
+        <>
+          <FieldLabel>{label}</FieldLabel>
+          <RacButton
+            className={stylexRenderProps<{ isHovered: boolean }>((state) => [
+              styles.trigger,
+              state.isHovered && styles.triggerHovered,
+              isInvalid && styles.triggerInvalid,
+              (isOpen || isFocusVisible) && styles.triggerFocused,
+              disabled && styles.triggerDisabled,
+            ])}
+          >
+            <SelectValue />
+            <ChevronsUpDown
+              size={ICON_SIZE.inline}
+              aria-hidden="true"
+              {...stylex.props(styles.chevron)}
+            />
+          </RacButton>
+          {isInvalid && <FieldErrorText slot="errorMessage">{errorMessage}</FieldErrorText>}
+          <Popover offset={2} className={stylex.props(styles.popover).className ?? ""}>
+            <ListBox className={stylex.props(styles.listBox).className ?? ""}>
+              {items.map((item) => (
+                <ListBoxItem
+                  key={item.value}
+                  id={item.value}
+                  textValue={item.label}
+                  className={stylexRenderProps<ListBoxItemRenderProps>((state) => [
+                    styles.item,
+                    (state.isFocused || state.isHovered) && styles.itemFocused,
+                    state.isSelected && styles.itemSelected,
+                  ])}
+                >
+                  {({ isSelected }) => (
+                    <>
+                      <span {...stylex.props(styles.checkSlot)}>
+                        {isSelected && <Check size={ICON_SIZE.inline} aria-hidden="true" />}
+                      </span>
+                      {item.label}
+                    </>
+                  )}
+                </ListBoxItem>
+              ))}
+            </ListBox>
+          </Popover>
+        </>
       )}
-      <Popover className={stylex.props(styles.popover).className ?? ""}>
-        <ListBox>
-          {items.map((item) => (
-            <ListBoxItem
-              key={item.value}
-              id={item.value}
-              textValue={item.label}
-              className={stylexRenderProps<ListBoxItemRenderProps>((state) => [
-                styles.item,
-                state.isFocused && styles.itemFocused,
-              ])}
-            >
-              {item.label}
-            </ListBoxItem>
-          ))}
-        </ListBox>
-      </Popover>
     </RacSelect>
   );
 }

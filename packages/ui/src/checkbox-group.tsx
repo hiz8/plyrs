@@ -1,17 +1,11 @@
 import { useId } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { Checkbox } from "./checkbox";
-import { colors, spacing, typography } from "./tokens.stylex";
+import { FieldErrorText, FieldLabel, fieldClassName } from "./field";
+import { space } from "./semantic.stylex";
 
 const styles = stylex.create({
-  group: {
-    display: "flex",
-    flexDirection: "column",
-    gap: spacing.xs,
-    fontFamily: typography.fontFamily,
-  },
-  label: { fontSize: typography.sizeSm, color: colors.textMuted },
-  error: { fontSize: typography.sizeSm, color: colors.danger },
+  options: { display: "flex", flexDirection: "column", gap: space.xxs },
 });
 
 export interface CheckboxGroupProps {
@@ -20,6 +14,7 @@ export interface CheckboxGroupProps {
   value: string[];
   onChange: (next: string[]) => void;
   errorMessage?: string;
+  isRequired?: boolean;
 }
 
 // 実装注意: RAC の CheckboxGroup（useCheckboxGroupState）は value を state に取り込み、
@@ -34,33 +29,39 @@ export function CheckboxGroup({
   value,
   onChange,
   errorMessage,
+  isRequired,
 }: CheckboxGroupProps) {
   const errorId = useId();
+  const isInvalid = errorMessage !== undefined;
 
   return (
     <div
       role="group"
       aria-label={label}
-      aria-describedby={errorMessage !== undefined ? errorId : undefined}
-      className={stylex.props(styles.group).className ?? ""}
+      aria-required={isRequired === true ? true : undefined}
+      aria-describedby={isInvalid ? errorId : undefined}
+      className={fieldClassName()}
     >
-      <span className={stylex.props(styles.label).className ?? ""}>{label}</span>
-      {options.map((option) => (
-        <Checkbox
-          key={option.value}
-          isSelected={value.includes(option.value)}
-          onChange={(selected) =>
-            onChange(selected ? [...value, option.value] : value.filter((v) => v !== option.value))
-          }
-        >
-          {option.label}
-        </Checkbox>
-      ))}
-      {errorMessage !== undefined && (
-        <span id={errorId} className={stylex.props(styles.error).className ?? ""}>
-          {errorMessage}
-        </span>
-      )}
+      <FieldLabel elementType="span" isRequired={isRequired}>
+        {label}
+      </FieldLabel>
+      <div {...stylex.props(styles.options)}>
+        {options.map((option) => (
+          <Checkbox
+            key={option.value}
+            isSelected={value.includes(option.value)}
+            isInvalid={isInvalid}
+            onChange={(selected) =>
+              onChange(
+                selected ? [...value, option.value] : value.filter((v) => v !== option.value),
+              )
+            }
+          >
+            {option.label}
+          </Checkbox>
+        ))}
+      </div>
+      {isInvalid && <FieldErrorText id={errorId}>{errorMessage}</FieldErrorText>}
     </div>
   );
 }

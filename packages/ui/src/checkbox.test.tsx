@@ -15,6 +15,16 @@ describe("Checkbox", () => {
     await userEvent.setup().click(screen.getByRole("checkbox", { name: "必須" }));
     expect(onChange).toHaveBeenCalledWith(true);
   });
+
+  it("一部選択は mixed として読み上げる", () => {
+    render(
+      <Checkbox isSelected={false} isIndeterminate onChange={() => {}}>
+        すべて
+      </Checkbox>,
+    );
+    // RAC は native input の indeterminate プロパティで mixed を伝える(aria-checked は付けない)
+    expect(screen.getByRole("checkbox", { name: "すべて" })).toBePartiallyChecked();
+  });
 });
 
 describe("CheckboxGroup", () => {
@@ -58,6 +68,21 @@ describe("CheckboxGroup", () => {
     const describedBy = group.getAttribute("aria-describedby");
     expect(describedBy).toBeTruthy();
     expect(document.getElementById(describedBy ?? "")).toHaveTextContent("必須です");
+  });
+
+  it("エラーのときはグループに説明を結び、各チェックボックスを invalid にする", () => {
+    render(
+      <CheckboxGroup
+        label="公開先"
+        options={[{ value: "web", label: "Web" }]}
+        value={[]}
+        onChange={() => {}}
+        errorMessage="1 つ以上選んでください"
+      />,
+    );
+    const group = screen.getByRole("group", { name: "公開先" });
+    expect(group).toHaveAccessibleDescription("1 つ以上選んでください");
+    expect(screen.getByRole("checkbox", { name: "Web" })).toHaveAttribute("aria-invalid", "true");
   });
 
   it("omits aria-describedby when there is no error", () => {
