@@ -1,5 +1,6 @@
 import { useId } from "react";
 import * as stylex from "@stylexjs/stylex";
+import { VisuallyHidden } from "react-aria-components";
 import { Checkbox } from "./checkbox";
 import { FieldErrorText, FieldLabel, fieldClassName } from "./field";
 import { space } from "./semantic.stylex";
@@ -32,19 +33,28 @@ export function CheckboxGroup({
   isRequired,
 }: CheckboxGroupProps) {
   const errorId = useId();
+  const requiredId = useId();
   const isInvalid = errorMessage !== undefined;
+  // role="group" に aria-required は許されない(aria-allowed-attr)。必須は説明として結ぶ
+  const describedBy = [isRequired === true && requiredId, isInvalid && errorId]
+    .filter((id) => id !== false)
+    .join(" ");
 
   return (
     <div
       role="group"
       aria-label={label}
-      aria-required={isRequired === true ? true : undefined}
-      aria-describedby={isInvalid ? errorId : undefined}
+      aria-describedby={describedBy === "" ? undefined : describedBy}
       className={fieldClassName()}
     >
       <FieldLabel elementType="span" isRequired={isRequired}>
         {label}
       </FieldLabel>
+      {isRequired === true && (
+        <VisuallyHidden elementType="span" id={requiredId}>
+          必須
+        </VisuallyHidden>
+      )}
       <div {...stylex.props(styles.options)}>
         {options.map((option) => (
           <Checkbox

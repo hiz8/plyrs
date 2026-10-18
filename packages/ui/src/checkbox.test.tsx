@@ -85,6 +85,26 @@ describe("CheckboxGroup", () => {
     expect(screen.getByRole("checkbox", { name: "Web" })).toHaveAttribute("aria-invalid", "true");
   });
 
+  it("必須は group に許されない aria-required を使わず、説明として「必須」を結ぶ(エラーと併記)", () => {
+    const { rerender } = render(
+      <CheckboxGroup label="タグ" options={options} value={[]} onChange={() => {}} isRequired />,
+    );
+    const group = screen.getByRole("group", { name: "タグ" });
+    expect(group).not.toHaveAttribute("aria-required");
+    expect(group).toHaveAccessibleDescription("必須");
+    rerender(
+      <CheckboxGroup
+        label="タグ"
+        options={options}
+        value={[]}
+        onChange={() => {}}
+        isRequired
+        errorMessage="1 つ以上選んでください"
+      />,
+    );
+    expect(group).toHaveAccessibleDescription("必須 1 つ以上選んでください");
+  });
+
   it("omits aria-describedby when there is no error", () => {
     render(<CheckboxGroup label="タグ" options={options} value={[]} onChange={() => {}} />);
     expect(screen.getByRole("group", { name: "タグ" })).not.toHaveAttribute("aria-describedby");

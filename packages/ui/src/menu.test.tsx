@@ -39,3 +39,27 @@ it("トリガーで開き、選んだ項目の id を onAction に渡す。無�
   expect(onAction).toHaveBeenCalledWith("delete");
   expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 });
+
+it("現在のサイトは名前に「(現在)」を含み、キーボードのフォーカスが来ると見た目が変わる", async () => {
+  const user = userEvent.setup();
+  render(
+    <Menu
+      label="サイト"
+      trigger={<IconButton icon={Ellipsis} label="サイト切替" />}
+      onAction={vi.fn()}
+    >
+      <MenuItem id="a" isCurrent>
+        サイト A
+      </MenuItem>
+      <MenuItem id="b">サイト B</MenuItem>
+    </Menu>,
+  );
+  screen.getByRole("button", { name: "サイト切替" }).focus();
+  await user.keyboard("{Enter}");
+  const current = await screen.findByRole("menuitem", { name: "サイト A(現在)" });
+  expect(current).toHaveFocus();
+  const focusedClass = current.className;
+  await user.keyboard("{ArrowDown}");
+  expect(screen.getByRole("menuitem", { name: "サイト B" })).toHaveFocus();
+  expect(current.className).not.toBe(focusedClass);
+});

@@ -9,6 +9,7 @@ import {
   MenuTrigger,
   Popover,
   Separator,
+  VisuallyHidden,
   type MenuItemRenderProps,
 } from "react-aria-components";
 import { stylexRenderProps } from "./compose";
@@ -18,6 +19,7 @@ import {
   bg,
   border,
   elevation,
+  focus,
   font,
   layer,
   radius,
@@ -40,6 +42,8 @@ const styles = stylex.create({
     borderColor: border.default,
     borderRadius: radius.container,
     boxShadow: elevation.menu,
+    // react-aria の useOverlayPosition が inline の style に zIndex: 100000 を書くため、実際の重なり順は
+    // その値になり、この layer.dropdown は上書きされる。将来 inline の値が外れたときの拠り所として残す
     zIndex: layer.dropdown,
     outline: "none",
   },
@@ -62,6 +66,13 @@ const styles = stylex.create({
     backgroundColor: accent.surface,
     color: accent.default,
     fontWeight: font.weightMedium,
+  },
+  // current の地が itemFocused の地を上書きするため、現在の項目へのキーボードのフォーカスは輪で示す
+  currentFocusVisible: {
+    outlineWidth: stroke.focus,
+    outlineStyle: "solid",
+    outlineColor: focus.ring,
+    outlineOffset: `calc(-1 * ${stroke.focus})`,
   },
   disabled: { opacity: 0.5, cursor: "not-allowed" },
   label: {
@@ -150,6 +161,7 @@ export function MenuItem({ id, children, icon: Icon, tone, isDisabled, isCurrent
         (state.isFocused || state.isHovered) && styles.itemFocused,
         tone === "danger" && styles.danger,
         isCurrent === true && styles.current,
+        isCurrent === true && state.isFocusVisible && styles.currentFocusVisible,
         state.isDisabled && styles.disabled,
       ])}
     >
@@ -158,6 +170,8 @@ export function MenuItem({ id, children, icon: Icon, tone, isDisabled, isCurrent
       <span title={children} {...stylex.props(styles.label)}>
         {children}
       </span>
+      {/* 地の色と check は見た目だけなので、現在であることを名前でも伝える */}
+      {isCurrent === true && <VisuallyHidden elementType="span">(現在)</VisuallyHidden>}
       {isCurrent === true && <Check size={ICON_SIZE.inline} aria-hidden="true" />}
     </RacMenuItem>
   );
