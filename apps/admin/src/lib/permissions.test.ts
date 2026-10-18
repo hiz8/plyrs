@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
 import * as api from "../../../api/src/auth/permissions";
-import { ROLES, ROLE_PERMISSIONS, can, type Operation } from "./permissions";
+import { ROLES, can, type Operation } from "./permissions";
 
-const OPERATIONS = [...new Set(Object.values(ROLE_PERMISSIONS).flat())] as readonly Operation[];
+// 網羅リストは ROLE_PERMISSIONS から導かない(表から操作が抜けると検査対象からも消えるため)。
+// Operation に操作が増えたら下の「操作の集合」テストで tsc が落ちる。
+const OPERATIONS = [
+  "type:manage",
+  "record:write",
+  "record:delete",
+  "record:read",
+  "record:publish",
+  "projection:rebuild",
+  "module:manage",
+] as const satisfies readonly Operation[];
 
 describe("permissions", () => {
   it("ロールの集合は api の permissions.ts と一致する", () => {
@@ -25,6 +35,9 @@ describe("permissions", () => {
       : false;
     const same: Same = true;
     expect(same).toBe(true);
+    type Missing = Exclude<Operation, (typeof OPERATIONS)[number]>;
+    const covered: [Missing] extends [never] ? true : false = true;
+    expect(covered).toBe(true);
   });
 
   it("viewer は閲覧だけ、editor は公開まで、owner は型とモジュールも管理できる", () => {

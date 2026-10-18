@@ -6,7 +6,7 @@ import { WORKFLOW_STATUSES, type WorkflowStatus } from "@plyrs/metamodel";
 import { Button, Select } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { WORKFLOW_STATUS_LABELS } from "../lib/labels";
-import { useCan } from "../lib/permissions";
+import { useCan } from "../lib/use-can";
 import { publicationQueryOptions } from "../lib/queries";
 import { useTenantSync } from "../lib/sync-context";
 import { useCollectionRows } from "../lib/use-collection";
