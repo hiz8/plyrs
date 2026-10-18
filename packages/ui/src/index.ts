@@ -33,3 +33,4 @@ export {
 } from "./rich-text-editor";
 export { RECORD_MENTION_NODE_NAME, type RichTextMentionItem } from "./record-mention";
 export { ASSET_IMAGE_NODE_NAME, createAssetImage, type AssetUrlResolver } from "./asset-image";
+export { Badge, type BadgeProps, type BadgeTone } from "./badge";
