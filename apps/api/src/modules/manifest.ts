@@ -18,8 +18,8 @@ export const moduleManifestSchema = z
     description: z.string().min(1).max(500).optional(),
     contentTypes: z.array(contentTypeDefinitionSchema),
     // 案 A 3.2: サイドバーに出す型。省略時はモジュールの全型を出す。内部用の型(例: 予約通知)を
-    // 隠すときに、出す型だけを列挙する
-    navTypes: z.array(z.string()).optional(),
+    // 隠すときに、出す型だけを列挙する。空配列は「全型を隠す」になるため受け付けない
+    navTypes: z.array(z.string()).min(1).optional(),
     // 操作キーは `${moduleId}:${key}` に展開される(§11.3 のモジュール独自権限)
     permissions: z.array(
       z.strictObject({
@@ -70,7 +70,16 @@ export const moduleManifestSchema = z
         });
       }
     }
+    const navKeys = new Set<string>();
     for (const typeKey of manifest.navTypes ?? []) {
+      if (navKeys.has(typeKey)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["navTypes"],
+          message: `duplicate nav type: ${typeKey}`,
+        });
+      }
+      navKeys.add(typeKey);
       if (!typeKeys.has(typeKey)) {
         ctx.addIssue({
           code: "custom",

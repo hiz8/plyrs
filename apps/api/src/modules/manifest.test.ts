@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  moduleManifestSchema,
-  moduleNavTypes,
-  moduleOperation,
-  type ModuleManifest,
-} from "./manifest";
+import { moduleManifestSchema, moduleNavTypes, moduleOperation } from "./manifest";
 import { BOOKING_MANIFEST } from "./booking/manifest";
 
 function minimalManifest() {
@@ -70,6 +65,13 @@ describe("moduleManifestSchema", () => {
     expect(moduleManifestSchema.safeParse(badNav).success).toBe(false);
   });
 
+  it("navTypes の空配列と重複を拒否する", () => {
+    const empty = { ...minimalManifest(), navTypes: [] };
+    expect(moduleManifestSchema.safeParse(empty).success).toBe(false);
+    const duplicated = { ...minimalManifest(), navTypes: ["demo.item", "demo.item"] };
+    expect(moduleManifestSchema.safeParse(duplicated).success).toBe(false);
+  });
+
   it("moduleOperation は名前空間つき操作キーを作る", () => {
     expect(moduleOperation("booking", "manage")).toBe("booking:manage");
   });
@@ -95,7 +97,7 @@ describe("BOOKING_MANIFEST", () => {
 
 describe("moduleNavTypes (案 A 3.2)", () => {
   it("navTypes 省略時はモジュールの全型を出す", () => {
-    const manifest = moduleManifestSchema.parse(minimalManifest()) as ModuleManifest;
+    const manifest = moduleManifestSchema.parse(minimalManifest());
     expect(moduleNavTypes(manifest)).toEqual(["demo.item"]);
   });
 
@@ -103,6 +105,13 @@ describe("moduleNavTypes (案 A 3.2)", () => {
     expect(
       moduleNavTypes({ ...BOOKING_MANIFEST, navTypes: ["booking.slot", "booking.resource"] }),
     ).toEqual(["booking.resource", "booking.slot"]);
+  });
+
+  it("サイドバーから隠す型は予約通知だけ(型を足したときの navTypes の追加漏れに気付くため)", () => {
+    const shown = new Set(moduleNavTypes(BOOKING_MANIFEST));
+    expect(
+      BOOKING_MANIFEST.contentTypes.map((t) => t.key).filter((key) => !shown.has(key)),
+    ).toEqual(["booking.notification"]);
   });
 
   it("予約モジュールは内部用の予約通知をサイドバーに出さない", () => {

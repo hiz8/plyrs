@@ -40,7 +40,7 @@ const contentTypes: ContentTypeDefinition[] = [
     source: "plugin",
     pluginId: BOOKING_MODULE_ID,
     version: 1,
-    listColumns: ["starts_at", "capacity"],
+    listColumns: ["resource", "starts_at", "capacity"],
     fields: [
       {
         key: "resource",
@@ -74,7 +74,6 @@ const contentTypes: ContentTypeDefinition[] = [
     source: "plugin",
     pluginId: BOOKING_MODULE_ID,
     version: 1,
-    titleField: "name",
     listColumns: ["state"],
     fields: [
       {
