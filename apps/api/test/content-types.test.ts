@@ -1,6 +1,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
+import { loadAllContentTypes } from "../src/sync/records";
 import { articleType, auth, uuid } from "./fixtures";
 import { asContentTypeRows } from "./rpc-unwrap";
 
@@ -122,5 +123,109 @@ describe("content type registration", () => {
     expect(rows.map((row) => row.key)).toStrictEqual(["article", "asset", "author"]);
     expect(rows[0]?.fields.some((field) => field.key === "title")).toBe(true);
     expect(rows[2]?.name).toBe("著者");
+  });
+});
+
+function displayType() {
+  const def = articleType();
+  return {
+    ...def,
+    fields: def.fields.map((field) =>
+      field.key === "title" ? { ...field, label: "タイトル", description: "一覧に表示" } : field,
+    ),
+    description: "ブログの記事",
+    titleField: "slug",
+    listColumns: ["published_at"],
+    menuOrder: 3,
+  };
+}
+
+describe("display metadata (案 E 2 章)", () => {
+  it("persists type and field display items and returns them from getContentType", async () => {
+    const stub = freshStub();
+    const result = await stub.registerContentType(displayType(), auth("admin"));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.contentType).toMatchObject({
+        description: "ブログの記事",
+        titleField: "slug",
+        listColumns: ["published_at"],
+        menuOrder: 3,
+      });
+    }
+    const row = await stub.getContentType("article");
+    expect(row).toMatchObject({
+      description: "ブログの記事",
+      titleField: "slug",
+      listColumns: ["published_at"],
+      menuOrder: 3,
+    });
+    expect(row?.fields.find((f) => f.key === "title")).toMatchObject({
+      label: "タイトル",
+      description: "一覧に表示",
+    });
+  });
+
+  it("returns null for unset items on existing-style definitions", async () => {
+    const stub = freshStub();
+    await stub.registerContentType(articleType(), auth("admin"));
+    const row = await stub.getContentType("article");
+    expect(row).toMatchObject({
+      description: null,
+      titleField: null,
+      listColumns: null,
+      menuOrder: null,
+    });
+  });
+
+  it("treats an identical re-register as a no-op and bumps the version on display changes", async () => {
+    const stub = freshStub();
+    await stub.registerContentType(displayType(), auth("admin"));
+    const same = await stub.registerContentType(displayType(), auth("admin"));
+    expect(same.ok && same.applied).toBe(false);
+
+    const reordered = await stub.registerContentType(
+      { ...displayType(), menuOrder: 1 },
+      auth("admin"),
+    );
+    expect(reordered.ok && reordered.applied).toBe(true);
+    if (reordered.ok) {
+      expect(reordered.contentType.version).toBe(2);
+    }
+
+    // 項目を省くと未指定(NULL)に戻る
+    const { description: _description, ...withoutDescription } = displayType();
+    const cleared = await stub.registerContentType(
+      { ...withoutDescription, menuOrder: 1 },
+      auth("admin"),
+    );
+    expect(cleared.ok && cleared.applied).toBe(true);
+    expect((await stub.getContentType("article"))?.description).toBeNull();
+  });
+
+  it("rejects a titleField that does not point to a text field", async () => {
+    const stub = freshStub();
+    const result = await stub.registerContentType(
+      { ...articleType(), titleField: "published_at" },
+      auth("admin"),
+    );
+    expect(result).toMatchObject({ ok: false, code: "validation_failed" });
+  });
+
+  it("delivers display items to sync clients via the content type definitions", async () => {
+    const stub = freshStub();
+    await stub.registerContentType(displayType(), auth("admin"));
+    await runInDurableObject(stub, async (_instance, state) => {
+      const article = loadAllContentTypes(state.storage.sql).find((t) => t.key === "article");
+      expect(article).toMatchObject({
+        description: "ブログの記事",
+        titleField: "slug",
+        listColumns: ["published_at"],
+        menuOrder: 3,
+      });
+      // 未指定の項目はキーごと無い(asset はシステム型で表示項目を持たない)
+      const asset = loadAllContentTypes(state.storage.sql).find((t) => t.key === "asset");
+      expect(asset).not.toHaveProperty("titleField");
+    });
   });
 });

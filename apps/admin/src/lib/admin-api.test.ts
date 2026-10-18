@@ -46,6 +46,10 @@ describe("admin api (Bearer 付き /v1/t/:tenantId)", () => {
         createdAt: "",
         updatedAt: "",
         version: 1,
+        description: null,
+        titleField: null,
+        listColumns: null,
+        menuOrder: null,
       },
     ];
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { contentTypes }));
