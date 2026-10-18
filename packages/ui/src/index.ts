@@ -1,5 +1,14 @@
 export { stylexRenderProps } from "./compose";
-export { Button, type ButtonProps, type ButtonVariant } from "./button";
+export {
+  Button,
+  IconButton,
+  type ButtonProps,
+  type ButtonSize,
+  type ButtonVariant,
+  type IconButtonProps,
+} from "./button";
+export { Tooltip, type TooltipProps } from "./tooltip";
+export { ICON_SIZE, ICON_STROKE } from "./icon";
 export { TextField, type TextFieldProps } from "./text-field";
 export { Checkbox, type CheckboxProps } from "./checkbox";
 export { CheckboxGroup, type CheckboxGroupProps } from "./checkbox-group";
