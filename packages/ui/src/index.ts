@@ -64,3 +64,13 @@ export {
   type MenuProps,
 } from "./menu";
 export { SearchField, type SearchFieldProps } from "./search-field";
+export {
+  Cell,
+  Column,
+  Row,
+  Table,
+  TableBody,
+  TableHeader,
+  type TableCellProps,
+  type TableColumnProps,
+} from "./table";
