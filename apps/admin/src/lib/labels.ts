@@ -1,5 +1,6 @@
 import type { WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncStatus } from "@plyrs/sync-client";
+import { isRole, type Role } from "./permissions";
 
 // 案 H 4.1: 画面に出す用語の唯一の基準。画面ごとに対応表を持たず、ここから引く。
 // 「テナント」は運営者・開発者の言葉のため、利用者の画面では「サイト」と呼ぶ(2026-10-17 決定)。
@@ -19,19 +20,11 @@ export const WORKFLOW_STATUS_LABELS: Record<WorkflowStatus, string> = {
   archived: "アーカイブ",
 };
 
-// api の auth/permissions.ts の ROLES と同じ集合(api は管理画面の依存に無いため値を複製する)。
-export const ROLES = ["owner", "editor", "viewer"] as const;
-export type Role = (typeof ROLES)[number];
-
 export const ROLE_LABELS: Record<Role, string> = {
   owner: "管理者",
   editor: "編集者",
   viewer: "閲覧者",
 };
-
-export function isRole(value: string): value is Role {
-  return (ROLES as readonly string[]).includes(value);
-}
 
 // TenantSummary.role などサーバーから文字列で届く値向け。未知のロールは値をそのまま出す。
 export function roleLabel(role: string): string {
