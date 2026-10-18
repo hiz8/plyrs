@@ -75,3 +75,4 @@ export {
   type TableColumnProps,
 } from "./table";
 export { DropZone, type DropZoneProps } from "./drop-zone";
+export { PageHeader, type PageHeaderProps } from "./page-header";
