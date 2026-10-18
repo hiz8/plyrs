@@ -56,14 +56,18 @@
 - `#0b1220`(ダークの `accentText`)は廃止する(D1 で確定)。blue の尺度に段は足さず、ダークの主ボタンの文字は `gray950` にする。ライトで主ボタンの文字が `bg.canvas` と同じ white であるのと対称になり、blue400 の上で 7.3:1 を保つ
 - 透明度付きの色は `black` / `white` に透明度を付けたプリミティブとして持つ。どの面の上でも同じ見え方になるため、ホバー・押下・スケルトンもこれを使う
 
-  | トークン       | 値                      | 用途                       |
-  | -------------- | ----------------------- | -------------------------- |
-  | `blackAlpha5`  | `rgba(0,0,0,.05)`       | ライトのホバー             |
-  | `blackAlpha10` | `rgba(0,0,0,.10)`       | ライトの押下               |
-  | `blackAlpha50` | `rgba(0,0,0,.50)`       | ライトの暗幕               |
-  | `blackAlpha70` | `rgba(0,0,0,.70)`       | ダークの暗幕               |
-  | `whiteAlpha8`  | `rgba(255,255,255,.08)` | ダークのホバー・スケルトン |
-  | `whiteAlpha12` | `rgba(255,255,255,.12)` | ダークの押下               |
+  | トークン       | 値                      | 用途                                                    |
+  | -------------- | ----------------------- | ------------------------------------------------------- |
+  | `blackAlpha5`  | `rgba(0,0,0,.05)`       | ライトのホバー                                          |
+  | `blackAlpha6`  | `rgba(0,0,0,.06)`       | ライトの影(menu の近い影)                               |
+  | `blackAlpha8`  | `rgba(0,0,0,.08)`       | ライトの影(modal の近い影)                              |
+  | `blackAlpha10` | `rgba(0,0,0,.10)`       | ライトの押下・ライトの影(menu の遠い影)                 |
+  | `blackAlpha18` | `rgba(0,0,0,.18)`       | ライトの影(modal の遠い影)                              |
+  | `blackAlpha40` | `rgba(0,0,0,.40)`       | ダークの影(menu の近い影)                               |
+  | `blackAlpha50` | `rgba(0,0,0,.50)`       | ライトの暗幕・ダークの影(menu の遠い影・modal の近い影) |
+  | `blackAlpha70` | `rgba(0,0,0,.70)`       | ダークの暗幕・ダークの影(modal の遠い影)                |
+  | `whiteAlpha8`  | `rgba(255,255,255,.08)` | ダークのホバー・スケルトン                              |
+  | `whiteAlpha12` | `rgba(255,255,255,.12)` | ダークの押下                                            |
 
 - 画面の地の明るさは white / gray950 で確定(D1)。gray50 / gray900 にする案も 4 面で比較したが見送った
 
@@ -114,6 +118,8 @@
 | `shadow3` | `0 1px 2px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.5)`    |
 | `shadow4` | `0 4px 8px rgba(0,0,0,.5), 0 16px 40px rgba(0,0,0,.7)`   |
 
+shadow1 と shadow3、shadow2 と shadow4 は形(オフセットとぼかし)が同じで、色の濃さだけが違う。`light-dark()` は色にしか書けないため、`elevation.*`(3.2)は shadow1〜4 を丸ごと参照せず、同じ形に透明度のプリミティブを `light-dark()` で当てて組む(V1、2026-10-18)。見え方は shadow1〜4 と同じ。shadow1〜4 は尺度として残す。
+
 ## 3. セマンティックトークン
 
 用途で名前を付け、値はプリミティブトークンを参照する。下の表の「ライト」「ダーク」の列は 4 章のテーマでの割り当て。
@@ -153,26 +159,38 @@
 
 ### 3.2 余白・文字・その他
 
-余白と文字はテーマで変えないため、テーマを通さずプリミティブを参照する。例外は `elevation.*` で、ダークでは濃い影に切り替える(D1 で確定)。
+余白と文字はテーマで変えないため、テーマを通さずプリミティブを参照する。例外は `elevation.*` で、ダークでは濃い影に切り替える(D1 で確定)。影の色だけを `light-dark()` で切り替える(2.4 の注記)。
 
-| トークン                               | 参照先                                       | 現在のトークン                                                             |
-| -------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------- |
-| `space.xs` / `sm` / `md` / `lg` / `xl` | space2 / space3 / space5 / space6 / space7   | `spacing.xs`〜`xl`(値は同じ)                                               |
-| `space.pageGutter`                     | space6                                       | (新規。本文の左右の余白)                                                   |
-| `size.control`                         | space7 + space2 = 36px                       | (新規、D1。ボタン・入力欄・セレクト・検索欄・メニュー項目・サイドバー項目) |
-| `size.controlSm`                       | space6 + space2 = 28px                       | (新規、D1。表の行内のボタン、ツールバーのボタン)                           |
-| `size.row`                             | space7 + space4 = 44px                       | (新規、D1。表の行。最小タップ領域)                                         |
-| `font.body`                            | fontSize2                                    | `typography.sizeMd`                                                        |
-| `font.caption`                         | fontSize1                                    | `typography.sizeSm`                                                        |
-| `font.label`                           | fontSize3                                    | `typography.sizeLg`                                                        |
-| `font.sectionTitle`                    | fontSize4                                    | `typography.sizeXl`                                                        |
-| `font.pageTitle`                       | fontSize5                                    | (新規。ページ見出し)                                                       |
-| `radius.button`                        | radiusFull                                   | (新規、案 R。ボタン全種。左右 padding は 16px、小型は 12px)                |
-| `radius.badge`                         | radius1                                      | (新規、案 R。バッジ、タブの件数。ボタンと形で区別する)                     |
-| `radius.control`                       | radius2                                      | (部品に直書きの 4px → 8px。入力欄・テキストエリア・セレクト・検索欄・日時) |
-| `radius.item`                          | radius2                                      | (新規、案 R。サイドバー・メニューの項目、ツールチップ)                     |
-| `radius.container`                     | radius3                                      | (部品に直書きの 8px → 16px。カード・メニュー・モーダル・トースト・空状態)  |
-| `elevation.menu` / `elevation.modal`   | shadow1 / shadow2(ダーク: shadow3 / shadow4) | (新規)                                                                     |
+| トークン                                                          | 参照先                                                   | 現在のトークン                                                             |
+| ----------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `space.xxs`                                                       | space1(2px)                                              | (新規、V1。ツールバーのボタン間、バッジの上下)                             |
+| `space.xs` / `sm` / `md` / `lg` / `xl`                            | space2 / space3 / space5 / space6 / space7               | `spacing.xs`〜`xl`(値は同じ)                                               |
+| `space.inset`                                                     | space4(12px)                                             | (新規、V1。入力欄・メニュー項目・表のセル・タブ・トーストの左右の余白)     |
+| `space.pageGutter`                                                | space6                                                   | (新規。本文の左右の余白)                                                   |
+| `size.control`                                                    | space7 + space2 = 36px                                   | (新規、D1。ボタン・入力欄・セレクト・検索欄・メニュー項目・サイドバー項目) |
+| `size.controlSm`                                                  | space6 + space2 = 28px                                   | (新規、D1。表の行内のボタン、ツールバーのボタン、チェックボックスの行)     |
+| `size.row`                                                        | space7 + space4 = 44px                                   | (新規、D1。表の行。最小タップ領域)                                         |
+| `size.rowCompact`                                                 | space7 + space3 = 40px                                   | (新規、V1。表の見出し行、タブ)                                             |
+| `font.family` / `font.familyMono`                                 | fontSans / fontMono                                      | `typography.fontFamily`                                                    |
+| `font.body`                                                       | fontSize2                                                | `typography.sizeMd`                                                        |
+| `font.caption`                                                    | fontSize1                                                | `typography.sizeSm`                                                        |
+| `font.label`                                                      | fontSize3                                                | `typography.sizeLg`(V1 でフォーム内の小見出し・空状態の題の用途に改めた)   |
+| `font.sectionTitle`                                               | fontSize4                                                | `typography.sizeXl`(ダイアログの題にも使う)                                |
+| `font.pageTitle`                                                  | fontSize5                                                | (新規。ページ見出し)                                                       |
+| `font.weightRegular` / `weightMedium` / `weightBold`              | fontWeightRegular / fontWeightMedium / fontWeightBold    | (新規、V1)                                                                 |
+| `font.lineHeightTight` / `lineHeightNormal` / `lineHeightRelaxed` | lineHeightTight / lineHeightNormal / lineHeightRelaxed   | (新規、V1)                                                                 |
+| `radius.button`                                                   | radiusFull                                               | (新規、案 R。ボタン全種。左右 padding は 16px、小型は 12px)                |
+| `radius.badge`                                                    | radius1                                                  | (新規、案 R。バッジ、タブの件数。ボタンと形で区別する)                     |
+| `radius.small`                                                    | radius1                                                  | (新規、V1。チェックボックスの箱、スケルトン、テキストリンクのフォーカス)   |
+| `radius.control`                                                  | radius2                                                  | (部品に直書きの 4px → 8px。入力欄・テキストエリア・セレクト・検索欄・日時) |
+| `radius.item`                                                     | radius2                                                  | (新規、案 R。サイドバー・メニューの項目、ツールチップ)                     |
+| `radius.container`                                                | radius3                                                  | (部品に直書きの 8px → 16px。カード・メニュー・モーダル・トースト・空状態)  |
+| `radius.full`                                                     | radiusFull                                               | (新規、V1。進捗バー、公開状態の点、アバター、空状態のアイコンの円)         |
+| `stroke.default` / `stroke.focus`                                 | borderWidth1 / borderWidth2                              | (新規、V1。罫線 / フォーカスの枠・ドロップ領域の破線)                      |
+| `elevation.menu`                                                  | shadow1 の形に blackAlpha6・10(ダーク: blackAlpha40・50) | (新規。メニュー・Select の候補・ツールチップ)                              |
+| `elevation.modal`                                                 | shadow2 の形に blackAlpha8・18(ダーク: blackAlpha50・70) | (新規。モーダル・トースト)                                                 |
+| `motion.fast` / `motion.normal`                                   | duration1 / duration2                                    | (新規、V1。ホバー / 開閉)                                                  |
+| `layer.dropdown` / `layer.modal` / `layer.toast`                  | zIndexDropdown / zIndexModal / zIndexToast               | (新規、V1)                                                                 |
 
 ## 4. テーマ
 
@@ -238,3 +256,4 @@ export const accentTheme = stylex.createTheme(semantic, {
 
 - 2026-10-17: D1(キャンバス https://claude.ai/artifact/K57TVUfpefMuiPxhZXyAnU)で 2 章の補間値と影、3.1 のダーク列、3.2 の部品の高さを確定。追加したセマンティックトークンは 3.1・3.2 の「新規、D1」。画面の地は white / gray950 のまま(gray50 / gray900 案は比較のうえ見送り)
 - 2026-10-18: 角丸を案 R(やわらか案)に変更。尺度の radius3 を 12 → 16px、radius4 24px を追加。`radius.button` / `radius.badge` / `radius.item` を新設し、ボタンは radiusFull、バッジは radius1、入力欄と項目は radius2、面は radius3。チェックボックスは radius1、アバターと進捗バーは radiusFull のまま。入力欄の枠線色はフォーカスで変えない(focus.ring だけで示す)ことも同日に確定
+- 2026-10-18: V1 の計画で次を確定。キャンバスの尺度に無い値(文字 13 / 11px、余白 10 / 6 / 5 / 14px など)は尺度に寄せる(13 → 14、11 → 12、10 → 12、6 → 8、5 → 4、14 → 12)。フォームのラベルは 14px / 500 とし、`font.label` は小見出しの用途に改めた。`elevation.*` は影の色だけを `light-dark()` で切り替え、そのために blackAlpha6 / 8 / 18 / 40 を足した。3.2 に `space.xxs` / `space.inset` / `size.rowCompact` / `font.*` の太さと行の高さ / `radius.small` / `radius.full` / `stroke.*` / `motion.*` / `layer.*` を足した。キャンバスの `bg.control` は採らず `bg.canvas` に読み替える

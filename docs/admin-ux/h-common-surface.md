@@ -48,7 +48,7 @@
 | 相対時刻                            | 「10 分前」の表示とツールチップの日時                  | B・D・F    |
 
 - react-aria-components が持つ部品(Dialog / Modal / Breadcrumbs / Menu / Table / Tabs / SearchField / Tooltip / DropZone / FileTrigger / ProgressBar など)を土台にし、見た目だけを StyleX で揃える。キーボード操作とスクリーンリーダー対応を部品側で担保するため
-- トーストは react-aria-components で安定版になっていない可能性がある(推測)。実装時に採否を確認し、使えなければ自前で作る
+- トーストは react-aria-components 1.21.1 では `UNSTABLE_Toast` / `UNSTABLE_ToastRegion` / `UNSTABLE_ToastQueue` としてだけ提供されている。これを `packages/ui/src/toast.tsx` の中だけで import して包み、外へは自前の API(`createToaster` / `ToastRegion`)を出す(V1、2026-10-18)。読み上げ・フォーカス移動・F6 での移動を RAC に任せ、将来の破壊的変更は 1 ファイルに閉じ込める。トーストの地は `bg.raised` とし、成功 / エラーはアイコンの色で示す
 
 ## 4. 文言
 
@@ -146,3 +146,4 @@ Lucide(`lucide-react`)を使う(D1 で確定、2026-10-17。[tech-selection.md](
 
 - 2026-10-17: D1(キャンバス https://claude.ai/artifact/K57TVUfpefMuiPxhZXyAnU)で 3 章の部品 22 種(既存 7 + 新規 15)の見た目と状態を確定。部品の一覧は変更なし。ボタンは塗り / 枠線 / 危険 / テキストリンクの 4 種に、アイコンのみの「ゴースト」(閉じる・その他)を加えた。アイコンセットは Lucide(12 章)
 - 2026-10-18: 角丸を案 R に変更(h-design-tokens.md 2.4・3.2)。バッジは radiusFull をやめ radius1 の長方形にし、pill のボタンと形で区別する。入力欄のフォーカスは focus.ring だけで示し、枠線の色は通常 / エラーの区別に使う
+- 2026-10-18: V1 の計画で、トーストは RAC の UNSTABLE_ を包んで使うことにした(3 章)。キャンバスとの食い違いは設計書を優先した: トーストの地は bg.raised、メニューのアイコンは 20px、バッジ内のアイコンは 16px、空状態のアイコンは 32px(線幅 1.75)、ダイアログの題は 20px、ゴーストボタンの文字は text.muted。テーマの選択欄は部品だけ作り、配置は V4 のアカウント設定で行う
