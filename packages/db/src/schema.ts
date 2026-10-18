@@ -15,6 +15,11 @@ export const contentTypes = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     version: integer("version").notNull().default(1),
+    // 案 E 2.2: 表示用の任意項目(NULL は未指定 = 画面側の既定に従う)
+    description: text("description"),
+    titleField: text("title_field"),
+    listColumns: text("list_columns"), // JSON: string[]
+    menuOrder: integer("menu_order"),
   },
   (table) => [uniqueIndex("idx_content_types_key").on(table.key)],
 );

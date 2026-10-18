@@ -15,6 +15,10 @@ export interface ContentTypeSummary {
   createdAt: string;
   updatedAt: string;
   version: number;
+  description: string | null;
+  titleField: string | null;
+  listColumns: string[] | null;
+  menuOrder: number | null;
 }
 
 // apps/api/src/do/publish.ts の PublicationState と構造一致(HTTP 契約)
