@@ -54,3 +54,12 @@ export {
   type Toaster,
 } from "./toast";
 export { Breadcrumbs, type BreadcrumbItem } from "./breadcrumbs";
+export { Tabs, type TabItem, type TabsProps } from "./tabs";
+export {
+  Menu,
+  MenuItem,
+  MenuSection,
+  MenuSeparator,
+  type MenuItemProps,
+  type MenuProps,
+} from "./menu";
