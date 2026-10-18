@@ -5,7 +5,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { useCan } from "../lib/permissions";
-import { publicationQueryOptions } from "../lib/queries";
+import { publicationQueryOptions, publicationsQueryKey } from "../lib/queries";
 
 const styles = stylex.create({
   root: { display: "flex", alignItems: "center", gap: spacing.sm },
@@ -32,9 +32,12 @@ export function PublishToolbar({ recordId }: { typeKey: string; recordId: string
       } else {
         await adminApi.unpublishRecord(tenant.id, recordId);
       }
-      await queryClient.invalidateQueries({
-        queryKey: publicationQueryOptions(adminApi, tenant.id, recordId).queryKey,
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: publicationQueryOptions(adminApi, tenant.id, recordId).queryKey,
+        }),
+        queryClient.invalidateQueries({ queryKey: publicationsQueryKey(tenant.id) }),
+      ]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
