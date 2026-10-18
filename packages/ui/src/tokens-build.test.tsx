@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { Spinner } from "./progress";
 
 // 3 層トークン(h-design-tokens.md 5 章)の実体を Vite でビルドし、出力 CSS の形を確かめる。
 // admin の stylex-tokens.test.ts は最小構成のフィクスチャで書き方を、こちらは実トークンを見る
@@ -16,10 +18,12 @@ const { Features } = createRequire(
 )("lightningcss") as { Features: { LightDark: number } };
 
 const SKELETON_ENTRY = join(process.cwd(), "src/test-utils/skeleton-entry.ts");
+const SURFACES_ENTRY = join(process.cwd(), "src/test-utils/surfaces-entry.ts");
 
 const outDirs: string[] = [];
 let css: string;
 let skeletonCss: string;
+let surfacesCss: string;
 
 async function buildCss(entry: string): Promise<string> {
   const outDir = await mkdtemp(join(tmpdir(), "ui-tokens-"));
@@ -37,6 +41,7 @@ async function buildCss(entry: string): Promise<string> {
 beforeAll(async () => {
   css = await buildCss(ENTRY);
   skeletonCss = await buildCss(SKELETON_ENTRY);
+  surfacesCss = await buildCss(SURFACES_ENTRY);
 }, 120_000);
 
 afterAll(async () => {
@@ -84,5 +89,29 @@ describe("Skeleton の出力", () => {
     expect(compact).toMatch(
       /@media\(prefers-reduced-motion:reduce\)\{[^{}]*\{[^{}]*animation-name:none/,
     );
+  });
+});
+
+describe("Spinner と ToastRegion の出力", () => {
+  it("Spinner の回転も動きを減らす設定の animation-name:none の規則を持つ", () => {
+    // 同じプロセスのビルドは StyleX の規則を共有するため、CSS の有無ではなく、
+    // @media の規則のクラスが Spinner の回転する要素に付くかで確かめる
+    const compact = surfacesCss.replace(/\s+/g, "");
+    const reduced =
+      /@media\(prefers-reduced-motion:reduce\)\{\.([\w-]+)[^{}]*\{animation-name:none/.exec(
+        compact,
+      )?.[1];
+    expect(reduced).toBeDefined();
+    render(<Spinner label="アップロードしています…" />);
+    const spinning = screen.getByText("アップロードしています…").previousElementSibling;
+    expect(spinning?.classList.contains(reduced ?? "")).toBe(true);
+  });
+
+  it("トーストの領域は狭い幅でも左右の余白が揃う(max-width の差し引きが右の余白の 2 倍)", () => {
+    const compact = surfacesCss.replace(/\s+/g, "");
+    const inset = /inset-inline-end:var\((--[\w-]+)\)/.exec(compact)?.[1];
+    const maxWidth = /max-width:calc\(100vw-2\*var\((--[\w-]+)\)\)/.exec(compact)?.[1];
+    expect(inset).toBeDefined();
+    expect(maxWidth).toBe(inset);
   });
 });

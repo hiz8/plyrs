@@ -6,7 +6,7 @@ import {
   Text,
   type DropZoneRenderProps,
 } from "react-aria-components";
-import { Button } from "./button";
+import { Button, DisabledAppearanceInheritedContext } from "./button";
 import { stylexRenderProps } from "./compose";
 import { ICON_SIZE, ICON_STROKE } from "./icon";
 import { accent, border, focus, font, radius, space, stroke, text } from "./semantic.stylex";
@@ -41,7 +41,7 @@ const styles = stylex.create({
     outlineColor: focus.ring,
     outlineOffset: stroke.focus,
   },
-  disabled: { opacity: 0.5 },
+  disabled: { opacity: 0.5, cursor: "not-allowed" },
   title: { fontSize: font.body, fontWeight: font.weightMedium, color: text.default },
   titleDropTarget: { color: accent.default },
 });
@@ -144,9 +144,12 @@ export function DropZone({
               if (files.length > 0) onFiles(files);
             }}
           >
-            <Button variant="secondary" isDisabled={isDisabled ?? false}>
-              {buttonLabel}
-            </Button>
+            {/* 外枠が opacity を持つため、中のボタンは操作だけ止めて opacity を重ねない(0.25 にしない) */}
+            <DisabledAppearanceInheritedContext value={isDisabled === true}>
+              <Button variant="secondary" isDisabled={isDisabled ?? false}>
+                {buttonLabel}
+              </Button>
+            </DisabledAppearanceInheritedContext>
           </FileTrigger>
         </>
       )}

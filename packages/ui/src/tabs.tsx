@@ -21,7 +21,8 @@ import {
   text,
 } from "./semantic.stylex";
 
-// D1 ボード 3d。件数は radius.badge の長方形(案 R)。件数 0 のタブは薄く出す(案 D 3.2)
+// D1 ボード 3d。件数は radius.badge の長方形(案 R)。件数 0 のタブは件数のバッジだけを薄く出す
+// (案 D 3.2。タブ全体の opacity はコントラストを下げ、押せるのに無効に見えるため使わない。d-content-list.md 11 章)
 const styles = stylex.create({
   list: {
     display: "flex",
@@ -50,7 +51,6 @@ const styles = stylex.create({
     outline: "none",
     whiteSpace: "nowrap",
   },
-  dimmed: { opacity: 0.5 },
   hovered: { backgroundColor: bg.hover },
   selected: { color: accent.default, borderBottomColor: accent.default },
   focusVisible: {
@@ -70,6 +70,8 @@ const styles = stylex.create({
     borderColor: border.default,
     borderRadius: radius.badge,
   },
+  // 地と枠を消し、文字は text.muted のまま(コントラストを保つ)
+  countEmpty: { backgroundColor: "transparent", borderColor: "transparent" },
   countSelected: {
     color: accent.default,
     backgroundColor: accent.surface,
@@ -104,7 +106,6 @@ export function Tabs({ label, items, selectedKey, onSelectionChange, children }:
             id={item.id}
             className={stylexRenderProps<TabRenderProps>((state) => [
               styles.tab,
-              item.count === 0 && !state.isSelected && styles.dimmed,
               state.isHovered && styles.hovered,
               state.isSelected && styles.selected,
               state.isFocusVisible && styles.focusVisible,
@@ -114,7 +115,13 @@ export function Tabs({ label, items, selectedKey, onSelectionChange, children }:
               <>
                 {item.label}
                 {item.count !== undefined && (
-                  <span {...stylex.props(styles.count, isSelected && styles.countSelected)}>
+                  <span
+                    {...stylex.props(
+                      styles.count,
+                      item.count === 0 && styles.countEmpty,
+                      isSelected && styles.countSelected,
+                    )}
+                  >
                     {item.count}
                   </span>
                 )}

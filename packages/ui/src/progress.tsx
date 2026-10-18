@@ -42,6 +42,8 @@ const styles = stylex.create({
     animationDuration: "1s",
     animationIterationCount: "infinite",
     animationTimingFunction: "linear",
+    // skeleton.tsx と同じ: 動きを減らす設定では回さない(文言で実行中が伝わる)
+    "@media (prefers-reduced-motion: reduce)": { animationName: "none" },
   },
 });
 

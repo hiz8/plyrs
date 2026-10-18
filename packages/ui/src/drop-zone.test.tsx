@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
+import { Button } from "./button";
 import { acceptsFile, collectDroppedFiles, DropZone } from "./drop-zone";
 
 it("ファイルを選ぶと onFiles に File の配列を渡す", async () => {
@@ -58,4 +59,21 @@ it("選択経路でも acceptedFileTypes に合わないファイルは渡さな
 it("isDisabled のときボタンは無効", () => {
   render(<DropZone onFiles={vi.fn()} isDisabled />);
   expect(screen.getByRole("button", { name: "ファイルを選択" })).toBeDisabled();
+});
+
+it("無効時は外枠だけを薄くし、中のボタンに opacity を重ねない", () => {
+  const { unmount } = render(
+    <Button variant="secondary" isDisabled>
+      ファイルを選択
+    </Button>,
+  );
+  const standalone = screen.getByRole("button", { name: "ファイルを選択" }).className.split(" ");
+  unmount();
+  render(<DropZone onFiles={vi.fn()} isDisabled />);
+  const button = screen.getByRole("button", { name: "ファイルを選択" });
+  expect(button).toBeDisabled();
+  // 単体の無効ボタンとの差は opacity の 1 クラスだけ(cursor: not-allowed は残す)
+  const inner = button.className.split(" ");
+  expect(standalone.filter((name) => !inner.includes(name))).toHaveLength(1);
+  expect(inner.filter((name) => !standalone.includes(name))).toHaveLength(0);
 });

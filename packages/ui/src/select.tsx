@@ -68,6 +68,8 @@ const styles = stylex.create({
     borderColor: border.default,
     borderRadius: radius.container,
     boxShadow: elevation.menu,
+    // react-aria の useOverlayPosition が inline の style に zIndex: 100000 を書くため、実際の重なり順は
+    // その値になり、この layer.dropdown は上書きされる。将来 inline の値が外れたときの拠り所として残す
     zIndex: layer.dropdown,
     outline: "none",
   },

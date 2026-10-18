@@ -81,7 +81,8 @@ const styles = stylex.create({
     gap: space.sm,
     // 部品固有の幅(D1 ボード 3c)
     width: "400px",
-    maxWidth: `calc(100vw - 2 * ${space.md})`,
+    // 右の余白(insetInlineEnd)と同じ値を左にも残し、狭い幅で左右を揃える
+    maxWidth: `calc(100vw - 2 * ${space.lg})`,
     outline: "none",
   },
   toast: {

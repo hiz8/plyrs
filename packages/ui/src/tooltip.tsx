@@ -16,7 +16,9 @@ const styles = stylex.create({
     borderRadius: radius.item,
     boxShadow: elevation.menu,
     whiteSpace: "nowrap",
-    // モーダルやトーストの中の要素にも出すため、最も上の重なり順にする
+    // react-aria の useOverlayPosition が inline の style に zIndex: 100000 を書くため、実際の重なり順は
+    // その値になり、この layer.toast は上書きされる(モーダルやトーストより上に出るのはその inline 値による)。
+    // 将来 inline の値が外れたときの拠り所として残す
     zIndex: layer.toast,
   },
 });

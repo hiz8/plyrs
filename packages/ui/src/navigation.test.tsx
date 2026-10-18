@@ -43,4 +43,16 @@ describe("Tabs", () => {
     await userEvent.click(screen.getByRole("tab", { name: /公開中/ }));
     expect(onSelectionChange).toHaveBeenCalledWith("published");
   });
+
+  it("件数 0 のタブ全体は薄くせず、件数のバッジだけで示す", () => {
+    render(
+      <Tabs label="公開状態" items={items} selectedKey="all" onSelectionChange={() => {}}>
+        {(id) => <p>panel:{id}</p>}
+      </Tabs>,
+    );
+    const nonZero = screen.getByRole("tab", { name: /公開中/ });
+    const zero = screen.getByRole("tab", { name: /アーカイブ/ });
+    expect(zero.className).toBe(nonZero.className);
+    expect(screen.getByText("0").className).not.toBe(screen.getByText("15").className);
+  });
 });
