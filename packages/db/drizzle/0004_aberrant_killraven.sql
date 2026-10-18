@@ -1,0 +1,1 @@
+CREATE INDEX `idx_published_snapshots_type` ON `published_snapshots` (`type`,`record_id`);
