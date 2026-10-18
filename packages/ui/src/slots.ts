@@ -14,12 +14,12 @@ interface SlotContributionBase {
 export interface NavItemContribution extends SlotContributionBase {
   label: string;
   /**
-   * TanStack Router のルートパス（例: "/t/$tenantSlug/content-types"）。
+   * TanStack Router のルートパス（例: "/t/$tenantSlug/settings/content-types"）。
    *
    * 契約（Phase 6a 裁定・6b 文書化）: 描画側（/t/$tenantSlug レイアウト）は
    * `params={{ tenantSlug }}` **だけ**を束縛する。つまり nav:item に載せてよいのは
    * パスパラメータが $tenantSlug のみのルートに限る。$typeKey 等の追加パラメータを
-   * 持つルート（例: /t/$tenantSlug/records/$typeKey）を載せるには、contribution に
+   * 持つルート（例: /t/$tenantSlug/content/$typeKey）を載せるには、contribution に
    * params を持たせるようレイアウト側の拡張が先に必要（Phase 9 のモジュール UI で再訪）。
    */
   to: string;
