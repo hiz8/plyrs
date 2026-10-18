@@ -94,6 +94,30 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     expect(new Headers(listCall.headers).get("authorization")).toBe("Bearer jwt-abc");
   });
 
+  it("binds nav item params alongside the current tenantSlug (案 A 4 章)", async () => {
+    const context = createAppContext(stubFetch(authedRoutes()), {
+      connect: () => () => pendingConnect(),
+    });
+    context.slots.register("nav:item", {
+      id: "test.records",
+      label: "記事の一覧",
+      to: "/t/$tenantSlug/records/$typeKey",
+      // tenantSlug は現在のテナントで上書きされ、contribution からは変えられない
+      params: { typeKey: "article", tenantSlug: "other" },
+      group: "module:test",
+      order: 99,
+    });
+    const router = getRouter({
+      context,
+      history: createMemoryHistory({ initialEntries: ["/t/blog/content-types"] }),
+    });
+    render(<RouterProvider router={router} />);
+    expect(await screen.findByRole("link", { name: "記事の一覧" })).toHaveAttribute(
+      "href",
+      "/t/blog/records/article",
+    );
+  });
+
   it("shows the empty state for a tenant without content types", async () => {
     const routes = authedRoutes({
       "/v1/t/t1/content-types": vi.fn(() => jsonResponse(200, { contentTypes: [] })),
