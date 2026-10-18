@@ -293,3 +293,13 @@ describe("画像挿入 (Phase 8 裁定 5)", () => {
     expect(node?.attrs?.["label"]).toBe("hero.png");
   });
 });
+
+describe("RichTextEditor ツールバーの見た目", () => {
+  it("ツールバーのボタンはアイコンのみで、名前は従来どおり", () => {
+    render(<RichTextEditor label="本文" value={undefined} onChange={() => {}} />);
+    const bold = screen.getByRole("button", { name: "太字" });
+    expect(bold).toHaveTextContent("");
+    expect(bold.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getAllByRole("separator").length).toBeGreaterThan(0);
+  });
+});

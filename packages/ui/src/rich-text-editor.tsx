@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Editor, JSONContent } from "@tiptap/core";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -10,7 +10,36 @@ import {
 import { Button } from "./button";
 import { TextField } from "./text-field";
 import { stylexRenderProps } from "./compose";
-import { colors, spacing, typography } from "./tokens.stylex";
+import {
+  Bold,
+  Code,
+  Heading1,
+  Heading2,
+  Heading3,
+  Image as ImageIcon,
+  Italic,
+  Link as LinkIcon,
+  List,
+  ListOrdered,
+  Quote,
+  SquareCode,
+  type LucideIcon,
+} from "lucide-react";
+import { FieldErrorText } from "./field";
+import { ICON_SIZE } from "./icon";
+import {
+  bg,
+  border,
+  elevation,
+  focus,
+  font,
+  radius,
+  size,
+  space,
+  stroke,
+  text,
+} from "./semantic.stylex";
+import { Tooltip } from "./tooltip";
 import {
   createRecordMention,
   type MentionGlue,
@@ -19,72 +48,93 @@ import {
 } from "./record-mention";
 import { ASSET_IMAGE_NODE_NAME, createAssetImage, type AssetUrlResolver } from "./asset-image";
 
+// D1 ボード 3b: 外枠に入力欄と同じ枠線と角丸、ツールバーはゴーストのアイコンボタン、
+// フォーカスのリングは外枠全体に付ける
 const styles = stylex.create({
-  root: {
-    display: "flex",
-    flexDirection: "column",
-    gap: spacing.xs,
-    fontFamily: typography.fontFamily,
-  },
-  label: { fontSize: typography.sizeSm, color: colors.textMuted },
-  toolbar: { display: "flex", flexWrap: "wrap", gap: spacing.xs, alignItems: "center" },
-  toolButton: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizeSm,
-    paddingBlock: spacing.xs,
-    paddingInline: spacing.sm,
-    borderRadius: "4px",
-    borderWidth: "1px",
+  root: { display: "flex", flexDirection: "column", gap: space.sm, fontFamily: font.family },
+  label: { fontSize: font.body, fontWeight: font.weightMedium, color: text.default },
+  frame: {
+    backgroundColor: bg.canvas,
+    borderWidth: stroke.default,
     borderStyle: "solid",
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    color: colors.text,
+    borderColor: border.default,
+    borderRadius: radius.control,
+    outlineStyle: { default: "none", ":focus-within": "solid" },
+    outlineWidth: stroke.focus,
+    outlineColor: focus.ring,
+    outlineOffset: stroke.focus,
+  },
+  toolbar: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: space.xxs,
+    padding: space.xs,
+    borderBottomWidth: stroke.default,
+    borderBottomStyle: "solid",
+    borderBottomColor: border.default,
+  },
+  separator: {
+    alignSelf: "stretch",
+    width: stroke.default,
+    marginInline: space.xs,
+    backgroundColor: border.default,
+  },
+  toolButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: size.controlSm,
+    height: size.controlSm,
+    color: text.muted,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    borderRadius: radius.button,
     cursor: "pointer",
     outline: "none",
   },
-  toolButtonActive: {
-    backgroundColor: colors.accent,
-    color: colors.accentText,
-    borderColor: colors.accent,
-  },
-  toolHovered: { opacity: 0.9 },
+  toolHovered: { backgroundColor: bg.hover, color: text.default },
+  toolButtonActive: { backgroundColor: bg.pressed, color: text.default },
   toolFocus: {
-    outlineWidth: "2px",
+    outlineWidth: stroke.focus,
     outlineStyle: "solid",
-    outlineColor: colors.focusRing,
-    outlineOffset: "1px",
+    outlineColor: focus.ring,
+    outlineOffset: stroke.focus,
   },
-  linkPanel: { display: "flex", gap: spacing.sm, alignItems: "flex-end" },
-  content: {
-    borderRadius: "6px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
-    paddingInline: spacing.md,
-    fontSize: typography.sizeMd,
+  linkPanel: {
+    display: "flex",
+    gap: space.sm,
+    alignItems: "flex-end",
+    padding: space.sm,
+    borderBottomWidth: stroke.default,
+    borderBottomStyle: "solid",
+    borderBottomColor: border.default,
   },
-  error: { fontSize: typography.sizeSm, color: colors.danger },
+  content: { fontSize: font.body, color: text.default },
   mentionList: {
-    borderRadius: "6px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
     display: "flex",
     flexDirection: "column",
     maxWidth: "320px",
+    padding: space.xs,
+    backgroundColor: bg.raised,
+    borderWidth: stroke.default,
+    borderStyle: "solid",
+    borderColor: border.default,
+    borderRadius: radius.container,
+    boxShadow: elevation.menu,
   },
   mentionOption: {
-    paddingBlock: spacing.xs,
-    paddingInline: spacing.sm,
-    cursor: "pointer",
     display: "flex",
     justifyContent: "space-between",
-    gap: spacing.sm,
+    alignItems: "center",
+    gap: space.sm,
+    minHeight: size.control,
+    paddingInline: space.inset,
+    borderRadius: radius.item,
+    cursor: "pointer",
   },
-  mentionOptionActive: { backgroundColor: colors.accent, color: colors.accentText },
-  mentionType: { fontSize: typography.sizeSm, opacity: 0.8 },
+  mentionOptionActive: { backgroundColor: bg.hover },
+  mentionType: { fontSize: font.caption, color: text.muted },
 });
 
 // records.data に入る AST エンベロープ(tech-selection 2.7)。doc の構造検証は
@@ -221,7 +271,7 @@ export function RichTextEditor({
           role: "textbox",
           "aria-multiline": "true",
           "aria-label": label,
-          style: "outline: none; min-height: 120px; padding-block: 8px;",
+          style: "outline: none; min-height: 120px; padding: 12px 16px; line-height: 1.75;",
         },
       },
       onUpdate: ({ editor: current }) => {
@@ -258,28 +308,30 @@ export function RichTextEditor({
   return (
     <div {...stylex.props(styles.root)}>
       <span {...stylex.props(styles.label)}>{label}</span>
-      <Toolbar
-        editor={editor}
-        label={label}
-        onRequestAssetImage={
-          onRequestAssetImage === undefined
-            ? undefined
-            : () =>
-                onRequestAssetImageRef.current?.((item) => {
-                  editor
-                    .chain()
-                    .focus()
-                    .insertContent([
-                      {
-                        type: ASSET_IMAGE_NODE_NAME,
-                        attrs: { recordType: "asset", recordId: item.id, label: item.label },
-                      },
-                    ])
-                    .run();
-                })
-        }
-      />
-      <EditorContent editor={editor} {...stylex.props(styles.content)} />
+      <div {...stylex.props(styles.frame)}>
+        <Toolbar
+          editor={editor}
+          label={label}
+          onRequestAssetImage={
+            onRequestAssetImage === undefined
+              ? undefined
+              : () =>
+                  onRequestAssetImageRef.current?.((item) => {
+                    editor
+                      .chain()
+                      .focus()
+                      .insertContent([
+                        {
+                          type: ASSET_IMAGE_NODE_NAME,
+                          attrs: { recordType: "asset", recordId: item.id, label: item.label },
+                        },
+                      ])
+                      .run();
+                  })
+          }
+        />
+        <EditorContent editor={editor} {...stylex.props(styles.content)} />
+      </div>
       {suggest !== null && suggest.items.length > 0 && (
         <div role="listbox" aria-label="record 参照の候補" {...stylex.props(styles.mentionList)}>
           {suggest.items.map((item, index) => (
@@ -302,7 +354,7 @@ export function RichTextEditor({
           ))}
         </div>
       )}
-      {errorMessage !== undefined && <span {...stylex.props(styles.error)}>{errorMessage}</span>}
+      {errorMessage !== undefined && <FieldErrorText>{errorMessage}</FieldErrorText>}
     </div>
   );
 }
@@ -356,91 +408,90 @@ function Toolbar({
     <>
       <div role="toolbar" aria-label={`${label} の書式`} {...stylex.props(styles.toolbar)}>
         <ToolbarToggle
-          label="太字"
-          isActive={active.bold}
-          onToggle={() => editor.chain().focus().toggleBold().run()}
-        >
-          B
-        </ToolbarToggle>
-        <ToolbarToggle
-          label="斜体"
-          isActive={active.italic}
-          onToggle={() => editor.chain().focus().toggleItalic().run()}
-        >
-          I
-        </ToolbarToggle>
-        <ToolbarToggle
-          label="コード"
-          isActive={active.code}
-          onToggle={() => editor.chain().focus().toggleCode().run()}
-        >
-          {"</>"}
-        </ToolbarToggle>
-        <ToolbarToggle
           label="見出し1"
+          icon={Heading1}
           isActive={active.heading1}
           onToggle={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-        >
-          H1
-        </ToolbarToggle>
+        />
         <ToolbarToggle
           label="見出し2"
+          icon={Heading2}
           isActive={active.heading2}
           onToggle={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-        >
-          H2
-        </ToolbarToggle>
+        />
         <ToolbarToggle
           label="見出し3"
+          icon={Heading3}
           isActive={active.heading3}
           onToggle={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-        >
-          H3
-        </ToolbarToggle>
+        />
+        <ToolbarSeparator />
+        <ToolbarToggle
+          label="太字"
+          icon={Bold}
+          isActive={active.bold}
+          onToggle={() => editor.chain().focus().toggleBold().run()}
+        />
+        <ToolbarToggle
+          label="斜体"
+          icon={Italic}
+          isActive={active.italic}
+          onToggle={() => editor.chain().focus().toggleItalic().run()}
+        />
+        <ToolbarToggle
+          label="コード"
+          icon={Code}
+          isActive={active.code}
+          onToggle={() => editor.chain().focus().toggleCode().run()}
+        />
+        <ToolbarSeparator />
         <ToolbarToggle
           label="箇条書き"
+          icon={List}
           isActive={active.bulletList}
           onToggle={() => editor.chain().focus().toggleBulletList().run()}
-        >
-          ・
-        </ToolbarToggle>
+        />
         <ToolbarToggle
           label="番号リスト"
+          icon={ListOrdered}
           isActive={active.orderedList}
           onToggle={() => editor.chain().focus().toggleOrderedList().run()}
-        >
-          1.
-        </ToolbarToggle>
+        />
         <ToolbarToggle
           label="引用"
+          icon={Quote}
           isActive={active.blockquote}
           onToggle={() => editor.chain().focus().toggleBlockquote().run()}
-        >
-          "
-        </ToolbarToggle>
+        />
         <ToolbarToggle
           label="コードブロック"
+          icon={SquareCode}
           isActive={active.codeBlock}
           onToggle={() => editor.chain().focus().toggleCodeBlock().run()}
-        >
-          {"{ }"}
-        </ToolbarToggle>
-        <ToolbarToggle label="リンク" isActive={active.link} onToggle={openLinkPanel}>
-          🔗
-        </ToolbarToggle>
+        />
+        <ToolbarSeparator />
+        <ToolbarToggle
+          label="リンク"
+          icon={LinkIcon}
+          isActive={active.link}
+          onToggle={openLinkPanel}
+        />
         {onRequestAssetImage !== undefined && (
-          <ToolbarToggle label="画像" isActive={false} onToggle={onRequestAssetImage}>
-            🖼
-          </ToolbarToggle>
+          <ToolbarToggle
+            label="画像"
+            icon={ImageIcon}
+            isActive={false}
+            onToggle={onRequestAssetImage}
+          />
         )}
       </div>
       {linkOpen && (
         <div {...stylex.props(styles.linkPanel)}>
           <TextField label="リンクURL" value={linkHref} onChange={setLinkHref} />
-          <Button variant="secondary" onPress={applyLink}>
+          <Button variant="secondary" size="sm" onPress={applyLink}>
             適用
           </Button>
-          <Button variant="secondary" onPress={() => setLinkOpen(false)}>
+          <Button variant="secondary" size="sm" onPress={() => setLinkOpen(false)}>
             閉じる
           </Button>
         </div>
@@ -451,28 +502,34 @@ function Toolbar({
 
 function ToolbarToggle({
   label,
+  icon: Icon,
   isActive,
   onToggle,
-  children,
 }: {
   label: string;
+  icon: LucideIcon;
   isActive: boolean;
   onToggle: () => void;
-  children: ReactNode;
 }) {
   return (
-    <RacToggleButton
-      aria-label={label}
-      isSelected={isActive}
-      onChange={onToggle}
-      className={stylexRenderProps<ToggleButtonRenderProps>((state) => [
-        styles.toolButton,
-        state.isSelected && styles.toolButtonActive,
-        state.isHovered && styles.toolHovered,
-        state.isFocusVisible && styles.toolFocus,
-      ])}
-    >
-      {children}
-    </RacToggleButton>
+    <Tooltip content={label}>
+      <RacToggleButton
+        aria-label={label}
+        isSelected={isActive}
+        onChange={onToggle}
+        className={stylexRenderProps<ToggleButtonRenderProps>((state) => [
+          styles.toolButton,
+          state.isHovered && styles.toolHovered,
+          state.isSelected && styles.toolButtonActive,
+          state.isFocusVisible && styles.toolFocus,
+        ])}
+      >
+        <Icon size={ICON_SIZE.inline} aria-hidden="true" />
+      </RacToggleButton>
+    </Tooltip>
   );
+}
+
+function ToolbarSeparator() {
+  return <span role="separator" aria-orientation="vertical" {...stylex.props(styles.separator)} />;
 }
