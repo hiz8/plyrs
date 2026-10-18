@@ -17,6 +17,9 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   rate_limited: "操作が集中しています。しばらく待ってから、もう一度お試しください",
   rate_limiter_unavailable: "ただいま混み合っています。しばらく待ってから、もう一度お試しください",
   not_a_member: "このサイトのメンバーではありません。サイトの管理者に招待を依頼してください",
+  // パスワードの変更(POST /auth/password、案 G 6.2)
+  wrong_password: "現在のパスワードが違います。入力し直してください",
+  same_password: "新しいパスワードが現在のパスワードと同じです。別のパスワードを入力してください",
   // コンテンツの書き込み・公開(do/write-record.ts、do/publish.ts、do/delete-record.ts、sync/handlers.ts)
   not_found: "対象が見つかりませんでした。削除された可能性があるため、画面を再読み込みしてください",
   validation_failed: "入力内容に誤りがあります。各項目を確認してください",

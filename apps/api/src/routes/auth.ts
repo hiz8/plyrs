@@ -12,7 +12,12 @@ import { signTenantToken, TOKEN_TTL } from "../auth/jwt";
 import { hashPassword, verifyPassword } from "../auth/password";
 import { isRole } from "../auth/permissions";
 import { checkAuthRateLimit } from "../auth/rate-limit";
-import { createSession, revokeOtherSessions, revokeSession, SESSION_COOKIE } from "../auth/session";
+import {
+  createSession,
+  revokeOtherSessionsStatement,
+  revokeSession,
+  SESSION_COOKIE,
+} from "../auth/session";
 import { sessionGate } from "../middleware/session-gate";
 import { verifyTurnstile } from "../modules/turnstile";
 
@@ -154,6 +159,7 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
           .limit(1)
       )[0];
       const { currentPassword, newPassword } = c.req.valid("json");
+      // gate 通過後に users 行が消えた場合の保険
       if (row === undefined) {
         return c.json({ error: "unauthenticated" }, 401);
       }
@@ -161,17 +167,19 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
       if (!(await verifyPassword(currentPassword, row.passwordHash))) {
         return c.json({ error: "wrong_password" }, 403);
       }
-      await db
-        .update(users)
-        .set({ passwordHash: await hashPassword(newPassword) })
-        .where(eq(users.id, session.userId));
-      const revokedSessions = await revokeOtherSessions(
-        c.env.DB,
-        session.userId,
-        session.token,
-        now,
-      );
-      return c.json({ ok: true, revokedSessions });
+      // 同じ値で「変更」すると、何も変わらないのにほかの端末だけがログアウトされて戸惑わせる
+      if (newPassword === currentPassword) {
+        return c.json({ error: "same_password" }, 400);
+      }
+      // パスワードの更新とほかのセッションの失効は 1 バッチ(片方だけ成功して締め出しが漏れない)
+      const [, revoked] = await db.batch([
+        db
+          .update(users)
+          .set({ passwordHash: await hashPassword(newPassword) })
+          .where(eq(users.id, session.userId)),
+        revokeOtherSessionsStatement(db, session.userId, session.sessionId, now),
+      ]);
+      return c.json({ ok: true, revokedSessions: revoked.length });
     },
   )
   // G5: セッション cookie（D1 真実源）を提示して短命 JWT を再発行する

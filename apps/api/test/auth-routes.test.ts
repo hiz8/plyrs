@@ -305,6 +305,44 @@ describe("POST /auth/password", () => {
     expect((await loginCookie(email, "hunter2hunter2")).status).toBe(200);
   });
 
+  it("does not count expired sessions waiting for the purge", async () => {
+    const { cookie } = await signupWithEmail();
+    const me = (await (await app.request("/auth/me", { headers: { cookie } }, testEnv)).json()) as {
+      userId: string;
+    };
+    await env.DB.prepare(
+      "INSERT INTO sessions (id, token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
+    )
+      .bind(
+        crypto.randomUUID(),
+        `expired-${crypto.randomUUID()}`,
+        me.userId,
+        "2000-01-01T00:00:00.000Z",
+        "2000-01-01T00:00:00.000Z",
+      )
+      .run();
+    const res = await app.request(
+      "/auth/password",
+      json({ currentPassword: "hunter2hunter2", newPassword: "correct horse battery" }, cookie),
+      testEnv,
+    );
+    expect(await res.json()).toStrictEqual({ ok: true, revokedSessions: 0 });
+  });
+
+  it("rejects a new password identical to the current one", async () => {
+    const { email, cookie } = await signupWithEmail();
+    const other = cookieFrom(await loginCookie(email, "hunter2hunter2"));
+    const res = await app.request(
+      "/auth/password",
+      json({ currentPassword: "hunter2hunter2", newPassword: "hunter2hunter2" }, cookie),
+      testEnv,
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toStrictEqual({ error: "same_password" });
+    // ほかの端末はログアウトされない
+    expect(await tenantsStatus(other)).toBe(200);
+  });
+
   it("requires a session and a new password of 12 characters or more", async () => {
     const { cookie } = await signupWithEmail();
     const anonymous = await app.request(
