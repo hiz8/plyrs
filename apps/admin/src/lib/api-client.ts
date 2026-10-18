@@ -1,3 +1,5 @@
+import { withNetworkErrors } from "./network-error";
+
 // 管理画面 → api Worker の HTTP 契約（すべて same-origin 相対パス。2026-07-16 裁定 #1）。
 // fetch は注入可能（テストはスタブを渡す）。セッション cookie は same-origin fetch の既定で送られる。
 export interface TenantSummary {
@@ -5,6 +7,12 @@ export interface TenantSummary {
   slug: string;
   name: string;
   role: string;
+}
+
+// 案 B 3 章: ログイン中の利用者(ホームの「自分」の判定、アカウントメニューのメールアドレス)
+export interface Me {
+  userId: string;
+  email: string;
 }
 
 export class ApiError extends Error {
@@ -42,7 +50,8 @@ const JSON_HEADERS = { "content-type": "application/json" } as const;
 
 // 既定値はグローバル fetch を束縛したラッパー。素の `fetch` を既定値にすると、ブラウザで
 // detached call（this 喪失）となり Illegal invocation を投げる。
-export function createApiClient(fetchImpl: typeof fetch = (...args) => fetch(...args)) {
+export function createApiClient(baseFetch: typeof fetch = (...args) => fetch(...args)) {
+  const fetchImpl = withNetworkErrors(baseFetch);
   async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetchImpl(path, init);
     if (!response.ok) {
@@ -88,6 +97,9 @@ export function createApiClient(fetchImpl: typeof fetch = (...args) => fetch(...
     // §6: siteKey が null なら Turnstile 無効(フロントは従来 UI のまま何もしない)
     turnstileConfig(): Promise<{ siteKey: string | null }> {
       return requestJson("/auth/turnstile-config");
+    },
+    getMe(): Promise<Me> {
+      return requestJson("/auth/me");
     },
     async listTenants(): Promise<TenantSummary[]> {
       const { tenants } = await requestJson<{ tenants: TenantSummary[] }>("/auth/tenants");

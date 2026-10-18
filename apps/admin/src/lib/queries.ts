@@ -12,11 +12,37 @@ export function tenantsQueryOptions(api: ApiClient) {
   });
 }
 
+// 自分の情報はセッションの間は変わらないため取り直さない。セッションが切り替わるときは
+// resetClientSession(ログアウト・ログイン・サインアップ)で捨てる。
+export function meQueryOptions(api: ApiClient) {
+  return queryOptions({
+    queryKey: ["me"],
+    queryFn: () => api.getMe(),
+    staleTime: Infinity,
+  });
+}
+
 export function contentTypesQueryOptions(adminApi: AdminApi, tenantId: string) {
   return queryOptions({
     queryKey: ["content-types", tenantId],
     queryFn: () => adminApi.listContentTypes(tenantId),
     staleTime: 10_000,
+  });
+}
+
+// 案 D 9 章: 公開は同期経路を通らないため、他の利用者の公開は即時には届かない。
+// 画面にフォーカスが戻ったときの再取得(React Query の既定)と、自分の公開・取り下げ直後の
+// invalidate(publicationsQueryKey の前方一致。公開版を消すレコード削除も含む)で補う。
+export function publicationsQueryKey(tenantId: string) {
+  return ["publications", tenantId] as const;
+}
+
+export function publicationsQueryOptions(adminApi: AdminApi, tenantId: string, type?: string) {
+  return queryOptions({
+    queryKey: [...publicationsQueryKey(tenantId), type ?? null],
+    queryFn: () => adminApi.listPublications(tenantId, type),
+    // publicationQueryOptions と揃える(画面往復のたびに DO を起こして全件取り直さない)
+    staleTime: 5_000,
   });
 }
 

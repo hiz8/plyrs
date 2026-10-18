@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { FieldDefinition } from "@plyrs/metamodel";
 import {
   buildDefinition,
+  displayOf,
   emptyFieldDraft,
   summaryToDefinition,
   toFieldDraft,
@@ -178,6 +179,10 @@ describe("summaryToDefinition", () => {
       createdAt: "2026-07-17T00:00:00Z",
       updatedAt: "2026-07-17T00:00:00Z",
       version: 4,
+      description: null,
+      titleField: null,
+      listColumns: null,
+      menuOrder: null,
     });
     expect(definition).toStrictEqual({
       id: uuid,
@@ -187,5 +192,94 @@ describe("summaryToDefinition", () => {
       source: "user",
       version: 4,
     });
+  });
+});
+
+describe("display metadata (案 E 2 章)", () => {
+  const summary = {
+    id: uuid,
+    key: "event",
+    name: "イベント",
+    fields: [
+      { key: "title", type: "text", label: "タイトル", description: "一覧に出ます" },
+      { key: "subtitle", type: "text" },
+      { key: "starts_at", type: "datetime", label: "開始日時" },
+    ] satisfies FieldDefinition[],
+    source: "user" as const,
+    pluginId: null,
+    createdAt: "2026-10-17T00:00:00Z",
+    updatedAt: "2026-10-17T00:00:00Z",
+    version: 3,
+    description: "イベントの告知",
+    titleField: "subtitle",
+    listColumns: ["starts_at", "subtitle"],
+    menuOrder: 2,
+  };
+
+  it("summaryToDefinition carries the type display items", () => {
+    expect(summaryToDefinition(summary)).toMatchObject({
+      description: "イベントの告知",
+      titleField: "subtitle",
+      listColumns: ["starts_at", "subtitle"],
+      menuOrder: 2,
+    });
+  });
+
+  it("round-trips field label/description through the drafts", () => {
+    const drafts = summary.fields.map(toFieldDraft);
+    expect(drafts[0]).toMatchObject({ label: "タイトル", description: "一覧に出ます" });
+    const built = buildDefinition({ id: uuid, key: "event", name: "イベント", drafts, version: 3 });
+    expect(built.ok).toBe(true);
+    if (built.ok) {
+      expect(built.definition.fields).toStrictEqual(summary.fields);
+    }
+  });
+
+  it("omits blank label/description", () => {
+    const draft = { ...emptyFieldDraft(), key: "title", label: "  ", description: "" };
+    const built = buildDefinition({ id: uuid, key: "x", name: "X", drafts: [draft], version: 1 });
+    expect(built.ok && built.definition.fields[0]).toStrictEqual({ key: "title", type: "text" });
+  });
+
+  it("keeps the existing type display items when editing", () => {
+    const built = buildDefinition({
+      id: uuid,
+      key: "event",
+      name: "イベント",
+      drafts: summary.fields.map(toFieldDraft),
+      version: 3,
+      display: displayOf(summary),
+    });
+    expect(built.ok && built.definition).toMatchObject({
+      description: "イベントの告知",
+      titleField: "subtitle",
+      listColumns: ["starts_at", "subtitle"],
+      menuOrder: 2,
+    });
+  });
+
+  it("drops titleField/listColumns whose fields were removed or retyped", () => {
+    const drafts = summary.fields
+      .filter((field) => field.key !== "starts_at")
+      .map(toFieldDraft)
+      .map((draft) => (draft.key === "subtitle" ? { ...draft, type: "number" as const } : draft));
+    const built = buildDefinition({
+      id: uuid,
+      key: "event",
+      name: "イベント",
+      drafts,
+      version: 3,
+      display: displayOf(summary),
+    });
+    expect(built.ok).toBe(true);
+    if (built.ok) {
+      expect(built.definition).not.toHaveProperty("titleField");
+      expect(built.definition.listColumns).toStrictEqual(["subtitle"]);
+      expect(built.definition.description).toBe("イベントの告知");
+    }
+  });
+
+  it("displayOf returns nothing for a new type", () => {
+    expect(displayOf(null)).toStrictEqual({});
   });
 });

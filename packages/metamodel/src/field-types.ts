@@ -16,9 +16,16 @@ const indexableConfig = {
   unique: z.boolean().optional(),
 } as const;
 
+// 案 E 2.1: label は入力フォームのラベルと一覧の列見出し(未指定なら key を表示)、
+// description は入力欄の下の補足。どちらも表示用で、検証・投影・公開 API には影響しない。
+export const FIELD_LABEL_MAX_LENGTH = 100;
+export const FIELD_DESCRIPTION_MAX_LENGTH = 500;
+
 const baseFieldShape = {
   key: fieldKeySchema,
   required: z.boolean().optional(),
+  label: z.string().trim().min(1).max(FIELD_LABEL_MAX_LENGTH).optional(),
+  description: z.string().trim().min(1).max(FIELD_DESCRIPTION_MAX_LENGTH).optional(),
 } as const;
 
 export const textFieldSchema = z.strictObject({

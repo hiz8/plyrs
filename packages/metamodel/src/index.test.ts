@@ -14,5 +14,6 @@ describe("@plyrs/metamodel public surface", () => {
     expect(metamodel.relationRefSchema).toBeDefined();
     expect(metamodel.richTextEnvelopeSchema).toBeDefined();
     expect(metamodel.uuidSchema).toBeDefined();
+    expect(metamodel.titleFieldKey).toBeTypeOf("function");
   });
 });
