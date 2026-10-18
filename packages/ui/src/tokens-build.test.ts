@@ -15,23 +15,32 @@ const { Features } = createRequire(
   createRequire(join(process.cwd(), "package.json")).resolve("@stylexjs/unplugin"),
 )("lightningcss") as { Features: { LightDark: number } };
 
-let outDir: string;
-let css: string;
+const SKELETON_ENTRY = join(process.cwd(), "src/test-utils/skeleton-entry.ts");
 
-beforeAll(async () => {
-  outDir = await mkdtemp(join(tmpdir(), "ui-tokens-"));
+const outDirs: string[] = [];
+let css: string;
+let skeletonCss: string;
+
+async function buildCss(entry: string): Promise<string> {
+  const outDir = await mkdtemp(join(tmpdir(), "ui-tokens-"));
+  outDirs.push(outDir);
   await build({
     root: join(process.cwd(), "src"),
     configFile: false,
     logLevel: "silent",
     plugins: [stylex.vite({ lightningcssOptions: { exclude: Features.LightDark } })],
-    build: { outDir, lib: { entry: ENTRY, formats: ["es"], fileName: "entry" } },
+    build: { outDir, lib: { entry, formats: ["es"], fileName: "entry" } },
   });
-  css = await readFile(join(outDir, "assets", "stylex.css"), "utf8");
-}, 60_000);
+  return readFile(join(outDir, "assets", "stylex.css"), "utf8");
+}
+
+beforeAll(async () => {
+  css = await buildCss(ENTRY);
+  skeletonCss = await buildCss(SKELETON_ENTRY);
+}, 120_000);
 
 afterAll(async () => {
-  await rm(outDir, { recursive: true, force: true });
+  await Promise.all(outDirs.map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
 function rootValues(): string[] {
@@ -66,5 +75,14 @@ describe("3 層トークンの出力(h-design-tokens.md 5 章)", () => {
   it("旧名はセマンティックの別名(var 参照)になり、生の値を持たない", () => {
     expect(css).not.toContain("prefers-color-scheme");
     expect(css).not.toContain("--lightningcss-light");
+  });
+});
+
+describe("Skeleton の出力", () => {
+  it("動きを減らす設定では @media の中で animation-name を none にする", () => {
+    const compact = skeletonCss.replace(/\s+/g, "");
+    expect(compact).toMatch(
+      /@media\(prefers-reduced-motion:reduce\)\{[^{}]*\{[^{}]*animation-name:none/,
+    );
   });
 });
