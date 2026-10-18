@@ -58,6 +58,40 @@ export interface DropZoneProps {
   isDisabled?: boolean;
 }
 
+/** ドロップ項目のうち、このファイルで使う最小の形(RAC の DropItem と構造的に互換) */
+export interface DroppedItem {
+  kind: string;
+  getFile?: () => Promise<File>;
+}
+
+/**
+ * FileTrigger の acceptedFileTypes と同じ規則で判定する。
+ * `.ext` は拡張子(大文字小文字を無視)、`type/*` は MIME の前半一致、それ以外は MIME の完全一致
+ */
+export function acceptsFile(file: File, acceptedFileTypes: string[] | undefined): boolean {
+  if (acceptedFileTypes === undefined) return true;
+  const name = file.name.toLowerCase();
+  return acceptedFileTypes.some((accepted) => {
+    if (accepted.startsWith(".")) return name.endsWith(accepted.toLowerCase());
+    if (accepted.endsWith("/*")) return file.type.startsWith(accepted.slice(0, -1));
+    return file.type === accepted;
+  });
+}
+
+export async function collectDroppedFiles(
+  items: DroppedItem[],
+  acceptedFileTypes: string[] | undefined,
+  allowsMultiple: boolean,
+): Promise<File[]> {
+  const files: File[] = [];
+  for (const item of items) {
+    if (item.kind !== "file" || item.getFile === undefined) continue;
+    const file = await item.getFile();
+    if (acceptsFile(file, acceptedFileTypes)) files.push(file);
+  }
+  return allowsMultiple ? files : files.slice(0, 1);
+}
+
 export function DropZone({
   onFiles,
   acceptedFileTypes,
@@ -70,17 +104,18 @@ export function DropZone({
   return (
     <RacDropZone
       isDisabled={isDisabled ?? false}
+      // ドラッグ中は MIME の一覧しか見えないため、ワイルドカードと拡張子の指定は onDrop で絞る
       getDropOperation={(types) =>
-        acceptedFileTypes === undefined || acceptedFileTypes.some((type) => types.has(type))
+        acceptedFileTypes === undefined ||
+        acceptedFileTypes.some(
+          (type) => type.startsWith(".") || type.endsWith("/*") || types.has(type),
+        )
           ? "copy"
           : "cancel"
       }
       onDrop={async (event) => {
-        const files: File[] = [];
-        for (const item of event.items) {
-          if (item.kind === "file") files.push(await item.getFile());
-        }
-        if (files.length > 0) onFiles(allowsMultiple ? files : files.slice(0, 1));
+        const files = await collectDroppedFiles(event.items, acceptedFileTypes, allowsMultiple);
+        if (files.length > 0) onFiles(files);
       }}
       className={stylexRenderProps<DropZoneRenderProps>((state) => [
         styles.zone,
@@ -103,7 +138,10 @@ export function DropZone({
             {...(acceptedFileTypes === undefined ? {} : { acceptedFileTypes })}
             allowsMultiple={allowsMultiple}
             onSelect={(list) => {
-              if (list !== null && list.length > 0) onFiles(Array.from(list));
+              if (list === null) return;
+              // ブラウザの accept 属性は強制ではないため、ドロップと同じ規則で絞る
+              const files = Array.from(list).filter((file) => acceptsFile(file, acceptedFileTypes));
+              if (files.length > 0) onFiles(files);
             }}
           >
             <Button variant="secondary" isDisabled={isDisabled ?? false}>
