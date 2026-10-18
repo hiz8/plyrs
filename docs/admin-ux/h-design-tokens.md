@@ -97,13 +97,13 @@
 
 ### 2.4 その他
 
-| 種類       | トークン                                                                                                          |
-| ---------- | ----------------------------------------------------------------------------------------------------------------- |
-| 角丸       | `radius0` 0 / `radius1` 4px / `radius2` 8px / `radius3` 12px / `radiusFull` 9999px                                |
-| 罫線の太さ | `borderWidth1` 1px / `borderWidth2` 2px                                                                           |
-| 影         | `shadow1` / `shadow2`(ライトのメニュー / モーダル)、`shadow3` / `shadow4`(ダークのメニュー / モーダル。D1 で追加) |
-| 時間       | `duration1` 100ms / `duration2` 200ms(開閉のアニメーション)                                                       |
-| 重なり順   | `zIndexDropdown` 100 / `zIndexModal` 200 / `zIndexToast` 300                                                      |
+| 種類       | トークン                                                                                                                                              |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 角丸       | `radius0` 0 / `radius1` 4px / `radius2` 8px / `radius3` 16px / `radius4` 24px / `radiusFull` 9999px(案 R、2026-10-18。12px は廃止し 16 / 24 に広げた) |
+| 罫線の太さ | `borderWidth1` 1px / `borderWidth2` 2px                                                                                                               |
+| 影         | `shadow1` / `shadow2`(ライトのメニュー / モーダル)、`shadow3` / `shadow4`(ダークのメニュー / モーダル。D1 で追加)                                     |
+| 時間       | `duration1` 100ms / `duration2` 200ms(開閉のアニメーション)                                                                                           |
+| 重なり順   | `zIndexDropdown` 100 / `zIndexModal` 200 / `zIndexToast` 300                                                                                          |
 
 影の値(D1 で確定)。ライトの薄い影は黒地では見えないため、ダーク用に濃い 2 段を足した。
 
@@ -120,34 +120,34 @@
 
 ### 3.1 色
 
-| トークン                | 用途                                                             | ライト       | ダーク       | 現在のトークン |
-| ----------------------- | ---------------------------------------------------------------- | ------------ | ------------ | -------------- |
-| `bg.canvas`             | 画面の地                                                         | white        | gray950      | `bg`           |
-| `bg.surface`            | サイドバー・カード                                               | gray50       | gray900      | `surface`      |
-| `bg.raised`             | モーダル・メニュー・トースト(常に `border.default` の枠線を伴う) | white        | gray800      | (新規)         |
-| `bg.overlay`            | モーダルの暗幕                                                   | blackAlpha50 | blackAlpha70 | (新規)         |
-| `bg.hover`              | 行・メニュー項目・枠線ボタンのホバー                             | blackAlpha5  | whiteAlpha8  | (新規、D1)     |
-| `bg.pressed`            | 行・メニュー項目・枠線ボタンの押下                               | blackAlpha10 | whiteAlpha12 | (新規、D1)     |
-| `bg.skeleton`           | スケルトン                                                       | gray100      | whiteAlpha8  | (新規、D1)     |
-| `bg.inverse`            | ツールチップの地                                                 | gray900      | gray100      | (新規、D1)     |
-| `text.inverse`          | ツールチップの文字                                               | gray50       | gray900      | (新規、D1)     |
-| `border.default`        | 罫線                                                             | gray200      | gray700      | `border`       |
-| `border.hover`          | 入力欄・枠線ボタンのホバー                                       | gray300      | gray600      | (新規、D1)     |
-| `text.default`          | 本文                                                             | gray900      | gray100      | `text`         |
-| `text.muted`            | 補足                                                             | gray600      | gray400      | `textMuted`    |
-| `text.onAccent`         | 主ボタン・危険ボタンの文字                                       | white        | gray950      | `accentText`   |
-| `accent.default`        | 主ボタン・リンク                                                 | blue600      | blue400      | `accent`       |
-| `accent.hover`          | 主ボタンのホバー                                                 | blue700      | blue300      | (新規)         |
-| `accent.active`         | 主ボタンの押下                                                   | blue800      | blue200      | (新規、D1)     |
-| `accent.surface`        | 選択行・サイドバーの現在地・「レビュー中」バッジの地             | blue50       | blue950      | (新規、D1)     |
-| `focus.ring`            | フォーカスの枠(2px、2px 外側)                                    | blue600      | blue400      | `focusRing`    |
-| `status.danger`         | エラー・危険な操作                                               | red600       | red400       | `danger`       |
-| `status.dangerHover`    | 危険ボタンのホバー・押下                                         | red700       | red300       | (新規、D1)     |
-| `status.dangerSurface`  | エラーのバナー・トースト・バッジの地                             | red50        | red950       | (新規)         |
-| `status.success`        | 公開中など                                                       | green700     | green400     | (新規)         |
-| `status.successSurface` | 成功のトースト・バッジの地                                       | green50      | green950     | (新規)         |
-| `status.warning`        | 未反映の変更あり・切断                                           | amber700     | amber400     | (新規)         |
-| `status.warningSurface` | 警告のバナー・バッジの地                                         | amber50      | amber950     | (新規)         |
+| トークン                | 用途                                                                | ライト       | ダーク       | 現在のトークン |
+| ----------------------- | ------------------------------------------------------------------- | ------------ | ------------ | -------------- |
+| `bg.canvas`             | 画面の地                                                            | white        | gray950      | `bg`           |
+| `bg.surface`            | サイドバー・カード                                                  | gray50       | gray900      | `surface`      |
+| `bg.raised`             | モーダル・メニュー・トースト(常に `border.default` の枠線を伴う)    | white        | gray800      | (新規)         |
+| `bg.overlay`            | モーダルの暗幕                                                      | blackAlpha50 | blackAlpha70 | (新規)         |
+| `bg.hover`              | 行・メニュー項目・枠線ボタンのホバー                                | blackAlpha5  | whiteAlpha8  | (新規、D1)     |
+| `bg.pressed`            | 行・メニュー項目・枠線ボタンの押下                                  | blackAlpha10 | whiteAlpha12 | (新規、D1)     |
+| `bg.skeleton`           | スケルトン                                                          | gray100      | whiteAlpha8  | (新規、D1)     |
+| `bg.inverse`            | ツールチップの地                                                    | gray900      | gray100      | (新規、D1)     |
+| `text.inverse`          | ツールチップの文字                                                  | gray50       | gray900      | (新規、D1)     |
+| `border.default`        | 罫線                                                                | gray200      | gray700      | `border`       |
+| `border.hover`          | 入力欄・枠線ボタンのホバー                                          | gray300      | gray600      | (新規、D1)     |
+| `text.default`          | 本文                                                                | gray900      | gray100      | `text`         |
+| `text.muted`            | 補足                                                                | gray600      | gray400      | `textMuted`    |
+| `text.onAccent`         | 主ボタン・危険ボタンの文字                                          | white        | gray950      | `accentText`   |
+| `accent.default`        | 主ボタン・リンク                                                    | blue600      | blue400      | `accent`       |
+| `accent.hover`          | 主ボタンのホバー                                                    | blue700      | blue300      | (新規)         |
+| `accent.active`         | 主ボタンの押下                                                      | blue800      | blue200      | (新規、D1)     |
+| `accent.surface`        | 選択行・サイドバーの現在地・「レビュー中」バッジの地                | blue50       | blue950      | (新規、D1)     |
+| `focus.ring`            | フォーカスの枠(2px、2px 外側)。入力欄の枠線色はフォーカスで変えない | blue600      | blue400      | `focusRing`    |
+| `status.danger`         | エラー・危険な操作                                                  | red600       | red400       | `danger`       |
+| `status.dangerHover`    | 危険ボタンのホバー・押下                                            | red700       | red300       | (新規、D1)     |
+| `status.dangerSurface`  | エラーのバナー・トースト・バッジの地                                | red50        | red950       | (新規)         |
+| `status.success`        | 公開中など                                                          | green700     | green400     | (新規)         |
+| `status.successSurface` | 成功のトースト・バッジの地                                          | green50      | green950     | (新規)         |
+| `status.warning`        | 未反映の変更あり・切断                                              | amber700     | amber400     | (新規)         |
+| `status.warningSurface` | 警告のバナー・バッジの地                                            | amber50      | amber950     | (新規)         |
 
 ライト / ダークの列は D1 で確定した値(2026-10-17)。ダークの割り当ては、現在の値(ダークの `bg` = `#111418` など)を 2.1 で割り当てた段で置き換えたもの。`status.success` / `status.warning` のライトは当初案の 600 だと白地で 3.3:1 / 3.2:1 にしかならないため 700 にした。すべての組み合わせで本文 4.5:1 以上、部品の境界 3:1 以上を確認済み(キャンバスの「2. セマンティックトークン」ボードに比率を併記)。
 
@@ -167,8 +167,11 @@
 | `font.label`                           | fontSize3                                    | `typography.sizeLg`                                                        |
 | `font.sectionTitle`                    | fontSize4                                    | `typography.sizeXl`                                                        |
 | `font.pageTitle`                       | fontSize5                                    | (新規。ページ見出し)                                                       |
-| `radius.control`                       | radius1                                      | (部品に直書きの 4px)                                                       |
-| `radius.container`                     | radius2                                      | (部品に直書きの 8px)                                                       |
+| `radius.button`                        | radiusFull                                   | (新規、案 R。ボタン全種。左右 padding は 16px、小型は 12px)                |
+| `radius.badge`                         | radius1                                      | (新規、案 R。バッジ、タブの件数。ボタンと形で区別する)                     |
+| `radius.control`                       | radius2                                      | (部品に直書きの 4px → 8px。入力欄・テキストエリア・セレクト・検索欄・日時) |
+| `radius.item`                          | radius2                                      | (新規、案 R。サイドバー・メニューの項目、ツールチップ)                     |
+| `radius.container`                     | radius3                                      | (部品に直書きの 8px → 16px。カード・メニュー・モーダル・トースト・空状態)  |
 | `elevation.menu` / `elevation.modal`   | shadow1 / shadow2(ダーク: shadow3 / shadow4) | (新規)                                                                     |
 
 ## 4. テーマ
@@ -234,3 +237,4 @@ export const accentTheme = stylex.createTheme(semantic, {
 ## 7. 決定ログ
 
 - 2026-10-17: D1(キャンバス https://claude.ai/artifact/K57TVUfpefMuiPxhZXyAnU)で 2 章の補間値と影、3.1 のダーク列、3.2 の部品の高さを確定。追加したセマンティックトークンは 3.1・3.2 の「新規、D1」。画面の地は white / gray950 のまま(gray50 / gray900 案は比較のうえ見送り)
+- 2026-10-18: 角丸を案 R(やわらか案)に変更。尺度の radius3 を 12 → 16px、radius4 24px を追加。`radius.button` / `radius.badge` / `radius.item` を新設し、ボタンは radiusFull、バッジは radius1、入力欄と項目は radius2、面は radius3。チェックボックスは radius1、アバターと進捗バーは radiusFull のまま。入力欄の枠線色はフォーカスで変えない(focus.ring だけで示す)ことも同日に確定

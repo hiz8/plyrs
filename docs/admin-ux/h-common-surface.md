@@ -145,3 +145,4 @@ Lucide(`lucide-react`)を使う(D1 で確定、2026-10-17。[tech-selection.md](
 ## 14. 決定ログ
 
 - 2026-10-17: D1(キャンバス https://claude.ai/artifact/K57TVUfpefMuiPxhZXyAnU)で 3 章の部品 22 種(既存 7 + 新規 15)の見た目と状態を確定。部品の一覧は変更なし。ボタンは塗り / 枠線 / 危険 / テキストリンクの 4 種に、アイコンのみの「ゴースト」(閉じる・その他)を加えた。アイコンセットは Lucide(12 章)
+- 2026-10-18: 角丸を案 R に変更(h-design-tokens.md 2.4・3.2)。バッジは radiusFull をやめ radius1 の長方形にし、pill のボタンと形で区別する。入力欄のフォーカスは focus.ring だけで示し、枠線の色は通常 / エラーの区別に使う
