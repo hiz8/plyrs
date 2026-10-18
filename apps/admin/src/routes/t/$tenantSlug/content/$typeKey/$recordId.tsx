@@ -6,6 +6,7 @@ import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { ConnectionBanner } from "../../../../../components/connection-banner";
 import { RecordForm, syncErrorMessage } from "../../../../../components/record-form";
 import { createAssetServices } from "../../../../../lib/asset-services";
+import { publicationQueryOptions, publicationsQueryKey } from "../../../../../lib/queries";
 import {
   useSyncHasSynced,
   useSyncStatus,
@@ -44,7 +45,7 @@ export const Route = createFileRoute("/t/$tenantSlug/content/$typeKey/$recordId"
 });
 
 function RecordEditorPage() {
-  const { slots, tenant, adminApi } = Route.useRouteContext();
+  const { slots, tenant, adminApi, queryClient } = Route.useRouteContext();
   const { tenantSlug, typeKey, recordId } = Route.useParams();
   const sync = useTenantSync();
   const status = useSyncStatus(sync);
@@ -79,6 +80,13 @@ function RecordEditorPage() {
       if (collection === undefined) return;
       const tx = collection.delete(recordId);
       await tx.isPersisted.promise;
+      // 削除は DO 側で公開版(published_snapshots)も消すため、publish-toolbar と同じく公開状態を取り直す
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: publicationQueryOptions(adminApi, tenant.id, recordId).queryKey,
+        }),
+        queryClient.invalidateQueries({ queryKey: publicationsQueryKey(tenant.id) }),
+      ]);
       await navigate({ to: "/t/$tenantSlug/content/$typeKey", params: { tenantSlug, typeKey } });
     } catch (cause) {
       setDeleteError(syncErrorMessage(cause));

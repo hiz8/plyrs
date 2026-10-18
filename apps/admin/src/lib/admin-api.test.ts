@@ -86,6 +86,38 @@ describe("admin api (Bearer 付き /v1/t/:tenantId)", () => {
     expect(new Headers(init.headers).get("authorization")).toBe("Bearer jwt-1");
   });
 
+  it("lists publications for a type, or for all types when omitted", async () => {
+    const publications = [
+      { recordId: "r1", publishedAt: "2026-10-17T00:00:00Z", sourceVersion: 2 },
+    ];
+    const handler = vi.fn(() => jsonResponse(200, { publications, nextCursor: null }));
+    const adminApi = createAdminApi(
+      manager(),
+      stubFetch({
+        "/v1/t/t1/publications?type=news%2Fx": handler,
+        "/v1/t/t1/publications": handler,
+      }),
+    );
+    expect(await adminApi.listPublications("t1", "news/x")).toStrictEqual(publications);
+    expect(await adminApi.listPublications("t1")).toStrictEqual(publications);
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
+
+  it("follows nextCursor until the last page and concatenates them", async () => {
+    const first = { recordId: "r1", publishedAt: "2026-10-17T00:00:00Z", sourceVersion: 1 };
+    const second = { recordId: "r2", publishedAt: "2026-10-17T00:00:01Z", sourceVersion: 3 };
+    const adminApi = createAdminApi(
+      manager(),
+      stubFetch({
+        "/v1/t/t1/publications?type=article": () =>
+          jsonResponse(200, { publications: [first], nextCursor: "r1" }),
+        "/v1/t/t1/publications?type=article&cursor=r1": () =>
+          jsonResponse(200, { publications: [second], nextCursor: null }),
+      }),
+    );
+    expect(await adminApi.listPublications("t1", "article")).toStrictEqual([first, second]);
+  });
+
   it("publishes, unpublishes and reads publication state", async () => {
     // 同上: mock.calls[0][0] を型付きで拾うため引数を明示する
     const publish = vi.fn((_init?: RequestInit) => jsonResponse(200, { ok: true }));
