@@ -3,6 +3,9 @@ import { ApiError } from "./api-client";
 import { NetworkError } from "./network-error";
 import { SuperApiError } from "./super-api";
 
+// 案 F 3.3 の文言。送る前に弾くとき(media.ts)と、サーバーの 413 で弾かれたときで共用する
+export const UPLOAD_TOO_LARGE_MESSAGE = "20 MB を超えるファイルはアップロードできません";
+
 // 案 H 4.2: API のエラー文をそのまま表示せず、エラーコードから利用者向けの文に置き換える。
 // 文は「何が起きたか」と「どうすればよいか」を書く。該当が無いときは呼び出し側の汎用の文を使う。
 export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
@@ -17,6 +20,9 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   rate_limited: "操作が集中しています。しばらく待ってから、もう一度お試しください",
   rate_limiter_unavailable: "ただいま混み合っています。しばらく待ってから、もう一度お試しください",
   not_a_member: "このサイトのメンバーではありません。サイトの管理者に招待を依頼してください",
+  // パスワードの変更(POST /auth/password、案 G 6.2)
+  wrong_password: "現在のパスワードが違います。入力し直してください",
+  same_password: "新しいパスワードが現在のパスワードと同じです。別のパスワードを入力してください",
   // コンテンツの書き込み・公開(do/write-record.ts、do/publish.ts、do/delete-record.ts、sync/handlers.ts)
   not_found: "対象が見つかりませんでした。削除された可能性があるため、画面を再読み込みしてください",
   validation_failed: "入力内容に誤りがあります。各項目を確認してください",
@@ -36,7 +42,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   type_not_empty:
     "コンテンツが残っているため、このコンテンツタイプは削除できません。先にコンテンツをすべて削除してください",
   // メディア(routes/tenant.ts の assets)
-  too_large: "ファイルが大きすぎます。20 MB 以下のファイルを選んでください",
+  too_large: UPLOAD_TOO_LARGE_MESSAGE,
   invalid_filename: "このファイル名は使用できません。名前を変更してから、もう一度お試しください",
   empty_body: "ファイルが空です。別のファイルを選んでください",
   // モジュール(modules/enablement.ts)

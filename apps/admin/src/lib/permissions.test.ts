@@ -12,6 +12,8 @@ const OPERATIONS = [
   "record:publish",
   "projection:rebuild",
   "module:manage",
+  "site:manage",
+  "member:manage",
 ] as const satisfies readonly Operation[];
 
 describe("permissions", () => {

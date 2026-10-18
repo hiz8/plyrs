@@ -101,7 +101,7 @@ describe("モジュール設定ページ", () => {
         module: { ...bookingModule, enabled: true, appliedVersion: 1 },
       }),
     );
-    renderAt("/t/blog/modules", {
+    renderAt("/t/blog/settings/modules", {
       ...authedRoutes(),
       "/v1/t/t1/modules": listHandler,
       "/v1/t/t1/modules/booking/enable": enableHandler,
@@ -115,7 +115,7 @@ describe("モジュール設定ページ", () => {
   });
 
   it("ナビに「モジュール」項目が出る", async () => {
-    renderAt("/t/blog/modules", {
+    renderAt("/t/blog/settings/modules", {
       ...authedRoutes(),
       "/v1/t/t1/modules": vi.fn(() => jsonResponse(200, { modules: [bookingModule] })),
     });

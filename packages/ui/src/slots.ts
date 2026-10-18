@@ -21,11 +21,11 @@ export type NavGroup = `module:${string}` | "settings";
 export interface NavItemContribution extends SlotContributionBase {
   label: string;
   /**
-   * TanStack Router のルートパス（例: "/t/$tenantSlug/content-types"）。
+   * TanStack Router のルートパス（例: "/t/$tenantSlug/settings/content-types"）。
    *
    * 契約: 描画側（/t/$tenantSlug レイアウト）は `params` に `tenantSlug` を重ねて束縛する
    * （tenantSlug は現在のテナントで常に上書きされ、contribution からは変えられない）。
-   * $typeKey 等の追加パラメータを持つルート（例: /t/$tenantSlug/records/$typeKey）は
+   * $typeKey 等の追加パラメータを持つルート（例: /t/$tenantSlug/content/$typeKey）は
    * `params` でその値を渡す（案 A 4 章）。
    */
   to: string;

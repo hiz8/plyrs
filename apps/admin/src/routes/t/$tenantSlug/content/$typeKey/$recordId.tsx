@@ -41,7 +41,7 @@ const styles = stylex.create({
   dangerZone: { display: "flex", gap: spacing.sm, marginTop: spacing.lg },
 });
 
-export const Route = createFileRoute("/t/$tenantSlug/records/$typeKey/$recordId")({
+export const Route = createFileRoute("/t/$tenantSlug/content/$typeKey/$recordId")({
   component: RecordEditorPage,
 });
 
@@ -90,7 +90,7 @@ function RecordEditorPage() {
         }),
         queryClient.invalidateQueries({ queryKey: publicationsQueryKey(tenant.id) }),
       ]);
-      await navigate({ to: "/t/$tenantSlug/records/$typeKey", params: { tenantSlug, typeKey } });
+      await navigate({ to: "/t/$tenantSlug/content/$typeKey", params: { tenantSlug, typeKey } });
     } catch (cause) {
       setDeleteError(syncErrorMessage(cause));
     }

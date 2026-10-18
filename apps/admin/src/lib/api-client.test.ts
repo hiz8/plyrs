@@ -46,6 +46,24 @@ describe("api client (same-origin 相対パス・fetch 注入)", () => {
     });
   });
 
+  it("posts the current and new passwords to /auth/password", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, { ok: true, revokedSessions: 2 }));
+    const api = createApiClient(fetchImpl);
+    expect(await api.changePassword("old-password!", "new-password!!")).toStrictEqual({
+      ok: true,
+      revokedSessions: 2,
+    });
+    const [path, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe("/auth/password");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toStrictEqual({
+      currentPassword: "old-password!",
+      newPassword: "new-password!!",
+    });
+  });
+
   it("fetches the turnstile site key from GET /auth/turnstile-config", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { siteKey: "site-xyz" }));
     const api = createApiClient(fetchImpl);

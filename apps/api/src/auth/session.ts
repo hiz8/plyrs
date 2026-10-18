@@ -1,5 +1,5 @@
-import { and, eq, isNotNull, isNull, lte, or } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
+import { and, eq, gt, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
+import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
 import { sessions, superSessions, users } from "@plyrs/db/control-plane";
 import { v7 as uuidv7 } from "uuid";
 
@@ -53,9 +53,14 @@ export async function lookupSessionUser(
   d1: D1Database,
   token: string,
   now: Date,
-): Promise<{ userId: string; email: string | null } | null> {
+): Promise<{ sessionId: string; userId: string; email: string | null } | null> {
   const rows = await drizzle(d1)
-    .select({ userId: sessions.userId, expiresAt: sessions.expiresAt, email: users.email })
+    .select({
+      sessionId: sessions.id,
+      userId: sessions.userId,
+      expiresAt: sessions.expiresAt,
+      email: users.email,
+    })
     .from(sessions)
     .leftJoin(users, eq(users.id, sessions.userId))
     .where(and(eq(sessions.tokenHash, await sha256Hex(token)), isNull(sessions.revokedAt)))
@@ -64,7 +69,7 @@ export async function lookupSessionUser(
   if (row === undefined || row.expiresAt <= now.toISOString()) {
     return null;
   }
-  return { userId: row.userId, email: row.email };
+  return { sessionId: row.sessionId, userId: row.userId, email: row.email };
 }
 
 export async function lookupSession(
@@ -81,6 +86,31 @@ export async function revokeSession(d1: D1Database, token: string, now: Date): P
     .update(sessions)
     .set({ revokedAt: now.toISOString() })
     .where(eq(sessions.tokenHash, await sha256Hex(token)));
+}
+
+// 案 G 6.2: パスワード変更時に、操作した端末以外のセッションをすべて失効させる。
+// 発行済みの短命 JWT(最大 15 分)は対象外 — /auth/token での再発行ができなくなる時点で止まる。
+// パスワードの更新と同じ batch で流せるよう、文を組み立てて返す。期限切れで purge を待つ行は
+// 数えない(「N 台の端末からログアウトしました」に存在しない端末を含めないため)。
+export function revokeOtherSessionsStatement(
+  db: DrizzleD1Database,
+  userId: string,
+  keepSessionId: string,
+  now: Date,
+) {
+  const iso = now.toISOString();
+  return db
+    .update(sessions)
+    .set({ revokedAt: iso })
+    .where(
+      and(
+        eq(sessions.userId, userId),
+        isNull(sessions.revokedAt),
+        gt(sessions.expiresAt, iso),
+        ne(sessions.id, keepSessionId),
+      ),
+    )
+    .returning({ id: sessions.id });
 }
 
 // §6: 期限切れ・失効済みセッションの掃除(cron から呼ぶ)。
