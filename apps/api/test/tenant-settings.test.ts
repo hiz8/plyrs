@@ -206,6 +206,18 @@ describe("/v1/t/:tenantId/members", () => {
     ).toBe(404);
   });
 
+  it("treats a change to the same role as a no-op without an audit log", async () => {
+    const { tenantId, auth } = await setupSite();
+    const member = await insertUser();
+    await addMembership(member.id, tenantId, "editor");
+    const res = await call("PATCH", `/v1/t/${tenantId}/members/${member.id}`, auth, {
+      role: "editor",
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ member: { userId: member.id, role: "editor" } });
+    expect(await auditActions(`${member.id}:${tenantId}`)).toStrictEqual([]);
+  });
+
   it("removes a member and blocks their issued tokens immediately", async () => {
     const { tenantId, auth } = await setupSite();
     const member = await insertUser();
@@ -217,7 +229,17 @@ describe("/v1/t/:tenantId/members", () => {
     expect(await roleOf(member.id, tenantId)).toBeUndefined();
     expect((await call("GET", `/v1/t/${tenantId}/content-types`, memberAuth)).status).toBe(403);
     expect(await auditActions(`${member.id}:${tenantId}`)).toStrictEqual(["member.remove"]);
-    expect((await call("DELETE", `/v1/t/${tenantId}/members/${member.id}`, auth)).status).toBe(404);
+    const detail = (
+      await drizzle(env.DB)
+        .select({ detail: auditLogs.detail })
+        .from(auditLogs)
+        .where(eq(auditLogs.targetId, `${member.id}:${tenantId}`))
+    )[0];
+    expect(JSON.parse(detail?.detail ?? "{}")).toStrictEqual({ role: "editor" });
+    // 既にいない相手は(最後の owner の 409 ではなく)404
+    const again = await call("DELETE", `/v1/t/${tenantId}/members/${member.id}`, auth);
+    expect(again.status).toBe(404);
+    expect(await again.json()).toStrictEqual({ error: "not_found" });
   });
 
   it("never removes or demotes the last owner", async () => {

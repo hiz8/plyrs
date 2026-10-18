@@ -104,6 +104,12 @@
 - 最後の owner の判定は更新・削除と同じ SQL 文の条件に入れ、2 人の owner が同時に互いを下げても 0 人にならないようにした
 - 外した直後の人を追加し直す場合は、剥奪時のブロック(最大 20 分)を解除する。残すとトークンを発行できないため
 - 監査ログの操作名は `site.rename` / `member.add` / `member.role_change` / `member.remove`。`actorId` は操作した利用者の userId
+  - 操作名は運営者の操作(`tenant.rename` / `membership.revoke` など)と重ならないため、`actorId` が利用者の userId か運営者の ID かは操作名で決まる。行に区別の列は足さない
+  - 対象がメンバーシップの行の `targetId` は、運営者の剥奪と同じ `userId:tenantId`(`membershipAuditTarget`)
+  - 外す操作は、削除が確定した時点で記録してから切断する(切断が失敗しても記録は残る)
+- 同じロールへの変更は何もせず 200 を返す(監査も残さない)
+- 更新・削除が 0 行だったときは、行がまだあれば 409 `last_owner`、消えていれば 404 `not_found` を返す(運営者の剥奪と重なった場合)
+- サイト名は、運営者の変更(`/super/v1/tenants/:tenantId`)も含めて前後の空白を除いてから検証する
 
 ## 5. 設定 › モジュール
 

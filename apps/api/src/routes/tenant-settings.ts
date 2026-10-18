@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { memberships, tenants, users } from "@plyrs/db/control-plane";
-import { writeAudit } from "../audit";
+import { membershipAuditTarget, writeAudit } from "../audit";
 import { cutOffMembership } from "../auth/ban";
 import { unblockMembership } from "../auth/blocklist";
 import { normalizeEmail } from "../auth/email";
@@ -41,10 +41,6 @@ async function requireCurrent(c: Context<GateEnv>, operation: Operation): Promis
   return null;
 }
 
-function membershipTarget(userId: string, tenantId: string): string {
-  return `${userId}:${tenantId}`;
-}
-
 async function findMember(
   d1: D1Database,
   tenantId: string,
@@ -69,6 +65,15 @@ async function findMember(
 // 2 人の owner が同時に互いを下げる競合でも owner が 0 人にならないようにする。
 const KEEPS_AN_OWNER =
   "(role != 'owner' OR (SELECT COUNT(*) FROM memberships WHERE tenant_id = ?1 AND role = 'owner') > 1)";
+
+// 更新・削除の文が 0 行だったときの理由を切り分ける。最後の owner の条件で弾かれたのか、
+// 事前の確認の後に行が消えた(運営者の剥奪と重なった等)のかで、409 と 404 を返し分ける
+async function notUpdated(c: Context<GateEnv>, tenantId: string, userId: string) {
+  const exists = await findMember(c.env.DB, tenantId, userId);
+  return exists === undefined
+    ? c.json({ error: "not_found" }, 404)
+    : c.json({ error: "last_owner" }, 409);
+}
 
 export const tenantSettingsRoutes = new Hono<GateEnv>()
   .patch(
@@ -125,7 +130,7 @@ export const tenantSettingsRoutes = new Hono<GateEnv>()
       const db = drizzle(c.env.DB);
       const user = (
         await db
-          .select({ id: users.id })
+          .select({ id: users.id, email: users.email })
           .from(users)
           .where(eq(users.email, normalizeEmail(email)))
           .limit(1)
@@ -149,10 +154,10 @@ export const tenantSettingsRoutes = new Hono<GateEnv>()
         actorId: c.get("auth").userId,
         action: "member.add",
         targetType: "membership",
-        targetId: membershipTarget(user.id, tenantId),
+        targetId: membershipAuditTarget(user.id, tenantId),
         detail: { role },
       });
-      return c.json({ member: await findMember(c.env.DB, tenantId, user.id) }, 201);
+      return c.json({ member: { userId: user.id, email: user.email, role, createdAt } }, 201);
     },
   )
   // 案 G 4.3: 新しいロールはトークンの再発行時(最大 15 分後)に反映される
@@ -167,23 +172,28 @@ export const tenantSettingsRoutes = new Hono<GateEnv>()
       const tenantId = c.req.param("tenantId");
       const userId = c.req.param("userId");
       const { role } = c.req.valid("json");
+      // 監査の from と応答のメールアドレスのために変更前の行を読む
       const before = await findMember(c.env.DB, tenantId, userId);
       if (before === undefined) {
         return c.json({ error: "not_found" }, 404);
       }
+      // 同じロールへの変更は何もしない(監査に from と to が同じ行を残さない)
+      if (before.role === role) {
+        return c.json({ member: before });
+      }
       const updated = await c.env.DB.prepare(
-        `UPDATE memberships SET role = ?3 WHERE tenant_id = ?1 AND user_id = ?2 AND (?3 = 'owner' OR ${KEEPS_AN_OWNER})`,
+        `UPDATE memberships SET role = ?3 WHERE tenant_id = ?1 AND user_id = ?2 AND (?3 = 'owner' OR ${KEEPS_AN_OWNER}) RETURNING user_id`,
       )
         .bind(tenantId, userId, role)
-        .run();
-      if (updated.meta.changes === 0) {
-        return c.json({ error: "last_owner" }, 409);
+        .all();
+      if (updated.results.length === 0) {
+        return notUpdated(c, tenantId, userId);
       }
       await writeAudit(c.env.DB, {
         actorId: c.get("auth").userId,
         action: "member.role_change",
         targetType: "membership",
-        targetId: membershipTarget(userId, tenantId),
+        targetId: membershipAuditTarget(userId, tenantId),
         detail: { from: before.role, to: role },
       });
       return c.json({ member: { ...before, role } });
@@ -197,25 +207,24 @@ export const tenantSettingsRoutes = new Hono<GateEnv>()
     }
     const tenantId = c.req.param("tenantId");
     const userId = c.req.param("userId");
-    const before = await findMember(c.env.DB, tenantId, userId);
-    if (before === undefined) {
-      return c.json({ error: "not_found" }, 404);
-    }
     const deleted = await c.env.DB.prepare(
-      `DELETE FROM memberships WHERE tenant_id = ?1 AND user_id = ?2 AND ${KEEPS_AN_OWNER}`,
+      `DELETE FROM memberships WHERE tenant_id = ?1 AND user_id = ?2 AND ${KEEPS_AN_OWNER} RETURNING role`,
     )
       .bind(tenantId, userId)
-      .run();
-    if (deleted.meta.changes === 0) {
-      return c.json({ error: "last_owner" }, 409);
+      .all<{ role: string }>();
+    const removed = deleted.results[0];
+    if (removed === undefined) {
+      return notUpdated(c, tenantId, userId);
     }
-    const { disconnected } = await cutOffMembership(c.env, userId, tenantId);
+    // 削除が確定した時点で記録する。この後の切断(KV・DO)が失敗して 500 になっても、
+    // 再試行は 404 になるため、ここで書かないと削除が記録されないまま残る(§11.6)
     await writeAudit(c.env.DB, {
       actorId: c.get("auth").userId,
       action: "member.remove",
       targetType: "membership",
-      targetId: membershipTarget(userId, tenantId),
-      detail: { role: before.role, disconnected },
+      targetId: membershipAuditTarget(userId, tenantId),
+      detail: { role: removed.role },
     });
+    const { disconnected } = await cutOffMembership(c.env, userId, tenantId);
     return c.json({ ok: true, disconnected });
   });

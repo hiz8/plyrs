@@ -1,6 +1,7 @@
 import type { ContentTypeDefinition, FieldDefinition } from "@plyrs/metamodel";
 import { throwApiError } from "./api-client";
 import { withNetworkErrors } from "./network-error";
+import type { Role } from "./permissions";
 import type { TokenManager } from "./token-manager";
 
 // Bearer 付きの管理 API(/v1/t/:tenantId/...)。トークンは token-manager が供給する。
@@ -219,7 +220,7 @@ export function createAdminApi(
       const { members } = await requestJson<{ members: MemberSummary[] }>(tenantId, "/members");
       return members;
     },
-    async addMember(tenantId: string, email: string, role: string): Promise<MemberSummary> {
+    async addMember(tenantId: string, email: string, role: Role): Promise<MemberSummary> {
       const { member } = await requestJson<{ member: MemberSummary }>(tenantId, "/members", {
         method: "POST",
         headers: JSON_HEADERS,
@@ -227,7 +228,7 @@ export function createAdminApi(
       });
       return member;
     },
-    async changeMemberRole(tenantId: string, userId: string, role: string): Promise<MemberSummary> {
+    async changeMemberRole(tenantId: string, userId: string, role: Role): Promise<MemberSummary> {
       const { member } = await requestJson<{ member: MemberSummary }>(
         tenantId,
         `/members/${userId}`,

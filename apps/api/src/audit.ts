@@ -24,6 +24,12 @@ export type AuditAction =
   | "member.role_change"
   | "member.remove";
 
+// メンバーシップを対象にした操作の targetId(運営者の剥奪と owner のメンバー管理で同じ形式にそろえ、
+// 同じ対象の履歴を 1 つの値で検索できるようにする)
+export function membershipAuditTarget(userId: string, tenantId: string): string {
+  return `${userId}:${tenantId}`;
+}
+
 export interface AuditEntry {
   actorId: string;
   action: AuditAction;
