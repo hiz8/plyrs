@@ -7,9 +7,14 @@ import {
   MAX_UPLOAD_BYTES,
   resolveUsage,
   uploadFiles,
+  uploadRejection,
   uploadSummaryMessage,
+  UPLOAD_TOO_LARGE_MESSAGE,
   type UploadItem,
 } from "./media";
+import { ApiError } from "./api-client";
+import { errorMessage } from "./error-messages";
+import { NetworkError } from "./network-error";
 
 function fileOf(name: string, size = 3): File {
   const file = new File([new Uint8Array(1)], name);
@@ -29,10 +34,64 @@ describe("isTooLarge", () => {
   });
 });
 
+describe("uploadRejection", () => {
+  it("rejects empty files and unusable names before sending", () => {
+    expect(uploadRejection(fileOf("a.png"))).toBeNull();
+    expect(uploadRejection(fileOf("empty.txt", 0))).toBe("empty");
+    expect(uploadRejection(fileOf("x".repeat(257)))).toBe("invalid_filename");
+    expect(uploadRejection(fileOf("huge.mov", MAX_UPLOAD_BYTES + 1))).toBe("too_large");
+  });
+
+  it("uses the same wording as the server's 413", () => {
+    expect(errorMessage(new ApiError(413, "too_large"), "fallback")).toBe(UPLOAD_TOO_LARGE_MESSAGE);
+  });
+});
+
 describe("uploadFiles", () => {
+  it("returns an empty summary for no files", async () => {
+    expect(await uploadFiles([], async () => ({ id: "x" }))).toStrictEqual({
+      items: [],
+      succeeded: 0,
+      failed: 0,
+    });
+  });
+
+  it("stops sending the rest when the failure is not about the file", async () => {
+    for (const cause of [new NetworkError(new TypeError("offline")), new ApiError(401, "x")]) {
+      const sent: string[] = [];
+      const summary = await uploadFiles(
+        [fileOf("a.png"), fileOf("b.png"), fileOf("c.png")],
+        async (file) => {
+          sent.push(file.name);
+          throw cause;
+        },
+      );
+      expect(sent).toStrictEqual(["a.png"]);
+      expect(summary.failed).toBe(3);
+      expect(summary.items.every((item) => item.status === "failed" && item.cause === cause)).toBe(
+        true,
+      );
+    }
+  });
+
+  it("leaves the rest queued once aborted", async () => {
+    const controller = new AbortController();
+    const summary = await uploadFiles(
+      [fileOf("a.png"), fileOf("b.png")],
+      async (file) => {
+        controller.abort();
+        return { id: `id-${file.name}` };
+      },
+      { signal: controller.signal },
+    );
+    expect(statuses(summary.items)).toStrictEqual(["a.png:done", "b.png:queued"]);
+    expect(summary).toMatchObject({ succeeded: 1, failed: 0 });
+  });
+
   it("uploads one file at a time, skips oversized files and keeps going after a failure", async () => {
     const sent: string[] = [];
     const snapshots: string[][] = [];
+    const refs: (readonly UploadItem[])[] = [];
     const boom = new Error("boom");
     const summary = await uploadFiles(
       [fileOf("a.png"), fileOf("huge.mov", MAX_UPLOAD_BYTES + 1), fileOf("b.png"), fileOf("c.png")],
@@ -43,8 +102,15 @@ describe("uploadFiles", () => {
         }
         return { id: `id-${file.name}` };
       },
-      (items) => snapshots.push(statuses(items)),
+      {
+        onChange: (items) => {
+          refs.push(items);
+          snapshots.push(statuses(items));
+        },
+      },
     );
+    // 再描画のため、onChange には毎回新しい配列を渡す
+    expect(new Set(refs).size).toBe(refs.length);
     expect(sent).toStrictEqual(["a.png", "b.png", "c.png"]);
     expect(summary.succeeded).toBe(2);
     expect(summary.failed).toBe(2);
@@ -147,7 +213,8 @@ describe("resolveUsage", () => {
         typeKey: "news",
         typeName: "お知らせ",
         title: "秋のキャンペーン",
-        fieldLabel: "アイキャッチ",
+        fieldKey: "hero",
+        origin: "field",
         place: "アイキャッチ",
       },
       {
@@ -155,7 +222,8 @@ describe("resolveUsage", () => {
         typeKey: "news",
         typeName: "お知らせ",
         title: "10 月の営業案内",
-        fieldLabel: "本文",
+        fieldKey: "body",
+        origin: "body",
         place: "本文中",
       },
     ]);
