@@ -6,7 +6,9 @@ export {
 } from "./system-fields";
 export { uuidSchema } from "./ids";
 export {
+  FIELD_DESCRIPTION_MAX_LENGTH,
   FIELD_KEY_PATTERN,
+  FIELD_LABEL_MAX_LENGTH,
   fieldDefinitionSchema,
   fieldKeySchema,
   relationFieldSchema,
@@ -14,9 +16,12 @@ export {
   type RelationFieldDefinition,
 } from "./field-types";
 export {
+  CONTENT_TYPE_DESCRIPTION_MAX_LENGTH,
+  LIST_COLUMNS_MAX,
   PLUGIN_ID_PATTERN,
   PLUGIN_TYPE_KEY_PATTERN,
   contentTypeDefinitionSchema,
+  titleFieldKey,
   type ContentTypeDefinition,
 } from "./content-type";
 export {

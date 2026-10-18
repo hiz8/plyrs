@@ -57,19 +57,19 @@ export function createAppContext(
   slots.register("nav:item", {
     id: "core.content-types",
     label: "コンテンツタイプ",
-    to: "/t/$tenantSlug/content-types",
+    to: "/t/$tenantSlug/settings/content-types",
     order: 0,
   });
   slots.register("nav:item", {
     id: "core.assets",
     label: "アセット",
-    to: "/t/$tenantSlug/assets",
+    to: "/t/$tenantSlug/media",
     order: 1,
   });
   slots.register("nav:item", {
     id: "core.modules",
     label: "モジュール",
-    to: "/t/$tenantSlug/modules",
+    to: "/t/$tenantSlug/settings/modules",
     order: 2,
   });
   // 裁定 5(2026-07-17): コア自身が record-editor スロットに登録する(ドッグフーディング)。

@@ -1,8 +1,17 @@
 import type { AssetUsageRow } from "./do/asset-usage";
-import type { ContentTypeRow, RegisterContentTypeResult } from "./do/content-types";
+import type {
+  ContentTypeRow,
+  DeleteContentTypeResult,
+  RegisterContentTypeResult,
+} from "./do/content-types";
 import type { DeleteRecordResult } from "./do/delete-record";
 import type { HealthReport } from "./do/health";
-import type { PublicationState, PublishResult, UnpublishResult } from "./do/publish";
+import type {
+  PublicationState,
+  PublicationSummary,
+  PublishResult,
+  UnpublishResult,
+} from "./do/publish";
 import type { RecordSnapshot, WriteRecordResult } from "./do/types";
 import type { EnableModuleResult, ModuleSummary } from "./modules/enablement";
 import type { CatalogRow, ProjectionPayload } from "./projection/payload";
@@ -32,6 +41,10 @@ export function asContentTypeRow(value: unknown): ContentTypeRow | null {
 
 export function asContentTypeRows(value: unknown): ContentTypeRow[] {
   return value as ContentTypeRow[];
+}
+
+export function asDeleteContentTypeResult(value: unknown): DeleteContentTypeResult {
+  return value as DeleteContentTypeResult;
 }
 
 export function asPublishResult(value: unknown): PublishResult {
@@ -65,6 +78,13 @@ export function asProjectionCatalog(value: unknown): { type: string; catalog: Ca
 
 export function asPublicationState(value: unknown): PublicationState {
   return value as PublicationState;
+}
+
+export function asPublicationsPage(value: unknown): {
+  publications: PublicationSummary[];
+  nextCursor: string | null;
+} {
+  return value as { publications: PublicationSummary[]; nextCursor: string | null };
 }
 
 export function asOrphanIds(value: unknown): string[] {

@@ -12,7 +12,8 @@ import { signTenantToken, TOKEN_TTL } from "../auth/jwt";
 import { hashPassword, verifyPassword } from "../auth/password";
 import { isRole } from "../auth/permissions";
 import { checkAuthRateLimit } from "../auth/rate-limit";
-import { createSession, lookupSession, revokeSession, SESSION_COOKIE } from "../auth/session";
+import { createSession, revokeSession, SESSION_COOKIE } from "../auth/session";
+import { sessionGate } from "../middleware/session-gate";
 import { verifyTurnstile } from "../modules/turnstile";
 
 const credentialsSchema = z.object({
@@ -124,15 +125,8 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
     return c.json({ ok: true });
   })
   // G5: セッション cookie（D1 真実源）を提示して短命 JWT を再発行する
-  .post("/token", zValidator("json", z.object({ tenantId: z.uuid() })), async (c) => {
-    const token = getCookie(c, SESSION_COOKIE);
-    const session = token === undefined ? null : await lookupSession(c.env.DB, token, new Date());
-    if (session === null) {
-      return c.json({ error: "unauthenticated" }, 401);
-    }
-    if (await isBlocked(c.env.BLOCKLIST, session.userId)) {
-      return c.json({ error: "blocked" }, 403);
-    }
+  .post("/token", zValidator("json", z.object({ tenantId: z.uuid() })), sessionGate, async (c) => {
+    const session = c.get("session");
     const { tenantId } = c.req.valid("json");
     const membership = (
       await drizzle(c.env.DB)
@@ -155,16 +149,9 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
     return c.json({ token: jwt, expiresIn: TOKEN_TTL });
   })
   // Phase 6a: 管理画面のテナント選択（slug→tenantId の解決元）。セッション cookie で認証し、
-  // membership を tenants に join して返す。/auth/token と同じく blocked ユーザーは 403。
-  .get("/tenants", async (c) => {
-    const token = getCookie(c, SESSION_COOKIE);
-    const session = token === undefined ? null : await lookupSession(c.env.DB, token, new Date());
-    if (session === null) {
-      return c.json({ error: "unauthenticated" }, 401);
-    }
-    if (await isBlocked(c.env.BLOCKLIST, session.userId)) {
-      return c.json({ error: "blocked" }, 403);
-    }
+  // membership を tenants に join して返す。blocked ユーザーは 403(sessionGate)。
+  .get("/tenants", sessionGate, async (c) => {
+    const session = c.get("session");
     const rows = await drizzle(c.env.DB)
       .select({ id: tenants.id, slug: tenants.slug, name: tenants.name, role: memberships.role })
       .from(memberships)
@@ -172,6 +159,12 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
       .where(eq(memberships.userId, session.userId))
       .orderBy(asc(tenants.slug));
     return c.json({ tenants: rows });
+  })
+  // 案 B 3 章 / 案 A: 管理画面が「自分」を判定し、アカウントメニューにメールアドレスを出すための
+  // 自分の情報。ログイン応答の userId は再読み込みで失われるため、セッション cookie から引き直す。
+  .get("/me", sessionGate, (c) => {
+    const { userId, email } = c.get("session");
+    return c.json({ userId, email });
   })
   // §6: フロントエンドが signup/login フォームに Turnstile ウィジェットを出すかどうかの判定材料。
   // secret key と違い site key は公開情報(未設定なら Turnstile 無効の合図として null)。

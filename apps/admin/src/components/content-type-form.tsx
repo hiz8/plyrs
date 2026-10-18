@@ -7,6 +7,7 @@ import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import type { ContentTypeSummary } from "../lib/admin-api";
 import {
   buildDefinition,
+  displayOf,
   emptyFieldDraft,
   toFieldDraft,
   type FieldDraft,
@@ -95,6 +96,7 @@ export function ContentTypeForm({ existing, onSubmit }: ContentTypeFormProps) {
       // version はサーバー管理(registerContentTypeCore が prev.version + 1 を採る)。
       // スキーマが positive int を要求するため現行値(新規は 1)を運ぶだけ。
       version: existing?.version ?? 1,
+      display: displayOf(existing),
     });
     if (!result.ok) {
       setErrors(result.errors);

@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
-import type { WorkflowStatus } from "@plyrs/metamodel";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { ConnectionBanner } from "../../../../../components/connection-banner";
+import { WORKFLOW_STATUS_LABELS } from "../../../../../lib/labels";
 import { labelForRecord } from "../../../../../lib/record-label";
 import {
   useSyncHasSynced,
@@ -27,14 +27,7 @@ const styles = stylex.create({
   link: { color: colors.accent },
 });
 
-export const STATUS_LABELS: Record<WorkflowStatus, string> = {
-  draft: "下書き",
-  in_review: "レビュー中",
-  ready: "公開準備完了",
-  archived: "アーカイブ",
-};
-
-export const Route = createFileRoute("/t/$tenantSlug/records/$typeKey/")({
+export const Route = createFileRoute("/t/$tenantSlug/content/$typeKey/")({
   component: RecordListPage,
 });
 
@@ -63,7 +56,7 @@ function RecordListPage() {
       <h1 {...stylex.props(styles.title)}>{contentType.name}</h1>
       <div {...stylex.props(styles.toolbar)}>
         <Link
-          to="/t/$tenantSlug/records/$typeKey/new"
+          to="/t/$tenantSlug/content/$typeKey/new"
           params={{ tenantSlug, typeKey }}
           {...stylex.props(styles.link)}
         >
@@ -87,14 +80,14 @@ function RecordListPage() {
               <tr key={record.id}>
                 <td {...stylex.props(styles.cell)}>
                   <Link
-                    to="/t/$tenantSlug/records/$typeKey/$recordId"
+                    to="/t/$tenantSlug/content/$typeKey/$recordId"
                     params={{ tenantSlug, typeKey, recordId: record.id }}
                     {...stylex.props(styles.link)}
                   >
                     {labelForRecord(types, record)}
                   </Link>
                 </td>
-                <td {...stylex.props(styles.cell)}>{STATUS_LABELS[record.status]}</td>
+                <td {...stylex.props(styles.cell)}>{WORKFLOW_STATUS_LABELS[record.status]}</td>
                 <td {...stylex.props(styles.cell)}>{record.updatedAt}</td>
                 <td {...stylex.props(styles.cell)}>{record.version}</td>
               </tr>

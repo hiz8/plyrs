@@ -7,6 +7,8 @@ export { Select, type SelectProps } from "./select";
 export { TextArea, type TextAreaProps } from "./text-area";
 export {
   createSlotRegistry,
+  type HomeWidgetContribution,
+  type NavGroup,
   type NavItemContribution,
   type RecordEditorPanelContribution,
   type RecordEditorToolbarContribution,

@@ -19,7 +19,7 @@ const styles = stylex.create({
   muted: { color: colors.textMuted },
 });
 
-export const Route = createFileRoute("/t/$tenantSlug/records/$typeKey/new")({
+export const Route = createFileRoute("/t/$tenantSlug/content/$typeKey/new")({
   component: NewRecordPage,
 });
 
@@ -73,7 +73,7 @@ function NewRecordPage() {
           const tx = collection.insert(record);
           await tx.isPersisted.promise;
           await navigate({
-            to: "/t/$tenantSlug/records/$typeKey",
+            to: "/t/$tenantSlug/content/$typeKey",
             params: { tenantSlug, typeKey },
           });
         }}

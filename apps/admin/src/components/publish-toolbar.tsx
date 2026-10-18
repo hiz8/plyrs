@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
-import { publicationQueryOptions } from "../lib/queries";
+import { useCan } from "../lib/use-can";
+import { publicationQueryOptions, publicationsQueryKey } from "../lib/queries";
 
 const styles = stylex.create({
   root: { display: "flex", alignItems: "center", gap: spacing.sm },
@@ -20,7 +21,7 @@ export function PublishToolbar({ recordId }: { typeKey: string; recordId: string
   const publication = useQuery(publicationQueryOptions(adminApi, tenant.id, recordId));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const canPublish = tenant.role !== "viewer";
+  const canPublish = useCan("record:publish");
 
   async function run(action: "publish" | "unpublish") {
     setError(null);
@@ -31,9 +32,12 @@ export function PublishToolbar({ recordId }: { typeKey: string; recordId: string
       } else {
         await adminApi.unpublishRecord(tenant.id, recordId);
       }
-      await queryClient.invalidateQueries({
-        queryKey: publicationQueryOptions(adminApi, tenant.id, recordId).queryKey,
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: publicationQueryOptions(adminApi, tenant.id, recordId).queryKey,
+        }),
+        queryClient.invalidateQueries({ queryKey: publicationsQueryKey(tenant.id) }),
+      ]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
