@@ -225,6 +225,9 @@ describe("auth routes", () => {
     const res = await app.request("/auth/me", { headers: { cookie } }, testEnv);
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({ error: "unauthenticated" });
+    expect(res.headers.get("set-cookie")).toMatch(
+      new RegExp(`^${SESSION_COOKIE}=;.*Max-Age=0`, "u"),
+    );
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining(ghostId));
     // 失効済みなので以後は users 行の有無を見る前に弾かれる(ログは 1 回だけ)
     const again = await app.request("/auth/tenants", { headers: { cookie } }, testEnv);

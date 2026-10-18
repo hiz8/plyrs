@@ -1,4 +1,4 @@
-import { getCookie } from "hono/cookie";
+import { deleteCookie, getCookie } from "hono/cookie";
 import { createMiddleware } from "hono/factory";
 import { isBlocked } from "../auth/blocklist";
 import { lookupSessionUser, revokeSession, SESSION_COOKIE } from "../auth/session";
@@ -18,10 +18,12 @@ export const sessionGate = createMiddleware<{
     return c.json({ error: "unauthenticated" }, 401);
   }
   if (session.email === null) {
-    // users 行が無いのにセッションだけ残っている異常状態。ログに残し、セッションを失効させて
-    // 以後の照会を止める(ログインし直しても invalid_credentials になるだけで原因が追えないため)
+    // users 行が無いのにセッションだけ残っている異常状態。ログインし直しても invalid_credentials に
+    // なるだけで原因が追えないためログに残し、セッションを失効させる
     console.error(`session without user row: userId=${session.userId}`);
     await revokeSession(c.env.DB, token, now);
+    // ブラウザが失効済みトークンを送り続けて毎回 D1 を引かないよう、/auth/logout と同じ属性で消す
+    deleteCookie(c, SESSION_COOKIE, { path: "/", secure: true });
     return c.json({ error: "unauthenticated" }, 401);
   }
   if (await isBlocked(c.env.BLOCKLIST, session.userId)) {
