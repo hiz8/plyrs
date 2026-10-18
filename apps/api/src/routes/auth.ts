@@ -12,7 +12,13 @@ import { signTenantToken, TOKEN_TTL } from "../auth/jwt";
 import { hashPassword, verifyPassword } from "../auth/password";
 import { isRole } from "../auth/permissions";
 import { checkAuthRateLimit } from "../auth/rate-limit";
-import { createSession, lookupSession, revokeSession, SESSION_COOKIE } from "../auth/session";
+import {
+  createSession,
+  revokeOtherSessionsStatement,
+  revokeSession,
+  SESSION_COOKIE,
+} from "../auth/session";
+import { sessionGate } from "../middleware/session-gate";
 import { verifyTurnstile } from "../modules/turnstile";
 
 const credentialsSchema = z.object({
@@ -123,16 +129,62 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
     deleteCookie(c, SESSION_COOKIE, { path: "/", secure: true });
     return c.json({ ok: true });
   })
+  // 案 G 6.2: パスワードの変更。現在のパスワードを確かめ、操作した端末以外のセッションを失効させる。
+  // 現在のパスワードの総当たりを防ぐため、ログインと同じレート制限をかける
+  .post(
+    "/password",
+    zValidator(
+      "json",
+      z.object({
+        currentPassword: z.string().min(1).max(128),
+        newPassword: credentialsSchema.shape.password,
+      }),
+    ),
+    sessionGate,
+    async (c) => {
+      const session = c.get("session");
+      const now = new Date();
+      const decision = await checkAuthRateLimit(c.env, c.req.header("cf-connecting-ip"));
+      if (decision !== "ok") {
+        return decision === "limited"
+          ? c.json({ error: "rate_limited" }, 429)
+          : c.json({ error: "rate_limiter_unavailable" }, 503);
+      }
+      const db = drizzle(c.env.DB);
+      const row = (
+        await db
+          .select({ passwordHash: users.passwordHash })
+          .from(users)
+          .where(eq(users.id, session.userId))
+          .limit(1)
+      )[0];
+      const { currentPassword, newPassword } = c.req.valid("json");
+      // gate 通過後に users 行が消えた場合の保険
+      if (row === undefined) {
+        return c.json({ error: "unauthenticated" }, 401);
+      }
+      // 401 は管理画面がログイン切れとして扱うため、パスワードの誤りは 403 で返す
+      if (!(await verifyPassword(currentPassword, row.passwordHash))) {
+        return c.json({ error: "wrong_password" }, 403);
+      }
+      // 同じ値で「変更」すると、何も変わらないのにほかの端末だけがログアウトされて戸惑わせる
+      if (newPassword === currentPassword) {
+        return c.json({ error: "same_password" }, 400);
+      }
+      // パスワードの更新とほかのセッションの失効は 1 バッチ(片方だけ成功して締め出しが漏れない)
+      const [, revoked] = await db.batch([
+        db
+          .update(users)
+          .set({ passwordHash: await hashPassword(newPassword) })
+          .where(eq(users.id, session.userId)),
+        revokeOtherSessionsStatement(db, session.userId, session.sessionId, now),
+      ]);
+      return c.json({ ok: true, revokedSessions: revoked.length });
+    },
+  )
   // G5: セッション cookie（D1 真実源）を提示して短命 JWT を再発行する
-  .post("/token", zValidator("json", z.object({ tenantId: z.uuid() })), async (c) => {
-    const token = getCookie(c, SESSION_COOKIE);
-    const session = token === undefined ? null : await lookupSession(c.env.DB, token, new Date());
-    if (session === null) {
-      return c.json({ error: "unauthenticated" }, 401);
-    }
-    if (await isBlocked(c.env.BLOCKLIST, session.userId)) {
-      return c.json({ error: "blocked" }, 403);
-    }
+  .post("/token", zValidator("json", z.object({ tenantId: z.uuid() })), sessionGate, async (c) => {
+    const session = c.get("session");
     const { tenantId } = c.req.valid("json");
     const membership = (
       await drizzle(c.env.DB)
@@ -155,16 +207,9 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
     return c.json({ token: jwt, expiresIn: TOKEN_TTL });
   })
   // Phase 6a: 管理画面のテナント選択（slug→tenantId の解決元）。セッション cookie で認証し、
-  // membership を tenants に join して返す。/auth/token と同じく blocked ユーザーは 403。
-  .get("/tenants", async (c) => {
-    const token = getCookie(c, SESSION_COOKIE);
-    const session = token === undefined ? null : await lookupSession(c.env.DB, token, new Date());
-    if (session === null) {
-      return c.json({ error: "unauthenticated" }, 401);
-    }
-    if (await isBlocked(c.env.BLOCKLIST, session.userId)) {
-      return c.json({ error: "blocked" }, 403);
-    }
+  // membership を tenants に join して返す。blocked ユーザーは 403(sessionGate)。
+  .get("/tenants", sessionGate, async (c) => {
+    const session = c.get("session");
     const rows = await drizzle(c.env.DB)
       .select({ id: tenants.id, slug: tenants.slug, name: tenants.name, role: memberships.role })
       .from(memberships)
@@ -172,6 +217,12 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
       .where(eq(memberships.userId, session.userId))
       .orderBy(asc(tenants.slug));
     return c.json({ tenants: rows });
+  })
+  // 案 B 3 章 / 案 A: 管理画面が「自分」を判定し、アカウントメニューにメールアドレスを出すための
+  // 自分の情報。ログイン応答の userId は再読み込みで失われるため、セッション cookie から引き直す。
+  .get("/me", sessionGate, (c) => {
+    const { userId, email } = c.get("session");
+    return c.json({ userId, email });
   })
   // §6: フロントエンドが signup/login フォームに Turnstile ウィジェットを出すかどうかの判定材料。
   // secret key と違い site key は公開情報(未設定なら Turnstile 無効の合図として null)。

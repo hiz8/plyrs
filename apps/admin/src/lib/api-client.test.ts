@@ -46,6 +46,24 @@ describe("api client (same-origin 相対パス・fetch 注入)", () => {
     });
   });
 
+  it("posts the current and new passwords to /auth/password", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, { ok: true, revokedSessions: 2 }));
+    const api = createApiClient(fetchImpl);
+    expect(await api.changePassword("old-password!", "new-password!!")).toStrictEqual({
+      ok: true,
+      revokedSessions: 2,
+    });
+    const [path, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe("/auth/password");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toStrictEqual({
+      currentPassword: "old-password!",
+      newPassword: "new-password!!",
+    });
+  });
+
   it("fetches the turnstile site key from GET /auth/turnstile-config", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { siteKey: "site-xyz" }));
     const api = createApiClient(fetchImpl);
@@ -59,6 +77,14 @@ describe("api client (same-origin 相対パス・fetch 注入)", () => {
     const api = createApiClient(fetchImpl);
     expect(await api.listTenants()).toStrictEqual(tenants);
     expect(fetchImpl.mock.calls[0]?.[0]).toBe("/auth/tenants");
+  });
+
+  it("getMe returns the signed-in user from /auth/me", async () => {
+    const me = { userId: "0190a1b2-0000-7000-8000-000000000001", email: "me@example.com" };
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, me));
+    const api = createApiClient(fetchImpl);
+    expect(await api.getMe()).toStrictEqual(me);
+    expect(fetchImpl.mock.calls[0]?.[0]).toBe("/auth/me");
   });
 
   it("throws ApiError carrying the server error code", async () => {

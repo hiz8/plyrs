@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
+import { useCan } from "../lib/use-can";
 import { publicationQueryOptions, publicationsQueryKey } from "../lib/queries";
 
 const styles = stylex.create({
@@ -20,7 +21,7 @@ export function PublishToolbar({ recordId }: { typeKey: string; recordId: string
   const publication = useQuery(publicationQueryOptions(adminApi, tenant.id, recordId));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const canPublish = tenant.role !== "viewer";
+  const canPublish = useCan("record:publish");
 
   async function run(action: "publish" | "unpublish") {
     setError(null);

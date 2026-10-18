@@ -9,6 +9,12 @@ export interface TenantSummary {
   role: string;
 }
 
+// 案 B 3 章: ログイン中の利用者(ホームの「自分」の判定、アカウントメニューのメールアドレス)
+export interface Me {
+  userId: string;
+  email: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -77,9 +83,23 @@ export function createApiClient(baseFetch: typeof fetch = (...args) => fetch(...
         body: "{}",
       });
     },
+    // 案 G 6.2: 成功すると、この端末以外のセッションはすべて失効する
+    changePassword(
+      currentPassword: string,
+      newPassword: string,
+    ): Promise<{ ok: true; revokedSessions: number }> {
+      return requestJson("/auth/password", {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+    },
     // §6: siteKey が null なら Turnstile 無効(フロントは従来 UI のまま何もしない)
     turnstileConfig(): Promise<{ siteKey: string | null }> {
       return requestJson("/auth/turnstile-config");
+    },
+    getMe(): Promise<Me> {
+      return requestJson("/auth/me");
     },
     async listTenants(): Promise<TenantSummary[]> {
       const { tenants } = await requestJson<{ tenants: TenantSummary[] }>("/auth/tenants");

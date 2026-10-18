@@ -3,7 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
-import { modulesQueryOptions } from "../../../../lib/queries";
+import { modulesQueryOptions } from "../../../../../lib/queries";
 
 const styles = stylex.create({
   title: { fontSize: typography.sizeXl, marginTop: 0 },
@@ -20,7 +20,7 @@ const styles = stylex.create({
   error: { color: colors.danger, fontSize: typography.sizeMd },
 });
 
-export const Route = createFileRoute("/t/$tenantSlug/modules/")({
+export const Route = createFileRoute("/t/$tenantSlug/settings/modules/")({
   component: ModulesPage,
 });
 

@@ -12,6 +12,7 @@ import {
   asAssetUsage,
   asContentTypeRow,
   asContentTypeRows,
+  asDeleteContentTypeResult,
   asDeleteResult,
   asEnableModuleResult,
   asModuleSummaries,
@@ -25,6 +26,7 @@ import {
   asUnpublishResult,
   asWriteResult,
 } from "../rpc-unwrap";
+import { tenantSettingsRoutes } from "./tenant-settings";
 import { AUTH_HEADER, extractTokenProtocol } from "../sync/session";
 
 const ERROR_STATUS: Record<string, ContentfulStatusCode> = {
@@ -36,6 +38,7 @@ const ERROR_STATUS: Record<string, ContentfulStatusCode> = {
   id_mismatch: 409,
   key_mismatch: 409,
   type_conflict: 409,
+  type_not_empty: 409,
   record_deleted: 410,
   already_deleted: 410,
   not_published: 409,
@@ -116,6 +119,7 @@ export const tenantRoutes = new Hono<GateEnv>()
     return stubFor(c).fetch(forwarded);
   })
   .use("/:tenantId/*", tenantGate)
+  .route("/", tenantSettingsRoutes)
   .post("/:tenantId/assets", async (c) => {
     const filename = c.req.query("filename") ?? "";
     if (filename.length === 0 || filename.length > MAX_ASSET_FILENAME_LENGTH) {
@@ -225,6 +229,13 @@ export const tenantRoutes = new Hono<GateEnv>()
   .get("/:tenantId/content-types", async (c) => {
     const rows = asContentTypeRows(await stubFor(c).listContentTypes());
     return c.json({ contentTypes: rows });
+  })
+  // 案 E 5.4: コンテンツが 0 件のユーザー型だけを削除できる(1 件以上は 409 type_not_empty)
+  .delete("/:tenantId/content-types/:key", async (c) => {
+    const result = asDeleteContentTypeResult(
+      await stubFor(c).deleteContentType(c.req.param("key"), c.get("auth")),
+    );
+    return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
   })
   .get("/:tenantId/content-types/:key", async (c) => {
     const row = asContentTypeRow(await stubFor(c).getContentType(c.req.param("key")));

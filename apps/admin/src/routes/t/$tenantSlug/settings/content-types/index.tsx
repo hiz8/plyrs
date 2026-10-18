@@ -2,7 +2,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
-import { contentTypesQueryOptions } from "../../../../lib/queries";
+import { contentTypesQueryOptions } from "../../../../../lib/queries";
 
 const styles = stylex.create({
   title: { fontSize: typography.sizeXl, marginTop: 0 },
@@ -26,7 +26,7 @@ const styles = stylex.create({
   link: { color: colors.accent, marginRight: spacing.sm },
 });
 
-export const Route = createFileRoute("/t/$tenantSlug/content-types/")({
+export const Route = createFileRoute("/t/$tenantSlug/settings/content-types/")({
   // invalidate → 一覧へ戻る経路があるため fetchQuery(ensureQueryData は stale でも返す — §11)
   loader: ({ context }) =>
     context.queryClient.fetchQuery(contentTypesQueryOptions(context.adminApi, context.tenant.id)),
@@ -43,7 +43,7 @@ function ContentTypesPage() {
       <h1 {...stylex.props(styles.title)}>コンテンツタイプ</h1>
       <div {...stylex.props(styles.toolbar)}>
         <Link
-          to="/t/$tenantSlug/content-types/new"
+          to="/t/$tenantSlug/settings/content-types/new"
           params={{ tenantSlug }}
           {...stylex.props(styles.link)}
         >
@@ -75,7 +75,7 @@ function ContentTypesPage() {
                 <td {...stylex.props(styles.cell)}>{contentType.version}</td>
                 <td {...stylex.props(styles.cell)}>
                   <Link
-                    to="/t/$tenantSlug/records/$typeKey"
+                    to="/t/$tenantSlug/content/$typeKey"
                     params={{ tenantSlug, typeKey: contentType.key }}
                     {...stylex.props(styles.link)}
                   >
@@ -83,7 +83,7 @@ function ContentTypesPage() {
                   </Link>
                   {contentType.source === "user" && (
                     <Link
-                      to="/t/$tenantSlug/content-types/$typeKey/edit"
+                      to="/t/$tenantSlug/settings/content-types/$typeKey/edit"
                       params={{ tenantSlug, typeKey: contentType.key }}
                       {...stylex.props(styles.link)}
                     >

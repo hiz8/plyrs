@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { app } from "../src/index";
 import { blockUser } from "../src/auth/blocklist";
 import { verifyTenantToken } from "../src/auth/jwt";
-import { SESSION_COOKIE } from "../src/auth/session";
+import { createSession, lookupSession, SESSION_COOKIE } from "../src/auth/session";
 import { insertTenantWithOwner } from "./create-tenant";
 import { fakeLimiter } from "./rate-limit-helper";
 
@@ -182,6 +182,60 @@ describe("auth routes", () => {
     expect(denied.status).toBe(403);
   });
 
+  it("returns the signed-in user's id and email on /auth/me", async () => {
+    const email = `${unique("Me")}@Example.com`;
+    const signup = await app.request(
+      "/auth/signup",
+      json({ email, password: "hunter2hunter2" }),
+      testEnv,
+    );
+    const { userId } = (await signup.json()) as { userId: string };
+    const res = await app.request("/auth/me", { headers: { cookie: cookieFrom(signup) } }, testEnv);
+    expect(res.status).toBe(200);
+    // 保存時に正規化されたメールアドレスを返す(パスワードのハッシュ等は含めない)
+    expect(await res.json()).toStrictEqual({ userId, email: email.toLowerCase() });
+  });
+
+  it("rejects anonymous, logged-out and blocked users on /auth/me", async () => {
+    const anon = await app.request("/auth/me", {}, testEnv);
+    expect(anon.status).toBe(401);
+    expect(await anon.json()).toMatchObject({ error: "unauthenticated" });
+
+    const loggedOut = await signupAndLogin();
+    await app.request("/auth/logout", json({}, loggedOut.cookie), testEnv);
+    const revoked = await app.request(
+      "/auth/me",
+      { headers: { cookie: loggedOut.cookie } },
+      testEnv,
+    );
+    expect(revoked.status).toBe(401);
+
+    const { userId, cookie } = await signupAndLogin();
+    await blockUser(env.BLOCKLIST, userId);
+    const denied = await app.request("/auth/me", { headers: { cookie } }, testEnv);
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({ error: "blocked" });
+  });
+
+  it("revokes and logs a session whose user row is gone (sessionGate)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const ghostId = crypto.randomUUID();
+    const { token } = await createSession(env.DB, ghostId, new Date());
+    const cookie = `${SESSION_COOKIE}=${token}`;
+    const res = await app.request("/auth/me", { headers: { cookie } }, testEnv);
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({ error: "unauthenticated" });
+    expect(res.headers.get("set-cookie")).toMatch(
+      new RegExp(`^${SESSION_COOKIE}=;.*Max-Age=0`, "u"),
+    );
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining(ghostId));
+    // 失効済みなので以後は users 行の有無を見る前に弾かれる(ログは 1 回だけ)
+    const again = await app.request("/auth/tenants", { headers: { cookie } }, testEnv);
+    expect(again.status).toBe(401);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(await lookupSession(env.DB, token, new Date())).toBeNull();
+  });
+
   it("rejects login for a globally blocked user", async () => {
     const email = `${unique("blocked")}@example.com`;
     const signup = await app.request(
@@ -198,5 +252,120 @@ describe("auth routes", () => {
     );
     expect(denied.status).toBe(403);
     expect(await denied.json()).toMatchObject({ error: "blocked" });
+  });
+});
+
+// 案 G 6.2: パスワードの変更(T14)
+async function signupWithEmail(): Promise<{ email: string; cookie: string }> {
+  const email = `${unique("pw")}@example.com`;
+  const res = await app.request(
+    "/auth/signup",
+    json({ email, password: "hunter2hunter2" }),
+    testEnv,
+  );
+  return { email, cookie: cookieFrom(res) };
+}
+
+async function loginCookie(email: string, password: string): Promise<Response> {
+  return app.request("/auth/login", json({ email, password }), testEnv);
+}
+
+async function tenantsStatus(cookie: string): Promise<number> {
+  return (await app.request("/auth/tenants", { headers: { cookie } }, testEnv)).status;
+}
+
+describe("POST /auth/password", () => {
+  it("changes the password and revokes every other session", async () => {
+    const { email, cookie } = await signupWithEmail();
+    const other = cookieFrom(await loginCookie(email, "hunter2hunter2"));
+    expect(await tenantsStatus(other)).toBe(200);
+    const res = await app.request(
+      "/auth/password",
+      json({ currentPassword: "hunter2hunter2", newPassword: "correct horse battery" }, cookie),
+      testEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toStrictEqual({ ok: true, revokedSessions: 1 });
+    // 操作した端末は残り、他の端末はログアウトされる
+    expect(await tenantsStatus(cookie)).toBe(200);
+    expect(await tenantsStatus(other)).toBe(401);
+    expect((await loginCookie(email, "hunter2hunter2")).status).toBe(401);
+    expect((await loginCookie(email, "correct horse battery")).status).toBe(200);
+  });
+
+  it("rejects a wrong current password with 403 and keeps the old one", async () => {
+    const { email, cookie } = await signupWithEmail();
+    const res = await app.request(
+      "/auth/password",
+      json({ currentPassword: "not-my-password", newPassword: "correct horse battery" }, cookie),
+      testEnv,
+    );
+    expect(res.status).toBe(403);
+    expect(await res.json()).toStrictEqual({ error: "wrong_password" });
+    expect((await loginCookie(email, "hunter2hunter2")).status).toBe(200);
+  });
+
+  it("does not count expired sessions waiting for the purge", async () => {
+    const { cookie } = await signupWithEmail();
+    const me = (await (await app.request("/auth/me", { headers: { cookie } }, testEnv)).json()) as {
+      userId: string;
+    };
+    await env.DB.prepare(
+      "INSERT INTO sessions (id, token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
+    )
+      .bind(
+        crypto.randomUUID(),
+        `expired-${crypto.randomUUID()}`,
+        me.userId,
+        "2000-01-01T00:00:00.000Z",
+        "2000-01-01T00:00:00.000Z",
+      )
+      .run();
+    const res = await app.request(
+      "/auth/password",
+      json({ currentPassword: "hunter2hunter2", newPassword: "correct horse battery" }, cookie),
+      testEnv,
+    );
+    expect(await res.json()).toStrictEqual({ ok: true, revokedSessions: 0 });
+  });
+
+  it("rejects a new password identical to the current one", async () => {
+    const { email, cookie } = await signupWithEmail();
+    const other = cookieFrom(await loginCookie(email, "hunter2hunter2"));
+    const res = await app.request(
+      "/auth/password",
+      json({ currentPassword: "hunter2hunter2", newPassword: "hunter2hunter2" }, cookie),
+      testEnv,
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toStrictEqual({ error: "same_password" });
+    // ほかの端末はログアウトされない
+    expect(await tenantsStatus(other)).toBe(200);
+  });
+
+  it("requires a session and a new password of 12 characters or more", async () => {
+    const { cookie } = await signupWithEmail();
+    const anonymous = await app.request(
+      "/auth/password",
+      json({ currentPassword: "hunter2hunter2", newPassword: "correct horse battery" }),
+      testEnv,
+    );
+    expect(anonymous.status).toBe(401);
+    const short = await app.request(
+      "/auth/password",
+      json({ currentPassword: "hunter2hunter2", newPassword: "short" }, cookie),
+      testEnv,
+    );
+    expect(short.status).toBe(400);
+  });
+
+  it("is rate limited like login", async () => {
+    const { cookie } = await signupWithEmail();
+    const res = await app.request(
+      "/auth/password",
+      json({ currentPassword: "hunter2hunter2", newPassword: "correct horse battery" }, cookie),
+      { ...env, AUTH_LIMITER: fakeLimiter(false) },
+    );
+    expect(res.status).toBe(429);
   });
 });

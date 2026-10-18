@@ -147,7 +147,7 @@ function renderAssetsList(
 ) {
   const router = getRouter({
     context: createAppContext(stubFetch(routes), { connect: () => harness.connect }),
-    history: createMemoryHistory({ initialEntries: ["/t/blog/assets"] }),
+    history: createMemoryHistory({ initialEntries: ["/t/blog/media"] }),
   });
   render(<RouterProvider router={router} />);
   return router;
@@ -159,13 +159,13 @@ function renderNewRecord(
 ) {
   const router = getRouter({
     context: createAppContext(stubFetch(routes), { connect: () => harness.connect }),
-    history: createMemoryHistory({ initialEntries: ["/t/blog/records/article/new"] }),
+    history: createMemoryHistory({ initialEntries: ["/t/blog/content/article/new"] }),
   });
   render(<RouterProvider router={router} />);
   return router;
 }
 
-describe("アセット一覧 (/t/$tenantSlug/assets)", () => {
+describe("アセット一覧 (/t/$tenantSlug/media)", () => {
   it("lists synced assets, uploads a file, and shows the broadcast record", async () => {
     const routes = authedRoutes();
     routes["/v1/t/t1/assets"] = vi.fn(() =>

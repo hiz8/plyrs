@@ -9,7 +9,9 @@ export type Operation =
   | "record:read"
   | "record:publish"
   | "projection:rebuild"
-  | "module:manage";
+  | "module:manage"
+  | "site:manage"
+  | "member:manage";
 
 // design-spec §11.5: デフォルトロールの権限展開表はコードに焼く（アプリと共にデプロイ）。
 // モジュール宣言権限（Phase 9）は有効化時に DO の config へ書き込まれ、同じ判定面に加わる。
@@ -22,6 +24,9 @@ const ROLE_PERMISSIONS: Record<Role, readonly Operation[]> = {
     "record:publish",
     "projection:rebuild",
     "module:manage",
+    // 案 G 3・4 章: サイト名の変更とメンバーの管理は owner のみ
+    "site:manage",
+    "member:manage",
   ],
   editor: ["record:write", "record:delete", "record:read", "record:publish"],
   viewer: ["record:read"],

@@ -13,6 +13,7 @@ import {
   useSyncTypes,
   useTenantSync,
 } from "../../../../../lib/sync-context";
+import { useCan } from "../../../../../lib/use-can";
 import { useCollectionRows } from "../../../../../lib/use-collection";
 
 const styles = stylex.create({
@@ -40,7 +41,7 @@ const styles = stylex.create({
   dangerZone: { display: "flex", gap: spacing.sm, marginTop: spacing.lg },
 });
 
-export const Route = createFileRoute("/t/$tenantSlug/records/$typeKey/$recordId")({
+export const Route = createFileRoute("/t/$tenantSlug/content/$typeKey/$recordId")({
   component: RecordEditorPage,
 });
 
@@ -57,6 +58,8 @@ function RecordEditorPage() {
   const rows = useCollectionRows(collection);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // 案 H 7 章: viewer には削除を押させない(守りは同期経路のサーバー判定)
+  const canDelete = useCan("record:delete");
 
   // §12 必須①(2026-07-17 裁定): ゲートは初回同期の完了までに限る。以降の切断・再同期は
   // バナー表示のみでフォーム(未保存入力)を維持する。
@@ -87,7 +90,7 @@ function RecordEditorPage() {
         }),
         queryClient.invalidateQueries({ queryKey: publicationsQueryKey(tenant.id) }),
       ]);
-      await navigate({ to: "/t/$tenantSlug/records/$typeKey", params: { tenantSlug, typeKey } });
+      await navigate({ to: "/t/$tenantSlug/content/$typeKey", params: { tenantSlug, typeKey } });
     } catch (cause) {
       setDeleteError(syncErrorMessage(cause));
     }
@@ -131,7 +134,11 @@ function RecordEditorPage() {
                 </Button>
               </>
             ) : (
-              <Button variant="secondary" onPress={() => setConfirmingDelete(true)}>
+              <Button
+                variant="secondary"
+                isDisabled={!canDelete}
+                onPress={() => setConfirmingDelete(true)}
+              >
                 削除
               </Button>
             )}

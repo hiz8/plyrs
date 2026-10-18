@@ -197,6 +197,29 @@ describe("admin api (Bearer 付き /v1/t/:tenantId)", () => {
   });
 });
 
+describe("deleteContentType (案 E 5.4)", () => {
+  it("sends DELETE and surfaces type_not_empty as ApiError", async () => {
+    const calls: { url: string; method: string | undefined }[] = [];
+    let status = 200;
+    const fetchImpl: typeof fetch = async (input, init) => {
+      calls.push({ url: String(input), method: init?.method });
+      return status === 200
+        ? jsonResponse(200, { ok: true, key: "booking.slot" })
+        : jsonResponse(409, { ok: false, code: "type_not_empty", message: "has records" });
+    };
+    const adminApi = createAdminApi(manager(), fetchImpl);
+    await adminApi.deleteContentType("t1", "booking.slot");
+    expect(calls[0]).toStrictEqual({
+      url: "/v1/t/t1/content-types/booking.slot",
+      method: "DELETE",
+    });
+    status = 409;
+    const error = await adminApi.deleteContentType("t1", "article").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).code).toBe("type_not_empty");
+  });
+});
+
 describe("asset endpoints (Phase 8)", () => {
   it("uploadAsset posts the raw file with filename query and content-type", async () => {
     const calls: { url: string; init: RequestInit | undefined }[] = [];
@@ -245,5 +268,49 @@ describe("asset endpoints (Phase 8)", () => {
       "GET /v1/t/t1/assets/a1/usage",
       "DELETE /v1/t/t1/records/r1",
     ]);
+  });
+});
+
+describe("site settings endpoints (案 G 3・4 章)", () => {
+  it("renames the site and manages members on the expected paths", async () => {
+    const calls: string[] = [];
+    const member = { userId: "u2", email: "e@x.com", role: "editor", createdAt: "" };
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const method = init?.method ?? "GET";
+      calls.push(
+        `${method} ${String(input)} ${typeof init?.body === "string" ? init.body : ""}`.trim(),
+      );
+      if (String(input).endsWith("/site")) {
+        return jsonResponse(200, { ok: true, name: "新しい名前" });
+      }
+      if (method === "GET") {
+        return jsonResponse(200, { members: [member] });
+      }
+      if (method === "DELETE") {
+        return jsonResponse(200, { ok: true, disconnected: 0 });
+      }
+      return jsonResponse(method === "POST" ? 201 : 200, { member });
+    };
+    const api = createAdminApi(manager(), fetchImpl);
+    expect(await api.renameSite("t1", "新しい名前")).toBe("新しい名前");
+    expect(await api.listMembers("t1")).toStrictEqual([member]);
+    expect(await api.addMember("t1", "e@x.com", "editor")).toStrictEqual(member);
+    expect(await api.changeMemberRole("t1", "u2", "editor")).toStrictEqual(member);
+    await api.removeMember("t1", "u2");
+    expect(calls).toStrictEqual([
+      'PATCH /v1/t/t1/site {"name":"新しい名前"}',
+      "GET /v1/t/t1/members",
+      'POST /v1/t/t1/members {"email":"e@x.com","role":"editor"}',
+      'PATCH /v1/t/t1/members/u2 {"role":"editor"}',
+      "DELETE /v1/t/t1/members/u2",
+    ]);
+  });
+
+  it("surfaces the last-owner rejection as an ApiError", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(409, { error: "last_owner" }));
+    const api = createAdminApi(manager(), fetchImpl);
+    const error = await api.removeMember("t1", "u1").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).code).toBe("last_owner");
   });
 });

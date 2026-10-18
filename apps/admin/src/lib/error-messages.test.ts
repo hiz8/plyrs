@@ -35,6 +35,21 @@ describe("errorMessage", () => {
     );
   });
 
+  it("型の削除を拒否したコード(案 E 5.4)も文に置き換える", () => {
+    expect(errorMessage(new ApiError(409, "type_not_empty"), FALLBACK)).toBe(
+      ERROR_MESSAGES.type_not_empty,
+    );
+  });
+
+  it("パスワードの変更を拒否したコード(案 G 6.2)も文に置き換える", () => {
+    expect(errorMessage(new ApiError(403, "wrong_password"), FALLBACK)).toBe(
+      ERROR_MESSAGES.wrong_password,
+    );
+    expect(errorMessage(new ApiError(400, "same_password"), FALLBACK)).toBe(
+      ERROR_MESSAGES.same_password,
+    );
+  });
+
   it("対応表に無いコードは汎用の文にする", () => {
     expect(errorMessage(new ApiError(500, "internal_error"), FALLBACK)).toBe(FALLBACK);
     expect(errorMessage(new ApiError(502, "unknown_error"), FALLBACK)).toBe(FALLBACK);
