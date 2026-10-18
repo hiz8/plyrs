@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./tokens.stylex": "./src/tokens.stylex.ts"
+    "./tokens.stylex": "./src/tokens.stylex.ts",
+    "./semantic.stylex": "./src/semantic.stylex.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -19,6 +20,7 @@
     "@tiptap/react": "catalog:",
     "@tiptap/starter-kit": "catalog:",
     "@tiptap/suggestion": "catalog:",
+    "lucide-react": "catalog:",
     "react": "catalog:",
     "react-aria-components": "catalog:"
   },
@@ -33,6 +35,7 @@
     "jsdom": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }
