@@ -63,3 +63,4 @@ export {
   type MenuItemProps,
   type MenuProps,
 } from "./menu";
+export { SearchField, type SearchFieldProps } from "./search-field";
