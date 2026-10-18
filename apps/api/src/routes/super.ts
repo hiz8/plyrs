@@ -13,7 +13,7 @@ import {
   users,
 } from "@plyrs/db/control-plane";
 import { assetKeyBelongsToTenant } from "../assets/ownership";
-import { writeAudit } from "../audit";
+import { membershipAuditTarget, writeAudit } from "../audit";
 import { banUserEverywhere, revokeMembership } from "../auth/ban";
 import { unblockUser } from "../auth/blocklist";
 import { normalizeEmail } from "../auth/email";
@@ -121,7 +121,7 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
   // slug は不変(§14-3 の凍結 embed URL 問題があるため rename は name のみ)。
   .patch(
     "/tenants/:tenantId",
-    zValidator("json", z.object({ name: z.string().min(1).max(100) })),
+    zValidator("json", z.object({ name: z.string().trim().min(1).max(100) })),
     async (c) => {
       const tenantId = c.req.param("tenantId");
       const { name } = c.req.valid("json");
@@ -238,7 +238,7 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       actorId: c.get("superAdmin").adminId,
       action: "membership.revoke",
       targetType: "membership",
-      targetId: `${userId}:${tenantId}`,
+      targetId: membershipAuditTarget(userId, tenantId),
       detail: { disconnected },
     });
     return c.json({ ok: true, disconnected });

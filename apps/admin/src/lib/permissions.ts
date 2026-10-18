@@ -13,7 +13,9 @@ export type Operation =
   | "record:read"
   | "record:publish"
   | "projection:rebuild"
-  | "module:manage";
+  | "module:manage"
+  | "site:manage"
+  | "member:manage";
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Operation[]> = {
   owner: [
@@ -24,6 +26,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Operation[]> = {
     "record:publish",
     "projection:rebuild",
     "module:manage",
+    // 案 G 3・4 章: サイト名の変更とメンバーの管理は owner のみ
+    "site:manage",
+    "member:manage",
   ],
   editor: ["record:write", "record:delete", "record:read", "record:publish"],
   viewer: ["record:read"],

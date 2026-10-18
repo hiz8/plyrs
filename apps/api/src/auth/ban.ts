@@ -33,6 +33,16 @@ export async function revokeMembership(
   await drizzle(env.DB)
     .delete(memberships)
     .where(and(eq(memberships.userId, userId), eq(memberships.tenantId, tenantId)));
+  return cutOffMembership(env, userId, tenantId);
+}
+
+// membership 行を消したあとの即時失効(発行済みトークンのブロック + 確立済みソケットの切断)。
+// 行の削除を条件付きで行う呼び出し元(案 G 4.5 の最後の owner の保護)も同じ後始末を使う。
+export async function cutOffMembership(
+  env: Env,
+  userId: string,
+  tenantId: string,
+): Promise<{ disconnected: number }> {
   await blockMembership(env.BLOCKLIST, userId, tenantId);
   const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
   const disconnected = await stub.disconnectUser(userId);

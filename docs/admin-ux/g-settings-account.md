@@ -90,6 +90,27 @@
 - 権限は `permissions.ts` に新しい操作(例: `member:manage`)を足し、owner のみに許可する
 - 追加・ロール変更・外す操作は監査ログに記録する
 
+実装(T13、2026-10-17)。`apps/api/src/routes/tenant-settings.ts`:
+
+| API                                       | 内容                                            | 主なエラー                                         |
+| ----------------------------------------- | ----------------------------------------------- | -------------------------------------------------- |
+| `PATCH /v1/t/:tenantId/site`              | サイト名の変更(`site:manage`、前後の空白は除く) | 400(空・100 字超)                                  |
+| `GET /v1/t/:tenantId/members`             | メンバー一覧(参加日の古い順)                    | —                                                  |
+| `POST /v1/t/:tenantId/members`            | `{ email, role }` で登録済みユーザーを追加      | 404 `user_not_found` / 409 `already_member`        |
+| `PATCH /v1/t/:tenantId/members/:userId`   | `{ role }` でロールを変更                       | 404 `not_found` / 409 `last_owner`                 |
+| `DELETE /v1/t/:tenantId/members/:userId`  | 外す(ブロックリストと切断で即時に無効化)        | 404 `not_found` / 409 `last_owner`                 |
+
+- 権限は `site:manage` と `member:manage`(owner のみ)。JWT のロールは最大 15 分古いため、JWT で弾いたうえで D1 の現在のロールでも確かめる(ロールを下げられた直後の owner が操作し続けられないように)
+- 最後の owner の判定は更新・削除と同じ SQL 文の条件に入れ、2 人の owner が同時に互いを下げても 0 人にならないようにした
+- 外した直後の人を追加し直す場合は、剥奪時のブロック(最大 20 分)を解除する。残すとトークンを発行できないため
+- 監査ログの操作名は `site.rename` / `member.add` / `member.role_change` / `member.remove`。`actorId` は操作した利用者の userId
+  - 操作名は運営者の操作(`tenant.rename` / `membership.revoke` など)と重ならないため、`actorId` が利用者の userId か運営者の ID かは操作名で決まる。行に区別の列は足さない
+  - 対象がメンバーシップの行の `targetId` は、運営者の剥奪と同じ `userId:tenantId`(`membershipAuditTarget`)
+  - 外す操作は、削除が確定した時点で記録してから切断する(切断が失敗しても記録は残る)
+- 同じロールへの変更は何もせず 200 を返す(監査も残さない)
+- 更新・削除が 0 行だったときは、行がまだあれば 409 `last_owner`、消えていれば 404 `not_found` を返す(運営者の剥奪と重なった場合)
+- サイト名は、運営者の変更(`/super/v1/tenants/:tenantId`)も含めて前後の空白を除いてから検証する
+
 ## 5. 設定 › モジュール
 
 - 現在の「モジュール」画面(有効化 / 無効化の一覧)をここへ移す

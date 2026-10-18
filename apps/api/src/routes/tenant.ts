@@ -26,6 +26,7 @@ import {
   asUnpublishResult,
   asWriteResult,
 } from "../rpc-unwrap";
+import { tenantSettingsRoutes } from "./tenant-settings";
 import { AUTH_HEADER, extractTokenProtocol } from "../sync/session";
 
 const ERROR_STATUS: Record<string, ContentfulStatusCode> = {
@@ -118,6 +119,7 @@ export const tenantRoutes = new Hono<GateEnv>()
     return stubFor(c).fetch(forwarded);
   })
   .use("/:tenantId/*", tenantGate)
+  .route("/", tenantSettingsRoutes)
   .post("/:tenantId/assets", async (c) => {
     const filename = c.req.query("filename") ?? "";
     if (filename.length === 0 || filename.length > MAX_ASSET_FILENAME_LENGTH) {
