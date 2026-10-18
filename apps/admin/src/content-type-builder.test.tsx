@@ -58,6 +58,10 @@ const articleRow = {
   createdAt: "2026-07-16T00:00:00Z",
   updatedAt: "2026-07-16T00:00:00Z",
   version: 2,
+  description: null,
+  titleField: null,
+  listColumns: null,
+  menuOrder: null,
 };
 
 function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, Handler> {

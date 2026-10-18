@@ -1,7 +1,7 @@
 import { WORKFLOW_STATUSES } from "@plyrs/metamodel";
 import { describe, expect, it } from "vitest";
-import { ROLES as API_ROLES } from "../../../api/src/auth/permissions";
-import { ROLES, WORKFLOW_STATUS_LABELS, roleLabel } from "./labels";
+import { ROLE_LABELS, WORKFLOW_STATUS_LABELS, roleLabel } from "./labels";
+import { ROLES } from "./permissions";
 
 describe("labels", () => {
   it("ワークフローの全ステータスに表示名がある", () => {
@@ -10,8 +10,10 @@ describe("labels", () => {
     }
   });
 
-  it("ロールの集合は api の permissions.ts と一致する", () => {
-    expect([...ROLES]).toEqual([...API_ROLES]);
+  it("全ロールに表示名がある", () => {
+    for (const role of ROLES) {
+      expect(ROLE_LABELS[role]).toBeTruthy();
+    }
   });
 
   it("owner は「管理者」と表示し、未知のロールは値をそのまま出す", () => {
