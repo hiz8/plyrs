@@ -22,10 +22,12 @@ import {
 } from "./do/asset-usage";
 import { requireOperation, type AuthContext } from "./do/authorize";
 import {
+  deleteContentTypeCore,
   loadAllContentTypeRows,
   loadContentTypeByKey,
   registerContentTypeCore,
   type ContentTypeRow,
+  type DeleteContentTypeResult,
   type RegisterContentTypeResult,
 } from "./do/content-types";
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
@@ -175,6 +177,24 @@ export class TenantDO extends DurableObject<Env> {
     );
     if (result.ok && result.applied) {
       // G1: content_types は seq を消費しない別チャネル。変更をコミット後に全接続へ配る。
+      this.broadcastAll({
+        type: "content-types",
+        contentTypes: loadAllContentTypes(this.ctx.storage.sql),
+      });
+    }
+    return result;
+  }
+
+  // 案 E 5.4: コンテンツが 0 件のユーザー型だけを削除する
+  deleteContentType(key: string, auth: AuthContext): DeleteContentTypeResult {
+    const denial = requireOperation(auth, "type:manage");
+    if (denial !== null) {
+      return denial;
+    }
+    const result = this.ctx.storage.transactionSync(() =>
+      deleteContentTypeCore(this.ctx.storage.sql, key),
+    );
+    if (result.ok) {
       this.broadcastAll({
         type: "content-types",
         contentTypes: loadAllContentTypes(this.ctx.storage.sql),

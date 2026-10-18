@@ -102,6 +102,14 @@ export function createAdminApi(
       );
       return result.contentType;
     },
+    // 案 E 5.4: コンテンツが 0 件の型だけ削除できる(1 件以上は ApiError の type_not_empty)
+    async deleteContentType(tenantId: string, key: string): Promise<void> {
+      await requestJson<{ ok: true; key: string }>(
+        tenantId,
+        `/content-types/${encodeURIComponent(key)}`,
+        { method: "DELETE" },
+      );
+    },
     async publishRecord(tenantId: string, recordId: string): Promise<void> {
       await requestJson<{ ok: true }>(tenantId, `/records/${recordId}/publish`, {
         method: "POST",
