@@ -85,7 +85,7 @@ function TenantsPage() {
           {tenants.map((tenant) => (
             <li key={tenant.id}>
               <Link
-                to="/t/$tenantSlug/content-types"
+                to="/t/$tenantSlug/settings/content-types"
                 params={{ tenantSlug: tenant.slug }}
                 {...stylex.props(styles.item)}
               >

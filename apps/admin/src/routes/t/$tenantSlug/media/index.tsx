@@ -57,7 +57,7 @@ const styles = stylex.create({
   actions: { display: "flex", gap: spacing.sm },
 });
 
-export const Route = createFileRoute("/t/$tenantSlug/assets/")({
+export const Route = createFileRoute("/t/$tenantSlug/media/")({
   component: AssetListPage,
 });
 
@@ -240,7 +240,7 @@ function AssetListPage() {
                 <td {...stylex.props(styles.cell)}>
                   <span {...stylex.props(styles.actions)}>
                     <Link
-                      to="/t/$tenantSlug/records/$typeKey/$recordId"
+                      to="/t/$tenantSlug/content/$typeKey/$recordId"
                       params={{ tenantSlug, typeKey: ASSET_TYPE_KEY, recordId: record.id }}
                       {...stylex.props(styles.link)}
                     >

@@ -122,10 +122,10 @@ function renderAt(
   return router;
 }
 
-describe("record 一覧（/t/$tenantSlug/records/$typeKey）", () => {
+describe("record 一覧（/t/$tenantSlug/content/$typeKey）", () => {
   it("lists synced records with workflow status", async () => {
     const harness = socketHarness();
-    renderAt("/t/blog/records/article", harness);
+    renderAt("/t/blog/content/article", harness);
     await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
     await bootstrapped(harness.latest(), [article(RECORD_1, "こんにちは")]);
     expect(await screen.findByRole("cell", { name: "こんにちは" })).toBeInTheDocument();
@@ -135,7 +135,7 @@ describe("record 一覧（/t/$tenantSlug/records/$typeKey）", () => {
 
   it("shows the syncing state until the bootstrap completes", async () => {
     const harness = socketHarness();
-    renderAt("/t/blog/records/article", harness);
+    renderAt("/t/blog/content/article", harness);
     expect(await screen.findByText(/同期中/)).toBeInTheDocument();
   });
 });
@@ -143,7 +143,7 @@ describe("record 一覧（/t/$tenantSlug/records/$typeKey）", () => {
 describe("record 新規作成", () => {
   it("inserts a record through the collection and pushes it to the socket", async () => {
     const harness = socketHarness();
-    renderAt("/t/blog/records/article/new", harness);
+    renderAt("/t/blog/content/article/new", harness);
     await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
     await bootstrapped(harness.latest(), []);
 
@@ -196,7 +196,7 @@ describe("record 新規作成", () => {
 describe("record エディタ", () => {
   it("edits an existing record and pushes only the changed field", async () => {
     const harness = socketHarness();
-    renderAt(`/t/blog/records/article/${RECORD_1}`, harness);
+    renderAt(`/t/blog/content/article/${RECORD_1}`, harness);
     await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
     await bootstrapped(harness.latest(), [article(RECORD_1, "旧タイトル")]);
 
@@ -229,7 +229,7 @@ describe("record エディタ", () => {
 
   it("shows a not-found message for a missing record after sync completes", async () => {
     const harness = socketHarness();
-    renderAt(`/t/blog/records/article/${RECORD_1}`, harness);
+    renderAt(`/t/blog/content/article/${RECORD_1}`, harness);
     await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
     await bootstrapped(harness.latest(), []);
     expect(await screen.findByText(/レコードが見つかりません/)).toBeInTheDocument();
@@ -237,7 +237,7 @@ describe("record エディタ", () => {
 
   it("deletes the record after confirmation and navigates back to the list", async () => {
     const harness = socketHarness();
-    renderAt(`/t/blog/records/article/${RECORD_1}`, harness);
+    renderAt(`/t/blog/content/article/${RECORD_1}`, harness);
     await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
     await bootstrapped(harness.latest(), [article(RECORD_1, "消える記事")]);
 
@@ -275,7 +275,7 @@ describe("record エディタ", () => {
 
   it("shows the unknown-type message for a type that does not exist", async () => {
     const harness = socketHarness();
-    renderAt("/t/blog/records/ghost", harness);
+    renderAt("/t/blog/content/ghost", harness);
     await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
     await bootstrapped(harness.latest(), []);
     expect(await screen.findByText(/未知のコンテンツタイプ/)).toBeInTheDocument();
@@ -283,7 +283,7 @@ describe("record エディタ", () => {
 
   it("keeps the form mounted with unsaved input across a disconnect (§12 必須①)", async () => {
     const harness = socketHarness();
-    renderAt(`/t/blog/records/article/${RECORD_1}`, harness);
+    renderAt(`/t/blog/content/article/${RECORD_1}`, harness);
     await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
     await bootstrapped(harness.latest(), [article(RECORD_1, "旧タイトル")]);
 

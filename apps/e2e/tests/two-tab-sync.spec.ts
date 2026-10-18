@@ -19,7 +19,7 @@ import {
 // 同じ record を更新しても、開いたままの入力欄の表示値は自動では変わらない(未保存の
 // 自分の入力を他者の変更で消さないための意図的な設計に見える)。そのため「値が現れる」
 // 確認は、record-form の内部 draft を経由せず useCollectionRows を直接描画する一覧ページ
-// (/t/$tenantSlug/records/$typeKey)で行う — こちらは reload なしで WS push を反映する。
+// (/t/$tenantSlug/content/$typeKey)で行う — こちらは reload なしで WS push を反映する。
 // 編集・保存の操作自体は brief どおり編集画面で行う。
 test("two tabs stay in sync over the WS push channel", async ({ page, context }) => {
   const email = `user+${Date.now()}@example.com`;
