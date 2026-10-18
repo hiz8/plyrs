@@ -38,10 +38,11 @@ export function roleLabel(role: string): string {
   return isRole(role) ? ROLE_LABELS[role] : role;
 }
 
-// 公開状態の 3 値(design-spec §7 の version 比較。案 D 4 章)
-export type PublicationState = "published" | "changed" | "unpublished";
+// 公開状態の 3 値(design-spec §7 の version 比較。案 D 4 章)。HTTP 契約の PublicationState
+// (admin-api.ts)とは別物なので、名前を分けている
+export type PublicationStateKey = "published" | "changed" | "unpublished";
 
-export const PUBLICATION_STATE_LABELS: Record<PublicationState, string> = {
+export const PUBLICATION_STATE_LABELS: Record<PublicationStateKey, string> = {
   published: "公開中",
   changed: "未反映の変更あり",
   unpublished: "未公開",

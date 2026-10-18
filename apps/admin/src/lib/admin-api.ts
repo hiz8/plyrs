@@ -1,5 +1,6 @@
 import type { ContentTypeDefinition, FieldDefinition } from "@plyrs/metamodel";
 import { throwApiError } from "./api-client";
+import { withNetworkErrors } from "./network-error";
 import type { TokenManager } from "./token-manager";
 
 // Bearer 付きの管理 API(/v1/t/:tenantId/...)。トークンは token-manager が供給する。
@@ -42,8 +43,9 @@ const JSON_HEADERS = { "content-type": "application/json" } as const;
 
 export function createAdminApi(
   tokens: TokenManager,
-  fetchImpl: typeof fetch = (...args) => fetch(...args),
+  baseFetch: typeof fetch = (...args) => fetch(...args),
 ) {
+  const fetchImpl = withNetworkErrors(baseFetch);
   async function authedFetch(tenantId: string, path: string, init: RequestInit): Promise<Response> {
     const request = async (token: string) =>
       fetchImpl(`/v1/t/${tenantId}${path}`, {
