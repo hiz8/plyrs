@@ -1,0 +1,96 @@
+{
+  "projectId": "a9421ac6-8f6c-4abd-a07e-cf78497ede55",
+  "shape": "package",
+  "pkg": "@plyrs/ui",
+  "globalName": "PlyrsUI",
+  "buildCmd": "corepack pnpm --filter @plyrs/ui exec vite build --config ../../.design-sync/ui-build.vite.mjs && corepack pnpm --filter @plyrs/ui exec tsc -p ../../.design-sync/ui-dts.tsconfig.json && ln -sfn ../../packages/ui/node_modules .design-sync/.cache/node_modules",
+  "cssEntry": "assets/stylex.css",
+  "docsDir": "../../docs",
+  "overrides": {
+    "ModalDialog": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "ConfirmDialog": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "Menu": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "MenuItem": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "MenuSection": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "MenuSeparator": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "Tooltip": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "ToastRegion": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "Cell": {
+      "cardMode": "column"
+    },
+    "Column": {
+      "cardMode": "column"
+    },
+    "Row": {
+      "cardMode": "column"
+    },
+    "Table": {
+      "cardMode": "column"
+    },
+    "TableBody": {
+      "cardMode": "column"
+    },
+    "TableHeader": {
+      "cardMode": "column"
+    },
+    "ProgressBar": {
+      "cardMode": "column"
+    },
+    "Skeleton": {
+      "cardMode": "column"
+    },
+    "CheckboxGroup": {
+      "cardMode": "column"
+    },
+    "DropZone": {
+      "cardMode": "column"
+    },
+    "RichTextEditor": {
+      "cardMode": "column"
+    },
+    "SearchField": {
+      "cardMode": "column"
+    },
+    "TextArea": {
+      "cardMode": "column"
+    },
+    "TextField": {
+      "cardMode": "column"
+    },
+    "PageHeader": {
+      "cardMode": "column"
+    },
+    "Tabs": {
+      "cardMode": "column"
+    },
+    "Select": {
+      "cardMode": "single",
+      "primaryStory": "Selected"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

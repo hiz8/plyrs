@@ -1,0 +1,12 @@
+{
+  "extends": "../packages/ui/tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "../packages/ui/src",
+    "outDir": ".cache/ui-dist"
+  },
+  "include": ["../packages/ui/src"],
+  "exclude": ["../packages/ui/src/**/*.test.ts", "../packages/ui/src/**/*.test.tsx", "../packages/ui/src/test-utils/**"]
+}

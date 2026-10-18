@@ -17,3 +17,10 @@ apps/e2e/test-results/
 apps/e2e/playwright-report/
 # helpers/setup.ts が spec 間で super 管理者の totp secret を橋渡しするための実行時キャッシュ
 apps/e2e/.state/
+
+# design-sync(claude.ai/design への同期)の作業物
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules

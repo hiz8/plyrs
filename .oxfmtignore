@@ -13,3 +13,6 @@ docs/
 # 生成物（tanstackStart / wrangler types が再生成する。手整形しない）
 apps/admin/src/routeTree.gen.ts
 apps/admin/worker-configuration.d.ts
+
+# design-sync の同期入力(プレビュー・メモ)。整形すると採点が無効になるため対象外
+.design-sync/

@@ -1,0 +1,45 @@
+# design-sync メモ(plyrs / @plyrs/ui)
+
+## ビルド
+- packages/ui は src を直接 export しており dist が無い。StyleX はコンパイルが必須なので、同期用のビルドを `.design-sync/ui-build.vite.mjs`(Vite のライブラリビルド、StyleX + lightningcss の LightDark 除外)と `.design-sync/ui-dts.tsconfig.json`(型定義)で `.design-sync/.cache/ui-dist/` に出す。手順は config の `buildCmd`
+- 変換ツールは `--entry` から最寄りの名前付き package.json をパッケージの置き場所とみなすため、Vite のビルドが ui-dist に `package.json`(name: @plyrs/ui)を出す。`cssEntry` はそこからの相対 `assets/stylex.css`
+- 型定義の展開に @types/react が要るため、`.design-sync/.cache/node_modules` → `packages/ui/node_modules` のリンクを置く(buildCmd の最後)
+- 変換: `node .ds-sync/package-build.mjs --config .design-sync/config.json --node-modules packages/ui/node_modules --entry .design-sync/.cache/ui-dist/index.js --out ./ds-bundle`
+- pnpm は PATH に無い → `corepack pnpm`。Playwright 1.63(chromium-1243 がキャッシュ済み)を `.ds-sync` に入れて描画チェックに使う
+- グループ分けは `.design-sync/docs/<Name>.md` の frontmatter の `category` だけのスタブ(`docsDir: ../../docs`)
+
+## 再同期の手順
+1. `.ds-sync/` を作り直す(スキルの base dir から package-build.mjs / package-validate.mjs / package-capture.mjs / resync.mjs / lib / storybook をコピーし、`npm i esbuild ts-morph @types/react playwright@<repo の @playwright/test の版>`)
+2. config の `buildCmd` を実行(packages/ui を変えたときは必須)
+3. プロジェクトの `_ds_sync.json` を `.design-sync/.cache/remote-sync.json` に取得し、
+   `node .ds-sync/resync.mjs --config .design-sync/config.json --node-modules packages/ui/node_modules --entry .design-sync/.cache/ui-dist/index.js --out ./ds-bundle --remote .design-sync/.cache/remote-sync.json`
+
+## プレビューを書くときの知見
+- 描画環境に日本語フォントが無く、スクリーンショットでは日本語が豆腐になる(利用者のブラウザでは正しく出る)。採点は形・色・並びで行う
+- 描画幅が 960px 未満なので、Table の `hideOnNarrow` の列は隠れる。プレビューでは `hideOnNarrow` を付けない
+- テーマは `light-dark()` で、描画環境はライト
+- import は `@plyrs/ui`(部品)と `lucide-react`(アイコン)。部品の props は ds-bundle/components/<group>/<Name>/<Name>.d.ts が正
+- 浮く部品(ModalDialog / ConfirmDialog / Menu 系 / Tooltip / ToastRegion)は config の overrides で `cardMode: single`・`viewport: 720x480`
+
+- 開く props の無い部品は、プレビューのラッパーで描画後に開く: Menu 系は 50ms 後にトリガーの button を click、Tooltip は内側の button を focus(delay=0)。ToastRegion は createToaster() + useEffect で success / error。ModalDialog / ConfirmDialog は isOpen
+- 構成部品(MenuItem / MenuSection / MenuSeparator / TableHeader / Column / TableBody / Row / Cell)は親を含む全体で描き、その部品が主役の構成にする(Menu の複製にしない)
+- DS は body のフォント・色を指定しない。プレビューで部品の外に地の文を置くときは、外側の div に font-family(system-ui … 'Noto Sans JP')を当てる。admin の画面側にも同じ穴がある(styles.css に body の font 指定が無い)
+- 幅の広い部品は overrides で `cardMode: column`、Select は `single`(候補の Popover が fixed で枠外に出るため)
+- 静的に描けない状態: IconButton のツールチップ(Tooltip のカードで代表)、Select の開いた一覧、DropZone のドラッグ中、表の無効行・ホバー・フォーカス
+- Badge の tone は neutral / accent / success / warning / danger のみ(info は無い)
+
+## 同期中に見つけて直した部品の不具合
+- Select: 既定の SelectValue が選択中の候補の中身(check 用の 16px の空き枠)を複製し、トリガーの値が右にずれていた → `SelectValue` の children で selectedText だけを出す(packages/ui/src/select.tsx、テスト追加)
+
+## 部品側の気づき(未対応)
+- Table の Row に無効(isDisabled / disabledKeys)の見た目が無い
+- ConfirmDialog の isPending は実行ボタンが薄くなるだけで、処理中の表示(Spinner)は無い
+
+## Known render warns
+(無し。GRID_OVERFLOW は overrides で対応済み)
+
+## Re-sync risks
+- packages/ui に正式なビルドが無く、同期用のビルドは `.design-sync/ui-build.vite.mjs` に依存する。packages/ui の依存や StyleX の版を上げたら、まずこのビルドが通るか確かめる
+- 撮影環境に日本語フォントが無く、採点は形・色・並びで行った。文字の詰まりや改行は実ブラウザで未確認
+- Menu・Tooltip の開いた状態は setTimeout / focus の時間に依存する。撮影が速すぎると閉じた状態で撮られうる
+- グループ分けは `.design-sync/docs/` のスタブ。部品を足したらスタブも足す(無いと general に入る)
