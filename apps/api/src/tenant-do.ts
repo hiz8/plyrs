@@ -22,10 +22,12 @@ import {
 } from "./do/asset-usage";
 import { requireOperation, type AuthContext } from "./do/authorize";
 import {
+  deleteContentTypeCore,
   loadAllContentTypeRows,
   loadContentTypeByKey,
   registerContentTypeCore,
   type ContentTypeRow,
+  type DeleteContentTypeResult,
   type RegisterContentTypeResult,
 } from "./do/content-types";
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
@@ -47,6 +49,7 @@ import {
   moduleIdFromAlarmKind,
   runModuleAlarmHandler,
 } from "./modules/module-alarms";
+import { moduleNavTypes } from "./modules/manifest";
 import { moduleById, moduleCatalog } from "./modules/registry";
 import {
   countUnsentModuleEvents,
@@ -183,6 +186,24 @@ export class TenantDO extends DurableObject<Env> {
     return result;
   }
 
+  // 案 E 5.4: コンテンツが 0 件のユーザー型だけを削除する
+  deleteContentType(key: string, auth: AuthContext): DeleteContentTypeResult {
+    const denial = requireOperation(auth, "type:manage");
+    if (denial !== null) {
+      return denial;
+    }
+    const result = this.ctx.storage.transactionSync(() =>
+      deleteContentTypeCore(this.ctx.storage.sql, key),
+    );
+    if (result.ok) {
+      this.broadcastAll({
+        type: "content-types",
+        contentTypes: loadAllContentTypes(this.ctx.storage.sql),
+      });
+    }
+    return result;
+  }
+
   getContentType(key: string): ContentTypeRow | null {
     return loadContentTypeByKey(this.ctx.storage.sql, key);
   }
@@ -254,6 +275,8 @@ export class TenantDO extends DurableObject<Env> {
     return {
       moduleId,
       name: module?.manifest.name ?? moduleId,
+      description: module?.manifest.description ?? null,
+      navTypes: module === undefined ? [] : moduleNavTypes(module.manifest),
       version: module?.manifest.version ?? 0,
       enabled: row?.enabled ?? false,
       appliedVersion: row?.appliedVersion ?? 0,

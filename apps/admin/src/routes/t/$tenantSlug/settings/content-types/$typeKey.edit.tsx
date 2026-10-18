@@ -2,15 +2,15 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
 import { colors, typography } from "@plyrs/ui/tokens.stylex";
-import { ContentTypeForm } from "../../../../components/content-type-form";
-import { contentTypesQueryOptions } from "../../../../lib/queries";
+import { ContentTypeForm } from "../../../../../components/content-type-form";
+import { contentTypesQueryOptions } from "../../../../../lib/queries";
 
 const styles = stylex.create({
   title: { fontSize: typography.sizeXl, marginTop: 0 },
   muted: { color: colors.textMuted },
 });
 
-export const Route = createFileRoute("/t/$tenantSlug/content-types/$typeKey/edit")({
+export const Route = createFileRoute("/t/$tenantSlug/settings/content-types/$typeKey/edit")({
   // 編集フォームは常に最新定義から開く(invalidate 後の stale 回避 = fetchQuery。§11)
   loader: ({ context }) =>
     context.queryClient.fetchQuery(contentTypesQueryOptions(context.adminApi, context.tenant.id)),
@@ -36,7 +36,7 @@ function EditContentTypePage() {
           await queryClient.invalidateQueries({
             queryKey: contentTypesQueryOptions(adminApi, tenant.id).queryKey,
           });
-          await navigate({ to: "/t/$tenantSlug/content-types", params: { tenantSlug } });
+          await navigate({ to: "/t/$tenantSlug/settings/content-types", params: { tenantSlug } });
         }}
       />
     </>

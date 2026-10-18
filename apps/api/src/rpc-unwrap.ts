@@ -1,5 +1,9 @@
 import type { AssetUsageRow } from "./do/asset-usage";
-import type { ContentTypeRow, RegisterContentTypeResult } from "./do/content-types";
+import type {
+  ContentTypeRow,
+  DeleteContentTypeResult,
+  RegisterContentTypeResult,
+} from "./do/content-types";
 import type { DeleteRecordResult } from "./do/delete-record";
 import type { HealthReport } from "./do/health";
 import type {
@@ -37,6 +41,10 @@ export function asContentTypeRow(value: unknown): ContentTypeRow | null {
 
 export function asContentTypeRows(value: unknown): ContentTypeRow[] {
   return value as ContentTypeRow[];
+}
+
+export function asDeleteContentTypeResult(value: unknown): DeleteContentTypeResult {
+  return value as DeleteContentTypeResult;
 }
 
 export function asPublishResult(value: unknown): PublishResult {

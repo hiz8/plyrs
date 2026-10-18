@@ -197,6 +197,29 @@ describe("admin api (Bearer 付き /v1/t/:tenantId)", () => {
   });
 });
 
+describe("deleteContentType (案 E 5.4)", () => {
+  it("sends DELETE and surfaces type_not_empty as ApiError", async () => {
+    const calls: { url: string; method: string | undefined }[] = [];
+    let status = 200;
+    const fetchImpl: typeof fetch = async (input, init) => {
+      calls.push({ url: String(input), method: init?.method });
+      return status === 200
+        ? jsonResponse(200, { ok: true, key: "booking.slot" })
+        : jsonResponse(409, { ok: false, code: "type_not_empty", message: "has records" });
+    };
+    const adminApi = createAdminApi(manager(), fetchImpl);
+    await adminApi.deleteContentType("t1", "booking.slot");
+    expect(calls[0]).toStrictEqual({
+      url: "/v1/t/t1/content-types/booking.slot",
+      method: "DELETE",
+    });
+    status = 409;
+    const error = await adminApi.deleteContentType("t1", "article").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).code).toBe("type_not_empty");
+  });
+});
+
 describe("asset endpoints (Phase 8)", () => {
   it("uploadAsset posts the raw file with filename query and content-type", async () => {
     const calls: { url: string; init: RequestInit | undefined }[] = [];

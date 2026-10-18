@@ -27,7 +27,7 @@ const styles = stylex.create({
   link: { color: colors.accent },
 });
 
-export const Route = createFileRoute("/t/$tenantSlug/records/$typeKey/")({
+export const Route = createFileRoute("/t/$tenantSlug/content/$typeKey/")({
   component: RecordListPage,
 });
 
@@ -56,7 +56,7 @@ function RecordListPage() {
       <h1 {...stylex.props(styles.title)}>{contentType.name}</h1>
       <div {...stylex.props(styles.toolbar)}>
         <Link
-          to="/t/$tenantSlug/records/$typeKey/new"
+          to="/t/$tenantSlug/content/$typeKey/new"
           params={{ tenantSlug, typeKey }}
           {...stylex.props(styles.link)}
         >
@@ -80,7 +80,7 @@ function RecordListPage() {
               <tr key={record.id}>
                 <td {...stylex.props(styles.cell)}>
                   <Link
-                    to="/t/$tenantSlug/records/$typeKey/$recordId"
+                    to="/t/$tenantSlug/content/$typeKey/$recordId"
                     params={{ tenantSlug, typeKey, recordId: record.id }}
                     {...stylex.props(styles.link)}
                   >

@@ -255,6 +255,9 @@ export function moduleWriteDenial(
 export interface ModuleSummary {
   moduleId: string;
   name: string;
+  // 案 G 5 章 / 案 A 3.2(マニフェストの description と、サイドバーに出す型の key)
+  description: string | null;
+  navTypes: string[];
   version: number;
   enabled: boolean;
   appliedVersion: number;
