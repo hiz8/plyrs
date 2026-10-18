@@ -1,3 +1,4 @@
+import type { WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 
 // 案 D 3〜8 章: コンテンツの一覧の絞り込み・並べ替え・ページ送りと、URL クエリとの相互変換。
@@ -13,8 +14,11 @@ export const LIST_TABS = [
 ] as const;
 export type ListTab = (typeof LIST_TABS)[number];
 
-// ステータスの絞り込み(アーカイブはタブで扱う)
-export const LIST_STATUSES = ["draft", "in_review", "ready"] as const;
+// ステータスの絞り込み(アーカイブはタブで扱う)。ステータスが増えたら satisfies で気付ける
+export const LIST_STATUSES = ["draft", "in_review", "ready"] as const satisfies readonly Exclude<
+  WorkflowStatus,
+  "archived"
+>[];
 export type ListStatus = (typeof LIST_STATUSES)[number];
 
 export const LIST_SORTS = ["updated", "title"] as const;
@@ -57,13 +61,22 @@ function positiveInt(value: unknown): number | undefined {
   return Number.isInteger(parsed) && parsed >= 1 ? parsed : undefined;
 }
 
+// TanStack Router の既定の search パーサは値を JSON として読むため、手書きのリンクの ?q=2026 は
+// number、?q=true は boolean で届く。検索語としては文字列に戻す
+function searchText(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  return typeof value === "number" || typeof value === "boolean" ? String(value) : "";
+}
+
 // URL クエリ(TanStack Router の validateSearch に渡る値)から。手で書き換えられた不正な値は既定に戻す
 export function parseListQuery(search: Record<string, unknown>): ListQuery {
   const sort = oneOf(LIST_SORTS, search["sort"]) ?? DEFAULT_LIST_QUERY.sort;
   return {
     tab: oneOf(LIST_TABS, search["tab"]) ?? DEFAULT_LIST_QUERY.tab,
     status: oneOf(LIST_STATUSES, search["status"]),
-    q: typeof search["q"] === "string" ? search["q"] : "",
+    q: searchText(search["q"]),
     sort,
     order: oneOf(["asc", "desc"] as const, search["order"]) ?? DEFAULT_ORDER[sort],
     page: positiveInt(search["page"]) ?? 1,
@@ -73,7 +86,9 @@ export function parseListQuery(search: Record<string, unknown>): ListQuery {
 
 // URL クエリへ。既定値は省き、URL を短く保つ(ホームから絞り込み済みの一覧へリンクするときにも使う)
 export function toListSearch(query: Partial<ListQuery>): Record<string, string | number> {
-  const full = { ...DEFAULT_LIST_QUERY, ...query };
+  const sort = query.sort ?? DEFAULT_LIST_QUERY.sort;
+  // 並び順の指定が無ければ、その並べ替えの既定(タイトルは昇順)とみなす
+  const full = { ...DEFAULT_LIST_QUERY, ...query, sort, order: query.order ?? DEFAULT_ORDER[sort] };
   const search: Record<string, string | number> = {};
   if (full.tab !== DEFAULT_LIST_QUERY.tab) {
     search["tab"] = full.tab;
@@ -115,6 +130,8 @@ export function publicationStateOf(
 export interface ListRow {
   record: SyncRecord;
   title: string;
+  /** 検索用に正規化したタイトル(入力のたびに全行を正規化し直さないよう、行を作るときに一度だけ) */
+  searchKey: string;
   publication: ListPublicationState;
 }
 
@@ -126,22 +143,28 @@ export function buildListRows(
 ): ListRow[] {
   return records
     .filter((record) => record.deletedAt === null)
-    .map((record) => ({
-      record,
-      title: titleOf(record),
-      publication: publicationStateOf(record, publications.get(record.id)),
-    }));
+    .map((record) => {
+      const title = titleOf(record);
+      return {
+        record,
+        title,
+        searchKey: normalizeForSearch(title),
+        publication: publicationStateOf(record, publications.get(record.id)),
+      };
+    });
 }
 
+// 案 D 3.2: アーカイブは普段の一覧から外したものとして扱い、「アーカイブ」タブ以外には出さない
+// (どのタブも「すべて」の部分集合になる)
 function matchesTab(row: ListRow, tab: ListTab): boolean {
   const archived = row.record.status === "archived";
   switch (tab) {
     case "all":
       return !archived;
     case "published":
-      return row.publication !== "unpublished";
+      return row.publication !== "unpublished" && !archived;
     case "unpublished-changes":
-      return row.publication === "changed";
+      return row.publication === "changed" && !archived;
     case "unpublished":
       return row.publication === "unpublished" && !archived;
     case "archived":
@@ -175,7 +198,7 @@ export function filterRows(
     (row) =>
       matchesTab(row, query.tab) &&
       (query.status === undefined || row.record.status === query.status) &&
-      (needle === "" || normalizeForSearch(row.title).includes(needle)),
+      (needle === "" || row.searchKey.includes(needle)),
   );
 }
 
@@ -187,7 +210,8 @@ export function sortRows(rows: readonly ListRow[], sort: ListSort, order: SortOr
     const primary =
       sort === "title"
         ? titleCollator.compare(a.title, b.title)
-        : Date.parse(a.record.updatedAt) - Date.parse(b.record.updatedAt);
+        : // updatedAt は DO の toISOString() による固定形式の UTC なので、文字列の比較で時刻順になる
+          a.record.updatedAt.localeCompare(b.record.updatedAt);
     // 同順位は id(UUIDv7 = 作成順)で並びを固定する
     return direction * (primary !== 0 ? primary : a.record.id.localeCompare(b.record.id));
   });

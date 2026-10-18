@@ -74,7 +74,7 @@ describe("tabs and filters", () => {
   it("counts each tab", () => {
     expect(tabCounts(all)).toStrictEqual({
       all: 3,
-      published: 3,
+      published: 2,
       "unpublished-changes": 1,
       unpublished: 1,
       archived: 2,
@@ -83,7 +83,9 @@ describe("tabs and filters", () => {
 
   it("filters by tab, status and title", () => {
     expect(ids(all, { tab: "all" })).toStrictEqual(["draft", "pub", "changed"]);
-    expect(ids(all, { tab: "published" })).toStrictEqual(["pub", "changed", "archived-pub"]);
+    // アーカイブ済みは公開中でも「アーカイブ」タブにだけ出る(案 D 3.2)
+    expect(ids(all, { tab: "published" })).toStrictEqual(["pub", "changed"]);
+    expect(ids(all, { tab: "archived" })).toStrictEqual(["archived-pub", "archived"]);
     expect(ids(all, { tab: "unpublished" })).toStrictEqual(["draft"]);
     expect(ids(all, { status: "ready" })).toStrictEqual(["pub"]);
     expect(ids(all, { q: " CHAN " })).toStrictEqual(["changed"]);
@@ -173,6 +175,18 @@ describe("URL query", () => {
   it("uses each sort's own default order", () => {
     expect(parseListQuery({ sort: "title" }).order).toBe("asc");
     expect(toListSearch({ sort: "title", order: "asc" })).toStrictEqual({ sort: "title" });
+    // 並び順を省いたら、その並べ替えの既定とみなす
+    expect(toListSearch({ sort: "title" })).toStrictEqual({ sort: "title" });
+    expect(toListSearch({ sort: "title", order: "desc" })).toStrictEqual({
+      sort: "title",
+      order: "desc",
+    });
+  });
+
+  it("keeps a numeric- or boolean-looking search term from a hand-written link", () => {
+    expect(parseListQuery({ q: 2026 }).q).toBe("2026");
+    expect(parseListQuery({ q: true }).q).toBe("true");
+    expect(parseListQuery({ q: { x: 1 } }).q).toBe("");
   });
 });
 
