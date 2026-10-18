@@ -1,38 +1,40 @@
 import * as stylex from "@stylexjs/stylex";
 import {
-  FieldError,
-  Label,
   TextArea as RacTextArea,
   TextField as RacTextField,
   type InputRenderProps,
 } from "react-aria-components";
 import { stylexRenderProps } from "./compose";
-import { colors, spacing, typography } from "./tokens.stylex";
+import { FieldErrorMessage, FieldLabel, fieldClassName } from "./field";
+import { bg, border, focus, font, radius, space, status, stroke, text } from "./semantic.stylex";
 
 const styles = stylex.create({
-  field: {
-    display: "flex",
-    flexDirection: "column",
-    gap: spacing.xs,
-    fontFamily: typography.fontFamily,
-  },
-  label: { fontSize: typography.sizeSm, color: colors.textMuted },
   area: {
-    fontSize: typography.sizeMd,
-    fontFamily: typography.fontFamily,
-    paddingBlock: spacing.xs,
-    paddingInline: spacing.sm,
-    borderRadius: "6px",
-    borderWidth: "1px",
+    // 部品固有の最小高(D1 ボード 3b)
+    minHeight: "96px",
+    paddingBlock: space.sm,
+    paddingInline: space.inset,
+    fontFamily: font.family,
+    fontSize: font.body,
+    lineHeight: font.lineHeightNormal,
+    color: text.default,
+    backgroundColor: bg.canvas,
+    borderWidth: stroke.default,
     borderStyle: "solid",
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
-    color: colors.text,
+    borderColor: border.default,
+    borderRadius: radius.control,
     outline: "none",
     resize: "vertical",
   },
-  areaFocused: { borderColor: colors.focusRing },
-  error: { fontSize: typography.sizeSm, color: colors.danger },
+  hovered: { borderColor: border.hover },
+  invalid: { borderColor: status.danger },
+  focused: {
+    outlineWidth: stroke.focus,
+    outlineStyle: "solid",
+    outlineColor: focus.ring,
+    outlineOffset: stroke.focus,
+  },
+  disabled: { opacity: 0.5, backgroundColor: bg.surface, cursor: "not-allowed" },
 });
 
 export interface TextAreaProps {
@@ -63,17 +65,20 @@ export function TextArea({
       isInvalid={isInvalid ?? false}
       isRequired={isRequired ?? false}
       isDisabled={isDisabled ?? false}
-      className={stylex.props(styles.field).className ?? ""}
+      className={fieldClassName()}
     >
-      <Label className={stylex.props(styles.label).className ?? ""}>{label}</Label>
+      <FieldLabel isRequired={isRequired}>{label}</FieldLabel>
       <RacTextArea
         rows={rows ?? 6}
         className={stylexRenderProps<InputRenderProps>((state) => [
           styles.area,
-          state.isFocused && styles.areaFocused,
+          state.isHovered && styles.hovered,
+          state.isInvalid && styles.invalid,
+          state.isFocused && styles.focused,
+          state.isDisabled && styles.disabled,
         ])}
       />
-      <FieldError className={stylex.props(styles.error).className ?? ""}>{errorMessage}</FieldError>
+      <FieldErrorMessage errorMessage={errorMessage} />
     </RacTextField>
   );
 }

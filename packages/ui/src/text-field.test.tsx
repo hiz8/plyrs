@@ -48,3 +48,30 @@ describe("TextField (react-aria-components + StyleX)", () => {
     expect(await screen.findByText("コードが不正です")).toBeInTheDocument();
   });
 });
+
+describe("TextField の D1 の見た目", () => {
+  it("必須の札は見えるが、アクセシブルな名前には混ざらない", () => {
+    render(<TextField label="タイトル" isRequired />);
+    expect(screen.getByLabelText("タイトル")).toBeRequired();
+    expect(screen.getByText("必須")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("エラーはアイコン付きで出し、入力欄を invalid にする", () => {
+    render(<TextField label="タイトル" isInvalid errorMessage="タイトルを入力してください" />);
+    expect(screen.getByLabelText("タイトル")).toHaveAttribute("aria-invalid", "true");
+    const error = screen.getByText("タイトルを入力してください");
+    expect(error.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("フォーカスで枠線のクラスを変えず、リングのクラスだけを足す", async () => {
+    render(<TextField label="タイトル" />);
+    const input = screen.getByLabelText("タイトル");
+    const before = input.className.split(" ");
+    await userEvent.tab();
+    expect(input).toHaveFocus();
+    const after = input.className.split(" ");
+    // 足されるだけで、元のクラス(枠線色を含む)は 1 つも消えない
+    expect(before.every((name) => after.includes(name))).toBe(true);
+    expect(after.length).toBeGreaterThan(before.length);
+  });
+});

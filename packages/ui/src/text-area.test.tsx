@@ -24,4 +24,9 @@ describe("TextArea", () => {
     );
     expect(screen.getByText("JSON として解釈できません")).toBeInTheDocument();
   });
+
+  it("必須の札はアクセシブルな名前に混ざらない", () => {
+    render(<TextArea label="概要" value="" onChange={() => {}} isRequired />);
+    expect(screen.getByLabelText("概要")).toBeRequired();
+  });
 });
