@@ -5,6 +5,8 @@ import { getRouteApi } from "@tanstack/react-router";
 import { WORKFLOW_STATUSES, type WorkflowStatus } from "@plyrs/metamodel";
 import { Button, Select } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
+import { WORKFLOW_STATUS_LABELS } from "../lib/labels";
+import { useCan } from "../lib/use-can";
 import { publicationQueryOptions } from "../lib/queries";
 import { useTenantSync } from "../lib/sync-context";
 import { useCollectionRows } from "../lib/use-collection";
@@ -27,13 +29,6 @@ const styles = stylex.create({
   error: { color: colors.danger, fontSize: typography.sizeSm },
 });
 
-const STATUS_LABELS: Record<WorkflowStatus, string> = {
-  draft: "下書き",
-  in_review: "レビュー中",
-  ready: "公開準備完了",
-  archived: "アーカイブ",
-};
-
 const tenantRoute = getRouteApi("/t/$tenantSlug");
 
 function isWorkflowStatus(value: string): value is WorkflowStatus {
@@ -51,7 +46,7 @@ export function StatusControl({ typeKey, recordId }: { typeKey: string; recordId
   const publication = useQuery(publicationQueryOptions(adminApi, tenant.id, recordId));
   const [pendingArchive, setPendingArchive] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const canWrite = tenant.role !== "viewer";
+  const canWrite = useCan("record:write");
   // §7 の archive 警告は公開状態が既知であることが前提 — 解決まで操作を保留(通常ミリ秒)
   const publicationKnown = publication.data !== undefined;
 
@@ -87,7 +82,10 @@ export function StatusControl({ typeKey, recordId }: { typeKey: string; recordId
     <div {...stylex.props(styles.root)}>
       <Select
         label="ステータス"
-        items={WORKFLOW_STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status] }))}
+        items={WORKFLOW_STATUSES.map((status) => ({
+          value: status,
+          label: WORKFLOW_STATUS_LABELS[status],
+        }))}
         selectedValue={record.status}
         onChange={onSelect}
         isDisabled={!canWrite || !publicationKnown}

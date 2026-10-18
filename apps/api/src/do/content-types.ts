@@ -16,6 +16,11 @@ export interface ContentTypeRow {
   createdAt: string;
   updatedAt: string;
   version: number;
+  // 案 E 2.2: 表示用の任意項目(null は未指定)
+  description: string | null;
+  titleField: string | null;
+  listColumns: string[] | null;
+  menuOrder: number | null;
 }
 
 export type RegisterContentTypeResult =
@@ -36,6 +41,10 @@ interface RawContentTypeRow extends Record<string, SqlStorageValue> {
   created_at: string;
   updated_at: string;
   version: number;
+  description: string | null;
+  title_field: string | null;
+  list_columns: string | null;
+  menu_order: number | null;
 }
 
 export function issuesToMessage(issues: z.core.$ZodIssue[]): string {
@@ -53,6 +62,10 @@ function rowToContentTypeRow(row: RawContentTypeRow): ContentTypeRow {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     version: row.version,
+    description: row.description,
+    titleField: row.title_field,
+    listColumns: row.list_columns === null ? null : (JSON.parse(row.list_columns) as string[]),
+    menuOrder: row.menu_order,
   };
 }
 
@@ -82,8 +95,30 @@ export function rowToDefinition(row: ContentTypeRow): ContentTypeDefinition {
     source: row.source,
     pluginId: row.pluginId ?? undefined,
     version: row.version,
+    // 未指定の項目はキーごと省く(strictObject の再検証と、定義同士の比較を素直にするため)
+    ...(row.description === null ? {} : { description: row.description }),
+    ...(row.titleField === null ? {} : { titleField: row.titleField }),
+    ...(row.listColumns === null ? {} : { listColumns: row.listColumns }),
+    ...(row.menuOrder === null ? {} : { menuOrder: row.menuOrder }),
   };
 }
+
+// 表示用の任意項目を DB の列の値へ(未指定は NULL)
+function displayColumns(def: ContentTypeDefinition) {
+  return {
+    description: def.description ?? null,
+    titleField: def.titleField ?? null,
+    listColumns: def.listColumns ?? null,
+    menuOrder: def.menuOrder ?? null,
+  };
+}
+
+// 利用者が管理できない型(システム型・モジュールの型)への登録・削除を断る文言。
+// 登録と削除で文言をずらさないため 1 か所にまとめる
+const MANAGED_TYPE_DENIALS = {
+  system: "system content types are managed by the platform",
+  plugin: "plugin content types are managed by modules",
+} as const;
 
 export function registerContentTypeCore(
   sql: SqlStorage,
@@ -101,20 +136,12 @@ export function registerContentTypeCore(
   // 登録・変更を許すと、r2_key 等のシステム管理フィールド定義を挿げ替えて配信を壊せてしまう
   // (フィールド値の防御 = assetGuardHook とは別レイヤーの、型定義そのものの防御)。
   if (options.allowSystem !== true && (def.source === "system" || prev?.source === "system")) {
-    return {
-      ok: false,
-      code: "forbidden",
-      message: "system content types are managed by the platform",
-    };
+    return { ok: false, code: "forbidden", message: MANAGED_TYPE_DENIALS.system };
   }
   // Phase 9: プラグイン名前空間はモジュールシステム専有(§4.1)。クライアント経由の登録を
   // 許すと、モジュール有効化時の固定 ID と衝突して enable が type_conflict で恒久失敗する。
   if (options.allowPlugin !== true && (def.source === "plugin" || prev?.source === "plugin")) {
-    return {
-      ok: false,
-      code: "forbidden",
-      message: "plugin content types are managed by modules",
-    };
+    return { ok: false, code: "forbidden", message: MANAGED_TYPE_DENIALS.plugin };
   }
   if (prev !== null && prev.id !== def.id) {
     return {
@@ -137,21 +164,27 @@ export function registerContentTypeCore(
   // 同じく、比較は zod 正規化後の値同士で行う(parsed.data は正規化済み・DB の prev.fields も
   // 保存時に正規化済み)。冪等マニフェスト再配信(Phase 9)が「再適用で version が動かない」
   // ことに依存する。
+  const display = displayColumns(def);
   if (
     prev !== null &&
     prev.name === def.name &&
     prev.source === def.source &&
     prev.pluginId === (def.pluginId ?? null) &&
-    JSON.stringify(prev.fields) === JSON.stringify(def.fields)
+    JSON.stringify(prev.fields) === JSON.stringify(def.fields) &&
+    prev.description === display.description &&
+    prev.titleField === display.titleField &&
+    JSON.stringify(prev.listColumns) === JSON.stringify(display.listColumns) &&
+    prev.menuOrder === display.menuOrder
   ) {
     return { ok: true, contentType: prev, applied: false };
   }
   // version はサーバー管理（入力の version は無視する）
   const version = prev === null ? 1 : prev.version + 1;
   const fieldsJson = JSON.stringify(def.fields);
+  const listColumnsJson = display.listColumns === null ? null : JSON.stringify(display.listColumns);
   if (prev === null) {
     sql.exec(
-      "INSERT INTO content_types (id, key, name, fields, source, plugin_id, created_at, updated_at, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO content_types (id, key, name, fields, source, plugin_id, created_at, updated_at, version, description, title_field, list_columns, menu_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       def.id,
       def.key,
       def.name,
@@ -161,16 +194,24 @@ export function registerContentTypeCore(
       now,
       now,
       version,
+      display.description,
+      display.titleField,
+      listColumnsJson,
+      display.menuOrder,
     );
   } else {
     sql.exec(
-      "UPDATE content_types SET name = ?, fields = ?, source = ?, plugin_id = ?, updated_at = ?, version = ? WHERE id = ?",
+      "UPDATE content_types SET name = ?, fields = ?, source = ?, plugin_id = ?, updated_at = ?, version = ?, description = ?, title_field = ?, list_columns = ?, menu_order = ? WHERE id = ?",
       def.name,
       fieldsJson,
       def.source,
       def.pluginId ?? null,
       now,
       version,
+      display.description,
+      display.titleField,
+      listColumnsJson,
+      display.menuOrder,
       def.id,
     );
   }
@@ -187,7 +228,42 @@ export function registerContentTypeCore(
       createdAt: prev?.createdAt ?? now,
       updatedAt: now,
       version,
+      ...display,
     },
     applied: true,
   };
+}
+
+export type DeleteContentTypeResult =
+  | { ok: true; key: string }
+  | { ok: false; code: "not_found" | "forbidden" | "type_not_empty"; message: string };
+
+// 案 E 5.4: コンテンツが 0 件の型だけを削除できる(コンテンツごと消す操作は設けない)。
+// 削除済みのコンテンツ(トゥームストーン)は同期の削除伝搬に要るため残し、件数にも数えない。
+// 公開版は削除時に cascadeUnpublish で消えるが、念のため残っていれば拒否する。
+// 他の型の relation が allowedTypes でこの key を指していても、関係はソフト参照のため妨げない。
+export function deleteContentTypeCore(sql: SqlStorage, key: string): DeleteContentTypeResult {
+  const prev = loadContentTypeByKey(sql, key);
+  if (prev === null) {
+    return { ok: false, code: "not_found", message: `content type not found: ${key}` };
+  }
+  if (prev.source !== "user") {
+    return { ok: false, code: "forbidden", message: MANAGED_TYPE_DENIALS[prev.source] };
+  }
+  // 件数は要らないので存在判定にとどめる(コンテンツが残っていれば公開版は見に行かない)
+  const exists = (query: string) => sql.exec(query, key).toArray().length > 0;
+  if (
+    exists("SELECT 1 FROM records WHERE type = ? AND deleted_at IS NULL LIMIT 1") ||
+    exists("SELECT 1 FROM published_snapshots WHERE type = ? LIMIT 1")
+  ) {
+    return {
+      ok: false,
+      code: "type_not_empty",
+      message: `content type '${key}' still has records`,
+    };
+  }
+  // 型ごとに作った生成列とインデックスを片付けてから行を消す
+  applyIndexDdl(sql, key, prev.fields, []);
+  sql.exec("DELETE FROM content_types WHERE id = ?", prev.id);
+  return { ok: true, key };
 }

@@ -1,10 +1,12 @@
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, type ComponentType, type ReactNode } from "react";
-import type { SyncStatus } from "@plyrs/sync-client";
 import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { ApiError } from "../../../lib/api-client";
+import { resetClientSession } from "../../../lib/client-session";
+import { SYNC_STATUS_LABELS } from "../../../lib/labels";
+import { legacyPathname } from "../../../lib/legacy-redirect";
 import { tenantsQueryOptions } from "../../../lib/queries";
 import { TenantSyncProvider, useSyncStatus } from "../../../lib/sync-context";
 
@@ -53,7 +55,15 @@ const styles = stylex.create({
 export const Route = createFileRoute("/t/$tenantSlug")({
   // 認証ガード（2026-07-16 裁定 #3）: テナント一覧から slug を解決する。未認証は /login、
   // 非所属 slug は /tenants へ（存在有無は応答から区別できない — 一覧に無い、が全て）。
-  beforeLoad: async ({ context, params }) => {
+  beforeLoad: async ({ context, params, location }) => {
+    // 案 A 6 章: 旧 URL はクエリ・ハッシュごと新しい URL へ転送する。router が beforeLoad の
+    // redirect を replace で扱うため、旧 URL は履歴に残らない
+    const legacy = legacyPathname(location.pathname);
+    if (legacy !== null) {
+      throw redirect({
+        href: `${legacy}${location.searchStr}${location.hash === "" ? "" : `#${location.hash}`}`,
+      });
+    }
     let tenantList;
     try {
       tenantList = await context.queryClient.ensureQueryData(tenantsQueryOptions(context.api));
@@ -80,14 +90,6 @@ const UntypedLink = Link as unknown as ComponentType<{
   className?: string;
   children: ReactNode;
 }>;
-
-const SYNC_STATUS_LABELS: Record<SyncStatus, string> = {
-  idle: "待機",
-  connecting: "接続中",
-  syncing: "同期中",
-  ready: "同期済み",
-  closed: "切断",
-};
 
 function ShellLayout() {
   const { tenant, slots, api, tokens, queryClient, sync } = Route.useRouteContext();
@@ -116,8 +118,7 @@ function ShellLayout() {
     } catch {
       // サーバー側 revoke の失敗とローカル資格情報の破棄は独立の関心 — ローカルは必ず破棄する
     }
-    tokens.clear();
-    queryClient.clear();
+    resetClientSession({ queryClient, tokens });
     await navigate({ to: "/login" });
   }
 
@@ -129,7 +130,7 @@ function ShellLayout() {
           <UntypedLink
             key={item.id}
             to={item.to}
-            params={{ tenantSlug }}
+            params={{ ...item.params, tenantSlug }}
             className={stylex.props(styles.navLink).className ?? ""}
           >
             {item.label}

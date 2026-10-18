@@ -5,6 +5,7 @@ import { memberships } from "@plyrs/db/control-plane";
 import { app } from "../src/index";
 import { insertTenantWithOwner } from "./create-tenant";
 import { fakeLimiter } from "./rate-limit-helper";
+import { BOOKING_MANIFEST } from "../src/modules/booking/manifest";
 
 // §6: AUTH_LIMITER は本物の Miniflare シミュレート ratelimit(--no-isolate で全ファイル共有)。
 // signup を叩く setupTenant はこの env を使う(素の env だと他テストの呼び出し数次第で 429 が混入する)。
@@ -79,7 +80,11 @@ describe("モジュール管理 API", () => {
       modules: { moduleId: string; enabled: boolean }[];
     };
     expect(modules).toEqual([
-      expect.objectContaining({ moduleId: "booking", enabled: true, appliedVersion: 1 }),
+      expect.objectContaining({
+        moduleId: "booking",
+        enabled: true,
+        appliedVersion: BOOKING_MANIFEST.version,
+      }),
     ]);
     const mirror = await env.DB.prepare(
       "SELECT enabled FROM tenant_modules WHERE tenant_id = ? AND module_id = 'booking'",

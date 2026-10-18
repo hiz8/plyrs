@@ -15,6 +15,7 @@ import type { ProjectionJob } from "../src/projection/jobs";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import { asModuleSummaries, asPublishResult } from "./rpc-unwrap";
 import { resetSuperAdmins, superEnv, superLogin } from "./super-login";
+import { BOOKING_MANIFEST } from "../src/modules/booking/manifest";
 
 afterEach(async () => {
   await resetSuperAdmins();
@@ -233,7 +234,10 @@ describe("dead letter park & replay", () => {
     ]);
     await worker.queue(modulesBatch, env, createExecutionContext());
     const modules = asModuleSummaries(await tenant.listModules());
-    expect(modules[0]).toMatchObject({ moduleId: "booking", appliedVersion: 1 });
+    expect(modules[0]).toMatchObject({
+      moduleId: "booking",
+      appliedVersion: BOOKING_MANIFEST.version,
+    });
 
     // plyrs-modules-preview-dlq: "plyrs-modules" 接頭辞と衝突しても endsWith("-dlq") が優先され、
     // module ハンドラは通らず DLQ 退避になる。

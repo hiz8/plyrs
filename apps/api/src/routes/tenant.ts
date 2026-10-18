@@ -12,11 +12,13 @@ import {
   asAssetUsage,
   asContentTypeRow,
   asContentTypeRows,
+  asDeleteContentTypeResult,
   asDeleteResult,
   asEnableModuleResult,
   asModuleSummaries,
   asOrphanIds,
   asPublicationState,
+  asPublicationsPage,
   asPublishResult,
   asRecordSnapshot,
   asRegisterResult,
@@ -35,6 +37,7 @@ const ERROR_STATUS: Record<string, ContentfulStatusCode> = {
   id_mismatch: 409,
   key_mismatch: 409,
   type_conflict: 409,
+  type_not_empty: 409,
   record_deleted: 410,
   already_deleted: 410,
   not_published: 409,
@@ -65,6 +68,8 @@ const writeBodySchema = z.object({
 const MAX_ASSET_SIZE_BYTES = 20 * 1024 * 1024;
 const MAX_ASSET_FILENAME_LENGTH = 256;
 const MAX_ASSET_CONTENT_TYPE_LENGTH = 256; // asset 型の content_type フィールド maxLength と一致
+// 公開状態一覧の 1 ページの上限(既定値も兼ねる)。1 行は 100 バイト前後なので 1 ページ 100KB 程度
+const MAX_PUBLICATIONS_LIMIT = 1000;
 
 type GateEnv = { Bindings: Env; Variables: GateVariables };
 
@@ -223,6 +228,13 @@ export const tenantRoutes = new Hono<GateEnv>()
     const rows = asContentTypeRows(await stubFor(c).listContentTypes());
     return c.json({ contentTypes: rows });
   })
+  // 案 E 5.4: コンテンツが 0 件のユーザー型だけを削除できる(1 件以上は 409 type_not_empty)
+  .delete("/:tenantId/content-types/:key", async (c) => {
+    const result = asDeleteContentTypeResult(
+      await stubFor(c).deleteContentType(c.req.param("key"), c.get("auth")),
+    );
+    return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
+  })
   .get("/:tenantId/content-types/:key", async (c) => {
     const row = asContentTypeRow(await stubFor(c).getContentType(c.req.param("key")));
     return row === null ? c.json({ error: "not_found" }, 404) : c.json(row);
@@ -237,6 +249,26 @@ export const tenantRoutes = new Hono<GateEnv>()
       ),
     );
     return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
+  })
+  // 案 D 9 章: 一覧・ホームが公開状態をレコード 1 件ずつ取らずに済むよう、型ごと(省略で全型)にまとめて返す。
+  // 1 応答の大きさと DO の占有時間を抑えるため record_id カーソルでページングする
+  .get("/:tenantId/publications", async (c) => {
+    const limitParam = c.req.query("limit");
+    let limit = MAX_PUBLICATIONS_LIMIT;
+    if (limitParam !== undefined) {
+      limit = /^\d{1,4}$/u.test(limitParam) ? Number(limitParam) : 0;
+      if (limit < 1 || limit > MAX_PUBLICATIONS_LIMIT) {
+        return c.json({ error: "bad_limit" }, 400);
+      }
+    }
+    const page = asPublicationsPage(
+      await stubFor(c).listPublications({
+        type: c.req.query("type"),
+        cursor: c.req.query("cursor") ?? null,
+        limit,
+      }),
+    );
+    return c.json(page);
   })
   .get("/:tenantId/records/:recordId/publication", async (c) => {
     const state = asPublicationState(await stubFor(c).getPublication(c.req.param("recordId")));

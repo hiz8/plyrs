@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { createAppContext, getRouter } from "./router";
@@ -68,6 +68,10 @@ function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, H
             createdAt: "2026-07-16T00:00:00Z",
             updatedAt: "2026-07-16T00:00:00Z",
             version: 1,
+            description: null,
+            titleField: null,
+            listColumns: null,
+            menuOrder: null,
           },
         ],
       }),
@@ -79,7 +83,7 @@ function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, H
 describe("認証済みシェル (/t/$tenantSlug)", () => {
   it("renders nav from the slot registry, the tenant header, and the content type list", async () => {
     const routes = authedRoutes();
-    renderAt("/t/blog/content-types", routes);
+    renderAt("/t/blog/settings/content-types", routes);
     expect(await screen.findByRole("link", { name: "コンテンツタイプ" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Blog/ })).toHaveAttribute("href", "/tenants");
     expect(await screen.findByRole("cell", { name: "article" })).toBeInTheDocument();
@@ -90,22 +94,46 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     expect(new Headers(listCall.headers).get("authorization")).toBe("Bearer jwt-abc");
   });
 
+  it("binds nav item params alongside the current tenantSlug (案 A 4 章)", async () => {
+    const context = createAppContext(stubFetch(authedRoutes()), {
+      connect: () => () => pendingConnect(),
+    });
+    context.slots.register("nav:item", {
+      id: "test.records",
+      label: "記事の一覧",
+      to: "/t/$tenantSlug/content/$typeKey",
+      // tenantSlug は現在のテナントで上書きされ、contribution からは変えられない
+      params: { typeKey: "article", tenantSlug: "other" },
+      group: "module:test",
+      order: 99,
+    });
+    const router = getRouter({
+      context,
+      history: createMemoryHistory({ initialEntries: ["/t/blog/settings/content-types"] }),
+    });
+    render(<RouterProvider router={router} />);
+    expect(await screen.findByRole("link", { name: "記事の一覧" })).toHaveAttribute(
+      "href",
+      "/t/blog/content/article",
+    );
+  });
+
   it("shows the empty state for a tenant without content types", async () => {
     const routes = authedRoutes({
       "/v1/t/t1/content-types": vi.fn(() => jsonResponse(200, { contentTypes: [] })),
     });
-    renderAt("/t/blog/content-types", routes);
+    renderAt("/t/blog/settings/content-types", routes);
     expect(await screen.findByText(/コンテンツタイプはまだありません/)).toBeInTheDocument();
   });
 
   it("redirects to /tenants for a slug the user does not belong to", async () => {
-    renderAt("/t/ghost/content-types", authedRoutes());
+    renderAt("/t/ghost/settings/content-types", authedRoutes());
     expect(await screen.findByRole("heading", { name: "テナントを選択" })).toBeInTheDocument();
   });
 
   it("redirects to /login when unauthenticated", async () => {
     renderAt(
-      "/t/blog/content-types",
+      "/t/blog/settings/content-types",
       authedRoutes({
         "/auth/tenants": vi.fn(() => jsonResponse(401, { error: "unauthenticated" })),
       }),
@@ -120,7 +148,7 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
 
   it("logs out from the shell header", async () => {
     const logout = vi.fn(() => jsonResponse(200, { ok: true }));
-    renderAt("/t/blog/content-types", authedRoutes({ "/auth/logout": logout }));
+    renderAt("/t/blog/settings/content-types", authedRoutes({ "/auth/logout": logout }));
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "ログアウト" }));
     expect(await screen.findByRole("heading", { name: "ログイン" })).toBeInTheDocument();
@@ -129,7 +157,7 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
 
   it("logs out locally even when the server logout fails", async () => {
     const logout = vi.fn(() => jsonResponse(500, { error: "boom" }));
-    renderAt("/t/blog/content-types", authedRoutes({ "/auth/logout": logout }));
+    renderAt("/t/blog/settings/content-types", authedRoutes({ "/auth/logout": logout }));
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "ログアウト" }));
     expect(await screen.findByRole("heading", { name: "ログイン" })).toBeInTheDocument();
@@ -138,7 +166,7 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
 
   it("shows the error screen when a loader fails with a server error", async () => {
     renderAt(
-      "/t/blog/content-types",
+      "/t/blog/settings/content-types",
       authedRoutes({
         "/v1/t/t1/content-types": vi.fn(() => jsonResponse(500, { error: "boom" })),
       }),
@@ -149,14 +177,14 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
   });
 
   it("shows the sync status indicator while connecting", async () => {
-    renderAt("/t/blog/content-types", authedRoutes());
+    renderAt("/t/blog/settings/content-types", authedRoutes());
     expect(await screen.findByText(/同期: 接続中/)).toBeInTheDocument();
   });
 
   it("offers a reconnect button when the sync connection is lost", async () => {
     let socket: FakeSocket | undefined;
     const connects: number[] = [];
-    renderAt("/t/blog/content-types", authedRoutes(), async () => {
+    renderAt("/t/blog/settings/content-types", authedRoutes(), async () => {
       connects.push(connects.length);
       socket = new FakeSocket();
       return socket;
@@ -169,5 +197,47 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     const before = connects.length;
     await userEvent.setup().click(screen.getByRole("button", { name: "再接続" }));
     await vi.waitFor(() => expect(connects.length).toBe(before + 1));
+  });
+});
+
+describe("旧 URL のリダイレクト (案 A 6 章)", () => {
+  const RECORD = "0190a1b2-c3d4-7000-8000-000000000001";
+  it.each([
+    ["/t/blog/records/article", "/t/blog/content/article"],
+    ["/t/blog/records/article/new", "/t/blog/content/article/new"],
+    [`/t/blog/records/article/${RECORD}`, `/t/blog/content/article/${RECORD}`],
+    ["/t/blog/assets", "/t/blog/media"],
+    ["/t/blog/content-types", "/t/blog/settings/content-types"],
+    ["/t/blog/content-types/new", "/t/blog/settings/content-types/new"],
+    ["/t/blog/content-types/article/edit", "/t/blog/settings/content-types/article/edit"],
+  ])("%s → %s", async (from, to) => {
+    const router = renderAt(from, authedRoutes());
+    await waitFor(() => expect(router.state.location.pathname).toBe(to));
+  });
+
+  it("モジュールの旧 URL も設定の下へ転送する", async () => {
+    const router = renderAt(
+      "/t/blog/modules",
+      authedRoutes({
+        "/v1/t/t1/modules": vi.fn(() => jsonResponse(200, { modules: [] })),
+      }),
+    );
+    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/settings/modules"));
+  });
+
+  it("クエリとハッシュを引き継ぎ、旧 URL を履歴に残さない", async () => {
+    const router = renderAt("/t/blog/records/article?x=1#field", authedRoutes());
+    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/content/article"));
+    expect(router.history.location.search).toBe("?x=1");
+    expect(router.history.location.hash).toBe("#field");
+    expect(router.history.length).toBe(1);
+  });
+
+  it.each([
+    ["/t/blog/settings", "/t/blog/settings/content-types"],
+    ["/t/blog/content", "/t/blog/settings/content-types"],
+  ])("末尾を削った %s は Not Found にせず %s へ転送する", async (from, to) => {
+    const router = renderAt(from, authedRoutes());
+    await waitFor(() => expect(router.state.location.pathname).toBe(to));
   });
 });

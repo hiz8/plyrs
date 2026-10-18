@@ -13,7 +13,7 @@ describe("isApiPath", () => {
     expect(isApiPath("/authx")).toBe(false);
     expect(isApiPath("/v10/records")).toBe(false);
     expect(isApiPath("/")).toBe(false);
-    expect(isApiPath("/t/blog/content-types")).toBe(false);
+    expect(isApiPath("/t/blog/settings/content-types")).toBe(false);
     // /public/v1 はヘッドレス契約 = api Worker の直接責務（プロキシしない）
     expect(isApiPath("/public/v1/blog/records/post")).toBe(false);
   });

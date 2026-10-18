@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import type { BeforeWriteHook } from "../do/hooks";
 import type { WriteRecordInput, WriteRecordResult } from "../do/types";
-import type { ModuleManifest } from "./manifest";
+import { moduleManifestSchema, type ModuleManifest } from "./manifest";
 import { bookingModule } from "./booking/module";
 
 // design-spec §9.1: ファーストパーティ・サンドボックスなし。モジュール = このレジストリに
@@ -50,9 +50,33 @@ export interface ModuleDefinition {
   publicEndpoints?: Record<string, PublicWriteEndpoint>;
 }
 
-export const MODULE_REGISTRY: Record<string, ModuleDefinition> = {
-  [bookingModule.manifest.moduleId]: bookingModule,
-};
+// マニフェストは TS リテラルなので、型参照の整合(navTypes・typeWriteGuards・publicWriteTypes が
+// 自モジュールの型を指すか)は typecheck では保証されない。登録時に一度スキーマを通し、
+// 不整合なら Worker の起動時に落とす(黙ってナビから型が消える等を防ぐ)。登録するのは
+// 検証済みの元オブジェクトそのもの(テストが vi.spyOn で差し替える同一参照を保つ)。
+export function buildModuleRegistry(
+  modules: readonly ModuleDefinition[],
+): Record<string, ModuleDefinition> {
+  const registry: Record<string, ModuleDefinition> = {};
+  for (const definition of modules) {
+    const parsed = moduleManifestSchema.safeParse(definition.manifest);
+    if (!parsed.success) {
+      throw new Error(
+        `invalid module manifest '${definition.manifest.moduleId}': ${parsed.error.message}`,
+      );
+    }
+    const { moduleId } = parsed.data;
+    if (moduleId in registry) {
+      throw new Error(`duplicate module id: ${moduleId}`);
+    }
+    registry[moduleId] = definition;
+  }
+  return registry;
+}
+
+export const MODULE_REGISTRY: Record<string, ModuleDefinition> = buildModuleRegistry([
+  bookingModule,
+]);
 
 export function moduleById(id: string): ModuleDefinition | undefined {
   return MODULE_REGISTRY[id];
