@@ -74,3 +74,4 @@ export {
   type TableCellProps,
   type TableColumnProps,
 } from "./table";
+export { DropZone, type DropZoneProps } from "./drop-zone";
