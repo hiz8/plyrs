@@ -113,6 +113,13 @@ function displayColumns(def: ContentTypeDefinition) {
   };
 }
 
+// 利用者が管理できない型(システム型・モジュールの型)への登録・削除を断る文言。
+// 登録と削除で文言をずらさないため 1 か所にまとめる
+const MANAGED_TYPE_DENIALS = {
+  system: "system content types are managed by the platform",
+  plugin: "plugin content types are managed by modules",
+} as const;
+
 export function registerContentTypeCore(
   sql: SqlStorage,
   input: unknown,
@@ -129,20 +136,12 @@ export function registerContentTypeCore(
   // 登録・変更を許すと、r2_key 等のシステム管理フィールド定義を挿げ替えて配信を壊せてしまう
   // (フィールド値の防御 = assetGuardHook とは別レイヤーの、型定義そのものの防御)。
   if (options.allowSystem !== true && (def.source === "system" || prev?.source === "system")) {
-    return {
-      ok: false,
-      code: "forbidden",
-      message: "system content types are managed by the platform",
-    };
+    return { ok: false, code: "forbidden", message: MANAGED_TYPE_DENIALS.system };
   }
   // Phase 9: プラグイン名前空間はモジュールシステム専有(§4.1)。クライアント経由の登録を
   // 許すと、モジュール有効化時の固定 ID と衝突して enable が type_conflict で恒久失敗する。
   if (options.allowPlugin !== true && (def.source === "plugin" || prev?.source === "plugin")) {
-    return {
-      ok: false,
-      code: "forbidden",
-      message: "plugin content types are managed by modules",
-    };
+    return { ok: false, code: "forbidden", message: MANAGED_TYPE_DENIALS.plugin };
   }
   if (prev !== null && prev.id !== def.id) {
     return {
@@ -233,4 +232,38 @@ export function registerContentTypeCore(
     },
     applied: true,
   };
+}
+
+export type DeleteContentTypeResult =
+  | { ok: true; key: string }
+  | { ok: false; code: "not_found" | "forbidden" | "type_not_empty"; message: string };
+
+// 案 E 5.4: コンテンツが 0 件の型だけを削除できる(コンテンツごと消す操作は設けない)。
+// 削除済みのコンテンツ(トゥームストーン)は同期の削除伝搬に要るため残し、件数にも数えない。
+// 公開版は削除時に cascadeUnpublish で消えるが、念のため残っていれば拒否する。
+// 他の型の relation が allowedTypes でこの key を指していても、関係はソフト参照のため妨げない。
+export function deleteContentTypeCore(sql: SqlStorage, key: string): DeleteContentTypeResult {
+  const prev = loadContentTypeByKey(sql, key);
+  if (prev === null) {
+    return { ok: false, code: "not_found", message: `content type not found: ${key}` };
+  }
+  if (prev.source !== "user") {
+    return { ok: false, code: "forbidden", message: MANAGED_TYPE_DENIALS[prev.source] };
+  }
+  // 件数は要らないので存在判定にとどめる(コンテンツが残っていれば公開版は見に行かない)
+  const exists = (query: string) => sql.exec(query, key).toArray().length > 0;
+  if (
+    exists("SELECT 1 FROM records WHERE type = ? AND deleted_at IS NULL LIMIT 1") ||
+    exists("SELECT 1 FROM published_snapshots WHERE type = ? LIMIT 1")
+  ) {
+    return {
+      ok: false,
+      code: "type_not_empty",
+      message: `content type '${key}' still has records`,
+    };
+  }
+  // 型ごとに作った生成列とインデックスを片付けてから行を消す
+  applyIndexDdl(sql, key, prev.fields, []);
+  sql.exec("DELETE FROM content_types WHERE id = ?", prev.id);
+  return { ok: true, key };
 }

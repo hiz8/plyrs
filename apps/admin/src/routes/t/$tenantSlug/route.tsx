@@ -130,7 +130,7 @@ function ShellLayout() {
           <UntypedLink
             key={item.id}
             to={item.to}
-            params={{ tenantSlug }}
+            params={{ ...item.params, tenantSlug }}
             className={stylex.props(styles.navLink).className ?? ""}
           >
             {item.label}

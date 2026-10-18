@@ -80,6 +80,8 @@ function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, H
 const bookingModule = {
   moduleId: "booking",
   name: "予約",
+  description: "予約枠を公開し、サイトの訪問者から予約を受け付けます。",
+  navTypes: ["booking.resource", "booking.slot", "booking.reservation"],
   version: 1,
   enabled: false,
   appliedVersion: 0,

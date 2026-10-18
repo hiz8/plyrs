@@ -33,6 +33,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
     "同じ識別名のコンテンツタイプが既にあります。画面を再読み込みしてから、もう一度お試しください",
   key_mismatch:
     "コンテンツタイプの識別名は変更できません。新しいコンテンツタイプとして作成してください",
+  type_not_empty:
+    "コンテンツが残っているため、このコンテンツタイプは削除できません。先にコンテンツをすべて削除してください",
   // メディア(routes/tenant.ts の assets)
   too_large: "ファイルが大きすぎます。20 MB 以下のファイルを選んでください",
   invalid_filename: "このファイル名は使用できません。名前を変更してから、もう一度お試しください",
