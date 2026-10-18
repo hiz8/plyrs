@@ -2,6 +2,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import type { RouterContext } from "../router";
+import { THEME_BOOT_SCRIPT } from "../lib/theme";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<RouterContext>()({
@@ -21,6 +22,8 @@ function RootShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="ja">
       <head>
+        {/* h-design-tokens.md 4 章: 記憶したテーマを描画より前に当てる(prerender で /_shell に入る) */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <HeadContent />
       </head>
       <body>

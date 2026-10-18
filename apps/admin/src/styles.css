@@ -1,3 +1,8 @@
+/* h-design-tokens.md 4 章: 既定は自動。lib/theme.ts が記憶した選択でルートの style を上書きする */
+:root {
+  color-scheme: light dark;
+}
+
 * {
   box-sizing: border-box;
 }
