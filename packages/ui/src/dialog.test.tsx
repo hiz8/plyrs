@@ -1,0 +1,83 @@
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useState } from "react";
+import { describe, expect, it, vi } from "vitest";
+import { Button } from "./button";
+import { ConfirmDialog, ModalDialog } from "./dialog";
+
+function Harness({ onConfirm }: { onConfirm: () => void }) {
+  const [isOpen, setOpen] = useState(false);
+  return (
+    <>
+      <Button onPress={() => setOpen(true)}>削除</Button>
+      <ConfirmDialog
+        isOpen={isOpen}
+        onOpenChange={setOpen}
+        title="お知らせを削除しますか？"
+        confirmLabel="削除する"
+        onConfirm={() => {
+          onConfirm();
+          setOpen(false);
+        }}
+      >
+        公開中のページも消え、元に戻せません。
+      </ConfirmDialog>
+    </>
+  );
+}
+
+describe("ConfirmDialog", () => {
+  it("危険な確認は alertdialog で、実行ボタンに初期フォーカスがある", async () => {
+    const user = userEvent.setup();
+    render(<Harness onConfirm={() => {}} />);
+    await user.click(screen.getByRole("button", { name: "削除" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "お知らせを削除しますか？" });
+    expect(dialog).toHaveTextContent("元に戻せません");
+    expect(screen.getByRole("button", { name: "削除する" })).toHaveFocus();
+  });
+
+  it("キャンセルで閉じて開いたボタンへフォーカスを戻し、実行は呼ばない", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    render(<Harness onConfirm={onConfirm} />);
+    const opener = screen.getByRole("button", { name: "削除" });
+    await user.click(opener);
+    await user.click(await screen.findByRole("button", { name: "キャンセル" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(opener).toHaveFocus());
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("実行ボタンで onConfirm を呼ぶ", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    render(<Harness onConfirm={onConfirm} />);
+    await user.click(screen.getByRole("button", { name: "削除" }));
+    await user.click(await screen.findByRole("button", { name: "削除する" }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+});
+
+function Open() {
+  const [isOpen, setOpen] = useState(true);
+  return (
+    <ModalDialog title="メンバーを追加" isOpen={isOpen} onOpenChange={setOpen}>
+      本文
+    </ModalDialog>
+  );
+}
+
+describe("ModalDialog", () => {
+  it("右上の閉じるボタンと Esc で閉じる", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Open />);
+    await user.click(await screen.findByRole("button", { name: "閉じる" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    rerender(<></>);
+    render(<Open />);
+    await screen.findByRole("dialog", { name: "メンバーを追加" });
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});

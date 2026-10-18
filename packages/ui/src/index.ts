@@ -39,3 +39,9 @@ export { EmptyState, type EmptyStateProps } from "./empty-state";
 export { Skeleton, type SkeletonProps } from "./skeleton";
 export { ProgressBar, Spinner, type ProgressBarProps } from "./progress";
 export { RelativeTime, type RelativeTimeValue } from "./relative-time";
+export {
+  ConfirmDialog,
+  ModalDialog,
+  type ConfirmDialogProps,
+  type ModalDialogProps,
+} from "./dialog";
