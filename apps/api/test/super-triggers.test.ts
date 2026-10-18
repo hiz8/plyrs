@@ -7,6 +7,7 @@ import { app } from "../src/index";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import { asModuleSummaries, asPublishResult } from "./rpc-unwrap";
 import { resetSuperAdmins, superEnv, superLogin } from "./super-login";
+import { BOOKING_MANIFEST } from "../src/modules/booking/manifest";
 
 // Queue の配送は非同期（miniflare のブローカ経由）。フラッシュ API は無いのでポーリングする
 // (dead-letters.test.ts / projection-e2e.test.ts と同じ様式)。
@@ -145,7 +146,7 @@ describe("super operational triggers", () => {
       modules: { moduleId: string; version: number; name: string; enabledTenants: number }[];
     };
     const booking = modules.find((m) => m.moduleId === "booking");
-    expect(booking).toMatchObject({ moduleId: "booking", version: 1 });
+    expect(booking).toMatchObject({ moduleId: "booking", version: BOOKING_MANIFEST.version });
     expect(booking?.enabledTenants).toBeGreaterThanOrEqual(1);
 
     const unknown = await app.request(
@@ -169,7 +170,7 @@ describe("super operational triggers", () => {
     await waitFor(async () => {
       const summaries = asModuleSummaries(await stub.listModules());
       const bookingSummary = summaries.find((m) => m.moduleId === "booking");
-      return bookingSummary?.appliedVersion === 1 ? bookingSummary : null;
+      return bookingSummary?.appliedVersion === BOOKING_MANIFEST.version ? bookingSummary : null;
     });
 
     expect(await auditActions()).toContain("module.redistribute");

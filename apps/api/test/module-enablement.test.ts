@@ -92,6 +92,8 @@ describe("モジュール有効化レジストリ (design-spec §9.5)", () => {
     expect(result.module).toEqual({
       moduleId: "booking",
       name: "予約",
+      description: BOOKING_MANIFEST.description,
+      navTypes: ["booking.resource", "booking.slot", "booking.reservation"],
       version: BOOKING_MANIFEST.version,
       enabled: true,
       appliedVersion: BOOKING_MANIFEST.version,
@@ -130,12 +132,20 @@ describe("モジュール有効化レジストリ (design-spec §9.5)", () => {
     const tenant = stub("mod-enable-5");
     const before = asModuleSummaries(await tenant.listModules());
     expect(before).toEqual([
-      { moduleId: "booking", name: "予約", version: 1, enabled: false, appliedVersion: 0 },
+      {
+        moduleId: "booking",
+        name: "予約",
+        description: BOOKING_MANIFEST.description,
+        navTypes: ["booking.resource", "booking.slot", "booking.reservation"],
+        version: BOOKING_MANIFEST.version,
+        enabled: false,
+        appliedVersion: 0,
+      },
     ]);
     await tenant.enableModule("t-mod", "booking", OWNER);
     await tenant.disableModule("t-mod", "booking", OWNER);
     const after = asModuleSummaries(await tenant.listModules());
-    expect(after[0]).toMatchObject({ enabled: false, appliedVersion: 1 }); // 型は残る(§9.5)
+    expect(after[0]).toMatchObject({ enabled: false, appliedVersion: BOOKING_MANIFEST.version }); // 型は残る(§9.5)
   });
 });
 
