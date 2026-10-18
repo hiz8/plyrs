@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "02e0f1e5-ac0d-4a15-98c9-5153a15af274",
+  "id": "17c021c5-0036-48df-8dba-4f34c039d85d",
   "prevId": "d46cccaa-396c-4f48-ba9b-f7c59697e519",
   "tables": {
     "alarm_registry": {
@@ -95,34 +95,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": 1
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "title_field": {
-          "name": "title_field",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "list_columns": {
-          "name": "list_columns",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "menu_order": {
-          "name": "menu_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {
@@ -403,7 +375,13 @@
           "default": 0
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_published_snapshots_type": {
+          "name": "idx_published_snapshots_type",
+          "columns": ["type", "record_id"],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

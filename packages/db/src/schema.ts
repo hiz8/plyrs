@@ -66,19 +66,25 @@ export const relations = sqliteTable(
 );
 
 // design-spec §7: 公開状態の真実源は published_snapshots 行の存在。records 側に公開フラグを持たない。
-export const publishedSnapshots = sqliteTable("published_snapshots", {
-  recordId: text("record_id").primaryKey(), // records.id と 1 対 1
-  type: text("type").notNull(),
-  data: text("data").notNull(), // publish 時点の data のコピー（JSON）
-  relations: text("relations").notNull(), // publish 時点の関係の凍結投影（JSON）
-  publishedAt: text("published_at").notNull(),
-  publishedBy: text("published_by").notNull(),
-  sourceVersion: integer("source_version").notNull(), // どの records.version を publish したか（参考情報。順序トークンではない）
-  // CRITICAL fix（レビュー指摘）: records.version は publish/unpublish で変化しないため順序トークンに
-  // なれない（unpublish→無編集republish が同じ version の upsert/delete を生む）。DO 全体で単調な
-  // 世代カウンタを別途持ち、投影の順序ガードはこちらを使う。
-  publishSeq: integer("publish_seq").notNull().default(0),
-});
+export const publishedSnapshots = sqliteTable(
+  "published_snapshots",
+  {
+    recordId: text("record_id").primaryKey(), // records.id と 1 対 1
+    type: text("type").notNull(),
+    data: text("data").notNull(), // publish 時点の data のコピー（JSON）
+    relations: text("relations").notNull(), // publish 時点の関係の凍結投影（JSON）
+    publishedAt: text("published_at").notNull(),
+    publishedBy: text("published_by").notNull(),
+    sourceVersion: integer("source_version").notNull(), // どの records.version を publish したか（参考情報。順序トークンではない）
+    // CRITICAL fix（レビュー指摘）: records.version は publish/unpublish で変化しないため順序トークンに
+    // なれない（unpublish→無編集republish が同じ version の upsert/delete を生む）。DO 全体で単調な
+    // 世代カウンタを別途持ち、投影の順序ガードはこちらを使う。
+    publishSeq: integer("publish_seq").notNull().default(0),
+  },
+  // 案 D 9 章: 型ごとの公開状態一覧(WHERE type = ? AND record_id > ? ORDER BY record_id)を
+  // フルスキャンせず索引だけで辿る
+  (table) => [index("idx_published_snapshots_type").on(table.type, table.recordId)],
+);
 
 // design-spec §12.3: アウトボックス。DO コミットと投影 D1 書き込みの dual-write を分離する。
 export const outbox = sqliteTable(
