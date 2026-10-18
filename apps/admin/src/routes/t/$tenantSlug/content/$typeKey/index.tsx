@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
-import type { WorkflowStatus } from "@plyrs/metamodel";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { ConnectionBanner } from "../../../../../components/connection-banner";
+import { WORKFLOW_STATUS_LABELS } from "../../../../../lib/labels";
 import { labelForRecord } from "../../../../../lib/record-label";
 import {
   useSyncHasSynced,
@@ -26,13 +26,6 @@ const styles = stylex.create({
   muted: { color: colors.textMuted },
   link: { color: colors.accent },
 });
-
-export const STATUS_LABELS: Record<WorkflowStatus, string> = {
-  draft: "下書き",
-  in_review: "レビュー中",
-  ready: "公開準備完了",
-  archived: "アーカイブ",
-};
 
 export const Route = createFileRoute("/t/$tenantSlug/content/$typeKey/")({
   component: RecordListPage,
@@ -94,7 +87,7 @@ function RecordListPage() {
                     {labelForRecord(types, record)}
                   </Link>
                 </td>
-                <td {...stylex.props(styles.cell)}>{STATUS_LABELS[record.status]}</td>
+                <td {...stylex.props(styles.cell)}>{WORKFLOW_STATUS_LABELS[record.status]}</td>
                 <td {...stylex.props(styles.cell)}>{record.updatedAt}</td>
                 <td {...stylex.props(styles.cell)}>{record.version}</td>
               </tr>
