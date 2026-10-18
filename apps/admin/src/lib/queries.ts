@@ -1,4 +1,4 @@
-import { queryOptions } from "@tanstack/react-query";
+import { queryOptions, type QueryClient } from "@tanstack/react-query";
 import type { AdminApi } from "./admin-api";
 import type { ApiClient } from "./api-client";
 
@@ -12,13 +12,21 @@ export function tenantsQueryOptions(api: ApiClient) {
   });
 }
 
-// 自分の情報はセッションの間は変わらない。ログアウト時は queryClient.clear() で消える。
+// 自分の情報はセッションの間は変わらないため取り直さない。セッションの切り替わりは
+// ログアウト(queryClient.clear())とログイン・サインアップ成功(startSession)の両方で捨てる。
+// セッション失効で /login へ戻された場合はログアウトを経ないため、ログイン側でも捨てる必要がある。
 export function meQueryOptions(api: ApiClient) {
   return queryOptions({
     queryKey: ["me"],
     queryFn: () => api.getMe(),
     staleTime: Infinity,
   });
+}
+
+// ログイン・サインアップの成功直後に呼ぶ。前の利用者のキャッシュ(自分の情報・サイト一覧など)を
+// 新しいセッションへ持ち越さない。
+export function startSession(queryClient: QueryClient): void {
+  queryClient.clear();
 }
 
 export function contentTypesQueryOptions(adminApi: AdminApi, tenantId: string) {

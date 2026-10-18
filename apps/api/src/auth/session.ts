@@ -1,6 +1,6 @@
 import { and, eq, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { sessions, superSessions } from "@plyrs/db/control-plane";
+import { sessions, superSessions, users } from "@plyrs/db/control-plane";
 import { v7 as uuidv7 } from "uuid";
 
 // design-spec §11.2: セッションの真実源は中央 D1。トークンは 32byte 不透明値を
@@ -61,6 +61,26 @@ export async function lookupSession(
     return null;
   }
   return { userId: row.userId };
+}
+
+// lookupSession と同じ判定に users を left join し、利用者のメールアドレスも 1 回の D1 照会で引く
+// (/auth/me が sessions → users を直列に引かずに済むように)。email が null なら users 行が無い。
+export async function lookupSessionUser(
+  d1: D1Database,
+  token: string,
+  now: Date,
+): Promise<{ userId: string; email: string | null } | null> {
+  const rows = await drizzle(d1)
+    .select({ userId: sessions.userId, expiresAt: sessions.expiresAt, email: users.email })
+    .from(sessions)
+    .leftJoin(users, eq(users.id, sessions.userId))
+    .where(and(eq(sessions.tokenHash, await sha256Hex(token)), isNull(sessions.revokedAt)))
+    .limit(1);
+  const row = rows[0];
+  if (row === undefined || row.expiresAt <= now.toISOString()) {
+    return null;
+  }
+  return { userId: row.userId, email: row.email };
 }
 
 export async function revokeSession(d1: D1Database, token: string, now: Date): Promise<void> {

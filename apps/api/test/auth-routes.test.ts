@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { app } from "../src/index";
 import { blockUser } from "../src/auth/blocklist";
 import { verifyTenantToken } from "../src/auth/jwt";
-import { SESSION_COOKIE } from "../src/auth/session";
+import { createSession, lookupSession, SESSION_COOKIE } from "../src/auth/session";
 import { insertTenantWithOwner } from "./create-tenant";
 import { fakeLimiter } from "./rate-limit-helper";
 
@@ -215,6 +215,22 @@ describe("auth routes", () => {
     const denied = await app.request("/auth/me", { headers: { cookie } }, testEnv);
     expect(denied.status).toBe(403);
     expect(await denied.json()).toMatchObject({ error: "blocked" });
+  });
+
+  it("revokes and logs a session whose user row is gone (sessionGate)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const ghostId = crypto.randomUUID();
+    const { token } = await createSession(env.DB, ghostId, new Date());
+    const cookie = `${SESSION_COOKIE}=${token}`;
+    const res = await app.request("/auth/me", { headers: { cookie } }, testEnv);
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({ error: "unauthenticated" });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining(ghostId));
+    // 失効済みなので以後は users 行の有無を見る前に弾かれる(ログは 1 回だけ)
+    const again = await app.request("/auth/tenants", { headers: { cookie } }, testEnv);
+    expect(again.status).toBe(401);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(await lookupSession(env.DB, token, new Date())).toBeNull();
   });
 
   it("rejects login for a globally blocked user", async () => {
