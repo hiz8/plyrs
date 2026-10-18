@@ -135,7 +135,13 @@ export function Select({
               disabled && styles.triggerDisabled,
             ])}
           >
-            <SelectValue />
+            {/* 既定の SelectValue は選択中の候補の中身(check 用の空き枠を含む)を複製して描き、
+                文字がずれるため、トリガーには選択中の文字だけを出す */}
+            <SelectValue>
+              {({ isPlaceholder, selectedText, defaultChildren }) =>
+                isPlaceholder ? defaultChildren : selectedText
+              }
+            </SelectValue>
             <ChevronsUpDown
               size={ICON_SIZE.inline}
               aria-hidden="true"

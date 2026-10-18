@@ -65,3 +65,17 @@ describe("Select", () => {
     expect(screen.getByText("型を選んでください").querySelector("svg")).not.toBeNull();
   });
 });
+
+it("トリガーには選択中の文字だけを出し、候補の check 用の枠を持ち込まない", () => {
+  render(
+    <Select
+      label="型"
+      items={[{ value: "news", label: "お知らせ" }]}
+      selectedValue="news"
+      onChange={() => {}}
+    />,
+  );
+  const value = screen.getByRole("button", { name: /型/ }).querySelector(".react-aria-SelectValue");
+  expect(value).toHaveTextContent("お知らせ");
+  expect(value?.children).toHaveLength(0);
+});
