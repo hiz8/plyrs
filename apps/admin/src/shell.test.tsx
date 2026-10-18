@@ -186,14 +186,34 @@ describe("旧 URL のリダイレクト (案 A 6 章)", () => {
     ["/t/blog/content-types", "/t/blog/settings/content-types"],
     ["/t/blog/content-types/new", "/t/blog/settings/content-types/new"],
     ["/t/blog/content-types/article/edit", "/t/blog/settings/content-types/article/edit"],
-    ["/t/blog/modules", "/t/blog/settings/modules"],
   ])("%s → %s", async (from, to) => {
+    const router = renderAt(from, authedRoutes());
+    await waitFor(() => expect(router.state.location.pathname).toBe(to));
+  });
+
+  it("モジュールの旧 URL も設定の下へ転送する", async () => {
     const router = renderAt(
-      from,
+      "/t/blog/modules",
       authedRoutes({
         "/v1/t/t1/modules": vi.fn(() => jsonResponse(200, { modules: [] })),
       }),
     );
+    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/settings/modules"));
+  });
+
+  it("クエリとハッシュを引き継ぎ、旧 URL を履歴に残さない", async () => {
+    const router = renderAt("/t/blog/records/article?x=1#field", authedRoutes());
+    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/content/article"));
+    expect(router.history.location.search).toBe("?x=1");
+    expect(router.history.location.hash).toBe("#field");
+    expect(router.history.length).toBe(1);
+  });
+
+  it.each([
+    ["/t/blog/settings", "/t/blog/settings/content-types"],
+    ["/t/blog/content", "/t/blog/settings/content-types"],
+  ])("末尾を削った %s は Not Found にせず %s へ転送する", async (from, to) => {
+    const router = renderAt(from, authedRoutes());
     await waitFor(() => expect(router.state.location.pathname).toBe(to));
   });
 });
