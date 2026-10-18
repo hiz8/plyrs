@@ -1,3 +1,5 @@
+import { withNetworkErrors } from "./network-error";
+
 // 管理画面 → api Worker の HTTP 契約（すべて same-origin 相対パス。2026-07-16 裁定 #1）。
 // fetch は注入可能（テストはスタブを渡す）。セッション cookie は same-origin fetch の既定で送られる。
 export interface TenantSummary {
@@ -48,7 +50,8 @@ const JSON_HEADERS = { "content-type": "application/json" } as const;
 
 // 既定値はグローバル fetch を束縛したラッパー。素の `fetch` を既定値にすると、ブラウザで
 // detached call（this 喪失）となり Illegal invocation を投げる。
-export function createApiClient(fetchImpl: typeof fetch = (...args) => fetch(...args)) {
+export function createApiClient(baseFetch: typeof fetch = (...args) => fetch(...args)) {
+  const fetchImpl = withNetworkErrors(baseFetch);
   async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetchImpl(path, init);
     if (!response.ok) {

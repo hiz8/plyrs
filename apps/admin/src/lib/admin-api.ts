@@ -1,5 +1,6 @@
 import type { ContentTypeDefinition, FieldDefinition } from "@plyrs/metamodel";
 import { throwApiError } from "./api-client";
+import { withNetworkErrors } from "./network-error";
 import type { TokenManager } from "./token-manager";
 
 // Bearer 付きの管理 API(/v1/t/:tenantId/...)。トークンは token-manager が供給する。
@@ -20,6 +21,13 @@ export interface ContentTypeSummary {
 export type PublicationState =
   | { published: false }
   | { published: true; publishedAt: string; publishedBy: string; sourceVersion: number };
+
+// apps/api/src/do/publish.ts の PublicationSummary と構造一致(HTTP 契約。案 D 9 章)
+export interface PublicationSummary {
+  recordId: string;
+  publishedAt: string;
+  sourceVersion: number;
+}
 
 // apps/api/src/do/asset-usage.ts の AssetUsageRow と構造一致(HTTP 契約)
 export interface AssetUsageEntry {
@@ -42,8 +50,9 @@ const JSON_HEADERS = { "content-type": "application/json" } as const;
 
 export function createAdminApi(
   tokens: TokenManager,
-  fetchImpl: typeof fetch = (...args) => fetch(...args),
+  baseFetch: typeof fetch = (...args) => fetch(...args),
 ) {
+  const fetchImpl = withNetworkErrors(baseFetch);
   async function authedFetch(tenantId: string, path: string, init: RequestInit): Promise<Response> {
     const request = async (token: string) =>
       fetchImpl(`/v1/t/${tenantId}${path}`, {
@@ -101,6 +110,25 @@ export function createAdminApi(
     },
     getPublication(tenantId: string, recordId: string): Promise<PublicationState> {
       return requestJson<PublicationState>(tenantId, `/records/${recordId}/publication`);
+    },
+    // type を省略すると全型分(ホームの集計用)。一覧のタブ件数は全件が要るため、
+    // record_id カーソルのページを最後まで辿って連結する
+    async listPublications(tenantId: string, type?: string): Promise<PublicationSummary[]> {
+      const all: PublicationSummary[] = [];
+      let cursor: string | null = null;
+      do {
+        const params = new URLSearchParams();
+        if (type !== undefined) params.set("type", type);
+        if (cursor !== null) params.set("cursor", cursor);
+        const query = params.size === 0 ? "" : `?${params.toString()}`;
+        const page = await requestJson<{
+          publications: PublicationSummary[];
+          nextCursor: string | null;
+        }>(tenantId, `/publications${query}`);
+        all.push(...page.publications);
+        cursor = page.nextCursor;
+      } while (cursor !== null);
+      return all;
     },
     async uploadAsset(tenantId: string, file: File): Promise<{ id: string }> {
       const response = await authedFetch(

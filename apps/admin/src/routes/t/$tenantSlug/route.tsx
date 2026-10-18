@@ -1,11 +1,11 @@
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, type ComponentType, type ReactNode } from "react";
-import type { SyncStatus } from "@plyrs/sync-client";
 import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { ApiError } from "../../../lib/api-client";
 import { resetClientSession } from "../../../lib/client-session";
+import { SYNC_STATUS_LABELS } from "../../../lib/labels";
 import { tenantsQueryOptions } from "../../../lib/queries";
 import { TenantSyncProvider, useSyncStatus } from "../../../lib/sync-context";
 
@@ -81,14 +81,6 @@ const UntypedLink = Link as unknown as ComponentType<{
   className?: string;
   children: ReactNode;
 }>;
-
-const SYNC_STATUS_LABELS: Record<SyncStatus, string> = {
-  idle: "待機",
-  connecting: "接続中",
-  syncing: "同期中",
-  ready: "同期済み",
-  closed: "切断",
-};
 
 function ShellLayout() {
   const { tenant, slots, api, tokens, queryClient, sync } = Route.useRouteContext();
