@@ -27,13 +27,30 @@ function Harness({ onConfirm }: { onConfirm: () => void }) {
 }
 
 describe("ConfirmDialog", () => {
-  it("危険な確認は alertdialog で、実行ボタンに初期フォーカスがある", async () => {
+  it("危険な確認は alertdialog で、キャンセルに初期フォーカスがある", async () => {
     const user = userEvent.setup();
     render(<Harness onConfirm={() => {}} />);
     await user.click(screen.getByRole("button", { name: "削除" }));
     const dialog = await screen.findByRole("alertdialog", { name: "お知らせを削除しますか？" });
     expect(dialog).toHaveTextContent("元に戻せません");
-    expect(screen.getByRole("button", { name: "削除する" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "キャンセル" })).toHaveFocus();
+  });
+
+  it("tone=primary の確認は dialog で、実行ボタンに初期フォーカスがある", async () => {
+    render(
+      <ConfirmDialog
+        isOpen
+        onOpenChange={() => {}}
+        title="公開しますか？"
+        confirmLabel="公開する"
+        tone="primary"
+        onConfirm={() => {}}
+      >
+        サイトに表示されます。
+      </ConfirmDialog>,
+    );
+    await screen.findByRole("dialog", { name: "公開しますか？" });
+    expect(screen.getByRole("button", { name: "公開する" })).toHaveFocus();
   });
 
   it("キャンセルで閉じて開いたボタンへフォーカスを戻し、実行は呼ばない", async () => {

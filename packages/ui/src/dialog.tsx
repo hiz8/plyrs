@@ -134,12 +134,14 @@ export function ConfirmDialog({
       showCloseButton={false}
       footer={
         <>
-          <Button variant="secondary" slot="close">
+          {/* 8 章(2026-10-18 裁定): 危険な確認はキャンセルに初期フォーカスを置き、開いた直後の Enter で
+              実行されないようにする(WAI-ARIA APG の alertdialog)。primary は実行ボタンに置く */}
+          <Button variant="secondary" slot="close" autoFocus={tone === "danger"}>
             {cancelLabel}
           </Button>
           <Button
             variant={tone === "danger" ? "danger" : "primary"}
-            autoFocus
+            autoFocus={tone !== "danger"}
             isDisabled={isPending ?? false}
             onPress={onConfirm}
           >
