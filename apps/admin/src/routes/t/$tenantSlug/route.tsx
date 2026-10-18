@@ -4,6 +4,7 @@ import { useEffect, useMemo, type ComponentType, type ReactNode } from "react";
 import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { ApiError } from "../../../lib/api-client";
+import { resetClientSession } from "../../../lib/client-session";
 import { SYNC_STATUS_LABELS } from "../../../lib/labels";
 import { tenantsQueryOptions } from "../../../lib/queries";
 import { TenantSyncProvider, useSyncStatus } from "../../../lib/sync-context";
@@ -108,8 +109,7 @@ function ShellLayout() {
     } catch {
       // サーバー側 revoke の失敗とローカル資格情報の破棄は独立の関心 — ローカルは必ず破棄する
     }
-    tokens.clear();
-    queryClient.clear();
+    resetClientSession({ queryClient, tokens });
     await navigate({ to: "/login" });
   }
 
