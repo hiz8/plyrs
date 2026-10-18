@@ -81,7 +81,7 @@
 
 - 7 日以内は相対表記(「たった今」「10 分前」「3 時間前」「昨日」「3 日前」)、それより前は「2026/10/17 10:00」
 - 相対表記にはツールチップで日時を添える
-- タイムゾーンと書式はブラウザの設定に従う(`Intl.DateTimeFormat`、`Intl.RelativeTimeFormat` を使う)
+- タイムゾーンはブラウザの設定に従い、書式は画面全体が日本語のため `ja` に固定する(`Intl.DateTimeFormat`、`Intl.RelativeTimeFormat` を使う。`apps/admin/src/lib/datetime.ts`)
 - 現在 ISO 形式のまま表示している箇所(一覧の更新日時、公開状態パネルの公開日時)はすべて置き換える
 
 ## 6. 状態の表示

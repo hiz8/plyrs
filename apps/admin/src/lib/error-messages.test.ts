@@ -1,6 +1,8 @@
+import { SyncRejectedError } from "@plyrs/sync-client";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "./api-client";
 import { ERROR_MESSAGES, NETWORK_ERROR_MESSAGE, errorCodeOf, errorMessage } from "./error-messages";
+import { NetworkError } from "./network-error";
 import { SuperApiError } from "./super-api";
 
 const FALLBACK = "保存できませんでした。もう一度お試しください";
@@ -25,11 +27,12 @@ describe("errorMessage", () => {
     expect(errorMessage(new SuperApiError(409, "slug_taken"), FALLBACK)).toBe(
       ERROR_MESSAGES.slug_taken,
     );
-    const rejected = Object.assign(new Error("dup"), {
-      name: "SyncRejectedError",
-      code: "unique_violation",
-    });
-    expect(errorMessage(rejected, FALLBACK)).toBe(ERROR_MESSAGES.unique_violation);
+    expect(errorMessage(new SyncRejectedError("unique_violation", "dup"), FALLBACK)).toBe(
+      ERROR_MESSAGES.unique_violation,
+    );
+    expect(errorMessage({ ok: false, code: "not_found", message: "x" }, FALLBACK)).toBe(
+      ERROR_MESSAGES.not_found,
+    );
   });
 
   it("対応表に無いコードは汎用の文にする", () => {
@@ -42,8 +45,16 @@ describe("errorMessage", () => {
     expect(errorMessage(new ApiError(400, "__proto__"), FALLBACK)).toBe(FALLBACK);
   });
 
-  it("fetch のネットワークの失敗(TypeError)は接続の確認を促す", () => {
-    expect(errorMessage(new TypeError("Failed to fetch"), FALLBACK)).toBe(NETWORK_ERROR_MESSAGE);
+  it("fetch のネットワークの失敗(NetworkError)は接続の確認を促す", () => {
+    expect(errorMessage(new NetworkError(new TypeError("Failed to fetch")), FALLBACK)).toBe(
+      NETWORK_ERROR_MESSAGE,
+    );
+  });
+
+  it("fetch 以外の TypeError(画面のバグ)は接続エラーに見せない", () => {
+    expect(errorMessage(new TypeError("Cannot read properties of undefined"), FALLBACK)).toBe(
+      FALLBACK,
+    );
   });
 
   it("コードの無い例外や Error 以外の値は汎用の文にする", () => {
