@@ -5,6 +5,7 @@ import { Button, TextField } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { TurnstileWidget } from "../components/turnstile-widget";
 import { ApiError } from "../lib/api-client";
+import { resetClientSession } from "../lib/client-session";
 
 const styles = stylex.create({
   page: {
@@ -57,7 +58,7 @@ function messageFor(cause: unknown): string {
 }
 
 function LoginPage() {
-  const { api } = Route.useRouteContext();
+  const { api, queryClient, tokens } = Route.useRouteContext();
   const { siteKey } = Route.useLoaderData();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
@@ -102,6 +103,7 @@ function LoginPage() {
     setError(null);
     try {
       await api.login(email, password, token ?? undefined);
+      resetClientSession({ queryClient, tokens });
       await navigate({ to: "/tenants" });
     } catch (cause) {
       setError(messageFor(cause));

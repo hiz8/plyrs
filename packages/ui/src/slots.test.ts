@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createSlotRegistry } from "./slots";
 
+function Widget() {
+  return null;
+}
+
 describe("SlotRegistry (design-spec §9.9 論点P 初版)", () => {
   it("returns contributions sorted by order then id", () => {
     const registry = createSlotRegistry();
@@ -28,5 +32,31 @@ describe("SlotRegistry (design-spec §9.9 論点P 初版)", () => {
     registry.register("nav:item", { id: "a", label: "A", to: "/t/$tenantSlug/a", order: 0 });
     registry.get("nav:item").pop();
     expect(registry.get("nav:item").length).toBe(1);
+  });
+
+  it("keeps group and params on nav items (案 A 4 章)", () => {
+    const registry = createSlotRegistry();
+    registry.register("nav:item", {
+      id: "booking.calendar",
+      label: "予約カレンダー",
+      to: "/t/$tenantSlug/records/$typeKey",
+      params: { typeKey: "booking.slot" },
+      group: "module:booking",
+      order: 0,
+    });
+    expect(registry.get("nav:item")[0]).toMatchObject({
+      params: { typeKey: "booking.slot" },
+      group: "module:booking",
+    });
+  });
+
+  it("registers home widgets in order (案 B 2.5)", () => {
+    const registry = createSlotRegistry();
+    registry.register("home:widget", { id: "b", title: "B", order: 1, render: Widget });
+    registry.register("home:widget", { id: "a", title: "今日の予約", order: 0, render: Widget });
+    expect(registry.get("home:widget").map((widget) => widget.title)).toStrictEqual([
+      "今日の予約",
+      "B",
+    ]);
   });
 });

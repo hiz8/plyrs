@@ -3,6 +3,7 @@ import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-rout
 import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { ApiError } from "../lib/api-client";
+import { resetClientSession } from "../lib/client-session";
 import { tenantsQueryOptions } from "../lib/queries";
 
 const styles = stylex.create({
@@ -70,8 +71,7 @@ function TenantsPage() {
     } catch {
       // サーバー側 revoke の失敗とローカル資格情報の破棄は独立の関心 — ローカルは必ず破棄する
     }
-    tokens.clear();
-    queryClient.clear();
+    resetClientSession({ queryClient, tokens });
     await router.navigate({ to: "/login" });
   }
 
@@ -85,7 +85,7 @@ function TenantsPage() {
           {tenants.map((tenant) => (
             <li key={tenant.id}>
               <Link
-                to="/t/$tenantSlug/content-types"
+                to="/t/$tenantSlug/settings/content-types"
                 params={{ tenantSlug: tenant.slug }}
                 {...stylex.props(styles.item)}
               >

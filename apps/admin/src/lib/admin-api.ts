@@ -45,6 +45,9 @@ export interface AssetUsageEntry {
 export interface ModuleSummary {
   moduleId: string;
   name: string;
+  // 案 G 5 章の説明文と、案 A 3.2 のサイドバーに出す型の key
+  description: string | null;
+  navTypes: string[];
   version: number;
   enabled: boolean;
   appliedVersion: number;
@@ -109,6 +112,14 @@ export function createAdminApi(
         { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify(definition) },
       );
       return result.contentType;
+    },
+    // 案 E 5.4: コンテンツが 0 件の型だけ削除できる(1 件以上は ApiError の type_not_empty)
+    async deleteContentType(tenantId: string, key: string): Promise<void> {
+      await requestJson<{ ok: true; key: string }>(
+        tenantId,
+        `/content-types/${encodeURIComponent(key)}`,
+        { method: "DELETE" },
+      );
     },
     async publishRecord(tenantId: string, recordId: string): Promise<void> {
       await requestJson<{ ok: true }>(tenantId, `/records/${recordId}/publish`, {
