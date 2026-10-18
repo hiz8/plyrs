@@ -9,7 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { useLeaveGuard } from "./use-leave-guard";
 
 function Editor({ dirty }: { dirty: boolean }) {
@@ -60,6 +60,19 @@ function goToOther(router: TestRouter) {
   });
 }
 
+// createBrowserHistory は window にリスナーを登録し、destroy() でしか外さない
+const browserHistories: ReturnType<typeof createBrowserHistory>[] = [];
+function browserHistory() {
+  const history = createBrowserHistory();
+  browserHistories.push(history);
+  return history;
+}
+afterEach(() => {
+  for (const history of browserHistories.splice(0)) {
+    history.destroy();
+  }
+});
+
 describe("useLeaveGuard (案 C 7 章)", () => {
   it("lets navigation through when there are no unsaved edits", async () => {
     const router = renderEditor(false);
@@ -81,9 +94,19 @@ describe("useLeaveGuard (案 C 7 章)", () => {
     expect(await screen.findByRole("heading", { name: "ほかの画面" })).toBeInTheDocument();
   });
 
+  it("lets the app's own navigation through with ignoreBlocker (案 C 6 章)", async () => {
+    const router = renderEditor(true);
+    await screen.findByRole("heading", { name: "編集画面" });
+    await act(async () => {
+      await router.navigate({ href: "/other", replace: true, ignoreBlocker: true });
+    });
+    expect(await screen.findByRole("heading", { name: "ほかの画面" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("asks the browser to confirm closing or reloading the tab only while dirty", async () => {
     // beforeunload の確認はブラウザの履歴(createBrowserHistory)でだけ登録される
-    renderEditor(true, createBrowserHistory());
+    renderEditor(true, browserHistory());
     await screen.findByRole("heading", { name: "編集画面" });
     const dirtyEvent = new Event("beforeunload", { cancelable: true });
     window.dispatchEvent(dirtyEvent);
@@ -91,7 +114,7 @@ describe("useLeaveGuard (案 C 7 章)", () => {
   });
 
   it("does not ask the browser to confirm when clean", async () => {
-    renderEditor(false, createBrowserHistory());
+    renderEditor(false, browserHistory());
     await screen.findByRole("heading", { name: "編集画面" });
     const cleanEvent = new Event("beforeunload", { cancelable: true });
     window.dispatchEvent(cleanEvent);

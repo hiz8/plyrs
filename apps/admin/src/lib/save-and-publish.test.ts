@@ -61,6 +61,18 @@ describe("saveAndPublish (案 C 4 章)", () => {
     expect(s.publish).not.toHaveBeenCalled();
   });
 
+  it("turns a throwing validation into a validate failure", async () => {
+    const cause = new Error("boom");
+    const s = steps({
+      validate: () => {
+        throw cause;
+      },
+    });
+    expect(await saveAndPublish(s)).toStrictEqual({ ok: false, stage: "validate", cause });
+    expect(s.save).not.toHaveBeenCalled();
+    expect(s.publish).not.toHaveBeenCalled();
+  });
+
   it("does not publish when the save fails, and flags body conflicts", async () => {
     const conflict = Object.assign(new Error("conflict"), { code: "conflict" });
     const s = steps({ save: async () => Promise.reject(conflict) });
@@ -110,6 +122,33 @@ describe("useSaveAndPublish", () => {
       await pending;
     });
     expect(result.current.phase).toBe("idle");
+    expect(result.current.result).toStrictEqual({ ok: true, outcome: "published" });
+  });
+
+  it("does not start a second run while one is in flight", async () => {
+    const release = { validate: (_valid: boolean) => {} };
+    const s = steps({
+      validate: () =>
+        new Promise<boolean>((resolve) => {
+          release.validate = resolve;
+        }),
+    });
+    const { result } = renderHook(() => useSaveAndPublish());
+
+    let first: Promise<unknown> = Promise.resolve();
+    let second: Promise<unknown> = Promise.resolve();
+    act(() => {
+      // 検証の await 中は phase が idle のまま。ここで 2 回目が押されても同じ実行を返す
+      first = result.current.run(s);
+      second = result.current.run(s);
+    });
+    expect(second).toBe(first);
+    await act(async () => {
+      release.validate(true);
+      await first;
+    });
+    expect(s.save).toHaveBeenCalledTimes(1);
+    expect(s.publish).toHaveBeenCalledTimes(1);
     expect(result.current.result).toStrictEqual({ ok: true, outcome: "published" });
   });
 

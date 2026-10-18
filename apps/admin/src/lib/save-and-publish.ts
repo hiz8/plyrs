@@ -20,7 +20,8 @@ export interface SaveAndPublishSteps {
 export type SaveAndPublishResult =
   | { ok: true; outcome: "published" | "updated" }
   | { ok: false; stage: "offline" }
-  | { ok: false; stage: "validate" }
+  // cause: 検証そのものが例外を投げたとき(false を返しただけなら無し)
+  | { ok: false; stage: "validate"; cause?: unknown }
   // conflict: 本文の競合。既存の競合ダイアログで解決してから、利用者がもう一度押す
   | { ok: false; stage: "save"; conflict: boolean; cause: unknown }
   // 保存は確定済み。再試行は公開だけを行う
@@ -50,7 +51,13 @@ export async function saveAndPublish(steps: SaveAndPublishSteps): Promise<SaveAn
   if (!steps.connected) {
     return { ok: false, stage: "offline" };
   }
-  if (!(await steps.validate())) {
+  let valid: boolean;
+  try {
+    valid = await steps.validate();
+  } catch (cause) {
+    return { ok: false, stage: "validate", cause };
+  }
+  if (!valid) {
     return { ok: false, stage: "validate" };
   }
   if (steps.save !== undefined) {
@@ -69,6 +76,7 @@ export interface SaveAndPublishState {
   phase: SaveAndPublishPhase;
   /** 直近の実行結果(実行中・未実行は null) */
   result: SaveAndPublishResult | null;
+  /** 実行中に呼ばれたら新たに実行せず、実行中の Promise を返す(ダブルクリック等の二重実行を防ぐ) */
   run: (steps: SaveAndPublishSteps) => Promise<SaveAndPublishResult>;
   /** 公開の段階で失敗したときだけ使える。保存は確定済みのため公開だけをやり直す */
   retryPublish: () => Promise<SaveAndPublishResult> | null;
@@ -79,10 +87,14 @@ export function useSaveAndPublish(): SaveAndPublishState {
   const [phase, setPhase] = useState<SaveAndPublishPhase>("idle");
   const [result, setResult] = useState<SaveAndPublishResult | null>(null);
   const lastSteps = useRef<SaveAndPublishSteps | null>(null);
-  const running = useRef(false);
+  // 実行中の Promise。validate の await 中は phase が idle のままなので、ボタンの無効化だけでは
+  // 二重実行(保存と公開 API の二重呼び出し、後着の結果による result の上書き)を防げない
+  const inFlight = useRef<Promise<SaveAndPublishResult> | null>(null);
 
-  const execute = useCallback(async (steps: SaveAndPublishSteps, publishOnlyRetry: boolean) => {
-    running.current = true;
+  const execute = useCallback((steps: SaveAndPublishSteps, publishOnlyRetry: boolean) => {
+    if (inFlight.current !== null) {
+      return inFlight.current;
+    }
     lastSteps.current = steps;
     setResult(null);
     const tracked: SaveAndPublishSteps = {
@@ -99,21 +111,30 @@ export function useSaveAndPublish(): SaveAndPublishState {
         await steps.publish();
       },
     };
-    try {
-      const next = publishOnlyRetry ? await publishOnly(tracked) : await saveAndPublish(tracked);
-      setResult(next);
-      return next;
-    } finally {
-      running.current = false;
-      setPhase("idle");
-    }
+    // saveAndPublish / publishOnly は各段階の例外を結果に変換するため reject しない
+    const promise = (publishOnlyRetry ? publishOnly(tracked) : saveAndPublish(tracked))
+      .then((next) => {
+        setResult(next);
+        return next;
+      })
+      .finally(() => {
+        inFlight.current = null;
+        setPhase("idle");
+      });
+    inFlight.current = promise;
+    return promise;
   }, []);
 
   const run = useCallback((steps: SaveAndPublishSteps) => execute(steps, false), [execute]);
 
   const retryPublish = useCallback(() => {
     const steps = lastSteps.current;
-    if (running.current || steps === null || result?.ok !== false || result.stage !== "publish") {
+    if (
+      inFlight.current !== null ||
+      steps === null ||
+      result?.ok !== false ||
+      result.stage !== "publish"
+    ) {
       return null;
     }
     return execute(steps, true);
