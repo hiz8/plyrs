@@ -1,8 +1,9 @@
 import * as stylex from "@stylexjs/stylex";
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { createContext, useContext, useId, type ReactNode } from "react";
 import {
   Button as RacButton,
+  VisuallyHidden,
   type ButtonProps as RacButtonProps,
   type ButtonRenderProps,
 } from "react-aria-components";
@@ -91,7 +92,60 @@ const styles = stylex.create({
     outlineOffset: stroke.focus,
   },
   disabled: { opacity: 0.5, cursor: "not-allowed" },
+  disabledCursor: { cursor: "not-allowed" },
+  reasonLine: { display: "block" },
 });
+
+/**
+ * @internal 親が無効の見た目(opacity)を既に持つとき、中のボタンの opacity を重ねないために使う
+ * (drop-zone.tsx)。操作の無効化は isDisabled のまま行う
+ */
+export const DisabledAppearanceInheritedContext = createContext(false);
+
+interface DisabledReasonResult {
+  /** RAC の Button へ渡す props(押下の処理を外し、isDisabled を使わない) */
+  racProps: RacButtonProps;
+  /** disabledReason があり、無効として振る舞うか */
+  isInert: boolean;
+  /** aria-describedby で結ぶ、視覚的に隠した理由の文言 */
+  reason: ReactNode;
+}
+
+// h-common-surface.md 7 章: 無効にして理由を添える。RAC の isDisabled はフォーカスを受けなくなるため使わず、
+// aria-disabled + 押下の処理を外す形にし、理由をツールチップと aria-describedby で伝える
+function useDisabledReason(
+  props: RacButtonProps,
+  disabledReason: string | undefined,
+): DisabledReasonResult {
+  const reasonId = useId();
+  if (disabledReason === undefined) return { racProps: props, isInert: false, reason: null };
+  const {
+    onPress: _onPress,
+    onPressStart: _onPressStart,
+    onPressEnd: _onPressEnd,
+    onPressChange: _onPressChange,
+    onPressUp: _onPressUp,
+    isDisabled: _isDisabled,
+    type: _type,
+    ...rest
+  } = props;
+  const describedBy = [props["aria-describedby"], reasonId].filter(Boolean).join(" ");
+  return {
+    racProps: {
+      ...rest,
+      // submit / reset でもフォームへ作用させない
+      type: "button",
+      "aria-disabled": "true",
+      "aria-describedby": describedBy,
+    },
+    isInert: true,
+    reason: (
+      <VisuallyHidden elementType="span" id={reasonId}>
+        {disabledReason}
+      </VisuallyHidden>
+    ),
+  };
+}
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "link" | "dangerLink";
 export type ButtonSize = "md" | "sm";
@@ -110,6 +164,11 @@ export interface ButtonProps extends Omit<RacButtonProps, "className" | "style" 
   /** 文字の左に置く Lucide のアイコン(装飾。読み上げない) */
   icon?: LucideIcon;
   children?: ReactNode;
+  /**
+   * 押せない理由。指定すると、フォーカスを受けたまま無効として振る舞い(aria-disabled)、
+   * 理由をツールチップと aria-describedby で伝える。isDisabled より優先する
+   */
+  disabledReason?: string;
 }
 
 export function Button({
@@ -117,25 +176,40 @@ export function Button({
   size: buttonSize = "md",
   icon: Icon,
   children,
+  disabledReason,
   ...props
 }: ButtonProps) {
   const [normal, hovered, pressed] = VARIANT_STYLES[variant];
-  return (
+  const inheritsDisabled = useContext(DisabledAppearanceInheritedContext);
+  const { racProps, isInert, reason } = useDisabledReason(props, disabledReason);
+  const button = (
     <RacButton
-      {...props}
+      {...racProps}
       className={stylexRenderProps<ButtonRenderProps>((state) => [
         styles.base,
         buttonSize === "sm" && styles.sm,
         normal,
-        state.isHovered && hovered,
-        state.isPressed && pressed,
+        !isInert && state.isHovered && hovered,
+        !isInert && state.isPressed && pressed,
         state.isFocusVisible && styles.focusVisible,
-        state.isDisabled && styles.disabled,
+        (isInert || state.isDisabled) &&
+          (inheritsDisabled ? styles.disabledCursor : styles.disabled),
       ])}
     >
       {Icon !== undefined && <Icon size={ICON_SIZE.inline} aria-hidden="true" />}
       {children}
     </RacButton>
+  );
+  // 理由の文言はボタンの外に置く(中に置くと名前に混ざる)
+  return disabledReason === undefined ? (
+    button
+  ) : (
+    <Tooltip content={disabledReason}>
+      <>
+        {button}
+        {reason}
+      </>
+    </Tooltip>
   );
 }
 
@@ -147,31 +221,49 @@ export interface IconButtonProps extends Omit<
   /** aria-label とツールチップの文言(h-common-surface.md 12 章: アイコンのみのボタンは必須) */
   label: string;
   size?: ButtonSize;
+  /** Button の disabledReason と同じ。名前は label のまま、理由を説明として結ぶ */
+  disabledReason?: string;
 }
 
 export function IconButton({
   icon: Icon,
   label,
   size: buttonSize = "md",
+  disabledReason,
   ...props
 }: IconButtonProps) {
+  const { racProps, isInert, reason } = useDisabledReason(props, disabledReason);
+  // 理由があるときはツールチップにラベルと理由を 2 行で出す。読み上げは名前(aria-label)と
+  // 説明(aria-describedby)で両方が伝わり、見える側もラベルを失わない
+  const content =
+    disabledReason === undefined ? (
+      label
+    ) : (
+      <>
+        <span {...stylex.props(styles.reasonLine)}>{label}</span>
+        <span {...stylex.props(styles.reasonLine)}>{disabledReason}</span>
+      </>
+    );
   return (
-    <Tooltip content={label}>
-      <RacButton
-        {...props}
-        aria-label={label}
-        className={stylexRenderProps<ButtonRenderProps>((state) => [
-          styles.base,
-          styles.ghost,
-          buttonSize === "sm" ? styles.iconSm : styles.iconMd,
-          state.isHovered && styles.ghostHovered,
-          state.isPressed && styles.ghostPressed,
-          state.isFocusVisible && styles.focusVisible,
-          state.isDisabled && styles.disabled,
-        ])}
-      >
-        <Icon size={ICON_SIZE.inline} aria-hidden="true" />
-      </RacButton>
+    <Tooltip content={content}>
+      <>
+        <RacButton
+          {...racProps}
+          aria-label={label}
+          className={stylexRenderProps<ButtonRenderProps>((state) => [
+            styles.base,
+            styles.ghost,
+            buttonSize === "sm" ? styles.iconSm : styles.iconMd,
+            !isInert && state.isHovered && styles.ghostHovered,
+            !isInert && state.isPressed && styles.ghostPressed,
+            state.isFocusVisible && styles.focusVisible,
+            (isInert || state.isDisabled) && styles.disabled,
+          ])}
+        >
+          <Icon size={ICON_SIZE.inline} aria-hidden="true" />
+        </RacButton>
+        {reason}
+      </>
     </Tooltip>
   );
 }

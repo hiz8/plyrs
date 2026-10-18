@@ -68,3 +68,75 @@ describe("IconButton", () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("disabledReason(無効の理由を添える)", () => {
+  it("Button はフォーカスでき、aria-disabled と理由の説明を持ち、押しても何もしない", async () => {
+    const user = userEvent.setup();
+    const onPress = vi.fn();
+    render(
+      <Button onPress={onPress} disabledReason="公開中は削除できません">
+        削除
+      </Button>,
+    );
+    const button = screen.getByRole("button", { name: "削除" });
+    await user.tab();
+    expect(button).toHaveFocus();
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(button).not.toBeDisabled();
+    expect(button).toHaveAccessibleDescription("公開中は削除できません");
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("公開中は削除できません");
+    await user.keyboard("{Enter}");
+    await user.click(button);
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it("isDisabled より disabledReason を優先する", () => {
+    render(
+      <Button isDisabled disabledReason="権限がありません">
+        公開
+      </Button>,
+    );
+    const button = screen.getByRole("button", { name: "公開" });
+    expect(button).not.toBeDisabled();
+    expect(button).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("type が submit でもフォームを送信しない", async () => {
+    const onSubmit = vi.fn((event: { preventDefault: () => void }) => event.preventDefault());
+    render(
+      <form onSubmit={onSubmit}>
+        <Button type="submit" disabledReason="必須の項目が未入力です">
+          保存
+        </Button>
+      </form>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await user.keyboard("{Enter}");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("IconButton は名前にラベル、説明に理由を持ち、ツールチップに両方を出す", async () => {
+    const user = userEvent.setup();
+    const onPress = vi.fn();
+    render(
+      <IconButton
+        icon={X}
+        label="削除"
+        onPress={onPress}
+        disabledReason="公開中は削除できません"
+      />,
+    );
+    const button = screen.getByRole("button", { name: "削除" });
+    await user.tab();
+    expect(button).toHaveFocus();
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(button).toHaveAccessibleDescription("公開中は削除できません");
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toHaveTextContent("削除");
+    expect(tooltip).toHaveTextContent("公開中は削除できません");
+    await user.keyboard("{Enter}");
+    await user.click(button);
+    expect(onPress).not.toHaveBeenCalled();
+  });
+});
