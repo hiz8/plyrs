@@ -11,6 +11,9 @@ export interface FieldDraft {
   key: string;
   type: FieldDefinition["type"];
   required: boolean;
+  /** 案 E 2.1: 表示名と説明(空文字 = 未指定) */
+  label: string;
+  description: string;
   maxLength: string;
   integer: boolean;
   /** 1 行 1 選択肢。"value=ラベル"(ラベル省略時は value がラベル) */
@@ -31,6 +34,8 @@ export function emptyFieldDraft(): FieldDraft {
     key: "",
     type: "text",
     required: false,
+    label: "",
+    description: "",
     maxLength: "",
     integer: false,
     optionsText: "",
@@ -49,6 +54,8 @@ export function toFieldDraft(field: FieldDefinition): FieldDraft {
   draft.key = field.key;
   draft.type = field.type;
   draft.required = field.required ?? false;
+  draft.label = field.label ?? "";
+  draft.description = field.description ?? "";
   switch (field.type) {
     case "text":
       draft.maxLength = field.config?.maxLength === undefined ? "" : String(field.config.maxLength);
@@ -100,6 +107,8 @@ function fromFieldDraft(
   const base = {
     key: draft.key,
     ...(draft.required ? { required: true } : {}),
+    ...(draft.label.trim() === "" ? {} : { label: draft.label.trim() }),
+    ...(draft.description.trim() === "" ? {} : { description: draft.description.trim() }),
   };
   const indexed = draft.indexed ? true : undefined;
   const unique = draft.unique ? true : undefined;
@@ -169,21 +178,52 @@ export type BuildDefinitionResult =
   | { ok: true; definition: ContentTypeDefinition }
   | { ok: false; errors: string[] };
 
+// 案 E 2.2 の型の表示項目。現行のフォームには入力欄が無いため、編集時は既存の値を引き継ぐ。
+export interface ContentTypeDisplay {
+  description?: string;
+  titleField?: string;
+  listColumns?: string[];
+  menuOrder?: number;
+}
+
+export function displayOf(row: ContentTypeSummary | null): ContentTypeDisplay {
+  if (row === null) {
+    return {};
+  }
+  return summaryToDefinition(row);
+}
+
+// フィールドの削除や種類の変更で参照先が無くなった titleField / listColumns は落とす
+// (入力欄の無い項目の検証エラーで保存できなくなるのを避ける。titleField は最初の text に戻る)
+function pickDisplay(display: ContentTypeDisplay, fields: { key: string; type: string }[]) {
+  const titleTarget = fields.find((field) => field.key === display.titleField);
+  const listColumns = display.listColumns?.filter((key) =>
+    fields.some((field) => field.key === key),
+  );
+  return {
+    ...(display.description === undefined ? {} : { description: display.description }),
+    ...(titleTarget?.type === "text" ? { titleField: titleTarget.key } : {}),
+    ...(listColumns === undefined || listColumns.length === 0 ? {} : { listColumns }),
+    ...(display.menuOrder === undefined ? {} : { menuOrder: display.menuOrder }),
+  };
+}
+
 export function buildDefinition(args: {
   id: string;
   key: string;
   name: string;
   drafts: FieldDraft[];
   version: number;
+  display?: ContentTypeDisplay;
 }): BuildDefinitionResult {
   const errors: string[] = [];
-  const fields: unknown[] = [];
+  const fields: { key: string; type: string }[] = [];
   for (const draft of args.drafts) {
     const converted = fromFieldDraft(draft);
     if (!converted.ok) {
       errors.push(converted.error);
     } else {
-      fields.push(converted.field);
+      fields.push(converted.field as { key: string; type: string });
     }
   }
   if (errors.length > 0) {
@@ -196,6 +236,7 @@ export function buildDefinition(args: {
     fields,
     source: "user",
     version: args.version,
+    ...pickDisplay(args.display ?? {}, fields),
   });
   if (!parsed.success) {
     return {
@@ -228,5 +269,9 @@ export function summaryToDefinition(row: ContentTypeSummary): ContentTypeDefinit
     source: row.source,
     ...(row.pluginId === null ? {} : { pluginId: row.pluginId }),
     version: row.version,
+    ...(row.description === null ? {} : { description: row.description }),
+    ...(row.titleField === null ? {} : { titleField: row.titleField }),
+    ...(row.listColumns === null ? {} : { listColumns: row.listColumns }),
+    ...(row.menuOrder === null ? {} : { menuOrder: row.menuOrder }),
   };
 }

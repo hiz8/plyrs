@@ -1,6 +1,6 @@
 import type { ContentTypeDefinition, RelationRef, WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import { loadContentTypeByKey, rowToDefinition } from "../do/content-types";
+import { loadAllContentTypeRows, loadContentTypeByKey, rowToDefinition } from "../do/content-types";
 import { loadRelationRefs } from "../do/write-record";
 
 export const SYNC_PAGE_SIZE = 100;
@@ -15,16 +15,6 @@ interface RawSyncRow extends Record<string, SqlStorageValue> {
   deleted_at: string | null;
   updated_at: string;
   updated_by: string;
-  version: number;
-}
-
-interface RawContentTypeRow extends Record<string, SqlStorageValue> {
-  id: string;
-  key: string;
-  name: string;
-  fields: string;
-  source: string;
-  plugin_id: string | null;
   version: number;
 }
 
@@ -101,22 +91,7 @@ export function loadSyncRecordsSince(
 }
 
 export function loadAllContentTypes(sql: SqlStorage): ContentTypeDefinition[] {
-  const rows = sql
-    .exec<RawContentTypeRow>("SELECT * FROM content_types ORDER BY key ASC")
-    .toArray();
-  return rows.map((row) =>
-    rowToDefinition({
-      id: row.id,
-      key: row.key,
-      name: row.name,
-      fields: JSON.parse(row.fields),
-      source: row.source as "user" | "plugin" | "system",
-      pluginId: row.plugin_id,
-      createdAt: "",
-      updatedAt: "",
-      version: row.version,
-    }),
-  );
+  return loadAllContentTypeRows(sql).map(rowToDefinition);
 }
 
 export function currentServerSeq(sql: SqlStorage): number {

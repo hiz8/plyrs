@@ -29,6 +29,20 @@
       "when": 1784343723501,
       "tag": "0003_high_sersi",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792248377604,
+      "tag": "0004_aberrant_killraven",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792297747832,
+      "tag": "0005_famous_mister_sinister",
+      "breakpoints": true
     }
   ]
 }
