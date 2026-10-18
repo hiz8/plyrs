@@ -37,3 +37,5 @@ export { Badge, type BadgeProps, type BadgeTone } from "./badge";
 export { Banner, type BannerProps } from "./banner";
 export { EmptyState, type EmptyStateProps } from "./empty-state";
 export { Skeleton, type SkeletonProps } from "./skeleton";
+export { ProgressBar, Spinner, type ProgressBarProps } from "./progress";
+export { RelativeTime, type RelativeTimeValue } from "./relative-time";
