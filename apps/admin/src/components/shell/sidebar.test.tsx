@@ -137,8 +137,42 @@ describe("Sidebar", () => {
   });
 
   it("同期状態の 3 状態", () => {
+    renderSidebar({ syncState: "ready" });
+    expect(screen.getByRole("status")).toHaveTextContent("同期済み");
+    cleanup();
+    renderSidebar({ syncState: "syncing" });
+    expect(screen.getByRole("status")).toHaveTextContent("同期中…");
+    cleanup();
     renderSidebar({ syncState: "disconnected" });
     expect(screen.getByRole("status")).toHaveTextContent("再接続しています…");
+  });
+
+  it("設定の下位ページでは「設定」が現在地になる", () => {
+    renderSidebar({ pathname: "/t/blog/settings/modules" });
+    expect(screen.getByRole("link", { name: "設定" })).toHaveAttribute("aria-current", "page");
+  });
+
+  const settingsSlot = {
+    id: "x.settings",
+    label: "拡張設定",
+    to: "/t/$tenantSlug/settings/x",
+    order: 0,
+    group: "settings",
+  } as const;
+
+  it("設定が出ない役割には settings 群の slot 項目も出さない", () => {
+    renderSidebar({ tenant: { ...tenant, role: "viewer" }, slotItems: [settingsSlot] });
+    expect(screen.queryByRole("link", { name: "拡張設定" })).not.toBeInTheDocument();
+  });
+
+  it("settings 群の slot 項目は「設定」の直後に並ぶ", () => {
+    renderSidebar({ slotItems: [settingsSlot] });
+    const nav = screen.getByRole("navigation", { name: "メインナビゲーション" });
+    const bottom = nav.nextElementSibling as HTMLElement;
+    const names = within(bottom)
+      .getAllByRole("link")
+      .map((a) => a.textContent);
+    expect(names).toEqual(["設定", "拡張設定"]);
   });
 
   it("slot の項目はモジュールの見出しの下、未指定は中段の最後、無効なモジュールの群は出さない", () => {

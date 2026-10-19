@@ -61,14 +61,14 @@ export interface AccountMenuProps {
 export function AccountMenu({ email, canSwitchSite, onOpenSiteList, onLogout }: AccountMenuProps) {
   return (
     <Menu
-      label="アカウント"
+      label={NAV_LABELS.account}
       placement="top start"
       onAction={(id) =>
         id === "sites" ? onOpenSiteList() : id === "logout" ? onLogout() : undefined
       }
       trigger={
         <Button
-          aria-label="アカウント"
+          aria-label={NAV_LABELS.account}
           className={stylexRenderProps<ButtonRenderProps>((state) => [
             styles.trigger,
             state.isHovered && styles.hovered,
@@ -87,11 +87,13 @@ export function AccountMenu({ email, canSwitchSite, onOpenSiteList, onLogout }: 
     >
       <MenuSection {...(email === undefined ? {} : { title: email })}>
         {canSwitchSite && (
-          <MenuItem id="sites" icon={ArrowUpDown}>
-            {NAV_LABELS.switchSite}
-          </MenuItem>
+          <>
+            <MenuItem id="sites" icon={ArrowUpDown}>
+              {NAV_LABELS.switchSite}
+            </MenuItem>
+            <MenuSeparator />
+          </>
         )}
-        <MenuSeparator />
         <MenuItem id="logout" icon={LogOut}>
           {NAV_LABELS.logout}
         </MenuItem>

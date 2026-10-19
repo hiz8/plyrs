@@ -66,6 +66,7 @@ export const NAV_LABELS = {
   openSiteList: "サイト一覧を開く",
   logout: "ログアウト",
   mainNav: "メインナビゲーション",
+  account: "アカウント",
 } as const;
 
 export const SYNC_INDICATOR_LABELS: Record<SyncIndicatorState, string> = {

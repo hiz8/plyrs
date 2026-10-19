@@ -147,7 +147,10 @@ export function Sidebar(props: SidebarProps) {
   const moduleSlots = (moduleId: string) =>
     sortedSlots.filter((item) => item.group === `module:${moduleId}`);
   const ungroupedSlots = sortedSlots.filter((item) => item.group === undefined);
-  const settingsSlots = sortedSlots.filter((item) => item.group === "settings");
+  // "settings" 群は設定の直後に出すもの。設定が出ない役割には項目も出さない(案 A 4 章)
+  const visibleSettingsSlots = canManage
+    ? sortedSlots.filter((item) => item.group === "settings")
+    : [];
 
   // 現在地は 1 つだけ。同じ型が 2 群に出ても最初の 1 つに決まる
   const typeEntry = (key: string): NavEntry => ({
@@ -164,9 +167,11 @@ export function Sidebar(props: SidebarProps) {
     ...contentTypes.map((t) => typeEntry(t.key)),
     { key: "media", href: `${base}/media` },
     ...groups.flatMap((g) => g.types.map((t) => typeEntry(t.key))),
-    ...[...groups.flatMap((g) => moduleSlots(g.moduleId)), ...ungroupedSlots, ...settingsSlots].map(
-      (item) => ({ key: `slot:${item.id}`, href: slotHref(item) }),
-    ),
+    ...[
+      ...groups.flatMap((g) => moduleSlots(g.moduleId)),
+      ...ungroupedSlots,
+      ...visibleSettingsSlots,
+    ].map((item) => ({ key: `slot:${item.id}`, href: slotHref(item) })),
     ...(canManage ? [settingsEntry] : []),
   ];
   const active = activeNavKey(entries, pathname);
@@ -222,29 +227,31 @@ export function Sidebar(props: SidebarProps) {
       <nav aria-label={NAV_LABELS.mainNav} {...stylex.props(styles.middle)}>
         <NavLink href={base} label={NAV_LABELS.home} icon={House} isCurrent={active === "home"} />
         <NavHeading id="nav-content">{NAV_LABELS.content}</NavHeading>
-        {contentTypes.length > 0 ? (
-          typeLinks(contentTypes)
-        ) : !hasSynced ? (
-          // 型がまだ届いていないだけ。案内ではなく項目 36px に合わせた骨組みを出す
-          <div aria-busy="true" {...stylex.props(styles.skeletons)}>
-            <Skeleton height={20} />
-            <Skeleton height={20} />
-          </div>
-        ) : canManage ? (
-          <Link
-            href={`${base}/settings/content-types/new`}
-            className={stylexRenderProps<LinkRenderProps>((state) => [
-              styles.createLink,
-              state.isHovered && styles.createHover,
-              state.isFocusVisible && styles.createFocus,
-            ])}
-          >
-            <Plus size={ICON_SIZE.inline} aria-hidden="true" />
-            {NAV_LABELS.createFirstType}
-          </Link>
-        ) : (
-          <div {...stylex.props(styles.noTypes)}>{NAV_LABELS.noTypes}</div>
-        )}
+        <div role="group" aria-labelledby="nav-content" {...stylex.props(styles.group)}>
+          {contentTypes.length > 0 ? (
+            typeLinks(contentTypes)
+          ) : !hasSynced ? (
+            // 型がまだ届いていないだけ。案内ではなく項目 36px に合わせた骨組みを出す
+            <div aria-busy="true" {...stylex.props(styles.skeletons)}>
+              <Skeleton height={20} />
+              <Skeleton height={20} />
+            </div>
+          ) : canManage ? (
+            <Link
+              href={`${base}/settings/content-types/new`}
+              className={stylexRenderProps<LinkRenderProps>((state) => [
+                styles.createLink,
+                state.isHovered && styles.createHover,
+                state.isFocusVisible && styles.createFocus,
+              ])}
+            >
+              <Plus size={ICON_SIZE.inline} aria-hidden="true" />
+              {NAV_LABELS.createFirstType}
+            </Link>
+          ) : (
+            <div {...stylex.props(styles.noTypes)}>{NAV_LABELS.noTypes}</div>
+          )}
+        </div>
         <div {...stylex.props(styles.groupGap)}>
           <NavLink
             href={`${base}/media`}
@@ -258,7 +265,12 @@ export function Sidebar(props: SidebarProps) {
           // 型も slot 項目も無い群は見出しごと出さない
           if (group.types.length === 0 && slots.length === 0) return null;
           return (
-            <div key={group.moduleId} {...stylex.props(styles.groupGap)}>
+            <div
+              key={group.moduleId}
+              role="group"
+              aria-labelledby={`nav-module-${group.moduleId}`}
+              {...stylex.props(styles.group, styles.groupGap)}
+            >
               <NavHeading id={`nav-module-${group.moduleId}`}>{group.name}</NavHeading>
               {typeLinks(group.types)}
               {slotLinks(slots)}
@@ -276,7 +288,7 @@ export function Sidebar(props: SidebarProps) {
             isCurrent={active === "settings"}
           />
         )}
-        {slotLinks(settingsSlots)}
+        {slotLinks(visibleSettingsSlots)}
         <SyncIndicator state={props.syncState} />
         <AccountMenu
           email={props.email}
