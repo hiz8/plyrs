@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
+import { VisuallyHidden } from "react-aria-components";
 import { PageHeader, Skeleton, type PageHeaderProps } from "@plyrs/ui";
 import { space } from "@plyrs/ui/semantic.stylex";
 import { syncIndicatorState } from "../lib/sync-indicator";
@@ -39,7 +40,15 @@ export function PageBody({ children }: { children: ReactNode }) {
 export function PageLoading({ breadcrumbs }: Pick<PageHeaderProps, "breadcrumbs">) {
   return (
     <>
-      <TenantPageHeader title={<Skeleton width={160} height={24} />} breadcrumbs={breadcrumbs} />
+      <TenantPageHeader
+        title={
+          <>
+            <VisuallyHidden>読み込み中</VisuallyHidden>
+            <Skeleton width={160} height={24} />
+          </>
+        }
+        breadcrumbs={breadcrumbs}
+      />
       <PageBody>
         <div role="status" aria-label="読み込み中" {...stylex.props(styles.loading)}>
           <Skeleton height={14} width="100%" />

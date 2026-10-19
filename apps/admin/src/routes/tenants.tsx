@@ -40,11 +40,11 @@ const styles = stylex.create({
   },
   brand: {
     fontSize: font.body,
-    fontWeight: 600,
+    fontWeight: font.weightBold,
     color: text.muted,
     letterSpacing: "0.06em",
   },
-  title: { margin: 0, fontSize: font.pageTitle, fontWeight: 600 },
+  title: { margin: 0, fontSize: font.pageTitle, fontWeight: font.weightBold },
   description: { margin: 0, fontSize: font.body, color: text.muted },
   list: {
     listStyle: "none",
@@ -85,7 +85,7 @@ const styles = stylex.create({
     flex: 1,
     minWidth: 0,
     fontSize: font.label,
-    fontWeight: 600,
+    fontWeight: font.weightBold,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",

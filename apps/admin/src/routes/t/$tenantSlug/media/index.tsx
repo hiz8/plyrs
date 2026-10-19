@@ -58,7 +58,7 @@ const styles = stylex.create({
     gap: space.sm,
     maxWidth: "480px",
   },
-  dialogTitle: { fontSize: font.body, fontWeight: 600, margin: 0 },
+  dialogTitle: { fontSize: font.body, fontWeight: font.weightBold, margin: 0 },
   usageList: { margin: 0, paddingInlineStart: space.lg },
   actions: { display: "flex", gap: space.sm },
 });

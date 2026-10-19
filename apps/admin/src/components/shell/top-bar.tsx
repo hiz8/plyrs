@@ -21,12 +21,12 @@ const styles = stylex.create({
     borderBottomColor: border.default,
     fontFamily: font.family,
   },
-  brand: { fontSize: font.caption, fontWeight: 600, color: text.muted },
+  brand: { fontSize: font.caption, fontWeight: font.weightBold, color: text.muted },
   name: {
     flex: 1,
     minWidth: 0,
     fontSize: font.label,
-    fontWeight: 600,
+    fontWeight: font.weightBold,
     color: text.default,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -57,6 +57,8 @@ export function TopBar({ tenantName, syncState, isMenuOpen, onToggleMenu }: TopB
       <span {...stylex.props(styles.brand)}>plyrs</span>
       <span {...stylex.props(styles.name)}>{tenantName}</span>
       <span
+        role="img"
+        aria-label={SYNC_INDICATOR_LABELS[syncState]}
         title={SYNC_INDICATOR_LABELS[syncState]}
         {...stylex.props(styles.dot, styles[syncState])}
       />

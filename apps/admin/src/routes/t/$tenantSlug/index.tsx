@@ -12,7 +12,7 @@ import { contentTypesQueryOptions } from "../../../lib/queries";
 // それまでは先頭の型の一覧へ送り、型が無ければ管理者は型の作成画面へ、それ以外は案内を出す
 export const Route = createFileRoute("/t/$tenantSlug/")({
   beforeLoad: async ({ context, params }) => {
-    const types = await context.queryClient.ensureQueryData(
+    const types = await context.queryClient.fetchQuery(
       contentTypesQueryOptions(context.adminApi, context.tenant.id),
     );
     const first = sidebarContentTypes(types)[0];
