@@ -38,6 +38,7 @@ function EditContentTypePage() {
             homeCrumb(tenantSlug),
             settingsCrumb(tenantSlug),
             settingsContentTypesCrumb(tenantSlug),
+            currentCrumb(typeKey),
           ]}
         />
         <PageBody>

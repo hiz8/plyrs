@@ -326,8 +326,9 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  // ドロワー(RAC Modal)を開いたテストの後に RAC のリンクを押すと jsdom で戻らなくなる(Modal の
-  // 後始末が残る)ため、パンくずのテストはドロワーのテストより前に置く(a-navigation.md 5 章)。
+  // ドロワー(RAC Modal)を開いたテストの後に RAC のリンクを押すと jsdom で戻らなくなる。原因は
+  // 未確認で、RAC の Modal の後始末が jsdom に残るためと推定。そのためパンくずのテストはドロワーの
+  // テストより前に置く。RAC を上げたら順序の制約が要るか再確認する。
   it("パンくずのリンクは画面内遷移になる", async () => {
     const router = renderAt("/t/blog/settings/content-types", authedRoutes());
     await screen.findByRole("heading", { name: "コンテンツタイプ" });

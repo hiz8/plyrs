@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
 import { Plus } from "lucide-react";
 import { Button } from "@plyrs/ui";
-import { border, accent, font, space, text } from "@plyrs/ui/semantic.stylex";
+import { accent, border, font, space, stroke, text } from "@plyrs/ui/semantic.stylex";
 import {
   PageBody,
   PageLoading,
@@ -20,7 +20,7 @@ const styles = stylex.create({
   cell: {
     textAlign: "left",
     padding: space.sm,
-    borderBottomWidth: "1px",
+    borderBottomWidth: stroke.default,
     borderBottomStyle: "solid",
     borderBottomColor: border.default,
   },
