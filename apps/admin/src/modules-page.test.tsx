@@ -114,11 +114,13 @@ describe("モジュール設定ページ", () => {
     expect(screen.getByText(/適用済み v1/)).toBeInTheDocument();
   });
 
-  it("ナビに「モジュール」項目が出る", async () => {
+  it("サイドバーの「設定」から入った設定画面にモジュールの一覧が出る", async () => {
     renderAt("/t/blog/settings/modules", {
       ...authedRoutes(),
       "/v1/t/t1/modules": vi.fn(() => jsonResponse(200, { modules: [bookingModule] })),
     });
-    expect(await screen.findByRole("link", { name: "モジュール" })).toBeInTheDocument();
+    // 案 A 4 章: コアの項目はサイドバーが生成する。「モジュール」のナビ項目は無く、「設定」が現在地になる
+    expect(await screen.findByRole("link", { name: "設定" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "モジュール" })).not.toBeInTheDocument();
   });
 });

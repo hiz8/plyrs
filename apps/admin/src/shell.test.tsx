@@ -92,10 +92,9 @@ function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, H
   };
 }
 
-// jsdom では、ルートの <html> が div の中に入るこの構成でアカウントメニューの Popover を開くと、
-// 2 本目以降のテストの role クエリが戻らなくなる(Popover の無い sidebar.test では起きない)。
-// シェルの配線(onLogout が呼ばれること)だけを確かめたいので、メニューは同じ操作名の
-// 素朴な代替に差し替える。メニュー自体の挙動は components/shell/sidebar.test.tsx で見る
+// jsdom では RootShell の <html> が div の中に入り、RAC の Popover を開くと user-event が
+// 戻らないため(2 本目以降の role クエリも戻らなくなる)。メニュー自体は sidebar.test が担保する。
+// ここではシェルの配線(onLogout が呼ばれること)だけを確かめるので、同じ操作名の代替に差し替える
 vi.mock("./components/shell/account-menu", async () => {
   const { useState } = await import("react");
   return {

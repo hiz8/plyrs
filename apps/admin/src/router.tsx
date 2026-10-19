@@ -53,25 +53,7 @@ export function createAppContext(
   const adminApi = createAdminApi(tokens, fetchImpl);
   const superApi = createSuperApi(fetchImpl);
   const slots = createSlotRegistry();
-  // コアのナビ項目。モジュール(Phase 9)も同じ register 経路で項目を足す(design-spec §9.9)
-  slots.register("nav:item", {
-    id: "core.content-types",
-    label: "コンテンツタイプ",
-    to: "/t/$tenantSlug/settings/content-types",
-    order: 0,
-  });
-  slots.register("nav:item", {
-    id: "core.assets",
-    label: "アセット",
-    to: "/t/$tenantSlug/media",
-    order: 1,
-  });
-  slots.register("nav:item", {
-    id: "core.modules",
-    label: "モジュール",
-    to: "/t/$tenantSlug/settings/modules",
-    order: 2,
-  });
+  // 案 A 4 章: コアの項目はサイドバーが型定義から生成する。nav:item はモジュール独自の画面用に残す
   // 裁定 5(2026-07-17): コア自身が record-editor スロットに登録する(ドッグフーディング)。
   // モジュール(Phase 9)も同じ register 経路で操作・パネルを足す。
   slots.register("record-editor:toolbar", { id: "core.publish", order: 0, render: PublishToolbar });
