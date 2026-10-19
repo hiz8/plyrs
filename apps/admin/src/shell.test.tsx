@@ -1,6 +1,7 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { createAppContext, getRouter } from "./router";
 import { FakeSocket, pendingConnect } from "./test-utils/fake-socket";
@@ -43,6 +44,15 @@ function renderAt(
   return router;
 }
 
+const articleType: ContentTypeDefinition = {
+  id: "018f2b6a-7a0a-7000-8000-000000000001",
+  key: "article",
+  name: "記事",
+  source: "user",
+  version: 1,
+  fields: [{ key: "title", type: "text", required: true }],
+};
+
 const blogTenant = { id: "t1", slug: "blog", name: "Blog", role: "owner" };
 
 function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, Handler> {
@@ -51,6 +61,8 @@ function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, H
     // 常に無効(siteKey: null)を用意しておく。
     "/auth/turnstile-config": vi.fn(() => jsonResponse(200, { siteKey: null })),
     "/auth/tenants": vi.fn(() => jsonResponse(200, { tenants: [blogTenant] })),
+    "/auth/me": vi.fn(() => jsonResponse(200, { userId: "u1", email: "owner@example.com" })),
+    "/v1/t/t1/modules": vi.fn(() => jsonResponse(200, { modules: [] })),
     "/auth/token": vi.fn(() => jsonResponse(200, { token: "jwt-abc", expiresIn: 900 })),
     "/v1/t/t1/content-types": vi.fn(() =>
       jsonResponse(200, {
@@ -80,18 +92,79 @@ function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, H
   };
 }
 
+// jsdom では、ルートの <html> が div の中に入るこの構成でアカウントメニューの Popover を開くと、
+// 2 本目以降のテストの role クエリが戻らなくなる(Popover の無い sidebar.test では起きない)。
+// シェルの配線(onLogout が呼ばれること)だけを確かめたいので、メニューは同じ操作名の
+// 素朴な代替に差し替える。メニュー自体の挙動は components/shell/sidebar.test.tsx で見る
+vi.mock("./components/shell/account-menu", async () => {
+  const { useState } = await import("react");
+  return {
+    AccountMenu: ({ email, onLogout }: { email: string | undefined; onLogout: () => void }) => {
+      const [open, setOpen] = useState(false);
+      return (
+        <div>
+          <button type="button" aria-label="アカウント" onClick={() => setOpen(true)}>
+            {email}
+          </button>
+          {open && (
+            <button type="button" role="menuitem" onClick={onLogout}>
+              ログアウト
+            </button>
+          )}
+        </div>
+      );
+    },
+  };
+});
+
+async function logoutFromAccountMenu() {
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "アカウント" }));
+  await user.click(await screen.findByRole("menuitem", { name: "ログアウト" }));
+}
+
 describe("認証済みシェル (/t/$tenantSlug)", () => {
-  it("renders nav from the slot registry, the tenant header, and the content type list", async () => {
+  it("サイドバーにホーム・型・メディア・設定が並び、設定画面のコンテンツタイプ一覧が出る", async () => {
     const routes = authedRoutes();
     renderAt("/t/blog/settings/content-types", routes);
-    expect(await screen.findByRole("link", { name: "コンテンツタイプ" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Blog/ })).toHaveAttribute("href", "/tenants");
+    const settings = await screen.findByRole("link", { name: "設定" });
+    await waitFor(() => expect(settings).toHaveAttribute("aria-current", "page"));
+    expect(screen.getByRole("link", { name: "ホーム" })).toHaveAttribute("href", "/t/blog");
+    expect(screen.getByRole("link", { name: "メディア" })).toHaveAttribute("href", "/t/blog/media");
+    // 型は同期で届く。pendingConnect では届かないので、同期前は案内も出さない
+    expect(screen.queryByRole("link", { name: "最初のコンテンツタイプを作成" })).toBeNull();
+    // ヘッダーの廃止(サイト名のリンクは無い)
+    expect(screen.queryByRole("link", { name: /Blog/ })).not.toBeInTheDocument();
     expect(await screen.findByRole("cell", { name: "article" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "記事" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "2" })).toBeInTheDocument(); // フィールド数
     // Bearer トークンが付与されている（token-manager 経由）
     const listCall = routes["/v1/t/t1/content-types"]?.mock.calls[0]?.[0] as RequestInit;
     expect(new Headers(listCall.headers).get("authorization")).toBe("Bearer jwt-abc");
+  });
+
+  it("同期で届いた型がサイドバーに並び、現在地の型だけ子項目を展開する", async () => {
+    let socket: FakeSocket | undefined;
+    renderAt("/t/blog/content/article", authedRoutes(), async () => {
+      socket = new FakeSocket();
+      return socket;
+    });
+    await vi.waitFor(() =>
+      expect(socket?.parsed()).toContainEqual({ type: "hello", checkpoint: 0 }),
+    );
+    socket?.deliver({
+      type: "welcome",
+      protocolVersion: 1,
+      contentTypes: [articleType],
+      serverSeq: 1,
+    });
+    socket?.deliver({ type: "sync", records: [], serverSeq: 1, complete: true });
+    expect(await screen.findByRole("link", { name: "記事" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByRole("link", { name: "一覧" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "新規追加" })).toBeInTheDocument();
   });
 
   it("binds nav item params alongside the current tenantSlug (案 A 4 章)", async () => {
@@ -104,7 +177,6 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
       to: "/t/$tenantSlug/content/$typeKey",
       // tenantSlug は現在のテナントで上書きされ、contribution からは変えられない
       params: { typeKey: "article", tenantSlug: "other" },
-      group: "module:test",
       order: 99,
     });
     const router = getRouter({
@@ -118,6 +190,27 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     );
   });
 
+  it("有効でないモジュールの群の slot 項目は出ない", async () => {
+    const context = createAppContext(stubFetch(authedRoutes()), {
+      connect: () => () => pendingConnect(),
+    });
+    context.slots.register("nav:item", {
+      id: "test.hidden",
+      label: "隠れた項目",
+      to: "/t/$tenantSlug/content/$typeKey",
+      params: { typeKey: "article" },
+      group: "module:test",
+      order: 99,
+    });
+    const router = getRouter({
+      context,
+      history: createMemoryHistory({ initialEntries: ["/t/blog/settings/content-types"] }),
+    });
+    render(<RouterProvider router={router} />);
+    await screen.findByRole("link", { name: "設定" });
+    expect(screen.queryByRole("link", { name: "隠れた項目" })).not.toBeInTheDocument();
+  });
+
   it("shows the empty state for a tenant without content types", async () => {
     const routes = authedRoutes({
       "/v1/t/t1/content-types": vi.fn(() => jsonResponse(200, { contentTypes: [] })),
@@ -127,8 +220,17 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
   });
 
   it("redirects to /tenants for a slug the user does not belong to", async () => {
-    renderAt("/t/ghost/settings/content-types", authedRoutes());
-    expect(await screen.findByRole("heading", { name: "テナントを選択" })).toBeInTheDocument();
+    renderAt(
+      "/t/ghost/settings/content-types",
+      authedRoutes({
+        "/auth/tenants": vi.fn(() =>
+          jsonResponse(200, {
+            tenants: [blogTenant, { id: "t2", slug: "shop", name: "Shop", role: "owner" }],
+          }),
+        ),
+      }),
+    );
+    expect(await screen.findByRole("heading", { name: "サイトを選択" })).toBeInTheDocument();
   });
 
   it("redirects to /login when unauthenticated", async () => {
@@ -142,15 +244,14 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
   });
 
   it("redirects /t/$tenantSlug to the content type list", async () => {
-    renderAt("/t/blog", authedRoutes());
-    expect(await screen.findByRole("cell", { name: "article" })).toBeInTheDocument();
+    const router = renderAt("/t/blog", authedRoutes());
+    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/content/article"));
   });
 
-  it("logs out from the shell header", async () => {
+  it("logs out from the アカウントメニュー", async () => {
     const logout = vi.fn(() => jsonResponse(200, { ok: true }));
     renderAt("/t/blog/settings/content-types", authedRoutes({ "/auth/logout": logout }));
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "ログアウト" }));
+    await logoutFromAccountMenu();
     expect(await screen.findByRole("heading", { name: "ログイン" })).toBeInTheDocument();
     expect(logout).toHaveBeenCalledTimes(1);
   });
@@ -158,8 +259,7 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
   it("logs out locally even when the server logout fails", async () => {
     const logout = vi.fn(() => jsonResponse(500, { error: "boom" }));
     renderAt("/t/blog/settings/content-types", authedRoutes({ "/auth/logout": logout }));
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "ログアウト" }));
+    await logoutFromAccountMenu();
     expect(await screen.findByRole("heading", { name: "ログイン" })).toBeInTheDocument();
     expect(logout).toHaveBeenCalledTimes(1);
   });
@@ -178,25 +278,65 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
 
   it("shows the sync status indicator while connecting", async () => {
     renderAt("/t/blog/settings/content-types", authedRoutes());
-    expect(await screen.findByText(/同期: 接続中/)).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent("同期中…");
   });
 
   it("offers a reconnect button when the sync connection is lost", async () => {
     let socket: FakeSocket | undefined;
     const connects: number[] = [];
-    renderAt("/t/blog/settings/content-types", authedRoutes(), async () => {
+    renderAt("/t/blog/content/article", authedRoutes(), async () => {
       connects.push(connects.length);
       socket = new FakeSocket();
       return socket;
     });
-    expect(await screen.findByText(/同期: 同期中/)).toBeInTheDocument();
-    // 正常クローズ → エンジンは再接続を試み、失敗が続くと closed に落ちる。
-    // ここでは接続関数を 1 回で止めるため 4003（blocked）で確定拒否させる。
+    await vi.waitFor(() =>
+      expect(socket?.parsed()).toContainEqual({ type: "hello", checkpoint: 0 }),
+    );
+    // 初回同期の前(hasSynced=false)でも、確定拒否(4003 blocked)で closed になれば出る
     socket?.emit("close", { code: 4003, reason: "blocked" });
-    expect(await screen.findByRole("button", { name: "再接続" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "今すぐ再接続" })).toBeInTheDocument();
     const before = connects.length;
-    await userEvent.setup().click(screen.getByRole("button", { name: "再接続" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "今すぐ再接続" }));
     await vi.waitFor(() => expect(connects.length).toBe(before + 1));
+  });
+
+  it("me の取得失敗でもシェルは描かれる(Review Focus 4)", async () => {
+    renderAt(
+      "/t/blog/settings/content-types",
+      authedRoutes({ "/auth/me": vi.fn(() => jsonResponse(500, { error: "boom" })) }),
+    );
+    expect(await screen.findByRole("button", { name: "アカウント" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("ドロワーを開いて項目を選ぶと閉じる(Review Focus 5)", async () => {
+    renderAt("/t/blog/settings/content-types", authedRoutes());
+    const toggle = await screen.findByRole("button", { name: "メニューを開く" });
+    // 開く操作だけ fireEvent: 上のコメントと同じ理由で、user-event のポインタ列だと戻らない
+    fireEvent.click(toggle);
+    const drawer = await screen.findByRole("dialog", { name: "メニュー" });
+    expect(
+      // モーダルが外側を aria-hidden にするので hidden: true で探す
+      screen.getByRole("button", { name: "メニューを閉じる", hidden: true }),
+    ).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(within(drawer).getByRole("link", { name: "メディア" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "メニュー" })).not.toBeInTheDocument(),
+    );
+    expect(await screen.findByRole("heading", { level: 1 })).toBeInTheDocument(); // メディア画面(同期前はスケルトン)
+  });
+
+  it("パンくずのリンクは画面内遷移になる", async () => {
+    const router = renderAt("/t/blog/settings/content-types", authedRoutes());
+    await screen.findByRole("heading", { name: "コンテンツタイプ" });
+    await userEvent.setup().click(
+      within(screen.getByRole("navigation", { name: "パンくず" })).getByRole("link", {
+        name: "設定",
+      }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/t/blog/settings/content-types"),
+    );
   });
 });
 
