@@ -6,6 +6,9 @@ import { border, font, size, space, stroke, text } from "./semantic.stylex";
 // h-common-surface.md 2 章 / D1 ボード 4: パンくず → 見出し行(h1 + 補助操作 + 主操作)。
 // 切断時の接続バナーはヘッダーと本文の間に挟む。編集画面の主操作は公開ボックスに置く(案 C)ため、
 // primaryAction を渡さない
+// 幅 960px 未満では余白を詰める(table.tsx と同じ値。StyleX 0.19.1 に defineConsts が無いのでファイルごとの定数)
+const NARROW = "@media (max-width: 959px)";
+
 const styles = stylex.create({
   header: {
     display: "flex",
@@ -13,7 +16,7 @@ const styles = stylex.create({
     gap: space.sm,
     paddingTop: space.lg,
     paddingBottom: space.md,
-    paddingInline: space.pageGutter,
+    paddingInline: { default: space.pageGutter, [NARROW]: space.md },
     fontFamily: font.family,
     borderBottomWidth: stroke.default,
     borderBottomStyle: "solid",
@@ -38,7 +41,7 @@ const styles = stylex.create({
 });
 
 export interface PageHeaderProps {
-  title: string;
+  title: ReactNode;
   breadcrumbs?: BreadcrumbItem[];
   /** 塗りのボタン 1 つ(新規追加・保存など) */
   primaryAction?: ReactNode;
@@ -62,7 +65,10 @@ export function PageHeader({
         {breadcrumbs !== undefined && breadcrumbs.length > 0 && <Breadcrumbs items={breadcrumbs} />}
         <div {...stylex.props(styles.titleRow)}>
           <h1 {...stylex.props(styles.title)}>
-            <span title={title} {...stylex.props(styles.titleText)}>
+            <span
+              title={typeof title === "string" ? title : undefined}
+              {...stylex.props(styles.titleText)}
+            >
               {title}
             </span>
           </h1>

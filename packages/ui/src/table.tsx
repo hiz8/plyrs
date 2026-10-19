@@ -115,7 +115,13 @@ export function TableHeader<T extends object>({
   return (
     <RacTableHeader>
       {selectionMode !== "none" && selectionBehavior === "toggle" && (
-        <RacColumn className={stylex.props(styles.column, styles.selection).className ?? ""}>
+        <RacColumn
+          className={stylexRenderProps<ColumnRenderProps>((state) => [
+            styles.column,
+            styles.selection,
+            state.isFocusVisible && styles.focusVisible,
+          ])}
+        >
           {selectionMode === "multiple" && <SelectionCheckbox />}
         </RacColumn>
       )}
@@ -174,7 +180,13 @@ export function Row<T extends object>({
       ])}
     >
       {selectionMode !== "none" && selectionBehavior === "toggle" && (
-        <RacCell className={stylex.props(styles.cell, styles.selection).className ?? ""}>
+        <RacCell
+          className={stylexRenderProps<CellRenderProps>((state) => [
+            styles.cell,
+            styles.selection,
+            state.isFocusVisible && styles.focusVisible,
+          ])}
+        >
           <SelectionCheckbox />
         </RacCell>
       )}
