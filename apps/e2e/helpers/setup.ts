@@ -85,8 +85,8 @@ export async function provisionTenant(
 }
 
 // ---- UI フロー((b) core-journey / (c) two-tab-sync 共通) ----
-// ラベル・ロール名は apps/admin の RTL テスト(auth-flow / content-type-builder /
-// records-flow / publish-slots)を真実源として合わせている。
+// ラベルは apps/admin の画面(シェルと各ページ)と RTL テスト(auth-flow /
+// content-type-builder / records-flow / publish-slots)に合わせている。
 
 export async function loginAsUser(page: Page, email: string, password: string): Promise<void> {
   await page.goto("/login");
@@ -99,7 +99,8 @@ export async function loginAsUser(page: Page, email: string, password: string): 
 
 /** ログイン直後のサイトでサイドバーの「設定」から入り、article 型(title text field)を作る。 */
 export async function createArticleType(page: Page): Promise<void> {
-  await page.getByRole("link", { name: "設定" }).click();
+  // パンくずにも「設定」リンクがあるため、サイドバー(<aside> = complementary)に限定する。
+  await page.getByRole("complementary").getByRole("link", { name: "設定", exact: true }).click();
   await expect(page.getByRole("heading", { name: "コンテンツタイプ" })).toBeVisible();
   await page.getByRole("button", { name: "コンテンツタイプを追加" }).click();
   await page.getByRole("textbox", { name: "key" }).fill("article");
