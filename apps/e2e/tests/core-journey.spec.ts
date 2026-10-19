@@ -23,7 +23,7 @@ test("signup to published public API", async ({ page }) => {
 
   // UI: ログイン → テナント → 型作成 → record 作成 → publish
   await loginAsUser(page, email, password);
-  await createArticleType(page, "Journey");
+  await createArticleType(page);
   const title = "スモーク記事";
   await createArticleRecord(page, title);
   await openRecordEditor(page, title);
