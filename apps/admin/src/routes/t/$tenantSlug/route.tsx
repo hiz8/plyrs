@@ -111,6 +111,19 @@ function ShellLayout() {
     setDrawerOpen(false);
   }, [pathname]);
 
+  // 広い幅(サイドバーが常設になる 960px 以上)へ広がったら、開いたままのドロワーを閉じる。
+  // レイアウトの切替自体は CSS だけで行い、matchMedia はこの後始末にだけ使う(裁定 11)
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(min-width: 960px)");
+    if (query.matches) setDrawerOpen(false);
+    const onChange = (event: { matches: boolean }) => {
+      if (event.matches) setDrawerOpen(false);
+    };
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
   async function logout() {
     tenantSync.stop();
     try {
@@ -158,7 +171,7 @@ function ShellLayout() {
         </main>
       </div>
       <Drawer isOpen={drawerOpen} onOpenChange={setDrawerOpen} label="メニュー" offsetTop={48}>
-        <Sidebar {...sidebarProps} />
+        <Sidebar {...sidebarProps} onNavigate={() => setDrawerOpen(false)} />
       </Drawer>
     </div>
   );

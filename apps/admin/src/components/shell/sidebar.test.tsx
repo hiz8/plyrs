@@ -118,6 +118,11 @@ describe("Sidebar", () => {
     );
     await user.click(screen.getByRole("menuitem", { name: /Shop 編集者/ }));
     expect(props.onSwitchTenant).toHaveBeenCalledWith("shop");
+    // 現在のサイトを選んでも切り替えない
+    vi.mocked(props.onSwitchTenant).mockClear();
+    await user.click(screen.getByRole("button", { name: "Blog" }));
+    await user.click(await screen.findByRole("menuitem", { name: /Blog 管理者/ }));
+    expect(props.onSwitchTenant).not.toHaveBeenCalled();
     cleanup();
     renderSidebar({ tenants: [tenant] });
     expect(screen.queryByRole("button", { name: "Blog" })).not.toBeInTheDocument();

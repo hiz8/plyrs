@@ -88,7 +88,11 @@ export function SiteSwitcher({ tenant, tenants, onSwitch, onOpenList }: SiteSwit
       {tenants.length > 1 ? (
         <Menu
           label={NAV_LABELS.switchSite}
-          onAction={(id) => (id === LIST_ID ? onOpenList() : onSwitch(id))}
+          onAction={(id) => {
+            if (id === LIST_ID) onOpenList();
+            // 現在のサイトを選んでも何もしない(同じ画面へ飛ばし直さない)
+            else if (id !== tenant.slug) onSwitch(String(id));
+          }}
           trigger={
             <Button
               className={stylexRenderProps<ButtonRenderProps>((state) => [

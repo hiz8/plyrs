@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { FileText, House, Image, Plus, Settings } from "lucide-react";
+import { useId } from "react";
 import { Link } from "react-aria-components";
 import { ICON_SIZE, Skeleton, stylexRenderProps, type NavItemContribution } from "@plyrs/ui";
 import {
@@ -126,6 +127,8 @@ export interface SidebarProps {
   onSwitchTenant: (slug: string) => void;
   onOpenTenantList: () => void;
   onLogout: () => void;
+  /** 項目を押したときに呼ぶ。ドロワー側だけが渡し、同じ URL への遷移でも閉じられるようにする */
+  onNavigate?: () => void;
 }
 
 // 昇順、同順位は id の辞書順(slots.ts の契約)
@@ -135,6 +138,11 @@ function bySlotOrder(a: NavItemContribution, b: NavItemContribution): number {
 
 export function Sidebar(props: SidebarProps) {
   const { tenant, types, hasSynced, modules, slotItems, pathname } = props;
+  const { onNavigate } = props;
+  // aside とドロワーで 2 回描かれるので、id は描画ごとに別にする
+  const uid = useId();
+  const contentId = `${uid}-nav-content`;
+  const moduleHeadingId = (id: string) => `${uid}-nav-module-${id}`;
   const base = `/t/${tenant.slug}`;
   const canWrite = can(tenant.role, "record:write");
   const canManage = can(tenant.role, "type:manage");
@@ -182,13 +190,20 @@ export function Sidebar(props: SidebarProps) {
       const isActive = active === entry.key;
       return (
         <div key={t.key} {...stylex.props(styles.group)}>
-          <NavLink href={entry.href} label={t.name} icon={FileText} isCurrent={isActive} />
+          <NavLink
+            href={entry.href}
+            label={t.name}
+            icon={FileText}
+            isCurrent={isActive}
+            onNavigate={onNavigate}
+          />
           {isActive && (
             <>
               <NavChildLink
                 href={entry.href}
                 label={NAV_LABELS.list}
                 isCurrent={pathname === entry.href}
+                onNavigate={onNavigate}
               />
               {canWrite && (
                 <NavChildLink
@@ -196,6 +211,7 @@ export function Sidebar(props: SidebarProps) {
                   label={NAV_LABELS.add}
                   icon={Plus}
                   isCurrent={pathname === `${entry.href}/new`}
+                  onNavigate={onNavigate}
                 />
               )}
             </>
@@ -211,6 +227,7 @@ export function Sidebar(props: SidebarProps) {
         href={slotHref(item)}
         label={item.label}
         isCurrent={active === `slot:${item.id}`}
+        onNavigate={onNavigate}
       />
     ));
 
@@ -225,9 +242,15 @@ export function Sidebar(props: SidebarProps) {
         />
       </div>
       <nav aria-label={NAV_LABELS.mainNav} {...stylex.props(styles.middle)}>
-        <NavLink href={base} label={NAV_LABELS.home} icon={House} isCurrent={active === "home"} />
-        <NavHeading id="nav-content">{NAV_LABELS.content}</NavHeading>
-        <div role="group" aria-labelledby="nav-content" {...stylex.props(styles.group)}>
+        <NavLink
+          href={base}
+          label={NAV_LABELS.home}
+          icon={House}
+          isCurrent={active === "home"}
+          onNavigate={onNavigate}
+        />
+        <NavHeading id={contentId}>{NAV_LABELS.content}</NavHeading>
+        <div role="group" aria-labelledby={contentId} {...stylex.props(styles.group)}>
           {contentTypes.length > 0 ? (
             typeLinks(contentTypes)
           ) : !hasSynced ? (
@@ -239,6 +262,7 @@ export function Sidebar(props: SidebarProps) {
           ) : canManage ? (
             <Link
               href={`${base}/settings/content-types/new`}
+              onPress={onNavigate}
               className={stylexRenderProps<LinkRenderProps>((state) => [
                 styles.createLink,
                 state.isHovered && styles.createHover,
@@ -258,6 +282,7 @@ export function Sidebar(props: SidebarProps) {
             label={NAV_LABELS.media}
             icon={Image}
             isCurrent={active === "media"}
+            onNavigate={onNavigate}
           />
         </div>
         {groups.map((group) => {
@@ -268,10 +293,10 @@ export function Sidebar(props: SidebarProps) {
             <div
               key={group.moduleId}
               role="group"
-              aria-labelledby={`nav-module-${group.moduleId}`}
+              aria-labelledby={moduleHeadingId(group.moduleId)}
               {...stylex.props(styles.group, styles.groupGap)}
             >
-              <NavHeading id={`nav-module-${group.moduleId}`}>{group.name}</NavHeading>
+              <NavHeading id={moduleHeadingId(group.moduleId)}>{group.name}</NavHeading>
               {typeLinks(group.types)}
               {slotLinks(slots)}
             </div>
@@ -286,6 +311,7 @@ export function Sidebar(props: SidebarProps) {
             label={NAV_LABELS.settings}
             icon={Settings}
             isCurrent={active === "settings"}
+            onNavigate={onNavigate}
           />
         )}
         {slotLinks(visibleSettingsSlots)}

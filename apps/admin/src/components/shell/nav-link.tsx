@@ -69,12 +69,22 @@ export interface NavLinkProps {
   label: string;
   icon?: LucideIcon;
   isCurrent: boolean;
+  /** 押されたときに呼ぶ(ドロワーを閉じる用。同じ URL への遷移でも確実に呼ばれる) */
+  onNavigate?: () => void;
 }
 
-function Item({ href, label, icon: Icon, isCurrent, child }: NavLinkProps & { child: boolean }) {
+function Item({
+  href,
+  label,
+  icon: Icon,
+  isCurrent,
+  onNavigate,
+  child,
+}: NavLinkProps & { child: boolean }) {
   return (
     <Link
       href={href}
+      onPress={onNavigate}
       // 現在地の 1 項目だけに付ける(他に aria-current="false" は付けない)
       aria-current={isCurrent ? "page" : undefined}
       className={stylexRenderProps<LinkRenderProps>((state) => [

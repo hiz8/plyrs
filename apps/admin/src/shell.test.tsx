@@ -2,47 +2,16 @@ import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
-import { describe, expect, it, vi, type Mock } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createAppContext, getRouter } from "./router";
 import { FakeSocket, pendingConnect } from "./test-utils/fake-socket";
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
-
-type Handler = Mock<(init?: RequestInit) => Response>;
-
-function stubFetch(routes: Record<string, Handler>): typeof fetch {
-  return async (input, init) => {
-    const path =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.pathname
-          : new URL(input.url).pathname;
-    const handler = routes[path];
-    if (handler === undefined) {
-      throw new Error(`unexpected fetch: ${path}`);
-    }
-    return handler(init ?? undefined);
-  };
-}
-
-function renderAt(
-  path: string,
-  routes: Record<string, Handler>,
-  connect: () => Promise<import("@plyrs/sync-client").WebSocketLike> = pendingConnect,
-) {
-  const router = getRouter({
-    context: createAppContext(stubFetch(routes), { connect: () => () => connect() }),
-    history: createMemoryHistory({ initialEntries: [path] }),
-  });
-  render(<RouterProvider router={router} />);
-  return router;
-}
+import {
+  authedRoutes,
+  blogTenant,
+  jsonResponse,
+  renderAt,
+  stubFetch,
+} from "./test-utils/shell-harness";
 
 const articleType: ContentTypeDefinition = {
   id: "018f2b6a-7a0a-7000-8000-000000000001",
@@ -52,45 +21,6 @@ const articleType: ContentTypeDefinition = {
   version: 1,
   fields: [{ key: "title", type: "text", required: true }],
 };
-
-const blogTenant = { id: "t1", slug: "blog", name: "Blog", role: "owner" };
-
-function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, Handler> {
-  return {
-    // 未認証時は /login に落ちる。その loader が無条件で叩くため、ここでの関心事でなくても
-    // 常に無効(siteKey: null)を用意しておく。
-    "/auth/turnstile-config": vi.fn(() => jsonResponse(200, { siteKey: null })),
-    "/auth/tenants": vi.fn(() => jsonResponse(200, { tenants: [blogTenant] })),
-    "/auth/me": vi.fn(() => jsonResponse(200, { userId: "u1", email: "owner@example.com" })),
-    "/v1/t/t1/modules": vi.fn(() => jsonResponse(200, { modules: [] })),
-    "/auth/token": vi.fn(() => jsonResponse(200, { token: "jwt-abc", expiresIn: 900 })),
-    "/v1/t/t1/content-types": vi.fn(() =>
-      jsonResponse(200, {
-        contentTypes: [
-          {
-            id: "c1",
-            key: "article",
-            name: "記事",
-            fields: [
-              { key: "title", type: "text", required: true },
-              { key: "slug", type: "text", config: { unique: true } },
-            ],
-            source: "user",
-            pluginId: null,
-            createdAt: "2026-07-16T00:00:00Z",
-            updatedAt: "2026-07-16T00:00:00Z",
-            version: 1,
-            description: null,
-            titleField: null,
-            listColumns: null,
-            menuOrder: null,
-          },
-        ],
-      }),
-    ),
-    ...overrides,
-  };
-}
 
 // jsdom では RootShell の <html> が div の中に入り、RAC の Popover を開くと user-event が
 // 戻らないため(2 本目以降の role クエリも戻らなくなる)。メニュー自体は sidebar.test が担保する。
@@ -330,11 +260,12 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
   // 未確認で、RAC の Modal の後始末が jsdom に残るためと推定。そのためパンくずのテストはドロワーの
   // テストより前に置く。RAC を上げたら順序の制約が要るか再確認する。
   it("パンくずのリンクは画面内遷移になる", async () => {
-    const router = renderAt("/t/blog/settings/content-types", authedRoutes());
-    await screen.findByRole("heading", { name: "コンテンツタイプ" });
+    const router = renderAt("/t/blog/settings/content-types/new", authedRoutes());
+    await screen.findByRole("navigation", { name: "パンくず" });
+    expect(router.state.location.pathname).toBe("/t/blog/settings/content-types/new");
     await userEvent.setup().click(
       within(screen.getByRole("navigation", { name: "パンくず" })).getByRole("link", {
-        name: "設定",
+        name: "コンテンツタイプ",
       }),
     );
     await waitFor(() =>
@@ -343,9 +274,12 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
   });
 
   it("ドロワーを開いて項目を選ぶと閉じる(Review Focus 5)", async () => {
-    renderAt("/t/blog/settings/content-types", authedRoutes());
+    const router = renderAt("/t/blog/settings/content-types", authedRoutes());
     const toggle = await screen.findByRole("button", { name: "メニューを開く" });
+    const overflowBefore = document.body.style.overflow;
     // 開く操作だけ fireEvent: 上のコメントと同じ理由で、user-event のポインタ列だと戻らない
+    // fireEvent.click はフォーカスを動かさないので、開く前に明示してフォーカス復帰を観測できるようにする
+    toggle.focus();
     fireEvent.click(toggle);
     const drawer = await screen.findByRole("dialog", { name: "メニュー" });
     expect(
@@ -356,7 +290,13 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "メニュー" })).not.toBeInTheDocument(),
     );
-    expect(await screen.findByRole("heading", { level: 1 })).toBeInTheDocument(); // メディア画面(同期前はスケルトン)
+    // メディア画面(同期前はスケルトンの見出し)
+    expect(await screen.findByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/t/blog/media");
+    // モーダルの後始末: 外側の aria-hidden が外れ、スクロール固定が戻り、フォーカスが開閉ボタンへ戻る
+    expect(screen.getByRole("main")).toBeInTheDocument();
+    expect(document.body.style.overflow).toBe(overflowBefore);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "メニューを開く" }));
   });
 });
 
