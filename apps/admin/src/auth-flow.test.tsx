@@ -37,6 +37,11 @@ function turnstileDisabled(): Handler {
   return vi.fn(() => jsonResponse(200, { siteKey: null }));
 }
 
+// /tenants の loader が /auth/me も取る(説明文のメール)。未定義パスで例外になるスタブなので明示する。
+function meOk(): Handler {
+  return vi.fn(() => jsonResponse(200, { userId: "u1", email: "user@example.com" }));
+}
+
 function renderAt(path: string, routes: Record<string, Handler>) {
   const router = getRouter({
     context: createAppContext(stubFetch(routes)),
@@ -53,13 +58,14 @@ describe("ログインフロー", () => {
     renderAt("/login", {
       "/auth/login": login,
       "/auth/tenants": tenants,
+      "/auth/me": meOk(),
       "/auth/turnstile-config": turnstileDisabled(),
     });
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText("メールアドレス"), "a@example.com");
     await user.type(screen.getByLabelText("パスワード"), "hunter2hunter2");
     await user.click(screen.getByRole("button", { name: "ログイン" }));
-    expect(await screen.findByRole("heading", { name: "テナントを選択" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "サイトを選択" })).toBeInTheDocument();
     expect(login).toHaveBeenCalledTimes(1);
     const loginInit = login.mock.calls[0]?.[0];
     const body = JSON.parse(String((loginInit as RequestInit).body));
@@ -84,13 +90,14 @@ describe("ログインフロー", () => {
     renderAt("/signup", {
       "/auth/signup": signup,
       "/auth/tenants": tenants,
+      "/auth/me": meOk(),
       "/auth/turnstile-config": turnstileDisabled(),
     });
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText("メールアドレス"), "new@example.com");
     await user.type(screen.getByLabelText("パスワード"), "hunter2hunter2");
     await user.click(screen.getByRole("button", { name: "サインアップ" }));
-    expect(await screen.findByRole("heading", { name: "テナントを選択" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "サイトを選択" })).toBeInTheDocument();
   });
 
   it("does not render the turnstile widget or send a token when turnstile is disabled", async () => {
@@ -99,13 +106,14 @@ describe("ログインフロー", () => {
     renderAt("/signup", {
       "/auth/signup": signup,
       "/auth/tenants": tenants,
+      "/auth/me": meOk(),
       "/auth/turnstile-config": turnstileDisabled(),
     });
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText("メールアドレス"), "new@example.com");
     await user.type(screen.getByLabelText("パスワード"), "hunter2hunter2");
     await user.click(screen.getByRole("button", { name: "サインアップ" }));
-    expect(await screen.findByRole("heading", { name: "テナントを選択" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "サイトを選択" })).toBeInTheDocument();
     // ウィジェット非表示なら loadTurnstile 自体が呼ばれず、script タグも注入されないはず
     // (window.turnstile 未定義のこの時点で widget が動いていれば script 注入で検出できる)。
     expect(
@@ -122,6 +130,7 @@ describe("ログインフロー", () => {
     const tenants = vi.fn(() => jsonResponse(401, { error: "unauthenticated" }));
     renderAt("/tenants", {
       "/auth/tenants": tenants,
+      "/auth/me": meOk(),
       "/auth/turnstile-config": turnstileDisabled(),
     });
     expect(await screen.findByRole("heading", { name: "ログイン" })).toBeInTheDocument();
@@ -136,19 +145,19 @@ describe("ログインフロー", () => {
         ],
       }),
     );
-    renderAt("/tenants", { "/auth/tenants": tenants });
+    renderAt("/tenants", { "/auth/tenants": tenants, "/auth/me": meOk() });
     const link = await screen.findByRole("link", { name: /Blog/ });
-    expect(link).toHaveAttribute("href", "/t/blog/settings/content-types");
-    expect(screen.getByRole("link", { name: /Shop/ })).toHaveAttribute(
-      "href",
-      "/t/shop/settings/content-types",
-    );
+    expect(link).toHaveAttribute("href", "/t/blog");
+    expect(screen.getByRole("link", { name: /Shop/ })).toHaveAttribute("href", "/t/shop");
+    expect(
+      screen.getByText("user@example.com として 2 つのサイトに所属しています"),
+    ).toBeInTheDocument();
   });
 
   it("shows an empty state with no self-serve creation form when there are no tenants", async () => {
     const tenants = vi.fn(() => jsonResponse(200, { tenants: [] }));
-    renderAt("/tenants", { "/auth/tenants": tenants });
-    expect(await screen.findByText("テナントは運営者が発行します")).toBeInTheDocument();
+    renderAt("/tenants", { "/auth/tenants": tenants, "/auth/me": meOk() });
+    expect(await screen.findByText("サイトは運営者が発行します")).toBeInTheDocument();
     expect(screen.queryByLabelText("テナント名")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("slug")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "作成" })).not.toBeInTheDocument();
@@ -290,6 +299,7 @@ describe("Turnstile 統合", () => {
     renderAt("/signup", {
       "/auth/signup": signup,
       "/auth/tenants": tenants,
+      "/auth/me": meOk(),
       "/auth/turnstile-config": turnstileEnabled(),
     });
     const user = userEvent.setup();
@@ -299,7 +309,7 @@ describe("Turnstile 統合", () => {
     lastRenderParams()?.callback?.("tok-signup");
     await waitFor(() => expect(screen.getByRole("button", { name: "サインアップ" })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: "サインアップ" }));
-    expect(await screen.findByRole("heading", { name: "テナントを選択" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "サイトを選択" })).toBeInTheDocument();
     const signupInit = signup.mock.calls[0]?.[0];
     const body = JSON.parse(String((signupInit as RequestInit).body));
     expect(body).toStrictEqual({
@@ -345,6 +355,7 @@ describe("Turnstile 統合", () => {
     renderAt("/login", {
       "/auth/login": login,
       "/auth/tenants": tenants,
+      "/auth/me": meOk(),
       "/auth/turnstile-config": turnstileEnabled(),
     });
     const user = userEvent.setup();
@@ -365,7 +376,7 @@ describe("Turnstile 統合", () => {
     lastRenderParams()?.callback?.("tok-second");
     await waitFor(() => expect(screen.getByRole("button", { name: "ログイン" })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: "ログイン" }));
-    expect(await screen.findByRole("heading", { name: "テナントを選択" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "サイトを選択" })).toBeInTheDocument();
     expect(login).toHaveBeenCalledTimes(2);
     const secondInit = login.mock.calls[1]?.[0];
     const body = JSON.parse(String((secondInit as RequestInit).body));
@@ -384,6 +395,7 @@ describe("Turnstile 統合", () => {
     renderAt("/signup", {
       "/auth/signup": signup,
       "/auth/tenants": tenants,
+      "/auth/me": meOk(),
       "/auth/turnstile-config": turnstileEnabled(),
     });
     const user = userEvent.setup();
@@ -402,7 +414,7 @@ describe("Turnstile 統合", () => {
     lastRenderParams()?.callback?.("tok-second");
     await waitFor(() => expect(screen.getByRole("button", { name: "サインアップ" })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: "サインアップ" }));
-    expect(await screen.findByRole("heading", { name: "テナントを選択" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "サイトを選択" })).toBeInTheDocument();
     expect(signup).toHaveBeenCalledTimes(2);
     const secondInit = signup.mock.calls[1]?.[0];
     const body = JSON.parse(String((secondInit as RequestInit).body));

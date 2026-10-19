@@ -218,18 +218,29 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     expect(await screen.findByText(/コンテンツタイプはまだありません/)).toBeInTheDocument();
   });
 
-  it("redirects to /tenants for a slug the user does not belong to", async () => {
+  it("非所属の slug は、所属が 1 件なら唯一のサイトへ転送する(Review Focus 2)", async () => {
+    const router = renderAt("/t/ghost/settings/content-types", authedRoutes());
+    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/content/article"));
+  });
+
+  it("非所属の slug は、所属が複数ならサイト選択へ戻す", async () => {
     renderAt(
       "/t/ghost/settings/content-types",
       authedRoutes({
         "/auth/tenants": vi.fn(() =>
           jsonResponse(200, {
-            tenants: [blogTenant, { id: "t2", slug: "shop", name: "Shop", role: "owner" }],
+            tenants: [blogTenant, { id: "t2", slug: "shop", name: "Shop", role: "editor" }],
           }),
         ),
       }),
     );
     expect(await screen.findByRole("heading", { name: "サイトを選択" })).toBeInTheDocument();
+    expect(
+      screen.getByText("owner@example.com として 2 つのサイトに所属しています"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Shop/ })).toHaveAttribute("href", "/t/shop");
+    expect(screen.getByRole("link", { name: /Shop/ })).toHaveTextContent("編集者");
+    expect(screen.queryByText("shop")).not.toBeInTheDocument(); // slug は出さない
   });
 
   it("redirects to /login when unauthenticated", async () => {
