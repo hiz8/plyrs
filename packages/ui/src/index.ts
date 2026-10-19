@@ -46,6 +46,7 @@ export {
   type ConfirmDialogProps,
   type ModalDialogProps,
 } from "./dialog";
+export { Drawer, type DrawerProps } from "./drawer";
 export {
   ToastRegion,
   createToaster,
