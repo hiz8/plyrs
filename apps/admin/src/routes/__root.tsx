@@ -33,11 +33,10 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "plyrs admin" },
     ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      // dev では StyleX の CSS がバンドルに入らず、unplugin の dev エンドポイントから取る
-      // (@stylexjs/unplugin README "Dev HTML injection")。build では prerender に入れない
-    ],
+    links: [{ rel: "stylesheet", href: appCss }],
+    // dev 専用: StyleX の HMR runtime(@stylexjs/unplugin README "Dev HTML injection")。
+    // dev の stylesheet link はここではなく RootShell の <head> に置く
+    // (React 19 が head() の stylesheet を保留し、jsdom で完了しないため)
     scripts: import.meta.env.DEV
       ? [{ type: "module", children: "import('virtual:stylex:runtime')" }]
       : [],
