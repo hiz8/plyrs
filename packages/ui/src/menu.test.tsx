@@ -75,3 +75,15 @@ it("detail は右に補足として出て、名前にも含まれる", async () 
   await userEvent.setup().click(screen.getByRole("button", { name: "サイト" }));
   expect(await screen.findByRole("menuitem", { name: "Blog 管理者" })).toBeInTheDocument();
 });
+
+it("detail と現在の印は名前の中で両立する", async () => {
+  render(
+    <Menu trigger={<Button>サイト</Button>} label="サイトを切り替え" onAction={() => {}}>
+      <MenuItem id="a" detail="管理者" isCurrent>
+        Blog
+      </MenuItem>
+    </Menu>,
+  );
+  await userEvent.setup().click(screen.getByRole("button", { name: "サイト" }));
+  expect(await screen.findByRole("menuitem", { name: "Blog 管理者 (現在)" })).toBeInTheDocument();
+});

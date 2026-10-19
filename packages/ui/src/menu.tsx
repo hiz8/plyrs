@@ -167,8 +167,10 @@ export function MenuItem({
     <RacMenuItem
       id={id}
       textValue={textValue}
-      // 補足は別の span なので、内容からの名前計算では語が連結される。名前は明示する
-      aria-label={detail === undefined ? undefined : textValue}
+      // 補足は別の span なので、内容からの名前計算では語が連結される。名前は明示し、現在の印も含める
+      aria-label={
+        detail === undefined ? undefined : isCurrent === true ? `${textValue} (現在)` : textValue
+      }
       isDisabled={isDisabled ?? false}
       className={stylexRenderProps<MenuItemRenderProps>((state) => [
         styles.item,

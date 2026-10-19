@@ -13,7 +13,7 @@ const styles = stylex.create({
     fontWeight: font.weightBold,
     userSelect: "none",
   },
-  // 部品固有の寸法
+  // 部品固有の寸法(a-navigation.md 3.5 / 8 章、D2: sm はサイドバー下段、md はサイト選択カード)
   sm: {
     width: "24px",
     height: "24px",
