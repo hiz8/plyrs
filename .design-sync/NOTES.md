@@ -27,6 +27,8 @@
 - 幅の広い部品は overrides で `cardMode: column`、Select は `single`(候補の Popover が fixed で枠外に出るため)
 - 静的に描けない状態: IconButton のツールチップ(Tooltip のカードで代表)、Select の開いた一覧、DropZone のドラッグ中、表の無効行・ホバー・フォーカス
 - Badge の tone は neutral / accent / success / warning / danger のみ(info は無い)
+- Drawer は浮く部品。overrides で `cardMode: single`・`viewport: 720x480`、プレビューは `isOpen` で開く(ModalDialog と同じ)
+- Avatar は `name` と `size`(sm / md)だけの小さな部品で、カードは `column` でよい
 
 ## 同期中に見つけて直した部品の不具合
 - Select: 既定の SelectValue が選択中の候補の中身(check 用の 16px の空き枠)を複製し、トリガーの値が右にずれていた → `SelectValue` の children で selectedText だけを出す(packages/ui/src/select.tsx、テスト追加)
@@ -34,6 +36,13 @@
 ## 部品側の気づき(未対応)
 - Table の Row に無効(isDisabled / disabledKeys)の見た目が無い
 - ConfirmDialog の isPending は実行ボタンが薄くなるだけで、処理中の表示(Spinner)は無い
+
+## V2 で変えた部品
+- `PageHeader`(title が ReactNode、狭い幅で左右 16px)
+- `MenuItem`(`detail` で右寄せの補足)
+- `Table`(選択列・セルの focusVisible。RAC がフォーカスを中のチェックボックスへ転送するため、見た目はチェックボックスの輪で担保される)
+- 新規 `Avatar` / `Drawer`
+- 再同期が必要(上の「再同期の手順」)。スタブは `.design-sync/docs/` に追加済み
 
 ## Known render warns
 (無し。GRID_OVERFLOW は overrides で対応済み)
