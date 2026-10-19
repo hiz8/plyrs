@@ -1,7 +1,8 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, type Mock } from "vitest";
+import { NAV_LABELS } from "./lib/labels";
 import { createAppContext, getRouter } from "./router";
 import { pendingConnect } from "./test-utils/fake-socket";
 
@@ -120,7 +121,13 @@ describe("モジュール設定ページ", () => {
       "/v1/t/t1/modules": vi.fn(() => jsonResponse(200, { modules: [bookingModule] })),
     });
     // 案 A 4 章: コアの項目はサイドバーが生成する。「モジュール」のナビ項目は無く、「設定」が現在地になる
-    expect(await screen.findByRole("link", { name: "設定" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "モジュール" })).not.toBeInTheDocument();
+    // h-common-surface.md 2 章: 見出しは PageHeader の h1。パンくずにも「設定」が出るので複数形で探す
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "モジュール" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "設定" }).length).toBeGreaterThan(0);
+    // サイドバー(主ナビ)には無い。現在地はパンくずの末尾に出る
+    const mainNav = screen.getByRole("navigation", { name: NAV_LABELS.mainNav });
+    expect(within(mainNav).queryByRole("link", { name: "モジュール" })).not.toBeInTheDocument();
   });
 });

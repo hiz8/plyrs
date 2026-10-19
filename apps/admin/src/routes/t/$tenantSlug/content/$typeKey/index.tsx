@@ -1,30 +1,31 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
-import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
-import { ConnectionBanner } from "../../../../../components/connection-banner";
+import { Plus } from "lucide-react";
+import { Button } from "@plyrs/ui";
+import { border, accent, font, space, text } from "@plyrs/ui/semantic.stylex";
+import {
+  PageBody,
+  PageLoading,
+  TenantPageHeader,
+} from "../../../../../components/tenant-page-header";
+import { currentCrumb, homeCrumb } from "../../../../../lib/breadcrumbs";
+import { useCan } from "../../../../../lib/use-can";
 import { WORKFLOW_STATUS_LABELS } from "../../../../../lib/labels";
 import { labelForRecord } from "../../../../../lib/record-label";
-import {
-  useSyncHasSynced,
-  useSyncStatus,
-  useSyncTypes,
-  useTenantSync,
-} from "../../../../../lib/sync-context";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
 import { useCollectionRows } from "../../../../../lib/use-collection";
 
 const styles = stylex.create({
-  title: { fontSize: typography.sizeXl, marginTop: 0 },
-  toolbar: { display: "flex", justifyContent: "flex-end", marginBottom: spacing.md },
-  table: { borderCollapse: "collapse", width: "100%", fontSize: typography.sizeMd },
+  table: { borderCollapse: "collapse", width: "100%", fontSize: font.body },
   cell: {
     textAlign: "left",
-    padding: spacing.sm,
+    padding: space.sm,
     borderBottomWidth: "1px",
     borderBottomStyle: "solid",
-    borderBottomColor: colors.border,
+    borderBottomColor: border.default,
   },
-  muted: { color: colors.textMuted },
-  link: { color: colors.accent },
+  muted: { color: text.muted },
+  link: { color: accent.default },
 });
 
 export const Route = createFileRoute("/t/$tenantSlug/content/$typeKey/")({
@@ -34,7 +35,8 @@ export const Route = createFileRoute("/t/$tenantSlug/content/$typeKey/")({
 function RecordListPage() {
   const { tenantSlug, typeKey } = Route.useParams();
   const sync = useTenantSync();
-  const status = useSyncStatus(sync);
+  const navigate = useNavigate();
+  const canWrite = useCan("record:write");
   const types = useSyncTypes(sync);
   const hasSynced = useSyncHasSynced(sync);
   const contentType = types.find((type) => type.key === typeKey);
@@ -43,58 +45,77 @@ function RecordListPage() {
   // §12 必須①(2026-07-17 裁定): ゲートは初回同期の完了までに限る。以降の切断・再同期は
   // バナー表示のみでフォーム(未保存入力)を維持する。
   if (!hasSynced) {
-    return <p {...stylex.props(styles.muted)}>同期中…（状態: {status}）</p>;
+    return <PageLoading breadcrumbs={[homeCrumb(tenantSlug)]} />;
   }
   if (contentType === undefined) {
-    return <p {...stylex.props(styles.muted)}>未知のコンテンツタイプです: {typeKey}</p>;
+    return (
+      <>
+        <TenantPageHeader title={typeKey} breadcrumbs={[homeCrumb(tenantSlug)]} />
+        <PageBody>
+          <p {...stylex.props(styles.muted)}>未知のコンテンツタイプです: {typeKey}</p>
+        </PageBody>
+      </>
+    );
   }
 
   const sorted = rows.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return (
     <>
-      <ConnectionBanner status={status} />
-      <h1 {...stylex.props(styles.title)}>{contentType.name}</h1>
-      <div {...stylex.props(styles.toolbar)}>
-        <Link
-          to="/t/$tenantSlug/content/$typeKey/new"
-          params={{ tenantSlug, typeKey }}
-          {...stylex.props(styles.link)}
-        >
-          新規レコード
-        </Link>
-      </div>
-      {sorted.length === 0 ? (
-        <p {...stylex.props(styles.muted)}>レコードはまだありません</p>
-      ) : (
-        <table {...stylex.props(styles.table)}>
-          <thead>
-            <tr>
-              <th {...stylex.props(styles.cell)}>タイトル</th>
-              <th {...stylex.props(styles.cell)}>ステータス</th>
-              <th {...stylex.props(styles.cell)}>更新日時</th>
-              <th {...stylex.props(styles.cell)}>version</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((record) => (
-              <tr key={record.id}>
-                <td {...stylex.props(styles.cell)}>
-                  <Link
-                    to="/t/$tenantSlug/content/$typeKey/$recordId"
-                    params={{ tenantSlug, typeKey, recordId: record.id }}
-                    {...stylex.props(styles.link)}
-                  >
-                    {labelForRecord(types, record)}
-                  </Link>
-                </td>
-                <td {...stylex.props(styles.cell)}>{WORKFLOW_STATUS_LABELS[record.status]}</td>
-                <td {...stylex.props(styles.cell)}>{record.updatedAt}</td>
-                <td {...stylex.props(styles.cell)}>{record.version}</td>
+      {/* h-common-surface.md 2 章 / a-navigation.md 5 章: 見出し・パンくず・主操作は PageHeader に集約。
+          閲覧者(record:write なし)には主操作を出さない */}
+      <TenantPageHeader
+        title={contentType.name}
+        breadcrumbs={[homeCrumb(tenantSlug), currentCrumb(contentType.name)]}
+        primaryAction={
+          canWrite ? (
+            <Button
+              icon={Plus}
+              onPress={() =>
+                void navigate({
+                  to: "/t/$tenantSlug/content/$typeKey/new",
+                  params: { tenantSlug, typeKey },
+                })
+              }
+            >
+              {contentType.name}を追加
+            </Button>
+          ) : undefined
+        }
+      />
+      <PageBody>
+        {sorted.length === 0 ? (
+          <p {...stylex.props(styles.muted)}>レコードはまだありません</p>
+        ) : (
+          <table {...stylex.props(styles.table)}>
+            <thead>
+              <tr>
+                <th {...stylex.props(styles.cell)}>タイトル</th>
+                <th {...stylex.props(styles.cell)}>ステータス</th>
+                <th {...stylex.props(styles.cell)}>更新日時</th>
+                <th {...stylex.props(styles.cell)}>version</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {sorted.map((record) => (
+                <tr key={record.id}>
+                  <td {...stylex.props(styles.cell)}>
+                    <Link
+                      to="/t/$tenantSlug/content/$typeKey/$recordId"
+                      params={{ tenantSlug, typeKey, recordId: record.id }}
+                      {...stylex.props(styles.link)}
+                    >
+                      {labelForRecord(types, record)}
+                    </Link>
+                  </td>
+                  <td {...stylex.props(styles.cell)}>{WORKFLOW_STATUS_LABELS[record.status]}</td>
+                  <td {...stylex.props(styles.cell)}>{record.updatedAt}</td>
+                  <td {...stylex.props(styles.cell)}>{record.version}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </PageBody>
     </>
   );
 }

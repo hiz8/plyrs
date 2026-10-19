@@ -1,13 +1,19 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
-import { colors, typography } from "@plyrs/ui/tokens.stylex";
+import { text } from "@plyrs/ui/semantic.stylex";
+import { PageBody, TenantPageHeader } from "../../../../../components/tenant-page-header";
+import {
+  currentCrumb,
+  homeCrumb,
+  settingsContentTypesCrumb,
+  settingsCrumb,
+} from "../../../../../lib/breadcrumbs";
 import { ContentTypeForm } from "../../../../../components/content-type-form";
 import { contentTypesQueryOptions } from "../../../../../lib/queries";
 
 const styles = stylex.create({
-  title: { fontSize: typography.sizeXl, marginTop: 0 },
-  muted: { color: colors.textMuted },
+  muted: { color: text.muted },
 });
 
 export const Route = createFileRoute("/t/$tenantSlug/settings/content-types/$typeKey/edit")({
@@ -24,21 +30,46 @@ function EditContentTypePage() {
   const { data: contentTypes } = useSuspenseQuery(contentTypesQueryOptions(adminApi, tenant.id));
   const existing = contentTypes.find((contentType) => contentType.key === typeKey);
   if (existing === undefined) {
-    return <p {...stylex.props(styles.muted)}>コンテンツタイプ {typeKey} が見つかりません</p>;
+    return (
+      <>
+        <TenantPageHeader
+          title={typeKey}
+          breadcrumbs={[
+            homeCrumb(tenantSlug),
+            settingsCrumb(tenantSlug),
+            settingsContentTypesCrumb(tenantSlug),
+          ]}
+        />
+        <PageBody>
+          <p {...stylex.props(styles.muted)}>コンテンツタイプ {typeKey} が見つかりません</p>
+        </PageBody>
+      </>
+    );
   }
   return (
     <>
-      <h1 {...stylex.props(styles.title)}>コンテンツタイプを編集: {existing.name}</h1>
-      <ContentTypeForm
-        existing={existing}
-        onSubmit={async (definition) => {
-          await adminApi.putContentType(tenant.id, definition);
-          await queryClient.invalidateQueries({
-            queryKey: contentTypesQueryOptions(adminApi, tenant.id).queryKey,
-          });
-          await navigate({ to: "/t/$tenantSlug/settings/content-types", params: { tenantSlug } });
-        }}
+      {/* h-common-surface.md 2 章 / a-navigation.md 5 章: 見出し・パンくず・主操作は PageHeader に集約 */}
+      <TenantPageHeader
+        title={existing.name}
+        breadcrumbs={[
+          homeCrumb(tenantSlug),
+          settingsCrumb(tenantSlug),
+          settingsContentTypesCrumb(tenantSlug),
+          currentCrumb(existing.name),
+        ]}
       />
+      <PageBody>
+        <ContentTypeForm
+          existing={existing}
+          onSubmit={async (definition) => {
+            await adminApi.putContentType(tenant.id, definition);
+            await queryClient.invalidateQueries({
+              queryKey: contentTypesQueryOptions(adminApi, tenant.id).queryKey,
+            });
+            await navigate({ to: "/t/$tenantSlug/settings/content-types", params: { tenantSlug } });
+          }}
+        />
+      </PageBody>
     </>
   );
 }

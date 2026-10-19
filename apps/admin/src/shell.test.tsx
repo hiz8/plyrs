@@ -122,14 +122,26 @@ async function logoutFromAccountMenu() {
   await user.click(await screen.findByRole("menuitem", { name: "ログアウト" }));
 }
 
+// パンくず(PageHeader)の中のリンクを除いた、サイドバー側のリンク
+function sidebarLinks(name: string): HTMLElement[] {
+  return screen
+    .queryAllByRole("link", { name })
+    .filter((link) => link.closest('nav[aria-label="パンくず"]') === null);
+}
+
 describe("認証済みシェル (/t/$tenantSlug)", () => {
   it("サイドバーにホーム・型・メディア・設定が並び、設定画面のコンテンツタイプ一覧が出る", async () => {
     const routes = authedRoutes();
     renderAt("/t/blog/settings/content-types", routes);
-    const settings = await screen.findByRole("link", { name: "設定" });
+    // パンくずにも「ホーム」「設定」が出るので、サイドバー側のリンクだけを探す(a-navigation.md 5 章)
+    const settings = await waitFor(() => {
+      const [link] = sidebarLinks("設定");
+      if (link === undefined) throw new Error("サイドバーの設定がまだ無い");
+      return link;
+    });
     await waitFor(() => expect(settings).toHaveAttribute("aria-current", "page"));
-    expect(screen.getByRole("link", { name: "ホーム" })).toHaveAttribute("href", "/t/blog");
-    expect(screen.getByRole("link", { name: "メディア" })).toHaveAttribute("href", "/t/blog/media");
+    expect(sidebarLinks("ホーム")[0]).toHaveAttribute("href", "/t/blog");
+    expect(sidebarLinks("メディア")[0]).toHaveAttribute("href", "/t/blog/media");
     // 型は同期で届く。pendingConnect では届かないので、同期前は案内も出さない
     expect(screen.queryByRole("link", { name: "最初のコンテンツタイプを作成" })).toBeNull();
     // ヘッダーの廃止(サイト名のリンクは無い)
@@ -206,7 +218,7 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
       history: createMemoryHistory({ initialEntries: ["/t/blog/settings/content-types"] }),
     });
     render(<RouterProvider router={router} />);
-    await screen.findByRole("link", { name: "設定" });
+    await waitFor(() => expect(sidebarLinks("設定")).toHaveLength(1));
     expect(screen.queryByRole("link", { name: "隠れた項目" })).not.toBeInTheDocument();
   });
 
@@ -314,6 +326,21 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  // ドロワー(RAC Modal)を開いたテストの後に RAC のリンクを押すと jsdom で戻らなくなる(Modal の
+  // 後始末が残る)ため、パンくずのテストはドロワーのテストより前に置く(a-navigation.md 5 章)。
+  it("パンくずのリンクは画面内遷移になる", async () => {
+    const router = renderAt("/t/blog/settings/content-types", authedRoutes());
+    await screen.findByRole("heading", { name: "コンテンツタイプ" });
+    await userEvent.setup().click(
+      within(screen.getByRole("navigation", { name: "パンくず" })).getByRole("link", {
+        name: "設定",
+      }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/t/blog/settings/content-types"),
+    );
+  });
+
   it("ドロワーを開いて項目を選ぶと閉じる(Review Focus 5)", async () => {
     renderAt("/t/blog/settings/content-types", authedRoutes());
     const toggle = await screen.findByRole("button", { name: "メニューを開く" });
@@ -329,19 +356,6 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
       expect(screen.queryByRole("dialog", { name: "メニュー" })).not.toBeInTheDocument(),
     );
     expect(await screen.findByRole("heading", { level: 1 })).toBeInTheDocument(); // メディア画面(同期前はスケルトン)
-  });
-
-  it("パンくずのリンクは画面内遷移になる", async () => {
-    const router = renderAt("/t/blog/settings/content-types", authedRoutes());
-    await screen.findByRole("heading", { name: "コンテンツタイプ" });
-    await userEvent.setup().click(
-      within(screen.getByRole("navigation", { name: "パンくず" })).getByRole("link", {
-        name: "設定",
-      }),
-    );
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe("/t/blog/settings/content-types"),
-    );
   });
 });
 

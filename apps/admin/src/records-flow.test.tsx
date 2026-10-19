@@ -130,13 +130,13 @@ describe("record 一覧（/t/$tenantSlug/content/$typeKey）", () => {
     await bootstrapped(harness.latest(), [article(RECORD_1, "こんにちは")]);
     expect(await screen.findByRole("cell", { name: "こんにちは" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "下書き" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "新規レコード" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "記事を追加" })).toBeInTheDocument();
   });
 
   it("shows the syncing state until the bootstrap completes", async () => {
     const harness = socketHarness();
     renderAt("/t/blog/content/article", harness);
-    expect(await screen.findByText(/同期中/)).toBeInTheDocument();
+    expect(await screen.findByRole("status", { name: "読み込み中" })).toBeInTheDocument();
   });
 });
 
@@ -298,7 +298,8 @@ describe("record エディタ", () => {
 
     // フォームはアンマウントされず、未保存入力と再同期バナーが出る
     expect(screen.getByRole("textbox", { name: "title" })).toHaveValue("未保存の編集");
-    expect(screen.getByRole("status")).toHaveTextContent(/再同期中/);
+    // 接続バナーは TenantPageHeader だけが描く(サイドバーの同期表示も status を持つので文言で探す)
+    expect(screen.getByText(/接続が切れています/)).toBeInTheDocument();
 
     // 再同期が完了するとバナーが消える(差分 hello は checkpoint 10)
     const socket2 = harness.latest();
@@ -312,7 +313,9 @@ describe("record エディタ", () => {
       serverSeq: 10,
     });
     socket2.deliver({ type: "sync", records: [], serverSeq: 10, complete: true });
-    await vi.waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
+    await vi.waitFor(() =>
+      expect(screen.queryByText(/接続が切れています/)).not.toBeInTheDocument(),
+    );
     expect(screen.getByRole("textbox", { name: "title" })).toHaveValue("未保存の編集");
   });
 });
