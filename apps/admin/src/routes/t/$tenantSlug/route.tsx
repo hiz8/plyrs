@@ -1,55 +1,50 @@
 import * as stylex from "@stylexjs/stylex";
-import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, type ComponentType, type ReactNode } from "react";
-import { Button } from "@plyrs/ui";
-import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
+import { useQuery } from "@tanstack/react-query";
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { Drawer } from "@plyrs/ui";
+import { bg, text } from "@plyrs/ui/semantic.stylex";
+import { Sidebar, type SidebarProps } from "../../../components/shell/sidebar";
+import { TopBar } from "../../../components/shell/top-bar";
 import { ApiError } from "../../../lib/api-client";
 import { resetClientSession } from "../../../lib/client-session";
-import { SYNC_STATUS_LABELS } from "../../../lib/labels";
 import { legacyPathname } from "../../../lib/legacy-redirect";
-import { tenantsQueryOptions } from "../../../lib/queries";
-import { TenantSyncProvider, useSyncStatus } from "../../../lib/sync-context";
+import { meQueryOptions, modulesQueryOptions, tenantsQueryOptions } from "../../../lib/queries";
+import {
+  TenantSyncProvider,
+  useSyncHasSynced,
+  useSyncStatus,
+  useSyncTypes,
+} from "../../../lib/sync-context";
+import { syncIndicatorState } from "../../../lib/sync-indicator";
+
+// a-navigation.md 3.4: 960px 未満でサイドバーをドロワーに畳み、上部バーを出す
+const NARROW = "@media (max-width: 959px)";
 
 const styles = stylex.create({
   shell: {
     display: "grid",
-    gridTemplateColumns: "220px 1fr",
+    // サイドバーの幅 240px(a-navigation.md 3.5)
+    gridTemplateColumns: { default: "240px 1fr", [NARROW]: "1fr" },
     minHeight: "100vh",
-    fontFamily: typography.fontFamily,
-    backgroundColor: colors.bg,
-    color: colors.text,
+    backgroundColor: bg.canvas,
+    color: text.default,
   },
-  sidebar: {
-    borderRightWidth: "1px",
-    borderRightStyle: "solid",
-    borderRightColor: colors.border,
-    padding: spacing.md,
-    display: "flex",
-    flexDirection: "column",
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
+  aside: {
+    display: { default: "block", [NARROW]: "none" },
+    position: "sticky",
+    top: 0,
+    height: "100vh",
   },
-  brand: { fontSize: typography.sizeLg, fontWeight: 600, marginBottom: spacing.md },
-  navLink: {
-    color: colors.text,
-    textDecoration: "none",
-    padding: spacing.xs,
-    borderRadius: "4px",
-  },
-  main: { display: "flex", flexDirection: "column" },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: spacing.md,
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: colors.border,
-  },
-  tenantLink: { color: colors.textMuted, textDecoration: "none", fontSize: typography.sizeSm },
-  content: { padding: spacing.lg },
-  headerSide: { display: "flex", alignItems: "center", gap: spacing.md },
-  syncStatus: { color: colors.textMuted, fontSize: typography.sizeSm },
+  column: { display: "flex", flexDirection: "column", minWidth: 0 },
+  topBar: { display: { default: "none", [NARROW]: "flex" } },
+  main: { flex: 1, minWidth: 0 },
 });
 
 export const Route = createFileRoute("/t/$tenantSlug")({
@@ -82,23 +77,23 @@ export const Route = createFileRoute("/t/$tenantSlug")({
   component: ShellLayout,
 });
 
-// スロット貢献の to は実行時文字列（モジュールが動的に登録する）のため typed routing の
-// 静的 union に載らない。untyped へ落とすのはこの 1 箇所だけ（rpc-unwrap と同じ境界 cast 方針）。
-const UntypedLink = Link as unknown as ComponentType<{
-  to: string;
-  params: Record<string, string>;
-  className?: string;
-  children: ReactNode;
-}>;
-
 function ShellLayout() {
-  const { tenant, slots, api, tokens, queryClient, sync } = Route.useRouteContext();
-  const { tenantSlug } = Route.useParams();
+  const { tenant, slots, api, adminApi, tokens, queryClient, sync } = Route.useRouteContext();
   const navigate = useNavigate();
   // 裁定 4: 接続はテナントレイアウトの寿命に一致させる。テナント切替は
   // tenant.id が変わる = useMemo が作り直し、effect cleanup が旧接続を stop する。
   const tenantSync = useMemo(() => sync(tenant.id), [sync, tenant.id]);
   const syncStatus = useSyncStatus(tenantSync);
+  const types = useSyncTypes(tenantSync);
+  const hasSynced = useSyncHasSynced(tenantSync);
+  const syncState = syncIndicatorState(syncStatus, hasSynced);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const tenantsQuery = useQuery(tenantsQueryOptions(api));
+  // me の失敗でシェルは止めない(email が無いだけ)。modules は届くまで undefined
+  const meQuery = useQuery(meQueryOptions(api));
+  const modulesQuery = useQuery(modulesQueryOptions(adminApi, tenant.id));
 
   useEffect(() => {
     tenantSync.start();
@@ -111,6 +106,24 @@ function ShellLayout() {
     };
   }, [tenantSync]);
 
+  // 項目を選んで画面が変わったらドロワーを閉じる(a-navigation.md 3.4)
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  // 広い幅(サイドバーが常設になる 960px 以上)へ広がったら、開いたままのドロワーを閉じる。
+  // レイアウトの切替自体は CSS だけで行い、matchMedia はこの後始末にだけ使う(裁定 11)
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(min-width: 960px)");
+    if (query.matches) setDrawerOpen(false);
+    const onChange = (event: { matches: boolean }) => {
+      if (event.matches) setDrawerOpen(false);
+    };
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
   async function logout() {
     tenantSync.stop();
     try {
@@ -122,44 +135,44 @@ function ShellLayout() {
     await navigate({ to: "/login" });
   }
 
+  const sidebarProps: SidebarProps = {
+    tenant,
+    tenants: tenantsQuery.data ?? [tenant],
+    email: meQuery.data?.email,
+    types,
+    hasSynced,
+    modules: modulesQuery.data,
+    slotItems: slots.get("nav:item"),
+    syncState,
+    pathname,
+    onSwitchTenant: (slug) => void navigate({ to: "/t/$tenantSlug", params: { tenantSlug: slug } }),
+    onOpenTenantList: () => void navigate({ to: "/tenants" }),
+    onLogout: () => void logout(),
+  };
+
   return (
     <div {...stylex.props(styles.shell)}>
-      <nav {...stylex.props(styles.sidebar)} aria-label="メインナビゲーション">
-        <span {...stylex.props(styles.brand)}>plyrs</span>
-        {slots.get("nav:item").map((item) => (
-          <UntypedLink
-            key={item.id}
-            to={item.to}
-            params={{ ...item.params, tenantSlug }}
-            className={stylex.props(styles.navLink).className ?? ""}
-          >
-            {item.label}
-          </UntypedLink>
-        ))}
-      </nav>
-      <div {...stylex.props(styles.main)}>
-        <header {...stylex.props(styles.header)}>
-          <Link to="/tenants" {...stylex.props(styles.tenantLink)}>
-            {tenant.name}（テナント切替）
-          </Link>
-          <div {...stylex.props(styles.headerSide)}>
-            <span {...stylex.props(styles.syncStatus)}>同期: {SYNC_STATUS_LABELS[syncStatus]}</span>
-            {syncStatus === "closed" && (
-              <Button variant="secondary" onPress={() => tenantSync.start()}>
-                再接続
-              </Button>
-            )}
-            <Button variant="secondary" onPress={() => void logout()}>
-              ログアウト
-            </Button>
-          </div>
-        </header>
-        <main {...stylex.props(styles.content)}>
+      <div {...stylex.props(styles.aside)}>
+        <Sidebar {...sidebarProps} />
+      </div>
+      <div {...stylex.props(styles.column)}>
+        <div {...stylex.props(styles.topBar)}>
+          <TopBar
+            tenantName={tenant.name}
+            syncState={syncState}
+            isMenuOpen={drawerOpen}
+            onToggleMenu={() => setDrawerOpen((open) => !open)}
+          />
+        </div>
+        <main {...stylex.props(styles.main)}>
           <TenantSyncProvider sync={tenantSync}>
             <Outlet />
           </TenantSyncProvider>
         </main>
       </div>
+      <Drawer isOpen={drawerOpen} onOpenChange={setDrawerOpen} label="メニュー" offsetTop={48}>
+        <Sidebar {...sidebarProps} onNavigate={() => setDrawerOpen(false)} />
+      </Drawer>
     </div>
   );
 }

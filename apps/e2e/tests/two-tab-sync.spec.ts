@@ -34,7 +34,7 @@ test("two tabs stay in sync over the WS push channel", async ({ page, context })
   });
 
   await loginAsUser(page, email, password);
-  await createArticleType(page, "Sync Tenant");
+  await createArticleType(page);
   const initialTitle = "初期値の記事";
   await createArticleRecord(page, initialTitle);
   const listUrl = page.url();

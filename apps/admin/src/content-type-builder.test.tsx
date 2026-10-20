@@ -76,7 +76,9 @@ function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, H
 describe("content_type ビルダー", () => {
   it("links from the list to the builder pages", async () => {
     renderAt("/t/blog/settings/content-types", authedRoutes());
-    expect(await screen.findByRole("link", { name: "新規コンテンツタイプ" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "コンテンツタイプを追加" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "編集" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "レコード" })).toBeInTheDocument();
   });

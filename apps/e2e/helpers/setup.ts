@@ -85,22 +85,24 @@ export async function provisionTenant(
 }
 
 // ---- UI フロー((b) core-journey / (c) two-tab-sync 共通) ----
-// ラベル・ロール名は apps/admin の RTL テスト(auth-flow / content-type-builder /
-// records-flow / publish-slots)を真実源として合わせている。
+// ラベルは apps/admin の画面(シェルと各ページ)と RTL テスト(auth-flow /
+// content-type-builder / records-flow / publish-slots)に合わせている。
 
 export async function loginAsUser(page: Page, email: string, password: string): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("メールアドレス").fill(email);
   await page.getByLabel("パスワード").fill(password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await expect(page.getByRole("heading", { name: "テナントを選択" })).toBeVisible();
+  // 所属 1 件ならサイト選択を飛ばしてサイトへ着地する。着地先は型の有無で変わるので URL だけを待つ。
+  await page.waitForURL(/\/t\/[^/]+\//);
 }
 
-/** テナント選択ページから tenantName のテナントへ入り、article 型(title text field)を作る。 */
-export async function createArticleType(page: Page, tenantName: string): Promise<void> {
-  await page.getByRole("link", { name: tenantName }).click();
+/** ログイン直後のサイトでサイドバーの「設定」から入り、article 型(title text field)を作る。 */
+export async function createArticleType(page: Page): Promise<void> {
+  // パンくずにも「設定」リンクがあるため、サイドバー(<aside> = complementary)に限定する。
+  await page.getByRole("complementary").getByRole("link", { name: "設定", exact: true }).click();
   await expect(page.getByRole("heading", { name: "コンテンツタイプ" })).toBeVisible();
-  await page.getByRole("link", { name: "新規コンテンツタイプ" }).click();
+  await page.getByRole("button", { name: "コンテンツタイプを追加" }).click();
   await page.getByRole("textbox", { name: "key" }).fill("article");
   await page.getByRole("textbox", { name: "表示名" }).fill("記事");
   await page.getByRole("button", { name: "フィールドを追加" }).click();
@@ -117,7 +119,7 @@ export async function createArticleRecord(page: Page, title: string): Promise<vo
     .getByRole("row", { name: /article/ })
     .getByRole("link", { name: "レコード" })
     .click();
-  await page.getByRole("link", { name: "新規レコード" }).click();
+  await page.getByRole("button", { name: "記事を追加" }).click();
   await page.getByRole("textbox", { name: "title" }).fill(title);
   await page.getByRole("button", { name: "作成" }).click();
   await expect(page.getByRole("cell", { name: title })).toBeVisible();

@@ -3,6 +3,7 @@ import { expect, it } from "vitest";
 import { Banner } from "./banner";
 import { Button } from "./button";
 import { PageHeader } from "./page-header";
+import { Skeleton } from "./skeleton";
 
 it("h1 を 1 つだけ置き、補助操作 → 主操作の順に右端へ並べ、バナーはヘッダーの後ろに置く", () => {
   render(
@@ -34,4 +35,9 @@ it("パンくずと操作は省ける", () => {
   render(<PageHeader title="ホーム" />);
   expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
   expect(screen.queryByRole("button")).not.toBeInTheDocument();
+});
+
+it("title に要素を渡せる(同期前のスケルトン)", () => {
+  render(<PageHeader title={<Skeleton width={160} height={24} />} />);
+  expect(screen.getByRole("heading", { level: 1 })).not.toHaveAttribute("title");
 });

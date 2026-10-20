@@ -82,6 +82,7 @@ const styles = stylex.create({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
+  detail: { flexShrink: 0, fontSize: font.caption, color: text.muted },
   header: {
     paddingTop: space.sm,
     paddingBottom: space.xs,
@@ -143,6 +144,8 @@ export function Menu({
 export interface MenuItemProps {
   id: string;
   children: string;
+  /** 右に出す補足(例: 権限)。アクセシブルな名前にも含める */
+  detail?: string;
   icon?: LucideIcon;
   tone?: "danger";
   isDisabled?: boolean;
@@ -150,11 +153,24 @@ export interface MenuItemProps {
   isCurrent?: boolean;
 }
 
-export function MenuItem({ id, children, icon: Icon, tone, isDisabled, isCurrent }: MenuItemProps) {
+export function MenuItem({
+  id,
+  children,
+  detail,
+  icon: Icon,
+  tone,
+  isDisabled,
+  isCurrent,
+}: MenuItemProps) {
+  const textValue = detail === undefined ? children : `${children} ${detail}`;
   return (
     <RacMenuItem
       id={id}
-      textValue={children}
+      textValue={textValue}
+      // 補足は別の span なので、内容からの名前計算では語が連結される。名前は明示し、現在の印も含める
+      aria-label={
+        detail === undefined ? undefined : isCurrent === true ? `${textValue} (現在)` : textValue
+      }
       isDisabled={isDisabled ?? false}
       className={stylexRenderProps<MenuItemRenderProps>((state) => [
         styles.item,
@@ -170,6 +186,7 @@ export function MenuItem({ id, children, icon: Icon, tone, isDisabled, isCurrent
       <span title={children} {...stylex.props(styles.label)}>
         {children}
       </span>
+      {detail !== undefined && <span {...stylex.props(styles.detail)}>{detail}</span>}
       {/* 地の色と check は見た目だけなので、現在であることを名前でも伝える */}
       {isCurrent === true && <VisuallyHidden elementType="span">(現在)</VisuallyHidden>}
       {isCurrent === true && <Check size={ICON_SIZE.inline} aria-hidden="true" />}

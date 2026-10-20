@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Ellipsis, Pencil, Trash2 } from "lucide-react";
 import { expect, it, vi } from "vitest";
-import { IconButton } from "./button";
+import { Button, IconButton } from "./button";
 import { Menu, MenuItem, MenuSection, MenuSeparator } from "./menu";
 
 it("トリガーで開き、選んだ項目の id を onAction に渡す。無効の項目は選べない", async () => {
@@ -62,4 +62,28 @@ it("現在のサイトは名前に「(現在)」を含み、キーボードの�
   await user.keyboard("{ArrowDown}");
   expect(screen.getByRole("menuitem", { name: "サイト B" })).toHaveFocus();
   expect(current.className).not.toBe(focusedClass);
+});
+
+it("detail は右に補足として出て、名前にも含まれる", async () => {
+  render(
+    <Menu trigger={<Button>サイト</Button>} label="サイトを切り替え" onAction={() => {}}>
+      <MenuItem id="a" detail="管理者">
+        Blog
+      </MenuItem>
+    </Menu>,
+  );
+  await userEvent.setup().click(screen.getByRole("button", { name: "サイト" }));
+  expect(await screen.findByRole("menuitem", { name: "Blog 管理者" })).toBeInTheDocument();
+});
+
+it("detail と現在の印は名前の中で両立する", async () => {
+  render(
+    <Menu trigger={<Button>サイト</Button>} label="サイトを切り替え" onAction={() => {}}>
+      <MenuItem id="a" detail="管理者" isCurrent>
+        Blog
+      </MenuItem>
+    </Menu>,
+  );
+  await userEvent.setup().click(screen.getByRole("button", { name: "サイト" }));
+  expect(await screen.findByRole("menuitem", { name: "Blog 管理者 (現在)" })).toBeInTheDocument();
 });

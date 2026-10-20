@@ -33,6 +33,7 @@ export {
 } from "./rich-text-editor";
 export { RECORD_MENTION_NODE_NAME, type RichTextMentionItem } from "./record-mention";
 export { ASSET_IMAGE_NODE_NAME, createAssetImage, type AssetUrlResolver } from "./asset-image";
+export { Avatar, type AvatarProps } from "./avatar";
 export { Badge, type BadgeProps, type BadgeTone } from "./badge";
 export { Banner, type BannerProps } from "./banner";
 export { EmptyState, type EmptyStateProps } from "./empty-state";
@@ -45,6 +46,7 @@ export {
   type ConfirmDialogProps,
   type ModalDialogProps,
 } from "./dialog";
+export { Drawer, type DrawerProps } from "./drawer";
 export {
   ToastRegion,
   createToaster,
