@@ -179,12 +179,12 @@ describe("一覧（/t/$tenantSlug/content/$typeKey）", () => {
     );
     const { user } = await setup(BASE, [article(id(1), "ある記事")], { publications });
     expect(await screen.findByRole("status", { name: "読み込み中" })).toBeInTheDocument();
-    const alert = await screen.findByRole("alert", {}, { timeout: 12_000 });
+    const alert = await screen.findByRole("alert");
     expect(screen.queryByRole("grid")).not.toBeInTheDocument();
     ok = true;
     await user.click(within(alert).getByRole("button", { name: "再試行" }));
     expect(await rowCount()).toBe(1);
-  }, 20_000);
+  });
 
   it("閲覧者には追加ボタン・選択列が無く「閲覧のみ」が出る", async () => {
     await setup(BASE, [article(id(1), "ある記事")], { role: "viewer" });

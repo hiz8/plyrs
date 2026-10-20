@@ -1,3 +1,4 @@
+import { QueryClient } from "@tanstack/react-query";
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
@@ -127,7 +128,11 @@ export async function bootstrapped(socket: FakeSocket, records: SyncRecord[]) {
 
 export function renderAt(path: string, harness: SocketHarness, routes = authedRoutes()) {
   const router = getRouter({
-    context: createAppContext(stubFetch(routes), { connect: () => harness.connect }),
+    context: createAppContext(stubFetch(routes), {
+      connect: () => harness.connect,
+      // 取得失敗のテストがリトライの待ちで遅くならないようにする
+      queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+    }),
     history: createMemoryHistory({ initialEntries: [path] }),
   });
   renderRouter(router);

@@ -26,6 +26,8 @@ export interface RouterContext {
 export interface AppContextOptions {
   /** テスト用: tenantId ごとの ConnectFn を差し替える(既定はブラウザ WS) */
   connect?: (tenantId: string) => ConnectFn;
+  /** テスト用: QueryClient を差し替える(既定はリトライありの本番設定) */
+  queryClient?: QueryClient;
 }
 
 function browserConnect(tenantId: string, tokens: TokenManager): ConnectFn {
@@ -63,7 +65,7 @@ export function createAppContext(
         await tokens.getToken(tenantId, { forceRefresh: true });
       },
     });
-  return { queryClient: new QueryClient(), api, adminApi, superApi, tokens, slots, sync };
+  return { queryClient: options?.queryClient ?? new QueryClient(), api, adminApi, superApi, tokens, slots, sync };
 }
 
 export function getRouter(options?: { context?: RouterContext; history?: RouterHistory }) {

@@ -1,13 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
-import { Inbox, Lock, Plus, Search } from "lucide-react";
+import { Lock, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Button, EmptyState, ICON_SIZE, Skeleton, Tabs } from "@plyrs/ui";
+import { Banner, Button, ConfirmDialog, ICON_SIZE, toaster } from "@plyrs/ui";
 import { space, text } from "@plyrs/ui/semantic.stylex";
-import { ContentTable } from "../../../../../components/content-table";
-import { ListFilters } from "../../../../../components/list-filters";
-import { ListPagination } from "../../../../../components/list-pagination";
+import { BulkBar, type BulkMenuAction } from "../../../../../components/bulk-bar";
+import { ContentListBody } from "../../../../../components/content-list-body";
 import {
   PageBody,
   PageLoading,
@@ -17,27 +16,29 @@ import { currentCrumb, homeCrumb } from "../../../../../lib/breadcrumbs";
 import {
   applyListQuery,
   buildListRows,
-  DEFAULT_LIST_QUERY,
-  describeFilters,
-  LIST_TABS,
   parseListQuery,
   toListSearch,
+  type BulkResult,
   type ListQuery,
+  type ListRow,
 } from "../../../../../lib/content-list";
 import { errorMessage } from "../../../../../lib/error-messages";
-import { LIST_LABELS, LOADING_LABEL, WORKFLOW_STATUS_LABELS } from "../../../../../lib/labels";
-import { publicationsQueryOptions } from "../../../../../lib/queries";
+import {
+  BULK_LABELS,
+  DIALOGS,
+  LIST_LABELS,
+  TOASTS,
+} from "../../../../../lib/labels";
+import { publicationsQueryKey, publicationsQueryOptions } from "../../../../../lib/queries";
 import { labelForRecord } from "../../../../../lib/record-label";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
 import { useCan } from "../../../../../lib/use-can";
+import { bulkResultMessage, useBulkAction, type BulkKind } from "../../../../../lib/use-bulk-action";
 import { useCollectionRows } from "../../../../../lib/use-collection";
 
 const styles = stylex.create({
   muted: { color: text.muted },
   meta: { display: "inline-flex", alignItems: "center", gap: space.xs },
-  stack: { display: "flex", flexDirection: "column", gap: space.md },
-  loading: { display: "flex", flexDirection: "column", gap: space.sm },
-  alert: { display: "flex", flexDirection: "column", alignItems: "flex-start", gap: space.sm },
 });
 
 // URL に載せる search。型は Partial<ListQuery> のままだが、実体は既定値を省いた toListSearch の結果。
@@ -57,7 +58,7 @@ export const Route = createFileRoute("/t/$tenantSlug/content/$typeKey/")({
 });
 
 function RecordListPage() {
-  const { tenant, adminApi } = Route.useRouteContext();
+  const { tenant, adminApi, queryClient } = Route.useRouteContext();
   const { tenantSlug, typeKey } = Route.useParams();
   const search = Route.useSearch();
   const query = useMemo(() => parseListQuery(search), [search]);
@@ -69,6 +70,11 @@ function RecordListPage() {
   const contentType = types.find((type) => type.key === typeKey);
   const rows = useCollectionRows(sync.registry.get(typeKey));
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [failedIds, setFailedIds] = useState<Set<string>>(() => new Set());
+  const [confirm, setConfirm] = useState<"unpublish" | "delete" | null>(null);
+  const [rowDelete, setRowDelete] = useState<ListRow | null>(null);
+  const [rowDeleting, setRowDeleting] = useState(false);
+  const bulk = useBulkAction();
   const publications = useQuery({
     ...publicationsQueryOptions(adminApi, tenant.id, typeKey),
     enabled: hasSynced,
@@ -78,6 +84,7 @@ function RecordListPage() {
   const queryKey = JSON.stringify(toListSearch(query));
   useEffect(() => {
     setSelected(new Set());
+    setFailedIds(new Set());
   }, [queryKey]);
 
   const publicationMap = useMemo(
@@ -120,116 +127,127 @@ function RecordListPage() {
       replace: options?.replace ?? false,
     });
 
+  const collection = sync.registry.get(typeKey);
+
+  const invalidatePublications = () =>
+    queryClient.invalidateQueries({ queryKey: publicationsQueryKey(tenant.id) });
+
+  // 実行後の後始末(run と retry の両方から通す)
+  const afterRun = (kind: BulkKind) => async (result: BulkResult) => {
+    await invalidatePublications();
+    const { tone, title } = bulkResultMessage(kind, result);
+    toaster[tone === "success" ? "success" : "error"](title);
+    const failed = new Set(result.failed.map((f) => f.id));
+    setSelected(failed);
+    setFailedIds(failed);
+  };
+
+  const startBulk = (kind: BulkKind, action: (rid: string) => Promise<void>) => {
+    setFailedIds(new Set());
+    return bulk.run(kind, selectedIds, action).then(afterRun(kind));
+  };
+
+  function runConfirmed(kind: "unpublish" | "delete") {
+    setConfirm(null);
+    if (kind === "unpublish") {
+      return startBulk("unpublish", (rid) => adminApi.unpublishRecord(tenant.id, rid));
+    }
+    return startBulk("delete", (rid) => {
+      if (collection === undefined) return Promise.reject(new Error("collection not found"));
+      return collection.delete(rid).isPersisted.promise.then(() => undefined);
+    });
+  }
+
+  function onBulkAction(action: BulkMenuAction) {
+    if (action.kind === "publish") {
+      void startBulk("publish", (rid) => adminApi.publishRecord(tenant.id, rid));
+    } else if (action.kind === "status") {
+      const next = action.status;
+      void startBulk("status", (rid) => {
+        if (collection === undefined) return Promise.reject(new Error("collection not found"));
+        return collection
+          .update(rid, (draft) => {
+            draft.status = next;
+          })
+          .isPersisted.promise.then(() => undefined);
+      });
+    } else {
+      setConfirm(action.kind);
+    }
+  }
+
+  async function confirmRowDelete() {
+    if (rowDelete === null || collection === undefined) return;
+    setRowDeleting(true);
+    try {
+      await collection.delete(rowDelete.record.id).isPersisted.promise;
+      await invalidatePublications();
+      toaster.success(TOASTS.deleted);
+    } catch (cause) {
+      toaster.error(errorMessage(cause, TOASTS.deleteFailed));
+    } finally {
+      setRowDeleting(false);
+      setRowDelete(null);
+    }
+  }
+
   const addButton = (
     <Button icon={Plus} onPress={goNew}>
       {typeName}を追加
     </Button>
   );
 
-  let body;
-  if (publications.isPending) {
-    body = (
-      <div role="status" aria-label={LOADING_LABEL} {...stylex.props(styles.loading)}>
-        <Skeleton height={14} width="100%" />
-        <Skeleton height={14} width="80%" />
-        <Skeleton height={14} width="60%" />
-      </div>
-    );
-  } else if (publications.isError) {
-    body = (
-      <div role="alert" {...stylex.props(styles.alert)}>
-        <p>{errorMessage(publications.error, LIST_LABELS.publicationsFailed)}</p>
-        <Button variant="secondary" onPress={() => void publications.refetch()}>
-          {LIST_LABELS.retry}
-        </Button>
-      </div>
-    );
-  } else if (listRows.length === 0) {
-    body = (
-      <EmptyState
-        icon={Inbox}
-        title={LIST_LABELS.empty.title(typeName)}
-        description={LIST_LABELS.empty.description(typeName)}
-        action={canWrite ? addButton : undefined}
-      />
-    );
-  } else {
-    const filters = describeFilters(query, {
-      tabs: LIST_LABELS.tabs,
-      statuses: WORKFLOW_STATUS_LABELS,
-      statusLabel: LIST_LABELS.statusFilter,
-    });
-    const now = new Date();
-    body = (
-      <Tabs
-        label={LIST_LABELS.tabsName}
-        items={LIST_TABS.map((id) => ({
-          id,
-          label: LIST_LABELS.tabs[id],
-          count: view.counts[id],
-        }))}
-        selectedKey={query.tab}
-        onSelectionChange={(id) => {
-          const tab = LIST_TABS.find((t) => t === id);
-          if (tab !== undefined) updateQuery({ tab, page: 1 });
-        }}
-      >
-        {() => (
-          <div {...stylex.props(styles.stack)}>
-            <ListFilters
-              status={query.status}
-              q={query.q}
-              onStatusChange={(status) => updateQuery({ status, page: 1 })}
-              onSearchChange={(q) => updateQuery({ q, page: 1 }, { replace: true })}
-            />
-            {view.total === 0 ? (
-              <div role="status">
-                <EmptyState
-                  size="compact"
-                  icon={Search}
-                  title={LIST_LABELS.noResults.title(query.q, typeName)}
-                  description={
-                    filters === "" ? undefined : LIST_LABELS.noResults.description(filters)
-                  }
-                  action={
-                    <Button variant="link" onPress={() => updateQuery(DEFAULT_LIST_QUERY)}>
-                      {LIST_LABELS.noResults.clear}
-                    </Button>
-                  }
-                />
-              </div>
-            ) : (
-              <ContentTable
-                tenantSlug={tenantSlug}
-                typeKey={typeKey}
-                typeName={typeName}
-                rows={view.items}
-                sort={{ column: query.sort, order: query.order }}
-                onSortChange={(sort, order) => updateQuery({ sort, order, page: 1 })}
-                selection={
-                  canWrite
-                    ? { selectedKeys: selected, onSelectionChange: setSelected, isDisabled: false }
-                    : undefined
-                }
-                failedIds={new Set<string>()}
-                canWrite={canWrite}
-                onDelete={() => {}}
-                now={now}
-              />
-            )}
-            <ListPagination
-              page={view.page}
-              pageCount={view.pageCount}
-              total={view.total}
-              perPage={query.perPage}
-              onPageChange={(page) => updateQuery({ page })}
-              onPerPageChange={(perPage) => updateQuery({ perPage, page: 1 })}
-            />
-          </div>
-        )}
-      </Tabs>
-    );
-  }
+  const selectedIds = view.items.map((r) => r.record.id).filter((rid) => selected.has(rid));
+  const showBulkBar =
+    canWrite && (selected.size > 0 || bulk.progress !== null || bulk.failure !== null);
+  const bulkBar = showBulkBar ? (
+    <BulkBar
+      selectedCount={selected.size}
+      pageCount={view.items.length}
+      onSelectPage={() => setSelected(new Set(view.items.map((r) => r.record.id)))}
+      onClear={() => {
+        setSelected(new Set());
+        setFailedIds(new Set());
+      }}
+      onAction={onBulkAction}
+      progress={bulk.progress === null ? null : { ...bulk.progress, onCancel: bulk.cancel }}
+      failure={
+        bulk.failure === null
+          ? null
+          : {
+              kind: bulk.failure.kind,
+              onRetry: () => {
+                const kind = bulk.failure?.kind;
+                const retrying = bulk.retry();
+                if (kind !== undefined && retrying !== null) void retrying.then(afterRun(kind));
+              },
+            }
+      }
+    />
+  ) : null;
+
+  const body = (
+    <ContentListBody
+      publications={publications}
+      totalRows={listRows.length}
+      tenantSlug={tenantSlug}
+      typeKey={typeKey}
+      typeName={typeName}
+      query={query}
+      view={view}
+      canWrite={canWrite}
+      addAction={canWrite ? addButton : undefined}
+      updateQuery={updateQuery}
+      bulkBar={bulkBar}
+      selected={selected}
+      onSelectionChange={setSelected}
+      selectionDisabled={bulk.progress !== null}
+      failedIds={failedIds}
+      onDelete={setRowDelete}
+    />
+  );
+
+  const hasPublishedInRow = rowDelete !== null && rowDelete.publication !== "unpublished";
 
   return (
     <>
@@ -249,6 +267,42 @@ function RecordListPage() {
         }
       />
       <PageBody>{body}</PageBody>
+      <ConfirmDialog
+        title={BULK_LABELS.confirmDelete.title(selectedIds.length, typeName)}
+        isOpen={confirm === "delete"}
+        onOpenChange={(open) => setConfirm(open ? "delete" : null)}
+        tone="danger"
+        confirmLabel={DIALOGS.delete.confirm}
+        onConfirm={() => void runConfirmed("delete")}
+      >
+        <p>{BULK_LABELS.confirmDelete.body}</p>
+      </ConfirmDialog>
+      <ConfirmDialog
+        title={BULK_LABELS.confirmUnpublish.title(selectedIds.length)}
+        isOpen={confirm === "unpublish"}
+        onOpenChange={(open) => setConfirm(open ? "unpublish" : null)}
+        tone="danger"
+        confirmLabel={DIALOGS.unpublish.confirm}
+        onConfirm={() => void runConfirmed("unpublish")}
+      >
+        <p>{BULK_LABELS.confirmUnpublish.body}</p>
+      </ConfirmDialog>
+      <ConfirmDialog
+        title={DIALOGS.delete.title(typeName)}
+        isOpen={rowDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setRowDelete(null);
+        }}
+        tone="danger"
+        confirmLabel={DIALOGS.delete.confirm}
+        isPending={rowDeleting}
+        onConfirm={() => void confirmRowDelete()}
+      >
+        <p>{DIALOGS.delete.body(rowDelete?.title ?? "")}</p>
+        {hasPublishedInRow && (
+          <Banner tone="warning">{DIALOGS.delete.publishedWarning(typeName)}</Banner>
+        )}
+      </ConfirmDialog>
     </>
   );
 }
