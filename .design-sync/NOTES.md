@@ -44,6 +44,15 @@
 - 新規 `Avatar` / `Drawer`
 - 再同期が必要(上の「再同期の手順」)。スタブは `.design-sync/docs/` に追加済み
 
+## V3 で変えた部品
+- `TextField` / `TextArea`(`isReadOnly`: 枠線なし・下罫線だけ・地は透明)
+- `Checkbox` / `CheckboxGroup`(`isReadOnly`: 箱はそのまま・カーソルは default・`aria-readonly`)
+- `Select`(`isReadOnly`: トリガーの代わりに選択中の文字を下罫線付きで出す。`size`: `"md" | "sm"`、sm は高さ `size.controlSm`・文字 `font.caption`)
+- `RichTextEditor`(`isReadOnly`: 編集不可・ツールバー無し・下罫線だけ)
+- `PageHeader`(`meta`: 見出しの右・操作の左に補足)
+- `Tabs`(狭い幅でタブの並びが横スクロール)
+- 再同期が必要(上の「再同期の手順」)
+
 ## Known render warns
 (無し。GRID_OVERFLOW は overrides で対応済み)
 

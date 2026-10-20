@@ -79,3 +79,44 @@ it("トリガーには選択中の文字だけを出し、候補の check 用の
   expect(value).toHaveTextContent("お知らせ");
   expect(value?.children).toHaveLength(0);
 });
+
+it("isReadOnly は選択中の文字だけを出し、ボタンを出さない", () => {
+  render(
+    <Select
+      label="ステータス"
+      items={[{ value: "draft", label: "下書き" }]}
+      selectedValue="draft"
+      onChange={() => {}}
+      isReadOnly
+    />,
+  );
+  expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  expect(screen.getByText("下書き")).toBeInTheDocument();
+});
+
+it("isReadOnly で未選択なら placeholder を出す", () => {
+  render(
+    <Select
+      label="ステータス"
+      items={[{ value: "draft", label: "下書き" }]}
+      selectedValue=""
+      onChange={() => {}}
+      placeholder="未設定"
+      isReadOnly
+    />,
+  );
+  expect(screen.getByText("未設定")).toBeInTheDocument();
+});
+
+it("size=sm でも従来どおり選べる", () => {
+  render(
+    <Select
+      label="ステータス"
+      items={[{ value: "draft", label: "下書き" }]}
+      selectedValue="draft"
+      onChange={() => {}}
+      size="sm"
+    />,
+  );
+  expect(screen.getByRole("button", { name: /ステータス/ })).toBeInTheDocument();
+});

@@ -33,6 +33,7 @@ const styles = stylex.create({
     cursor: "pointer",
   },
   rootDisabled: { opacity: 0.5, cursor: "not-allowed" },
+  rootReadOnly: { cursor: "default" },
   box: {
     display: "inline-flex",
     alignItems: "center",
@@ -100,6 +101,8 @@ export interface CheckboxProps {
   /** 一部選択(表の見出しの全選択など) */
   isIndeterminate?: boolean;
   isInvalid?: boolean;
+  /** 閲覧者向け。箱はそのまま、押しても変わらない(RAC が aria-readonly を付ける) */
+  isReadOnly?: boolean;
 }
 
 export function Checkbox({
@@ -109,6 +112,7 @@ export function Checkbox({
   isDisabled,
   isIndeterminate,
   isInvalid,
+  isReadOnly,
 }: CheckboxProps) {
   return (
     <RacCheckbox
@@ -117,9 +121,11 @@ export function Checkbox({
       isDisabled={isDisabled ?? false}
       isIndeterminate={isIndeterminate ?? false}
       isInvalid={isInvalid ?? false}
+      isReadOnly={isReadOnly ?? false}
       className={stylexRenderProps<CheckboxRenderProps>((state) => [
         styles.root,
         state.isDisabled && styles.rootDisabled,
+        state.isReadOnly && styles.rootReadOnly,
       ])}
     >
       {(state) => (

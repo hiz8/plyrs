@@ -64,6 +64,14 @@ const styles = stylex.create({
     outlineColor: focus.ring,
     outlineOffset: stroke.focus,
   },
+  // 閲覧者向け: 枠線を外して下罫線だけにする
+  frameReadOnly: {
+    backgroundColor: "transparent",
+    borderTopWidth: 0,
+    borderInlineWidth: 0,
+    borderBottomWidth: stroke.default,
+    borderRadius: 0,
+  },
   toolbar: {
     display: "flex",
     flexWrap: "wrap",
@@ -178,6 +186,8 @@ export interface RichTextEditorProps {
     | undefined;
   /** 本文中画像のプレビュー URL 解決(認証付き fetch → objectURL)。省略時は src なし表示 */
   resolveAssetUrl?: AssetUrlResolver | undefined;
+  /** 閲覧者向け。編集不可・ツールバー無し・下罫線だけ(onRequestAssetImage は無視) */
+  isReadOnly?: boolean | undefined;
 }
 
 export function RichTextEditor({
@@ -189,6 +199,7 @@ export function RichTextEditor({
   onEditorReady,
   onRequestAssetImage,
   resolveAssetUrl,
+  isReadOnly,
 }: RichTextEditorProps) {
   // useEditor のオプションは初回マウントで確定する(deps [])。以降に変わりうる
   // コールバックは ref 経由で最新を参照する。
@@ -260,6 +271,7 @@ export function RichTextEditor({
         createAssetImage(() => resolveAssetUrlRef.current),
       ],
       content: docContent(value),
+      editable: isReadOnly !== true,
       // v3 既定と同じだが明示: transaction ごとに React を再レンダーしない。
       // ツールバーの活性状態は useEditorState が購読する。
       shouldRerenderOnTransaction: false,
@@ -283,6 +295,13 @@ export function RichTextEditor({
     },
     [],
   );
+
+  // useEditor のオプションは初回で確定するため、読み取り専用の切り替えは setEditable で反映する
+  useEffect(() => {
+    if (editor !== null && editor.isEditable === (isReadOnly === true)) {
+      editor.setEditable(isReadOnly !== true);
+    }
+  }, [editor, isReadOnly]);
 
   useEffect(() => {
     if (editor !== null) {
@@ -308,28 +327,30 @@ export function RichTextEditor({
   return (
     <div {...stylex.props(styles.root)}>
       <span {...stylex.props(styles.label)}>{label}</span>
-      <div {...stylex.props(styles.frame)}>
-        <Toolbar
-          editor={editor}
-          label={label}
-          onRequestAssetImage={
-            onRequestAssetImage === undefined
-              ? undefined
-              : () =>
-                  onRequestAssetImageRef.current?.((item) => {
-                    editor
-                      .chain()
-                      .focus()
-                      .insertContent([
-                        {
-                          type: ASSET_IMAGE_NODE_NAME,
-                          attrs: { recordType: "asset", recordId: item.id, label: item.label },
-                        },
-                      ])
-                      .run();
-                  })
-          }
-        />
+      <div {...stylex.props(styles.frame, isReadOnly === true && styles.frameReadOnly)}>
+        {isReadOnly !== true && (
+          <Toolbar
+            editor={editor}
+            label={label}
+            onRequestAssetImage={
+              onRequestAssetImage === undefined
+                ? undefined
+                : () =>
+                    onRequestAssetImageRef.current?.((item) => {
+                      editor
+                        .chain()
+                        .focus()
+                        .insertContent([
+                          {
+                            type: ASSET_IMAGE_NODE_NAME,
+                            attrs: { recordType: "asset", recordId: item.id, label: item.label },
+                          },
+                        ])
+                        .run();
+                    })
+            }
+          />
+        )}
         <EditorContent editor={editor} {...stylex.props(styles.content)} />
       </div>
       {suggest !== null && suggest.items.length > 0 && (

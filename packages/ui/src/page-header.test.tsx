@@ -41,3 +41,8 @@ it("title に要素を渡せる(同期前のスケルトン)", () => {
   render(<PageHeader title={<Skeleton width={160} height={24} />} />);
   expect(screen.getByRole("heading", { level: 1 })).not.toHaveAttribute("title");
 });
+
+it("meta を見出しの右に出す", () => {
+  render(<PageHeader title="お知らせを編集" meta={<span>最終更新 10 分前</span>} />);
+  expect(screen.getByText("最終更新 10 分前")).toBeInTheDocument();
+});

@@ -303,3 +303,23 @@ describe("RichTextEditor ツールバーの見た目", () => {
     expect(screen.getAllByRole("separator").length).toBeGreaterThan(0);
   });
 });
+
+it("isReadOnly はツールバーを出さず編集できない", async () => {
+  let editor: Editor | undefined;
+  render(
+    <RichTextEditor
+      label="本文"
+      value={undefined}
+      onChange={() => {}}
+      isReadOnly
+      onRequestAssetImage={() => {}}
+      onEditorReady={(e) => {
+        editor = e;
+      }}
+    />,
+  );
+  await vi.waitFor(() => expect(editor).toBeDefined());
+  expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "画像" })).not.toBeInTheDocument();
+  expect(editor?.isEditable).toBe(false);
+});

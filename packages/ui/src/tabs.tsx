@@ -27,6 +27,8 @@ const styles = stylex.create({
   list: {
     display: "flex",
     gap: space.xs,
+    // 狭い画面ではタブの並びだけを横に流す
+    overflowX: "auto",
     borderBottomWidth: stroke.default,
     borderBottomStyle: "solid",
     borderBottomColor: border.default,
@@ -35,6 +37,7 @@ const styles = stylex.create({
   tab: {
     display: "inline-flex",
     alignItems: "center",
+    flexShrink: 0,
     gap: space.sm,
     height: size.rowCompact,
     paddingInline: space.inset,

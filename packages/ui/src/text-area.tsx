@@ -35,6 +35,17 @@ const styles = stylex.create({
     outlineOffset: stroke.focus,
   },
   disabled: { opacity: 0.5, backgroundColor: bg.surface, cursor: "not-allowed" },
+  // 閲覧者向け: 枠線を消して下罫線だけにし、地は透明にする
+  readOnly: {
+    paddingInline: 0,
+    backgroundColor: "transparent",
+    borderTopWidth: 0,
+    borderInlineWidth: 0,
+    borderBottomWidth: stroke.default,
+    borderRadius: 0,
+    resize: "none",
+    cursor: "default",
+  },
 });
 
 export interface TextAreaProps {
@@ -46,6 +57,7 @@ export interface TextAreaProps {
   isInvalid?: boolean;
   isRequired?: boolean;
   isDisabled?: boolean;
+  isReadOnly?: boolean;
 }
 
 export function TextArea({
@@ -57,6 +69,7 @@ export function TextArea({
   isInvalid,
   isRequired,
   isDisabled,
+  isReadOnly,
 }: TextAreaProps) {
   return (
     <RacTextField
@@ -65,6 +78,7 @@ export function TextArea({
       isInvalid={isInvalid ?? false}
       isRequired={isRequired ?? false}
       isDisabled={isDisabled ?? false}
+      isReadOnly={isReadOnly ?? false}
       className={fieldClassName()}
     >
       <FieldLabel isRequired={isRequired}>{label}</FieldLabel>
@@ -76,6 +90,7 @@ export function TextArea({
           state.isInvalid && styles.invalid,
           state.isFocused && styles.focused,
           state.isDisabled && styles.disabled,
+          isReadOnly === true && styles.readOnly,
         ])}
       />
       <FieldErrorMessage errorMessage={errorMessage} />

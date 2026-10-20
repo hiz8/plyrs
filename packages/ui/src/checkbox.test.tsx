@@ -110,3 +110,33 @@ describe("CheckboxGroup", () => {
     expect(screen.getByRole("group", { name: "タグ" })).not.toHaveAttribute("aria-describedby");
   });
 });
+
+it("Checkbox の isReadOnly は aria-readonly を持ち、押しても onChange が呼ばれない", async () => {
+  const onChange = vi.fn();
+  render(
+    <Checkbox isSelected onChange={onChange} isReadOnly>
+      必須
+    </Checkbox>,
+  );
+  const box = screen.getByRole("checkbox", { name: "必須" });
+  expect(box).toHaveAttribute("aria-readonly", "true");
+  await userEvent.setup().click(box);
+  expect(onChange).not.toHaveBeenCalled();
+});
+
+it("CheckboxGroup の isReadOnly は中のチェックを読み取り専用にする", async () => {
+  const onChange = vi.fn();
+  render(
+    <CheckboxGroup
+      label="タグ"
+      options={[{ value: "tech", label: "技術" }]}
+      value={["tech"]}
+      onChange={onChange}
+      isReadOnly
+    />,
+  );
+  const box = screen.getByRole("checkbox", { name: "技術" });
+  expect(box).toHaveAttribute("aria-readonly", "true");
+  await userEvent.setup().click(box);
+  expect(onChange).not.toHaveBeenCalled();
+});

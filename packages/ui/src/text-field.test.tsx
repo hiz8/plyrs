@@ -75,3 +75,11 @@ describe("TextField の D1 の見た目", () => {
     expect(after.length).toBeGreaterThan(before.length);
   });
 });
+
+it("isReadOnly は入力を受け付けず readonly 属性を持つ", async () => {
+  render(<TextField label="タイトル" value="初期値" onChange={() => {}} isReadOnly />);
+  const input = screen.getByRole("textbox", { name: "タイトル" });
+  expect(input).toHaveAttribute("readonly");
+  await userEvent.setup().type(input, "x");
+  expect(input).toHaveValue("初期値");
+});

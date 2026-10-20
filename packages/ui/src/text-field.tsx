@@ -47,6 +47,16 @@ const styles = stylex.create({
     outlineOffset: stroke.focus,
   },
   disabled: { opacity: 0.5, backgroundColor: bg.surface, cursor: "not-allowed" },
+  // 閲覧者向け: 枠線を消して下罫線だけにし、地は透明にする
+  readOnly: {
+    paddingInline: 0,
+    backgroundColor: "transparent",
+    borderTopWidth: 0,
+    borderInlineWidth: 0,
+    borderBottomWidth: stroke.default,
+    borderRadius: 0,
+    cursor: "default",
+  },
 });
 
 export interface TextFieldProps extends Omit<RacTextFieldProps, "className" | "style"> {
@@ -80,6 +90,7 @@ export function TextField({
           state.isInvalid && styles.invalid,
           state.isFocused && styles.focused,
           state.isDisabled && styles.disabled,
+          props.isReadOnly === true && styles.readOnly,
         ])}
       />
       {description !== undefined && <FieldDescription>{description}</FieldDescription>}

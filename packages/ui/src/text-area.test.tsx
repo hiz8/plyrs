@@ -30,3 +30,11 @@ describe("TextArea", () => {
     expect(screen.getByLabelText("概要")).toBeRequired();
   });
 });
+
+it("isReadOnly は入力を受け付けず readonly 属性を持つ", async () => {
+  render(<TextArea label="概要" value="初期値" onChange={() => {}} isReadOnly />);
+  const area = screen.getByRole("textbox", { name: "概要" });
+  expect(area).toHaveAttribute("readonly");
+  await userEvent.setup().type(area, "x");
+  expect(area).toHaveValue("初期値");
+});

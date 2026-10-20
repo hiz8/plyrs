@@ -37,6 +37,11 @@ const styles = stylex.create({
     color: text.default,
   },
   titleText: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  meta: {
+    flexShrink: 0,
+    fontSize: font.caption,
+    color: text.muted,
+  },
   actions: { display: "flex", alignItems: "center", gap: space.sm, flexShrink: 0 },
 });
 
@@ -49,6 +54,8 @@ export interface PageHeaderProps {
   secondaryActions?: ReactNode;
   /** 切断時の接続バナー(V2 でシェルが渡す) */
   banner?: ReactNode;
+  /** 見出しの右(操作の左)に出す補足(最終更新など) */
+  meta?: ReactNode;
 }
 
 export function PageHeader({
@@ -57,8 +64,10 @@ export function PageHeader({
   primaryAction,
   secondaryActions,
   banner,
+  meta,
 }: PageHeaderProps) {
-  const hasActions = primaryAction !== undefined || secondaryActions !== undefined;
+  const hasActions =
+    primaryAction !== undefined || secondaryActions !== undefined || meta !== undefined;
   return (
     <>
       <header {...stylex.props(styles.header)}>
@@ -74,6 +83,7 @@ export function PageHeader({
           </h1>
           {hasActions && (
             <div {...stylex.props(styles.actions)}>
+              {meta !== undefined && <span {...stylex.props(styles.meta)}>{meta}</span>}
               {secondaryActions}
               {primaryAction}
             </div>

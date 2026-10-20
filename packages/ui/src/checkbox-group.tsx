@@ -16,6 +16,8 @@ export interface CheckboxGroupProps {
   onChange: (next: string[]) => void;
   errorMessage?: string;
   isRequired?: boolean;
+  /** 閲覧者向け。中のチェックを読み取り専用にする */
+  isReadOnly?: boolean;
 }
 
 // 実装注意: RAC の CheckboxGroup（useCheckboxGroupState）は value を state に取り込み、
@@ -31,6 +33,7 @@ export function CheckboxGroup({
   onChange,
   errorMessage,
   isRequired,
+  isReadOnly,
 }: CheckboxGroupProps) {
   const errorId = useId();
   const requiredId = useId();
@@ -61,6 +64,7 @@ export function CheckboxGroup({
             key={option.value}
             isSelected={value.includes(option.value)}
             isInvalid={isInvalid}
+            isReadOnly={isReadOnly ?? false}
             onChange={(selected) =>
               onChange(
                 selected ? [...value, option.value] : value.filter((v) => v !== option.value),
