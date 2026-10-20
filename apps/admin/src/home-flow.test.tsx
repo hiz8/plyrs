@@ -336,6 +336,10 @@ describe("ホーム", () => {
     );
     await router.navigate({ to: "/t/$tenantSlug", params: { tenantSlug: "blog" } });
     expect(await screen.findByRole("heading", { level: 2, name: "はじめに" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "メンバーを追加" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/settings/members"));
+    await router.navigate({ to: "/t/$tenantSlug", params: { tenantSlug: "blog" } });
+    expect(await screen.findByRole("heading", { level: 2, name: "はじめに" })).toBeInTheDocument();
     harness.latest().deliver({ type: "content-types", contentTypes: [articleOrdered] });
     await waitFor(() =>
       expect(screen.queryByRole("heading", { name: "はじめに" })).not.toBeInTheDocument(),

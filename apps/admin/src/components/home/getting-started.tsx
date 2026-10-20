@@ -76,13 +76,20 @@ export function GettingStarted({
   siteName,
   onCreateType,
   onOpenMedia,
+  onInviteMembers,
 }: {
   siteName: string;
   onCreateType: () => void;
   onOpenMedia: () => void;
+  onInviteMembers: () => void;
 }) {
   const titleId = useId();
   const labels = HOME_LABELS.gettingStarted;
+  const steps = [
+    { ...labels.createType, variant: "primary" as const, onPress: onCreateType },
+    { ...labels.uploadMedia, variant: "secondary" as const, onPress: onOpenMedia },
+    { ...labels.inviteMembers, variant: "secondary" as const, onPress: onInviteMembers },
+  ];
   return (
     <section aria-labelledby={titleId} {...stylex.props(styles.card)}>
       <h2 id={titleId} {...stylex.props(styles.title)}>
@@ -90,34 +97,22 @@ export function GettingStarted({
       </h2>
       <p {...stylex.props(styles.description)}>{labels.description(siteName)}</p>
       <ol {...stylex.props(styles.steps)}>
-        <li {...stylex.props(styles.step)}>
-          <span aria-hidden="true" {...stylex.props(styles.circle)}>
-            1
-          </span>
-          <div {...stylex.props(styles.stepBody)}>
-            <h3 {...stylex.props(styles.stepTitle)}>{labels.createType.title}</h3>
-            <p {...stylex.props(styles.stepText)}>{labels.createType.body}</p>
-            <div {...stylex.props(styles.action)}>
-              <Button variant="primary" onPress={onCreateType}>
-                {labels.createType.action}
-              </Button>
+        {steps.map((step, index) => (
+          <li key={step.title} {...stylex.props(styles.step)}>
+            <span aria-hidden="true" {...stylex.props(styles.circle)}>
+              {index + 1}
+            </span>
+            <div {...stylex.props(styles.stepBody)}>
+              <h3 {...stylex.props(styles.stepTitle)}>{step.title}</h3>
+              <p {...stylex.props(styles.stepText)}>{step.body}</p>
+              <div {...stylex.props(styles.action)}>
+                <Button variant={step.variant} onPress={step.onPress}>
+                  {step.action}
+                </Button>
+              </div>
             </div>
-          </div>
-        </li>
-        <li {...stylex.props(styles.step)}>
-          <span aria-hidden="true" {...stylex.props(styles.circle)}>
-            2
-          </span>
-          <div {...stylex.props(styles.stepBody)}>
-            <h3 {...stylex.props(styles.stepTitle)}>{labels.uploadMedia.title}</h3>
-            <p {...stylex.props(styles.stepText)}>{labels.uploadMedia.body}</p>
-            <div {...stylex.props(styles.action)}>
-              <Button variant="secondary" onPress={onOpenMedia}>
-                {labels.uploadMedia.action}
-              </Button>
-            </div>
-          </div>
-        </li>
+          </li>
+        ))}
       </ol>
     </section>
   );

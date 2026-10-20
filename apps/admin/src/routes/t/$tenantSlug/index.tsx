@@ -179,6 +179,8 @@ function HomePage() {
           })
         }
         onOpenMedia={() => void navigate({ to: "/t/$tenantSlug/media", params: { tenantSlug } })}
+        // Task 7 で型付きの to に替える
+        onInviteMembers={() => void navigate({ href: `/t/${tenantSlug}/settings/members` })}
       />
     ) : (
       <NoTypesNotice />

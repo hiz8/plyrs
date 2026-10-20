@@ -13,7 +13,6 @@ const NARROW = "@media (max-width: 959px)";
 const ROW_HEIGHT = "40px";
 
 // 項目の区切り(装飾。読み上げない)
-const SEPARATOR = " ・ ";
 
 const styles = stylex.create({
   card: {
@@ -266,7 +265,7 @@ export function TypeLinks({
         <Fragment key={item.type.key}>
           {index === 0 ? null : (
             <span aria-hidden="true" {...stylex.props(styles.separator)}>
-              {SEPARATOR}
+              {HOME_LABELS.separator}
             </span>
           )}
           <InlineLink href={hrefOf(item.type)}>
@@ -298,7 +297,7 @@ export function SummaryLink({
       {summary.byType.length === 0 ? null : (
         <>
           <span aria-hidden="true" {...stylex.props(styles.separator)}>
-            {SEPARATOR}
+            {HOME_LABELS.separator}
           </span>
           <TypeLinks items={summary.byType} hrefOf={hrefOf} />
         </>

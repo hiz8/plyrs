@@ -6,6 +6,7 @@ import { Button, TextField } from "@plyrs/ui";
 import { colors, spacing } from "@plyrs/ui/tokens.stylex";
 import { SuperApiError } from "../../lib/super-api";
 import { superStyles } from "./-styles";
+import { LOADING_LABEL } from "../../lib/labels";
 
 const styles = stylex.create({
   link: { color: colors.accent },
@@ -137,7 +138,7 @@ function SuperTenantsPage() {
         </p>
       ) : null}
       {tenants.isPending ? (
-        <p {...stylex.props(superStyles.muted)}>読み込み中…</p>
+        <p {...stylex.props(superStyles.muted)}>{LOADING_LABEL}</p>
       ) : rows.length === 0 ? (
         <p {...stylex.props(superStyles.muted)}>テナントはまだありません</p>
       ) : (

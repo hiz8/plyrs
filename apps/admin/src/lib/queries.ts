@@ -77,5 +77,7 @@ export function modulesQueryOptions(adminApi: AdminApi, tenantId: string) {
     queryFn: () => adminApi.listModules(tenantId),
     // トグル直後の状態を確実に映す(設定ページは低頻度アクセスなのでキャッシュ不要)
     staleTime: 0,
+    // 取得の失敗で最大 7 秒ほどホームがスケルトンのままにならないよう 1 回だけ(V4-B の申し送り)
+    retry: 1,
   });
 }

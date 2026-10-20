@@ -2,6 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { superStyles } from "./-styles";
+import { LOADING_LABEL } from "../../lib/labels";
 
 interface AuditLogRow {
   id: string;
@@ -36,7 +37,7 @@ function SuperAuditPage() {
         </p>
       ) : null}
       {audit.isPending ? (
-        <p {...stylex.props(superStyles.muted)}>読み込み中…</p>
+        <p {...stylex.props(superStyles.muted)}>{LOADING_LABEL}</p>
       ) : rows.length === 0 ? (
         <p {...stylex.props(superStyles.muted)}>監査ログはありません</p>
       ) : (

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button, Checkbox } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { superStyles } from "./-styles";
+import { LOADING_LABEL } from "../../lib/labels";
 
 const styles = stylex.create({
   // タイトルだけ marginBottom: 0 を足す独自版(超一覧ページなどの title とは異なる)。
@@ -197,7 +198,7 @@ function TenantDetailPage() {
           </p>
         ) : null}
         {members.isPending ? (
-          <p {...stylex.props(superStyles.muted)}>読み込み中…</p>
+          <p {...stylex.props(superStyles.muted)}>{LOADING_LABEL}</p>
         ) : memberRows.length === 0 ? (
           <p {...stylex.props(superStyles.muted)}>メンバーはいません</p>
         ) : (

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@plyrs/ui";
 import { superStyles } from "./-styles";
+import { LOADING_LABEL } from "../../lib/labels";
 
 interface DeadLetterRow {
   id: string;
@@ -80,7 +81,7 @@ function SuperDlqPage() {
         </p>
       ) : null}
       {dlq.isPending ? (
-        <p {...stylex.props(superStyles.muted)}>読み込み中…</p>
+        <p {...stylex.props(superStyles.muted)}>{LOADING_LABEL}</p>
       ) : rows.length === 0 ? (
         <p {...stylex.props(superStyles.muted)}>デッドレターはありません</p>
       ) : (

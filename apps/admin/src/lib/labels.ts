@@ -86,6 +86,8 @@ export const HOME_LABELS = {
   retry: "再試行",
   // グリッドの aria-label
   widgets: "モジュールのウィジェット",
+  // カードの項目の区切り(home-card)
+  separator: " ・ ",
   gettingStarted: {
     title: "はじめに",
     description: (site: string) =>
@@ -99,6 +101,11 @@ export const HOME_LABELS = {
       title: "メディアをアップロードする",
       body: "画像や PDF を先に入れておくと、記事を書くときに選ぶだけで済みます。",
       action: "メディアを開く",
+    },
+    inviteMembers: {
+      title: "メンバーを招待する",
+      body: "編集を手伝ってくれる人を、設定 › メンバーから追加します。追加できるのは plyrs に登録済みの人です",
+      action: "メンバーを追加",
     },
   },
   noTypes: {
