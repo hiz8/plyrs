@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
 import { text } from "@plyrs/ui/semantic.stylex";
 import { PageBody, TenantPageHeader } from "../../../../../components/tenant-page-header";
@@ -9,7 +9,7 @@ import {
   settingsContentTypesCrumb,
   settingsCrumb,
 } from "../../../../../lib/breadcrumbs";
-import { ContentTypeForm } from "../../../../../components/content-type-form";
+import { CONTENT_TYPE_LABELS } from "../../../../../lib/labels";
 import { contentTypesQueryOptions } from "../../../../../lib/queries";
 
 const styles = stylex.create({
@@ -24,9 +24,8 @@ export const Route = createFileRoute("/t/$tenantSlug/settings/content-types/$typ
 });
 
 function EditContentTypePage() {
-  const { adminApi, tenant, queryClient } = Route.useRouteContext();
+  const { adminApi, tenant } = Route.useRouteContext();
   const { tenantSlug, typeKey } = Route.useParams();
-  const navigate = useNavigate();
   const { data: contentTypes } = useSuspenseQuery(contentTypesQueryOptions(adminApi, tenant.id));
   const existing = contentTypes.find((contentType) => contentType.key === typeKey);
   if (existing === undefined) {
@@ -42,7 +41,7 @@ function EditContentTypePage() {
           ]}
         />
         <PageBody>
-          <p {...stylex.props(styles.muted)}>コンテンツタイプ {typeKey} が見つかりません</p>
+          <p {...stylex.props(styles.muted)}>{CONTENT_TYPE_LABELS.editor.notFound(typeKey)}</p>
         </PageBody>
       </>
     );
@@ -60,16 +59,7 @@ function EditContentTypePage() {
         ]}
       />
       <PageBody>
-        <ContentTypeForm
-          existing={existing}
-          onSubmit={async (definition) => {
-            await adminApi.putContentType(tenant.id, definition);
-            await queryClient.invalidateQueries({
-              queryKey: contentTypesQueryOptions(adminApi, tenant.id).queryKey,
-            });
-            await navigate({ to: "/t/$tenantSlug/settings/content-types", params: { tenantSlug } });
-          }}
-        />
+        <p>{existing.name}</p>
       </PageBody>
     </>
   );

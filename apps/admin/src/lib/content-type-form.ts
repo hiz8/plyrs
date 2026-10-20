@@ -1,61 +1,110 @@
 import {
+  ASSET_TYPE_KEY,
+  FIELD_KEY_PATTERN,
+  SYSTEM_FIELD_KEYS,
   contentTypeDefinitionSchema,
   type ContentTypeDefinition,
   type FieldDefinition,
 } from "@plyrs/metamodel";
+import type { SyncRecord } from "@plyrs/sync-protocol";
 import type { ContentTypeSummary } from "./admin-api";
+import { CONTENT_TYPE_LABELS } from "./labels";
 
-// content_type ビルダーの UI 状態。すべての型のノブを 1 つの平坦な構造で持ち、
-// type に応じて必要なものだけ FieldDefinition の config へ写す。
+// 案 E: 型設計の下書き。画面の判断はここに寄せ、部品は描くだけにする。
+
+export type FieldKind =
+  | "text"
+  | "richtext"
+  | "number"
+  | "datetime"
+  | "boolean"
+  | "select"
+  | "asset"
+  | "reference"
+  | "slug"
+  | "json";
+export type KindGroup = "basic" | "link" | "advanced";
+
+export const FIELD_KINDS: readonly { kind: FieldKind; group: KindGroup }[] = [
+  { kind: "text", group: "basic" },
+  { kind: "richtext", group: "basic" },
+  { kind: "number", group: "basic" },
+  { kind: "datetime", group: "basic" },
+  { kind: "boolean", group: "basic" },
+  { kind: "select", group: "basic" },
+  { kind: "asset", group: "link" },
+  { kind: "reference", group: "link" },
+  { kind: "slug", group: "link" },
+  { kind: "json", group: "advanced" },
+];
+
+const SLUG_KEY = "slug";
+
+// E12: 読む側(record-form)の判定と同じ
+export function kindOf(field: FieldDefinition): FieldKind {
+  switch (field.type) {
+    case "text":
+      return field.key === SLUG_KEY && field.config?.unique === true ? "slug" : "text";
+    case "relation": {
+      const allowed = field.config.allowedTypes;
+      return allowed.length === 1 && allowed[0] === ASSET_TYPE_KEY ? "asset" : "reference";
+    }
+    default:
+      return field.type;
+  }
+}
+
+export interface SelectOptionDraft {
+  value: string;
+  label: string;
+}
+
 export interface FieldDraft {
   key: string;
-  type: FieldDefinition["type"];
-  required: boolean;
-  /** 案 E 2.1: 表示名と説明(空文字 = 未指定) */
+  kind: FieldKind;
   label: string;
   description: string;
+  required: boolean;
+  /** 未保存(E16・E17) */
+  isNew: boolean;
   maxLength: string;
   integer: boolean;
-  /** 1 行 1 選択肢。"value=ラベル"(ラベル省略時は value がラベル) */
-  optionsText: string;
+  options: SelectOptionDraft[];
   multiple: boolean;
-  /** カンマ区切りの type key */
-  allowedTypes: string;
+  allowedTypes: string[];
   cardinality: "one" | "many";
   ordered: boolean;
-  /** 公開時に値を埋め込む(Phase 8 裁定 4: snapshotEmbed "value"。asset 限定) */
-  embedValue: boolean;
   indexed: boolean;
   unique: boolean;
 }
 
-export function emptyFieldDraft(): FieldDraft {
+export function emptyFieldDraft(kind: FieldKind, key: string, label: string): FieldDraft {
   return {
-    key: "",
-    type: "text",
-    required: false,
-    label: "",
+    key: kind === "slug" ? SLUG_KEY : key,
+    kind,
+    label,
     description: "",
+    required: false,
+    isNew: true,
     maxLength: "",
     integer: false,
-    optionsText: "",
+    options: [],
     multiple: false,
-    allowedTypes: "",
+    allowedTypes: kind === "asset" ? [ASSET_TYPE_KEY] : [],
     cardinality: "one",
     ordered: false,
-    embedValue: false,
     indexed: false,
-    unique: false,
+    unique: kind === "slug",
   };
 }
 
 export function toFieldDraft(field: FieldDefinition): FieldDraft {
-  const draft = emptyFieldDraft();
-  draft.key = field.key;
-  draft.type = field.type;
-  draft.required = field.required ?? false;
-  draft.label = field.label ?? "";
-  draft.description = field.description ?? "";
+  const draft: FieldDraft = {
+    ...emptyFieldDraft(kindOf(field), field.key, field.label ?? ""),
+    isNew: false,
+    required: field.required ?? false,
+    description: field.description ?? "",
+  };
   switch (field.type) {
     case "text":
       draft.maxLength = field.config?.maxLength === undefined ? "" : String(field.config.maxLength);
@@ -78,22 +127,212 @@ export function toFieldDraft(field: FieldDefinition): FieldDraft {
     case "richtext":
       break;
     case "select":
-      draft.optionsText = field.config.options
-        .map((option) =>
-          option.label === option.value ? option.value : `${option.value}=${option.label}`,
-        )
-        .join("\n");
+      draft.options = field.config.options.map((option) => ({
+        value: option.value,
+        label: option.label,
+      }));
       draft.multiple = field.config.multiple ?? false;
       draft.indexed = field.config.indexed ?? false;
       break;
     case "relation":
-      draft.allowedTypes = field.config.allowedTypes.join(", ");
+      draft.allowedTypes = [...field.config.allowedTypes];
       draft.cardinality = field.config.cardinality;
       draft.ordered = field.config.ordered ?? false;
-      draft.embedValue = field.config.snapshotEmbed === "value";
       break;
   }
   return draft;
+}
+
+// E13: 表示名・API 名・説明・必須・未保存かどうかを保ち、種類ごとの設定は新しい種類の既定に戻す
+export function changeKind(draft: FieldDraft, kind: FieldKind): FieldDraft {
+  return {
+    ...emptyFieldDraft(kind, draft.key, draft.label),
+    description: draft.description,
+    required: draft.required,
+    isNew: draft.isNew,
+  };
+}
+
+// URL スラッグは API 名が slug で、他に URL スラッグが無いときだけ選べる(E13)
+export function availableKinds(draft: FieldDraft, hasOtherSlug: boolean): FieldKind[] {
+  return FIELD_KINDS.map((entry) => entry.kind).filter(
+    (kind) => kind !== "slug" || (draft.key === SLUG_KEY && !hasOtherSlug),
+  );
+}
+
+export interface TypeDraft {
+  name: string;
+  key: string;
+  description: string;
+  fields: FieldDraft[];
+  titleField: string | null;
+  listColumns: string[];
+}
+
+export function emptyTypeDraft(): TypeDraft {
+  return { name: "", key: "", description: "", fields: [], titleField: null, listColumns: [] };
+}
+
+export function toTypeDraft(row: ContentTypeSummary): TypeDraft {
+  return {
+    name: row.name,
+    key: row.key,
+    description: row.description ?? "",
+    fields: row.fields.map(toFieldDraft),
+    titleField: row.titleField,
+    listColumns: row.listColumns ?? [],
+  };
+}
+
+// E19: titleFieldKey と同じ規則を下書きに適用する(対象はテキスト(1 行)だけ。URL スラッグは含めない)
+export function effectiveTitleField(draft: TypeDraft): string | null {
+  if (draft.titleField !== null) {
+    const target = draft.fields.find((field) => field.key === draft.titleField);
+    if (target?.kind === "text") {
+      return target.key;
+    }
+  }
+  return draft.fields.find((field) => field.kind === "text")?.key ?? null;
+}
+
+export function hasSlugField(fields: readonly FieldDraft[], exceptKey?: string): boolean {
+  return fields.some((field) => field.kind === "slug" && field.key !== exceptKey);
+}
+
+// E14
+export function suggestKey(label: string): string {
+  const lowered = label.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const firstLetter = lowered.search(/[a-z]/);
+  if (firstLetter === -1) {
+    return "";
+  }
+  return lowered.slice(firstLetter).replace(/_+$/, "");
+}
+
+export function autoFill(prevLabel: string, prevValue: string, nextLabel: string): string {
+  return prevValue === "" || prevValue === suggestKey(prevLabel)
+    ? suggestKey(nextLabel)
+    : prevValue;
+}
+
+export type KeyError =
+  | { kind: "empty" }
+  | { kind: "invalid"; example: string }
+  | { kind: "duplicate"; label: string }
+  | { kind: "reserved" };
+
+const SYSTEM_KEYS: readonly string[] = SYSTEM_FIELD_KEYS;
+
+function invalidExample(key: string): KeyError {
+  return { kind: "invalid", example: suggestKey(key) || "title" };
+}
+
+// E15
+export function validateFieldKey(
+  key: string,
+  others: readonly { key: string; label: string }[],
+): KeyError | null {
+  if (key === "") {
+    return { kind: "empty" };
+  }
+  if (SYSTEM_KEYS.includes(key)) {
+    return { kind: "reserved" };
+  }
+  if (!FIELD_KEY_PATTERN.test(key)) {
+    return invalidExample(key);
+  }
+  const same = others.find((other) => other.key === key);
+  return same === undefined ? null : { kind: "duplicate", label: same.label };
+}
+
+export function validateTypeKey(
+  key: string,
+  existing: readonly { key: string; name: string }[],
+): KeyError | null {
+  if (key === "") {
+    return { kind: "empty" };
+  }
+  if (!FIELD_KEY_PATTERN.test(key)) {
+    return invalidExample(key);
+  }
+  const same = existing.find((other) => other.key === key);
+  return same === undefined ? null : { kind: "duplicate", label: same.name };
+}
+
+export function keyErrorMessage(error: KeyError, key = ""): string {
+  const labels = CONTENT_TYPE_LABELS.keyErrors;
+  switch (error.kind) {
+    case "empty":
+      return labels.empty;
+    case "invalid":
+      return labels.invalid(error.example);
+    case "duplicate":
+      return labels.duplicate(key, error.label);
+    case "reserved":
+      return labels.reserved(key);
+  }
+}
+
+export interface FieldChange {
+  requiredAdded: boolean;
+  kindChanged: { from: FieldKind; to: FieldKind } | null;
+}
+
+// E18 の注意の元。保存済み(original あり)のフィールドだけが対象
+export function fieldChange(original: FieldDefinition | undefined, draft: FieldDraft): FieldChange {
+  if (original === undefined) {
+    return { requiredAdded: false, kindChanged: null };
+  }
+  const from = kindOf(original);
+  return {
+    requiredAdded: original.required !== true && draft.required,
+    kindChanged: from === draft.kind ? null : { from, to: draft.kind },
+  };
+}
+
+function isEmptyValue(value: unknown): boolean {
+  return (
+    value === undefined ||
+    value === null ||
+    value === "" ||
+    (Array.isArray(value) && value.length === 0)
+  );
+}
+
+function liveRecords(records: readonly SyncRecord[]): SyncRecord[] {
+  return records.filter((record) => record.deletedAt === null);
+}
+
+export function countEmpty(records: readonly SyncRecord[], key: string): number {
+  return liveRecords(records).filter((record) => isEmptyValue(record.input[key])).length;
+}
+
+export function countFilled(records: readonly SyncRecord[], key: string): number {
+  return liveRecords(records).filter((record) => !isEmptyValue(record.input[key])).length;
+}
+
+const NO_INDEXED_KINDS: readonly FieldKind[] = ["asset", "reference", "richtext", "json"];
+
+export function fieldTags(
+  draft: FieldDraft,
+  titleKey: string | null,
+  change: FieldChange,
+): string[] {
+  const tags = CONTENT_TYPE_LABELS.tags;
+  const result: string[] = [];
+  if (draft.required) result.push(tags.required);
+  if (titleKey !== null && draft.key === titleKey) result.push(tags.title);
+  if (draft.kind === "asset" || draft.kind === "reference") {
+    result.push(draft.cardinality === "many" ? tags.many : tags.one);
+  }
+  if (draft.indexed && !NO_INDEXED_KINDS.includes(draft.kind)) result.push(tags.indexed);
+  if (change.requiredAdded) result.push(tags.requiredChanged);
+  if (change.kindChanged !== null) result.push(tags.kindChanged);
+  return result;
+}
+
+export function isTypeDraftDirty(a: TypeDraft, b: TypeDraft): boolean {
+  return JSON.stringify(a) !== JSON.stringify(b);
 }
 
 function compactConfig<T extends Record<string, unknown>>(config: T): T | undefined {
@@ -104,16 +343,23 @@ function compactConfig<T extends Record<string, unknown>>(config: T): T | undefi
 function fromFieldDraft(
   draft: FieldDraft,
 ): { ok: true; field: unknown } | { ok: false; error: string } {
+  const label = draft.label.trim();
+  const description = draft.description.trim();
   const base = {
     key: draft.key,
     ...(draft.required ? { required: true } : {}),
-    ...(draft.label.trim() === "" ? {} : { label: draft.label.trim() }),
-    ...(draft.description.trim() === "" ? {} : { description: draft.description.trim() }),
+    ...(label === "" ? {} : { label }),
+    ...(description === "" ? {} : { description }),
   };
   const indexed = draft.indexed ? true : undefined;
   const unique = draft.unique ? true : undefined;
-  switch (draft.type) {
-    case "text": {
+  const withConfig = (type: string, config: Record<string, unknown> | undefined) => ({
+    ok: true as const,
+    field: { ...base, type, ...(config ? { config } : {}) },
+  });
+  switch (draft.kind) {
+    case "text":
+    case "slug": {
       let maxLength: number | undefined;
       if (draft.maxLength.trim() !== "") {
         maxLength = Number(draft.maxLength.trim());
@@ -121,56 +367,50 @@ function fromFieldDraft(
           return { ok: false, error: `${draft.key}: maxLength は正の整数で指定してください` };
         }
       }
-      const config = compactConfig({ indexed, unique, maxLength });
-      return { ok: true, field: { ...base, type: "text", ...(config ? { config } : {}) } };
+      if (draft.kind === "slug") {
+        return {
+          ok: true,
+          field: {
+            ...base,
+            key: SLUG_KEY,
+            type: "text",
+            config: compactConfig({ indexed, unique: true, maxLength }),
+          },
+        };
+      }
+      return withConfig("text", compactConfig({ indexed, unique, maxLength }));
     }
-    case "number": {
-      const config = compactConfig({ indexed, unique, integer: draft.integer ? true : undefined });
-      return { ok: true, field: { ...base, type: "number", ...(config ? { config } : {}) } };
-    }
-    case "boolean": {
-      const config = compactConfig({ indexed });
-      return { ok: true, field: { ...base, type: "boolean", ...(config ? { config } : {}) } };
-    }
-    case "datetime": {
-      const config = compactConfig({ indexed, unique });
-      return { ok: true, field: { ...base, type: "datetime", ...(config ? { config } : {}) } };
-    }
+    case "number":
+      return withConfig(
+        "number",
+        compactConfig({ indexed, unique, integer: draft.integer ? true : undefined }),
+      );
+    case "boolean":
+      return withConfig("boolean", compactConfig({ indexed }));
+    case "datetime":
+      return withConfig("datetime", compactConfig({ indexed, unique }));
     case "json":
-      return { ok: true, field: { ...base, type: "json" } };
+      return withConfig("json", undefined);
     case "richtext":
-      return { ok: true, field: { ...base, type: "richtext" } };
-    case "select": {
-      const options = draft.optionsText
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line !== "")
-        .map((line) => {
-          const eq = line.indexOf("=");
-          return eq === -1
-            ? { value: line, label: line }
-            : { value: line.slice(0, eq).trim(), label: line.slice(eq + 1).trim() };
-        });
-      const config = {
-        options,
+      return withConfig("richtext", undefined);
+    case "select":
+      return withConfig("select", {
+        options: draft.options.map((option) => ({ value: option.value, label: option.label })),
         ...(draft.multiple ? { multiple: true } : {}),
         ...(indexed !== undefined ? { indexed } : {}),
-      };
-      return { ok: true, field: { ...base, type: "select", config } };
-    }
-    case "relation": {
-      const allowedTypes = draft.allowedTypes
-        .split(",")
-        .map((entry) => entry.trim())
-        .filter((entry) => entry !== "");
-      const config = {
-        allowedTypes,
+      });
+    case "asset":
+      return withConfig("relation", {
+        allowedTypes: [ASSET_TYPE_KEY],
+        cardinality: draft.cardinality,
+        snapshotEmbed: "value",
+      });
+    case "reference":
+      return withConfig("relation", {
+        allowedTypes: draft.allowedTypes,
         cardinality: draft.cardinality,
         ...(draft.ordered ? { ordered: true } : {}),
-        ...(draft.embedValue ? { snapshotEmbed: "value" as const } : {}),
-      };
-      return { ok: true, field: { ...base, type: "relation", config } };
-    }
+      });
   }
 }
 
@@ -178,78 +418,58 @@ export type BuildDefinitionResult =
   | { ok: true; definition: ContentTypeDefinition }
   | { ok: false; errors: string[] };
 
-// 案 E 2.2 の型の表示項目。現行のフォームには入力欄が無いため、編集時は既存の値を引き継ぐ。
-export interface ContentTypeDisplay {
-  description?: string;
-  titleField?: string;
-  listColumns?: string[];
-  menuOrder?: number;
-}
-
-export function displayOf(row: ContentTypeSummary | null): ContentTypeDisplay {
-  if (row === null) {
-    return {};
-  }
-  return summaryToDefinition(row);
-}
-
-// フィールドの削除や種類の変更で参照先が無くなった titleField / listColumns は落とす
-// (入力欄の無い項目の検証エラーで保存できなくなるのを避ける。titleField は最初の text に戻る)
-function pickDisplay(display: ContentTypeDisplay, fields: { key: string; type: string }[]) {
-  const titleTarget = fields.find((field) => field.key === display.titleField);
-  const listColumns = display.listColumns?.filter((key) =>
-    fields.some((field) => field.key === key),
-  );
-  return {
-    ...(display.description === undefined ? {} : { description: display.description }),
-    ...(titleTarget?.type === "text" ? { titleField: titleTarget.key } : {}),
-    ...(listColumns === undefined || listColumns.length === 0 ? {} : { listColumns }),
-    ...(display.menuOrder === undefined ? {} : { menuOrder: display.menuOrder }),
-  };
-}
-
+// titleField / listColumns は無くなった参照を落とす(titleField は最初のテキストに戻る)。
+// 描画側で検証済みの前提だが、スキーマの issue は errors に人が読める形で返す。
 export function buildDefinition(args: {
   id: string;
-  key: string;
-  name: string;
-  drafts: FieldDraft[];
   version: number;
-  display?: ContentTypeDisplay;
+  menuOrder?: number;
+  draft: TypeDraft;
 }): BuildDefinitionResult {
+  const { draft } = args;
   const errors: string[] = [];
-  const fields: { key: string; type: string }[] = [];
-  for (const draft of args.drafts) {
-    const converted = fromFieldDraft(draft);
+  const fields: unknown[] = [];
+  for (const fieldDraft of draft.fields) {
+    const converted = fromFieldDraft(fieldDraft);
     if (!converted.ok) {
       errors.push(converted.error);
     } else {
-      fields.push(converted.field as { key: string; type: string });
+      fields.push(converted.field);
     }
   }
   if (errors.length > 0) {
     return { ok: false, errors };
   }
+  const titleTarget =
+    draft.titleField === null
+      ? undefined
+      : draft.fields.find((field) => field.key === draft.titleField && field.kind === "text");
+  const listColumns = draft.listColumns.filter((key) =>
+    draft.fields.some((field) => field.key === key),
+  );
+  const description = draft.description.trim();
   const parsed = contentTypeDefinitionSchema.safeParse({
     id: args.id,
-    key: args.key,
-    name: args.name,
+    key: draft.key,
+    name: draft.name.trim(),
     fields,
     source: "user",
     version: args.version,
-    ...pickDisplay(args.display ?? {}, fields),
+    ...(description === "" ? {} : { description }),
+    ...(titleTarget === undefined ? {} : { titleField: titleTarget.key }),
+    ...(listColumns.length === 0 ? {} : { listColumns }),
+    ...(args.menuOrder === undefined ? {} : { menuOrder: args.menuOrder }),
   });
   if (!parsed.success) {
     return {
       ok: false,
       errors: parsed.error.issues.map((issue) => {
         // zod の path は "fields.0.config.options" のように配列 index を使うため人には読みにくい。
-        // path が fields.<index>.… の形なら index を該当 draft の key に差し替える(round-trip
-        // テストは「tags」のようなフィールド key がエラー文言に出ることを期待する)。issue.path は
-        // PropertyKey[]（symbol を含みうる）なので String() で明示変換する(テンプレートリテラル
-        // に symbol を直接埋め込むと例外になる)。
+        // path が fields.<index>.… の形なら index を該当 draft の key に差し替える。
+        // issue.path は PropertyKey[](symbol を含みうる)なので String() で明示変換する。
         const [first, index, ...rest] = issue.path;
         if (first === "fields" && typeof index === "number") {
-          const key = args.drafts[index]?.key ?? String(index);
+          const key = draft.fields[index]?.key ?? String(index);
           return `${[key, ...rest.map(String)].join(".")}: ${issue.message}`;
         }
         return `${issue.path.map(String).join(".")}: ${issue.message}`;

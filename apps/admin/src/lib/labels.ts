@@ -1,5 +1,6 @@
 import type { WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncStatus } from "@plyrs/sync-client";
+import type { FieldKind } from "./content-type-form";
 import type { ListTab } from "./content-list";
 import { isRole, type Role } from "./permissions";
 import type { SyncIndicatorState } from "./sync-indicator";
@@ -535,5 +536,187 @@ export const ACCOUNT_LABELS = {
     current: "現在のサイト",
     switch: "切り替える",
     loadFailed: "所属しているサイトを取得できませんでした",
+  },
+} as const;
+
+// 案 E(型設計): フィールドの種類の呼称と説明(E 3 章)
+export const FIELD_KIND_LABELS: Record<FieldKind, { name: string; description: string }> = {
+  text: { name: "テキスト(1 行)", description: "タイトルや名前。最大文字数を決められます" },
+  richtext: { name: "リッチテキスト", description: "見出し・太字・画像を含む本文" },
+  number: { name: "数値", description: "価格や人数。整数のみにもできます" },
+  datetime: { name: "日時", description: "公開日や開催日時" },
+  boolean: { name: "チェックボックス", description: "はい / いいえ" },
+  select: { name: "選択肢", description: "決まった候補から選ぶ。複数選択も可" },
+  asset: { name: "画像・ファイル", description: "メディアから選ぶ。1 件 / 複数" },
+  reference: { name: "他のコンテンツへの参照", description: "別の型のコンテンツを選ぶ" },
+  slug: { name: "URL スラッグ", description: "公開 URL に使う名前。型に 1 つだけ" },
+  json: { name: "JSON", description: "任意の構造のデータをそのまま保存" },
+};
+
+export const CONTENT_TYPE_LABELS = {
+  description:
+    "サイトに載せる内容の種類と、そのフィールドを設計します。並び順はサイドバーの並び順になります(つまみをドラッグ)。",
+  create: "コンテンツタイプを作成",
+  createCrumb: "作成",
+  createTitle: "コンテンツタイプを作成",
+  tableLabel: "コンテンツタイプの一覧",
+  columns: { name: "表示名", fields: "フィールド", contents: "コンテンツ", actions: "操作" },
+  apiName: (key: string) => `API 名: ${key}`,
+  count: (n: number) => `${n} 件`,
+  separator: " ・ ",
+  empty: {
+    title: "コンテンツタイプはまだありません",
+    description: "「お知らせ」「ブログ」のような、サイトに載せる内容の種類を作ります",
+  },
+  moduleBadge: "モジュール",
+  moduleNote: "このモジュールの型は編集できません。表示名と説明はモジュールが持っています",
+  edit: "編集",
+  viewFields: "フィールドを見る",
+  delete: "削除",
+  dragLabel: (name: string) => `${name}を並べ替え`,
+  reorderFailed: "並び順を保存できませんでした",
+  loadFailed: "コンテンツタイプを読み込めませんでした",
+  deleteDialog: {
+    title: (name: string) => `「${name}」を削除しますか？`,
+    body: "コンテンツが 0 件のため削除できます。削除後は同じ API 名で作り直せます。",
+    offline: "オフラインの端末にこの型の下書きが残っている場合、再接続時にその下書きは失われます",
+    confirm: "削除する",
+    deleted: (name: string) => `「${name}」を削除しました`,
+    failed: "削除できませんでした",
+  },
+  editor: {
+    name: "表示名",
+    nameHelp: "サイドバーと一覧の見出しに使います",
+    nameRequired: "表示名を入力してください",
+    key: "API 名",
+    keyPlaceholder: "news など、英小文字・数字・_",
+    keyHelpNew:
+      "公開 API の URL に使います。表示名が英数字なら自動で入ります。日本語の場合は入力してください。作成後は変更できません",
+    keyHelpEdit: "公開 API の URL に使います。作成後は変更できません",
+    descriptionLabel: "説明",
+    descriptionPlaceholder: "この種類の内容を一言で",
+    descriptionHelp: "設定の一覧と、はじめての利用の案内に表示します",
+    descriptionTooLong: "説明は 1000 文字以内で入力してください",
+    fields: "フィールド",
+    fieldsHelp: "上から順に入力フォームに並びます",
+    emptyTitle: "フィールドはまだありません",
+    emptyDescription:
+      "タイトル・本文・画像のような入力項目を足していきます。最初のテキスト(1 行)がタイトルとして使われます。",
+    addField: "フィールドを追加",
+    editField: "編集",
+    editingField: "編集中",
+    viewField: "詳細",
+    listColumns: "一覧に表示する列",
+    listColumnsMax: (n: number) => `最大 ${n} 件`,
+    addColumn: "列を追加",
+    removeColumn: (label: string) => `${label}を外す`,
+    listColumnsHelp: "タイトル・公開・ステータス・更新に加えて、一覧に出す列です",
+    save: "保存",
+    create: "作成",
+    cancel: "キャンセル",
+    panelOpenReason: "フィールドの設定を適用するか、キャンセルしてください",
+    created: "作成しました",
+    saved: "保存しました",
+    saveFailed: "保存できませんでした",
+    viewMeta: "モジュールの型(編集できません)",
+    notFound: (key: string) => `コンテンツタイプが見つかりません: ${key}`,
+  },
+  tags: {
+    required: "必須",
+    title: "タイトルに使う",
+    one: "1 件だけ",
+    many: "複数",
+    indexed: "絞り込み・並べ替え",
+    requiredChanged: "必須に変更",
+    kindChanged: "種類を変更",
+  },
+  kindChangeArrow: " → ",
+  warnings: {
+    requiredAdded: (count: number | null) =>
+      count === null
+        ? "既に作成済みで値が空のコンテンツは、次に保存するときに入力が必要になります"
+        : `既に作成済みで値が空のコンテンツ(${count} 件)は、次に保存するときに入力が必要になります`,
+    kindChanged: (count: number | null) =>
+      count === null
+        ? "入力済みの値は自動では変換されません。値が新しい種類に合わない場合、そのコンテンツを次に保存するときに入力し直す必要があります"
+        : `入力済みの値(${count} 件)は自動では変換されません。値が新しい種類に合わない場合、そのコンテンツを次に保存するときに入力し直す必要があります`,
+  },
+  keyErrors: {
+    empty: "API で使う名前を入力してください",
+    invalid: (example: string) => `英小文字・数字・_ だけが使えます。例: ${example}`,
+    duplicate: (key: string, label: string) => `「${key}」は「${label}」で既に使われています`,
+    reserved: (key: string) => `「${key}」はシステムが使う名前のため使えません`,
+  },
+} as const;
+
+export const ADD_FIELD_LABELS = {
+  title: "フィールドを追加",
+  step1: "1. 種類を選ぶ",
+  step1Done: (kind: string) => `1. 種類を選ぶ: ${kind}`,
+  step2: "2. 名前を付ける",
+  stepArrow: " › ",
+  groups: { basic: "基本", link: "他のデータとつなぐ", advanced: "上級者向け" },
+  slugTaken: "この型には既に URL スラッグがあります",
+  next: "次へ",
+  back: "種類を選び直す",
+  add: "追加",
+  cancel: "キャンセル",
+  label: "表示名",
+  labelHelp: "入力フォームのラベルと一覧の列見出しに使います",
+  labelRequired: "表示名を入力してください",
+  labelTooLong: (max: number) => `表示名は ${max} 文字以内で入力してください`,
+  keyPlaceholder: "subtitle など、英小文字・数字・_",
+  keyHelp:
+    "公開 API の応答でこの名前が使われます。フロントエンドの開発者が読む名前なので、意味の分かる英語にしてください。保存したあとは変更できません",
+} as const;
+
+export const FIELD_PANEL_LABELS = {
+  subtitle: (kind: string) => `種類: ${kind}`,
+  kind: "種類",
+  close: "閉じる",
+  apply: "適用",
+  cancel: "キャンセル",
+  deleteField: "このフィールドを削除",
+  label: "表示名",
+  labelHelp: "入力フォームのラベルと一覧の列見出しに使います",
+  keyHelp: "公開 API の応答でこの名前が使われます。英小文字・数字・_ のみ",
+  keyHelpSaved: "公開 API の応答でこの名前が使われます。保存したあとは変更できません",
+  description: "説明文",
+  descriptionHelp: "入力欄の下に補足として表示します",
+  descriptionTooLong: (max: number) => `説明文は ${max} 文字以内で入力してください`,
+  required: "必須",
+  titleField: "タイトルに使う",
+  titleFieldHelp: "一覧・ホーム・パンくずで、このフィールドの値をタイトルとして表示します",
+  indexed: "公開 API で絞り込み・並べ替えに使う",
+  indexedHelp: "公開 API の検索条件や並び順に使えるようになります",
+  unique: "同じ値を許可しない",
+  uniqueHelp: "他のコンテンツと同じ値は保存できません",
+  uniqueSlugHelp: "他のコンテンツと同じ値は保存できません。URL スラッグでは常に有効です",
+  maxLength: "最大文字数",
+  maxLengthInvalid: "1 以上の整数で入力してください",
+  integer: "整数のみ",
+  options: "選択肢",
+  optionLabel: "表示名",
+  optionValue: "API で使う値",
+  addOption: "選択肢を追加",
+  removeOption: (label: string) => `${label || "(空)"}を外す`,
+  optionsRequired: "選択肢を 1 件以上入力してください",
+  optionValueEmpty: "API で使う値を入力してください",
+  optionValueDuplicate: (value: string) => `「${value}」が重複しています`,
+  multiple: "複数選択",
+  cardinality: "件数",
+  one: "1 件だけ",
+  many: "複数",
+  ordered: "並び順を保持",
+  orderedHelp: "選んだ順番を公開 API の応答でも保ちます",
+  allowedTypes: "参照できる型",
+  allowedTypesRequired: "参照できる型を 1 つ以上選んでください",
+  deleteDialog: {
+    title: (label: string) => `フィールド「${label}」を削除しますか？`,
+    body: (key: string) =>
+      `このフィールドは入力フォームから消えます。入力済みの値はデータ上に残り、同じ API 名(${key})でフィールドを作り直すと再び表示されます。`,
+    publicNote:
+      "公開 API の応答にはこの項目の値が残ったまま返りますが、絞り込み・並べ替えには使えなくなります。サイト側でこの項目を使っている場合は、先にサイト側を直してください",
+    confirm: "削除する",
   },
 } as const;
