@@ -280,7 +280,8 @@ export function RecordForm({
       return;
     } catch (cause) {
       const conflictFields = syncConflictFields(cause);
-      if (conflictFields.length === 0) {
+      // 新規作成(record なし)の競合は突き合わせ相手が無くダイアログを出せないため、そのまま投げる
+      if (conflictFields.length === 0 || record === null) {
         throw cause;
       }
       const outcome = await new Promise<ConflictOutcome>((resolve) => {
@@ -306,6 +307,15 @@ export function RecordForm({
   };
 
   useImperativeHandle(ref, () => ({ validate, save }));
+
+  // 競合待ちの間にアンマウントされたら「あとで決める」扱いで save() を抜けさせる
+  useEffect(
+    () => () => {
+      conflictResolver.current?.("deferred");
+      conflictResolver.current = null;
+    },
+    [],
+  );
 
   // §8 の自己競合ガード: conflict ack は「ack 消失後の再送が、適用済みの自分自身の変更と
   // 衝突した」だけのことがある。手元 store の最新 record と突き合わせ、全競合フィールドが
@@ -447,12 +457,6 @@ export function RecordForm({
       )}
     </form>
   );
-}
-
-interface PendingConflict {
-  fieldKeys: string[];
-  submittedInput: Record<string, unknown>;
-  submittedDraft: DraftValues;
 }
 
 // text / json 以外の型(自前のラベルを持つ部品)に補足説明を添える。ラベルの直下ではなく部品の下に出る

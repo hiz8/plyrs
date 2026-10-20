@@ -569,6 +569,51 @@ describe("RecordForm 本文競合(裁定 3 / R10)", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
+  it("新規作成で conflict が返っても競合扱いにせず cause を投げる", async () => {
+    const cause = conflictError();
+    const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
+      throw cause;
+    });
+    render(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={buildRegistry()}
+        record={null}
+        onDirtyChange={() => {}}
+        ref={handle}
+        onSubmit={onSubmit}
+      />,
+    );
+    const user = userEvent.setup();
+    await user.type(screen.getByRole("textbox", { name: "title" }), "x");
+    let caught: unknown;
+    await act(async () => {
+      caught = await startSave().catch((error: unknown) => error);
+    });
+    expect(caught).toBe(cause);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("競合待ち中にアンマウントすると save は SaveDeferredError で終わる", async () => {
+    const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
+      throw conflictError();
+    });
+    const view = render(
+      conflictForm(
+        buildRegistry(),
+        articleRecord({ title: "t", body: bodyEnvelope("旧本文") }),
+        onSubmit,
+      ),
+    );
+    const user = userEvent.setup();
+    await editBody(user);
+    const settled = startSave().catch((error: unknown) => error);
+    await screen.findByRole("dialog", { name: "本文が他の人の編集と重なりました" });
+    view.unmount();
+    expect(await settled).toBeInstanceOf(SaveDeferredError);
+  });
+
   it("競合したサーバーの値が自分の送信値と同じなら、静かに保存成功にする(§8 自己競合ガード)", async () => {
     const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
       throw conflictError();
