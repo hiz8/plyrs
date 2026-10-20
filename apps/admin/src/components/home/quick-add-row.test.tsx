@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { BLOG, NEWS, SLOT } from "./fixtures";
@@ -8,6 +8,8 @@ it("型ごとのボタンをサイドバーの順に並べ、押すと onAdd に
   const onAdd = vi.fn();
   render(<QuickAddRow types={[NEWS, BLOG, SLOT]} onAdd={onAdd} />);
   expect(screen.getByText("新規追加")).toBeInTheDocument();
+  const group = screen.getByRole("group", { name: "新規追加" });
+  expect(within(group).getAllByRole("button")).toHaveLength(3);
   const buttons = screen.getAllByRole("button");
   expect(buttons.map((b) => b.textContent)).toEqual(["お知らせ", "ブログ", "予約枠"]);
   await userEvent.click(screen.getByRole("button", { name: "ブログ" }));

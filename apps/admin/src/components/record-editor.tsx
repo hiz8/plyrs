@@ -135,7 +135,7 @@ export function RecordEditor({
     isNew,
     isAsset,
     publication: isNew || isAsset ? undefined : publication.data,
-    publicationError: publication.isError,
+    publicationError: publication.isLoadingError,
     recordVersion: record?.version ?? 0,
     dirty,
     connected,

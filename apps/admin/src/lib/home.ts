@@ -133,7 +133,10 @@ export function countChanged(
 ): StatusSummary {
   return summarize(
     rows.filter(
-      (row) => publicationStateOf(row.record, publications.get(row.record.id)) === "changed",
+      (row) =>
+        // 一覧のタブ unpublished-changes(content-list.ts の matchesTab)と同じくアーカイブは除く
+        row.record.status !== "archived" &&
+        publicationStateOf(row.record, publications.get(row.record.id)) === "changed",
     ),
     order,
   );

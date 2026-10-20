@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Plus } from "lucide-react";
-import { Fragment } from "react";
+import { Fragment, useId } from "react";
 import { Button, Skeleton } from "@plyrs/ui";
 import { border, font, space, text } from "@plyrs/ui/semantic.stylex";
 import type { HomeType } from "../../lib/home";
@@ -35,9 +35,12 @@ export function QuickAddRow({
   onAdd: (typeKey: string) => void;
   isLoading?: boolean;
 }) {
+  const labelId = useId();
   return (
-    <div {...stylex.props(styles.row)}>
-      <span {...stylex.props(styles.label)}>{HOME_LABELS.quickAdd}</span>
+    <div role="group" aria-labelledby={labelId} {...stylex.props(styles.row)}>
+      <span id={labelId} {...stylex.props(styles.label)}>
+        {HOME_LABELS.quickAdd}
+      </span>
       {isLoading === true ? (
         <>
           <Skeleton shape="circle" width={96} height={32} />

@@ -111,6 +111,17 @@ describe("ホーム", () => {
     expect(screen.getByRole("heading", { level: 2, name: "最近の更新" })).toBeInTheDocument();
   });
 
+  it("閲覧者の同期前は新規追加と下書きを出さず、確認待ちと最近の更新だけをスケルトンにする", async () => {
+    const harness = socketHarness();
+    renderAt("/t/blog", harness, authedRoutes({}, "viewer"));
+    expect(await screen.findByRole("heading", { level: 1, name: "ホーム" })).toBeInTheDocument();
+    expect(screen.getByRole("main").querySelector("[aria-busy='true']")).not.toBeNull();
+    expect(screen.queryByText("新規追加")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "自分の下書き" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "確認待ち" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "最近の更新" })).toBeInTheDocument();
+  });
+
   it("新規追加はサイドバーの順(お知らせ → 記事 → 予約枠)で並び、押すと作成画面へ移る", async () => {
     const harness = socketHarness();
     const router = renderAt("/t/blog", harness, authedRoutes(modulesRoute()));
@@ -190,7 +201,7 @@ describe("ホーム", () => {
         rec("article", 2, "レビュー2", { status: "in_review" }),
         rec("article", 3, "確認済み記事", { status: "ready" }),
         rec("notice", 4, "確認済みお知らせ", { status: "ready" }),
-        rec("article", 5, "公開後に編集", { status: "archived", version: 2 }),
+        rec("article", 5, "公開後に編集", { status: "draft", version: 2 }),
       ],
       types2,
     );
@@ -271,7 +282,7 @@ describe("ホーム", () => {
       harness,
       [
         rec("article", 1, "レビュー1", { status: "in_review" }),
-        rec("article", 2, "公開後に編集", { status: "archived", version: 2 }),
+        rec("article", 2, "公開後に編集", { status: "draft", version: 2 }),
       ],
       types2,
     );

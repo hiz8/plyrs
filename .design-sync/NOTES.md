@@ -65,4 +65,5 @@
 ## V4 で変えた部品
 - `ProgressBar`(`isLabelHidden`: `aria-label` は残し、見た目の題を描かず値の文字だけ右寄せにする)
 - `Toaster.clear()`(溜まった通知をすべて消す)
+- `HomeWidgetContribution`(`size?: "half" | "full"`、`moduleId?: string`。型だけの変更で見た目は無し)
 - 再同期は V4-F の最後にまとめて行う

@@ -129,7 +129,7 @@ function HomePage() {
           drafts: myDrafts(rows, userId),
           summary: countMyDrafts(rows, userId, homeTypeList),
         };
-  const changedState: ChangedState = publications.isError
+  const changedState: ChangedState = publications.isLoadingError
     ? { kind: "error", onRetry: () => void publications.refetch() }
     : publications.isPending
       ? { kind: "loading" }
@@ -138,20 +138,34 @@ function HomePage() {
   let content;
   if (!typesSettled) {
     // 裁定 B12: 見出しは残し、中身だけスケルトンにする
+    // 閲覧者は確定後と同じく新規追加・下書きを出さない(裁定 B20)
+    const loadingReview = (
+      <ReviewCard
+        slug={tenantSlug}
+        isLoading
+        inReview={EMPTY_SUMMARY}
+        ready={EMPTY_SUMMARY}
+        changed={{ kind: "loading" }}
+      />
+    );
+    const loadingRecent = <RecentCard slug={tenantSlug} isLoading rows={[]} />;
     content = (
       <div aria-busy="true" {...stylex.props(styles.body)}>
-        <QuickAddRow types={[]} onAdd={() => {}} isLoading />
-        <div {...stylex.props(styles.grid)}>
-          {canWrite ? <DraftsCard slug={tenantSlug} state={{ kind: "loading" }} /> : null}
-          <ReviewCard
-            slug={tenantSlug}
-            isLoading
-            inReview={EMPTY_SUMMARY}
-            ready={EMPTY_SUMMARY}
-            changed={{ kind: "loading" }}
-          />
-        </div>
-        <RecentCard slug={tenantSlug} isLoading rows={[]} />
+        {canWrite ? (
+          <>
+            <QuickAddRow types={[]} onAdd={() => {}} isLoading />
+            <div {...stylex.props(styles.grid)}>
+              <DraftsCard slug={tenantSlug} state={{ kind: "loading" }} />
+              {loadingReview}
+            </div>
+            {loadingRecent}
+          </>
+        ) : (
+          <>
+            {loadingReview}
+            {loadingRecent}
+          </>
+        )}
       </div>
     );
   } else if (homeTypeList.length === 0) {

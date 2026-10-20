@@ -194,6 +194,16 @@ describe("home", () => {
     ]);
   });
 
+  it("countChanged はアーカイブ済みを数えない(一覧のタブと揃える)", () => {
+    const rows = homeRecords(
+      [rec("a", "article", { version: 3, status: "archived", updatedAt: newer })],
+      ht,
+      titleOf,
+    );
+    const summary = countChanged(rows, new Map([["a", { sourceVersion: 2 }]]), ht);
+    expect(summary.total).toBe(0);
+  });
+
   it("homeRecords と recentUpdates は archived も含む(裁定 B9)", () => {
     const rows = homeRecords([rec("z", "article", { status: "archived" })], ht, titleOf);
     expect(rows).toHaveLength(1);

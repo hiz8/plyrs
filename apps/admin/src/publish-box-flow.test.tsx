@@ -125,6 +125,7 @@ describe("公開ボックス(/t/$tenantSlug/content/$typeKey/$recordId)", () => 
     );
     await user.click(publishBox().getByRole("button", { name: "再試行" }));
     expect(await publishBox().findByText("未公開")).toBeInTheDocument();
+    expect(publishBox().queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("未保存の編集がある状態の更新は、push の ack の後に publish を呼ぶ", async () => {
