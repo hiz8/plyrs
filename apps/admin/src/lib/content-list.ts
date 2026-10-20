@@ -252,15 +252,28 @@ export function applyListQuery(rows: readonly ListRow[], query: ListQuery): List
 export interface BulkResult {
   succeeded: string[];
   failed: { id: string; cause: unknown }[];
+  /** 中止で手を付けなかったもの */
+  skipped: string[];
 }
 
+export interface RunBulkOptions {
+  onProgress?: (done: number, total: number) => void;
+  signal?: AbortSignal;
+}
+
+// 中止: 実行中の 1 件は待ち、残りを skipped にする(処理済みは戻さない)
 export async function runBulk(
   ids: readonly string[],
   action: (id: string) => Promise<void>,
-  onProgress?: (done: number, total: number) => void,
+  options: RunBulkOptions = {},
 ): Promise<BulkResult> {
-  const result: BulkResult = { succeeded: [], failed: [] };
+  const { onProgress, signal } = options;
+  const result: BulkResult = { succeeded: [], failed: [], skipped: [] };
   for (const [index, id] of ids.entries()) {
+    if (signal?.aborted === true) {
+      result.skipped.push(...ids.slice(index));
+      break;
+    }
     try {
       await action(id);
       result.succeeded.push(id);
@@ -270,4 +283,47 @@ export async function runBulk(
     onProgress?.(index + 1, ids.length);
   }
   return result;
+}
+
+export type PageItem = number | "gap";
+
+// ページ送りの番号。7 枠に収める: pageCount <= 7 なら全部。それ以外は 1・末尾・現在 ±1 を出し、
+// 間が 2 以上空くときだけ "gap"(1 つ空くだけなら数字で埋める)
+export function pageWindow(page: number, pageCount: number): PageItem[] {
+  if (pageCount <= 7) {
+    return Array.from({ length: pageCount }, (_, i) => i + 1);
+  }
+  const shown = new Set([1, pageCount, page - 1, page, page + 1]);
+  const numbers = [...shown].filter((n) => n >= 1 && n <= pageCount).toSorted((a, b) => a - b);
+  const items: PageItem[] = [];
+  let previous = 0;
+  for (const n of numbers) {
+    if (n - previous === 2) {
+      items.push(previous + 1);
+    } else if (n - previous > 2) {
+      items.push("gap");
+    }
+    items.push(n);
+    previous = n;
+  }
+  return items;
+}
+
+// 検索 0 件の説明文の「{タブ}・ステータス「{値}」」の部分。条件が無ければ ""
+export function describeFilters(
+  query: Pick<ListQuery, "tab" | "status">,
+  labels: {
+    tabs: Record<ListTab, string>;
+    statuses: Record<ListStatus, string>;
+    statusLabel: string;
+  },
+): string {
+  const parts: string[] = [];
+  if (query.tab !== "all") {
+    parts.push(labels.tabs[query.tab]);
+  }
+  if (query.status !== undefined) {
+    parts.push(`${labels.statusLabel}「${labels.statuses[query.status]}」`);
+  }
+  return parts.join("・");
 }

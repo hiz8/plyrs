@@ -4,7 +4,9 @@ import {
   applyListQuery,
   buildListRows,
   DEFAULT_LIST_QUERY,
+  describeFilters,
   filterRows,
+  pageWindow,
   paginate,
   parseListQuery,
   publicationStateOf,
@@ -219,10 +221,14 @@ describe("runBulk", () => {
           throw boom;
         }
       },
-      progress,
+      { onProgress: progress },
     );
     expect(order).toStrictEqual(["a", "b", "c"]);
-    expect(result).toStrictEqual({ succeeded: ["a", "c"], failed: [{ id: "b", cause: boom }] });
+    expect(result).toStrictEqual({
+      succeeded: ["a", "c"],
+      failed: [{ id: "b", cause: boom }],
+      skipped: [],
+    });
     expect(progress.mock.calls).toStrictEqual([
       [1, 3],
       [2, 3],
@@ -240,5 +246,65 @@ describe("runBulk", () => {
       running -= 1;
     });
     expect(maxRunning).toBe(1);
+  });
+});
+
+describe("runBulk の中止", () => {
+  it("signal の中止で残りを skipped にし、処理済みは戻さない", async () => {
+    const controller = new AbortController();
+    const calls: string[] = [];
+    const result = await runBulk(
+      ["a", "b", "c"],
+      async (id) => {
+        calls.push(id);
+        if (id === "a") {
+          controller.abort();
+        }
+      },
+      { signal: controller.signal },
+    );
+    expect(calls).toEqual(["a"]);
+    expect(result).toEqual({ succeeded: ["a"], failed: [], skipped: ["b", "c"] });
+  });
+});
+
+describe("pageWindow", () => {
+  it.each<[number, number, (number | "gap")[]]>([
+    [1, 1, [1]],
+    [3, 7, [1, 2, 3, 4, 5, 6, 7]],
+    [1, 10, [1, 2, "gap", 10]],
+    [2, 10, [1, 2, 3, "gap", 10]],
+    [5, 10, [1, "gap", 4, 5, 6, "gap", 10]],
+    [10, 10, [1, "gap", 9, 10]],
+  ])("pageWindow(%i, %i)", (page, pageCount, expected) => {
+    expect(pageWindow(page, pageCount)).toEqual(expected);
+  });
+});
+
+describe("describeFilters", () => {
+  const labels = {
+    tabs: {
+      all: "すべて",
+      published: "公開中",
+      "unpublished-changes": "未反映の変更あり",
+      unpublished: "未公開",
+      archived: "アーカイブ",
+    },
+    statuses: { draft: "下書き", in_review: "レビュー中", ready: "公開待ち" },
+    statusLabel: "ステータス",
+  };
+  it("条件なしは空文字", () => {
+    expect(describeFilters({ tab: "all", status: undefined }, labels)).toBe("");
+  });
+  it("タブだけ", () => {
+    expect(describeFilters({ tab: "published", status: undefined }, labels)).toBe("公開中");
+  });
+  it("ステータスだけ", () => {
+    expect(describeFilters({ tab: "all", status: "draft" }, labels)).toBe("ステータス「下書き」");
+  });
+  it("両方は「・」で繋ぐ", () => {
+    expect(describeFilters({ tab: "published", status: "draft" }, labels)).toBe(
+      "公開中・ステータス「下書き」",
+    );
   });
 });
