@@ -154,3 +154,47 @@ it("このフィールドを削除で onDelete を呼ぶ", async () => {
   await user.click(screen.getByRole("button", { name: P.deleteField }));
   expect(onDelete).toHaveBeenCalledOnce();
 });
+
+it("タイトルに使うを on にして適用すると isTitle: true を返す", async () => {
+  const user = userEvent.setup();
+  const { onApply } = setup(saved("text", "title", "タイトル"));
+  await user.click(screen.getByRole("checkbox", { name: P.titleField }));
+  await user.click(screen.getByRole("button", { name: P.apply }));
+  expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ key: "title" }), {
+    isTitle: true,
+  });
+});
+
+it("タイトルのテキストを数値に変えて適用すると isTitle: false を返す", async () => {
+  const user = userEvent.setup();
+  const { onApply } = setup(saved("text", "title", "タイトル"), { isTitle: true });
+  expect(screen.getByRole("checkbox", { name: P.titleField })).toBeChecked();
+  await user.click(screen.getByRole("button", { name: new RegExp(P.kind) }));
+  await user.click(await screen.findByRole("option", { name: FIELD_KIND_LABELS.number.name }));
+  await user.click(screen.getByRole("button", { name: P.apply }));
+  expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ kind: "number" }), {
+    isTitle: false,
+  });
+});
+
+it("draft を別の key に差し替えるとローカルを取り直し、同じ内容の再描画では巻き戻さない", async () => {
+  const user = userEvent.setup();
+  const props = {
+    others: [],
+    typeOptions: [],
+    isReadOnly: false,
+    returnFocusTo: createRef<HTMLElement>(),
+    onApply: vi.fn(),
+    onCancel: vi.fn(),
+    onDelete: vi.fn(),
+  };
+  const { rerender } = render(
+    <FieldPanel {...props} draft={saved("text", "title", "タイトル")} isTitle={false} />,
+  );
+  await user.type(screen.getByRole("textbox", { name: P.maxLength }), "30");
+  rerender(<FieldPanel {...props} draft={saved("text", "title", "タイトル")} isTitle={false} />);
+  expect(screen.getByRole("textbox", { name: P.maxLength })).toHaveValue("30");
+  rerender(<FieldPanel {...props} draft={saved("text", "other", "別")} isTitle />);
+  expect(screen.getByRole("textbox", { name: P.maxLength })).toHaveValue("");
+  expect(screen.getByRole("checkbox", { name: P.titleField })).toBeChecked();
+});

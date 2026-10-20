@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Plus, X } from "lucide-react";
-import { useEffect, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   Button,
   Checkbox,
@@ -117,12 +117,15 @@ export function FieldPanel({
   const [titleOn, setTitleOn] = useState(isTitle);
   const [submitted, setSubmitted] = useState(false);
 
-  // 開く対象が変わるたびに複製と isTitle を取り直す
+  // 開く対象(key)が変わるたびに複製と isTitle を取り直す。親が毎レンダー新しい draft を渡しても巻き戻さない
+  const latest = useRef({ draft, isTitle });
+  latest.current = { draft, isTitle };
+  const draftKey = draft?.key ?? null;
   useEffect(() => {
-    setLocal(draft);
-    setTitleOn(isTitle);
+    setLocal(latest.current.draft);
+    setTitleOn(latest.current.isTitle);
     setSubmitted(false);
-  }, [draft, isTitle]);
+  }, [draftKey]);
 
   if (draft === null || local === null) return null;
 
