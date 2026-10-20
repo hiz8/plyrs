@@ -86,8 +86,8 @@ export interface StatusSummary {
 }
 
 // rows は更新順なので、byType の並びは order(homeTypes の結果)の順へ戻す。
-// order を省くと rows での登場順になる。
-function summarize(rows: readonly HomeRecord[], order?: readonly HomeType[]): StatusSummary {
+// (裁定 B1。order は必須で、渡し忘れを型エラーにする)
+function summarize(rows: readonly HomeRecord[], order: readonly HomeType[]): StatusSummary {
   const counts = new Map<string, TypeCount>();
   for (const row of rows) {
     const entry = counts.get(row.type.key);
@@ -97,20 +97,17 @@ function summarize(rows: readonly HomeRecord[], order?: readonly HomeType[]): St
       entry.count += 1;
     }
   }
-  const byType =
-    order === undefined
-      ? [...counts.values()]
-      : order.flatMap((type) => {
-          const entry = counts.get(type.key);
-          return entry === undefined ? [] : [entry];
-        });
+  const byType = order.flatMap((type) => {
+    const entry = counts.get(type.key);
+    return entry === undefined ? [] : [entry];
+  });
   return { total: rows.length, byType };
 }
 
 export function countByStatus(
   rows: readonly HomeRecord[],
   status: WorkflowStatus,
-  order?: readonly HomeType[],
+  order: readonly HomeType[],
 ): StatusSummary {
   return summarize(
     rows.filter((row) => row.record.status === status),
@@ -121,7 +118,7 @@ export function countByStatus(
 export function countMyDrafts(
   rows: readonly HomeRecord[],
   userId: string,
-  order?: readonly HomeType[],
+  order: readonly HomeType[],
 ): StatusSummary {
   return summarize(
     rows.filter((row) => isMyDraft(row, userId)),
@@ -132,7 +129,7 @@ export function countMyDrafts(
 export function countChanged(
   rows: readonly HomeRecord[],
   publications: ReadonlyMap<string, { sourceVersion: number }>,
-  order?: readonly HomeType[],
+  order: readonly HomeType[],
 ): StatusSummary {
   return summarize(
     rows.filter(

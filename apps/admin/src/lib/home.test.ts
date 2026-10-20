@@ -48,6 +48,8 @@ function rec(id: string, typeKey: string, over: Partial<SyncRecord> = {}): SyncR
   } as SyncRecord;
 }
 
+const keysOf = (summary: { byType: { type: { key: string }; count: number }[] }) =>
+  summary.byType.map((t) => [t.type.key, t.count]);
 const titleOf = (r: SyncRecord) => r.id;
 const types = [
   type("article", "記事", "user", 1),
@@ -125,33 +127,56 @@ describe("home", () => {
     expect(recentUpdates(many, 3).map((r) => r.record.id)).toStrictEqual(["rev", "other", "m6"]);
   });
 
+  // article の方が新しいので、更新順の初登場は article → page。homeTypes の順は page → article
+  const newer = "2026-10-05T00:00:00.000Z";
+  const older = "2026-10-01T00:00:00.000Z";
+
   it("countByStatus は型をまたいで数え、byType は homeTypes の順で 0 件の型を含まない", () => {
     const rows = homeRecords(
       [
-        rec("a", "article", { status: "in_review" }),
-        rec("b", "page", { status: "in_review" }),
-        rec("c", "page", { status: "in_review" }),
+        rec("a", "article", { status: "in_review", updatedAt: newer }),
+        rec("b", "page", { status: "in_review", updatedAt: older }),
+        rec("c", "page", { status: "in_review", updatedAt: older }),
         rec("d", "booking.slot", { status: "ready" }),
       ],
       ht,
       titleOf,
     );
+    expect(rows[0]?.type.key).toBe("article");
     const summary = countByStatus(rows, "in_review", ht);
     expect(summary.total).toBe(3);
-    expect(summary.byType.map((t) => [t.type.key, t.count])).toStrictEqual([
+    expect(keysOf(summary)).toStrictEqual([
       ["page", 2],
       ["article", 1],
     ]);
     expect(countByStatus(rows, "archived", ht)).toStrictEqual({ total: 0, byType: [] });
-    expect(countMyDrafts(many, "u1", ht).total).toBe(6);
   });
 
-  it("countChanged は公開中かつ sourceVersion が古いものだけを数える", () => {
+  it("countMyDrafts の byType も homeTypes の順になる", () => {
     const rows = homeRecords(
       [
-        rec("a", "article", { version: 3 }),
-        rec("b", "article", { version: 2 }),
-        rec("c", "page", { version: 5 }),
+        rec("a", "article", { updatedAt: newer }),
+        rec("b", "page", { updatedAt: older }),
+        rec("c", "page", { updatedAt: older, updatedBy: "u2" }),
+      ],
+      ht,
+      titleOf,
+    );
+    const summary = countMyDrafts(rows, "u1", ht);
+    expect(summary.total).toBe(2);
+    expect(keysOf(summary)).toStrictEqual([
+      ["page", 1],
+      ["article", 1],
+    ]);
+  });
+
+  it("countChanged は公開中かつ sourceVersion が古いものだけを数え、byType は homeTypes の順", () => {
+    const rows = homeRecords(
+      [
+        rec("a", "article", { version: 3, updatedAt: newer }),
+        rec("b", "article", { version: 2, updatedAt: newer }),
+        rec("c", "page", { version: 5, updatedAt: older }),
+        rec("d", "page", { version: 4, updatedAt: older }),
       ],
       ht,
       titleOf,
@@ -159,10 +184,20 @@ describe("home", () => {
     const publications = new Map([
       ["a", { sourceVersion: 2 }],
       ["b", { sourceVersion: 2 }],
+      ["c", { sourceVersion: 3 }],
     ]);
     const summary = countChanged(rows, publications, ht);
-    expect(summary.total).toBe(1);
-    expect(summary.byType.map((t) => [t.type.key, t.count])).toStrictEqual([["article", 1]]);
+    expect(summary.total).toBe(2);
+    expect(keysOf(summary)).toStrictEqual([
+      ["page", 1],
+      ["article", 1],
+    ]);
+  });
+
+  it("homeRecords と recentUpdates は archived も含む(裁定 B9)", () => {
+    const rows = homeRecords([rec("z", "article", { status: "archived" })], ht, titleOf);
+    expect(rows).toHaveLength(1);
+    expect(recentUpdates(rows).map((r) => r.record.id)).toStrictEqual(["z"]);
   });
 
   it("listHref は既定値を省いたクエリを付け、空なら ? を付けない", () => {

@@ -51,8 +51,6 @@ export const SYNC_STATUS_LABELS: Record<SyncStatus, string> = {
   closed: "切断",
 };
 
-// 案 A: シェル(サイドバー・ヘッダー)の文言
-// ホームの暫定画面(a-navigation.md 9 章、2026-10-19 裁定)。型が無い編集者・閲覧者向けの案内
 // b-home.md: ホーム(ダッシュボード)の文言
 export const HOME_LABELS = {
   meta: (email: string, role: string) => `${email} ・ ${role}`,
@@ -110,11 +108,13 @@ export const HOME_LABELS = {
   },
 } as const;
 
+// ホームの暫定画面(a-navigation.md 9 章、2026-10-19 裁定)。型が無い編集者・閲覧者向けの案内
 export const HOME_PLACEHOLDER = {
   title: "コンテンツの種類がまだありません",
   description: "サイトの管理者に作成を依頼してください",
 } as const;
 
+// 案 A: シェル(サイドバー・ヘッダー)の文言
 export const NAV_LABELS = {
   home: "ホーム",
   content: "コンテンツ",
