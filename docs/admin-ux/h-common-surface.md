@@ -52,6 +52,7 @@
 - V3(2026-10-20): 入力部品に `isReadOnly`(閲覧者の読み取り専用表示。枠線なし・下罫線だけ、`RichTextEditor` はツールバー無し)(R2)、`Select` に `size="sm"`、`PageHeader` に `meta`(見出しの右の補足)を足した。表の中のリンクは RAC の `Link` を admin から直接使う(R23)
 - V4-B(2026-10-20): ホームの枠の中のリンクも RAC の `Link` を admin から直接使う(B10)。枠内の 0 件表示は `EmptyState` を使わない(B8)。`ProgressBar` に `isLabelHidden`、`Toaster` に `clear()` を足した
 - V4-G(2026-10-20): `SegmentedControl`(3 択の pill)を足した(G2)。所属サイトの「切り替える」と有効化直後の「{型名}を追加 ›」も RAC の `Link` を admin から直接使う(G28)
+- V4-G(2026-10-20、実行中の裁定): ダイアログ内の注記は admin の `DialogNote`(Banner はページ用)、`Select` に `isLabelHidden`、`Tabs` に `keyboardActivation`、クリップボードは `lib/clipboard.ts` の `copyText` に集約
 - トーストは react-aria-components 1.21.1 では `UNSTABLE_Toast` / `UNSTABLE_ToastRegion` / `UNSTABLE_ToastQueue` としてだけ提供されている。これを `packages/ui/src/toast.tsx` の中だけで import して包み、外へは自前の API(`createToaster` / `ToastRegion`)を出す(V1、2026-10-18)。読み上げ・フォーカス移動・F6 での移動を RAC に任せ、将来の破壊的変更は 1 ファイルに閉じ込める。トーストの地は `bg.raised` とし、成功 / エラーはアイコンの色で示す
 
 ## 4. 文言
