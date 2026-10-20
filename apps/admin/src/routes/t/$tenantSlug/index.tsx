@@ -200,10 +200,10 @@ function HomePage() {
             {recent}
           </>
         ) : (
-          <div {...stylex.props(styles.grid)}>
+          <>
             {review}
             {recent}
-          </div>
+          </>
         )}
         <WidgetGrid widgets={widgets} />
       </div>

@@ -298,6 +298,13 @@ describe("ホーム", () => {
     expect(main().queryByText("新規追加")).not.toBeInTheDocument();
     expect(main().queryByRole("heading", { name: "自分の下書き" })).not.toBeInTheDocument();
     expect(main().getByRole("heading", { level: 2, name: "確認待ち" })).toBeInTheDocument();
+    // D3 H2: 2 つの枠は同じ縦積みの入れ物の直下に並ぶ(2 列グリッドの子ではない)
+    const reviewBox = screen.getByRole("region", { name: "確認待ち" }).parentElement;
+    const recentBox = screen.getByRole("region", { name: "最近の更新" }).parentElement;
+    expect(reviewBox).not.toBeNull();
+    expect(reviewBox).toBe(recentBox);
+    // その入れ物は本文そのもの(PageBody の唯一の子)で、grid のラッパーではない
+    expect(reviewBox?.parentElement?.children).toHaveLength(1);
   });
 
   it("型 0 件の管理者には「はじめに」が出て、型が届くと普段の表示に変わる", async () => {
