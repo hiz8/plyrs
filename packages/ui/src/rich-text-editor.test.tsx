@@ -322,4 +322,9 @@ it("isReadOnly はツールバーを出さず編集できない", async () => {
   expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "画像" })).not.toBeInTheDocument();
   expect(editor?.isEditable).toBe(false);
+  const surface = screen.getByRole("textbox", { name: "本文" });
+  expect(surface).toHaveAttribute("aria-readonly", "true");
+  expect(surface).toHaveAttribute("tabindex", "0");
+  expect(surface.style.paddingLeft).toBe("0px");
+  expect(surface.style.paddingRight).toBe("0px");
 });

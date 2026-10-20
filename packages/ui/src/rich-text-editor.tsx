@@ -162,6 +162,29 @@ function docContent(value: RichTextValue | undefined): JSONContent {
   return value === undefined ? EMPTY_DOC : (value.doc as JSONContent);
 }
 
+// 編集面の属性。TextField と同じ getByRole("textbox", { name: label }) で見つける規約。
+// StyleX は ProseMirror が生成する DOM に届かないため、編集面の最小スタイルは
+// inline で持つ(tech-selection §1.3 の「動的スタイルは inline で逃がす」規約)。
+// 読み取り専用は contenteditable=false でフォーカスできないため tabindex=0 で止まれるようにし、余白は左右とも 0 にする
+function editorAttributes(label: string, isReadOnly: boolean): Record<string, string> {
+  const base = {
+    role: "textbox",
+    "aria-multiline": "true",
+    "aria-label": label,
+  };
+  return isReadOnly
+    ? {
+        ...base,
+        "aria-readonly": "true",
+        tabindex: "0",
+        style: "outline: none; min-height: 120px; padding: 12px 0; line-height: 1.75;",
+      }
+    : {
+        ...base,
+        style: "outline: none; min-height: 120px; padding: 12px 16px; line-height: 1.75;",
+      };
+}
+
 export interface RichTextEditorProps {
   label: string;
   /** undefined = 空ドキュメントから開始 */
@@ -275,17 +298,7 @@ export function RichTextEditor({
       // v3 既定と同じだが明示: transaction ごとに React を再レンダーしない。
       // ツールバーの活性状態は useEditorState が購読する。
       shouldRerenderOnTransaction: false,
-      editorProps: {
-        attributes: {
-          // TextField と同じ getByRole("textbox", { name: label }) で見つける規約。
-          // StyleX は ProseMirror が生成する DOM に届かないため、編集面の最小スタイルは
-          // inline で持つ(tech-selection §1.3 の「動的スタイルは inline で逃がす」規約)。
-          role: "textbox",
-          "aria-multiline": "true",
-          "aria-label": label,
-          style: "outline: none; min-height: 120px; padding: 12px 16px; line-height: 1.75;",
-        },
-      },
+      editorProps: { attributes: editorAttributes(label, isReadOnly === true) },
       onUpdate: ({ editor: current }) => {
         onChangeRef.current({
           schemaVersion: RICH_TEXT_SCHEMA_VERSION,
@@ -298,10 +311,16 @@ export function RichTextEditor({
 
   // useEditor のオプションは初回で確定するため、読み取り専用の切り替えは setEditable で反映する
   useEffect(() => {
-    if (editor !== null && editor.isEditable === (isReadOnly === true)) {
+    if (editor === null) {
+      return;
+    }
+    if (editor.isEditable === (isReadOnly === true)) {
       editor.setEditable(isReadOnly !== true);
     }
-  }, [editor, isReadOnly]);
+    editor.setOptions({
+      editorProps: { attributes: editorAttributes(label, isReadOnly === true) },
+    });
+  }, [editor, isReadOnly, label]);
 
   useEffect(() => {
     if (editor !== null) {
