@@ -1,5 +1,15 @@
 import * as stylex from "@stylexjs/stylex";
-import { Button, Cell, Column, RelativeTime, Row, Table, TableBody, TableHeader } from "@plyrs/ui";
+import {
+  Button,
+  Cell,
+  Column,
+  ICON_SIZE,
+  RelativeTime,
+  Row,
+  Table,
+  TableBody,
+  TableHeader,
+} from "@plyrs/ui";
 import { accent, font, space, status } from "@plyrs/ui/semantic.stylex";
 import { CircleAlert } from "lucide-react";
 import { Link, type Selection } from "react-aria-components";
@@ -35,8 +45,8 @@ const styles = stylex.create({
 export interface ContentTableProps {
   tenantSlug: string;
   typeKey: string;
-  /** aria-label「{型名}の一覧」に使う型の表示名。省略時は typeKey */
-  typeName?: string;
+  /** aria-label「{型名}の一覧」に使う型の表示名(API 名は出さない) */
+  typeName: string;
   rows: readonly ListRow[];
   sort: { column: ListSort; order: SortOrder };
   onSortChange: (column: ListSort, order: SortOrder) => void;
@@ -86,7 +96,7 @@ export function ContentTable({
   };
   return (
     <Table
-      aria-label={LIST_LABELS.tableLabel(typeName ?? typeKey)}
+      aria-label={LIST_LABELS.tableLabel(typeName)}
       selectionMode={selection === undefined ? "none" : "multiple"}
       selectionBehavior="toggle"
       selectedKeys={selection === undefined ? new Set<string>() : selection.selectedKeys}
@@ -154,7 +164,7 @@ export function ContentTable({
                         <PublicationBadge state={row.publication} />
                         {failedIds.has(row.record.id) && (
                           <span {...stylex.props(styles.failed)}>
-                            <CircleAlert size={16} aria-hidden="true" />
+                            <CircleAlert size={ICON_SIZE.inline} aria-hidden="true" />
                             {LIST_LABELS.failed}
                           </span>
                         )}
