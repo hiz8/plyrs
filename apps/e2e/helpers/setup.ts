@@ -93,8 +93,8 @@ export async function loginAsUser(page: Page, email: string, password: string): 
   await page.getByLabel("メールアドレス").fill(email);
   await page.getByLabel("パスワード").fill(password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  // 所属 1 件ならサイト選択を飛ばしてサイトへ着地する。着地先は型の有無で変わるので URL だけを待つ。
-  await page.waitForURL(/\/t\/[^/]+\//);
+  // 所属 1 件ならサイト選択を飛ばしてホームに着地する(型の有無で転送しない)。URL だけを待つ。
+  await page.waitForURL(/\/t\/[^/]+(\/|$)/);
 }
 
 /** ログイン直後のサイトでサイドバーの「設定」から入り、article 型(title text field)を作る。 */
