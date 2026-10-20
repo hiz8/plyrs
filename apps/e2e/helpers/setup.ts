@@ -97,18 +97,25 @@ export async function loginAsUser(page: Page, email: string, password: string): 
   await page.waitForURL(/\/t\/[^/]+(\/|$)/);
 }
 
-/** ログイン直後のサイトでサイドバーの「設定」から入り、article 型(title text field)を作る。 */
+/** ログイン直後のサイトでサイドバーの「設定」から入り、タブ「コンテンツタイプ」を開いて article 型(title text field)を作る。設定はまず「一般」に着地する(V4-G、裁定 G4)ためタブを押す。 */
 export async function createArticleType(page: Page): Promise<void> {
   // パンくずにも「設定」リンクがあるため、サイドバー(<aside> = complementary)に限定する。
   await page.getByRole("complementary").getByRole("link", { name: "設定", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "コンテンツタイプ" })).toBeVisible();
+  await page.getByRole("tab", { name: "コンテンツタイプ" }).click();
+  await expect(page.getByRole("tab", { name: "コンテンツタイプ" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   await page.getByRole("button", { name: "コンテンツタイプを追加" }).click();
   await page.getByRole("textbox", { name: "key" }).fill("article");
   await page.getByRole("textbox", { name: "表示名" }).fill("記事");
   await page.getByRole("button", { name: "フィールドを追加" }).click();
   await page.getByRole("textbox", { name: "フィールド key" }).fill("title");
   await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByRole("heading", { name: "コンテンツタイプ" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "コンテンツタイプ" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
 }
 
 /** コンテンツタイプ一覧から article の編集画面を開いて 1 件下書き保存し、一覧へ戻る。 */
