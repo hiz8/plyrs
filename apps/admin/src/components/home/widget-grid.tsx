@@ -10,7 +10,8 @@ const styles = stylex.create({
   grid: {
     display: "grid",
     gridTemplateColumns: { default: "repeat(2, minmax(0, 1fr))", [NARROW]: "minmax(0, 1fr)" },
-    gap: space.md,
+    // b-home.md 2 章 / D3 H1: グリッドの間隔は 20px ではなく 24px(space.lg)
+    gap: space.lg,
   },
 });
 
