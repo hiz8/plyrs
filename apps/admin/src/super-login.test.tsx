@@ -132,7 +132,7 @@ describe("super login", () => {
     renderAt("/super", { "/super-auth/status": status, "/super-auth/me": me });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("エラーが発生しました");
-    expect(screen.getByRole("alert")).toHaveTextContent("ページを表示できませんでした");
+    expect(screen.getByRole("alert")).toHaveTextContent("500: server_error");
     expect(
       screen.queryByRole("heading", { name: "運営コンソールへログイン" }),
     ).not.toBeInTheDocument();
