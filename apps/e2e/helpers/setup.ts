@@ -106,12 +106,19 @@ export async function createArticleType(page: Page): Promise<void> {
     "aria-selected",
     "true",
   );
-  await page.getByRole("button", { name: "コンテンツタイプを追加" }).click();
-  await page.getByRole("textbox", { name: "key" }).fill("article");
-  await page.getByRole("textbox", { name: "表示名" }).fill("記事");
+  await page.getByRole("button", { name: "コンテンツタイプを作成" }).click();
+  await page.getByRole("textbox", { name: /^表示名/ }).fill("記事");
+  // 表示名が日本語だと API 名は自動導出できないので手入力する。
+  await page.getByRole("textbox", { name: /^API 名/ }).fill("article");
   await page.getByRole("button", { name: "フィールドを追加" }).click();
-  await page.getByRole("textbox", { name: "フィールド key" }).fill("title");
-  await page.getByRole("button", { name: "保存" }).click();
+  const dialog = page.getByRole("dialog", { name: "フィールドを追加" });
+  await dialog.getByRole("button", { name: /テキスト\(1 行\)/ }).click();
+  await dialog.getByRole("button", { name: "次へ" }).click();
+  // フィールドの API 名は表示名「title」から自動で title になる。
+  await dialog.getByRole("textbox", { name: /^表示名/ }).fill("title");
+  await dialog.getByRole("button", { name: "追加" }).click();
+  await page.getByRole("dialog", { name: "title" }).getByRole("button", { name: "適用" }).click();
+  await page.getByRole("button", { name: "作成", exact: true }).click();
   await expect(page.getByRole("tab", { name: "コンテンツタイプ" })).toHaveAttribute(
     "aria-selected",
     "true",
@@ -120,12 +127,8 @@ export async function createArticleType(page: Page): Promise<void> {
 
 /** コンテンツタイプ一覧から article の編集画面を開いて 1 件下書き保存し、一覧へ戻る。 */
 export async function createArticleRecord(page: Page, title: string): Promise<void> {
-  // テナントには asset 型(システム管理)も同居しており「レコード」リンクが複数行にまたがるため、
-  // article 行に絞る(article/asset は互いに部分文字列でないので row 名の正規表現で一意)。
-  await page
-    .getByRole("row", { name: /article/ })
-    .getByRole("link", { name: "レコード" })
-    .click();
+  // 一覧の行にレコードへのリンクは無い。サイドバー(complementary)の型名のリンクから入る。
+  await page.getByRole("complementary").getByRole("link", { name: "記事", exact: true }).click();
   // 一覧が 0 件のときは空状態にも「記事を追加」があるため、見出しの右(先頭)のボタンに絞る(V3 の案 D 空状態)。
   await page.getByRole("button", { name: "記事を追加" }).first().click();
   await page.getByRole("textbox", { name: "title" }).fill(title);
