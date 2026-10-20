@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
-import { useEffect, useState } from "react";
-import { useForm } from "@tanstack/react-form";
+import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
+import { useForm, useStore } from "@tanstack/react-form";
 import {
   ASSET_SYSTEM_MANAGED_FIELD_KEYS,
   ASSET_TYPE_KEY,
@@ -11,7 +11,6 @@ import type { FieldConflict, SyncRecord } from "@plyrs/sync-protocol";
 import { SyncRejectedError } from "@plyrs/sync-client";
 import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
 import {
-  Button,
   Checkbox,
   CheckboxGroup,
   RichTextEditor,
@@ -20,13 +19,14 @@ import {
   TextField,
   type RichTextMentionItem,
 } from "@plyrs/ui";
-import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
+import { border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "../lib/asset-services";
 import { labelForRecord } from "../lib/record-label";
 import {
   asRichTextValue,
   draftValueEquals,
   fromDraftValues,
+  isDraftDirty,
   relationDraftKey,
   toDraftValues,
   type DraftValues,
@@ -48,56 +48,47 @@ const styles = stylex.create({
   form: {
     display: "flex",
     flexDirection: "column",
-    gap: spacing.md,
+    gap: space.md,
     maxWidth: "640px",
-    fontFamily: typography.fontFamily,
+    fontFamily: font.family,
   },
   banner: {
-    padding: spacing.sm,
-    borderRadius: "6px",
-    borderWidth: "1px",
+    padding: space.sm,
+    borderRadius: radius.control,
+    borderWidth: stroke.default,
     borderStyle: "solid",
-    borderColor: colors.danger,
-    color: colors.danger,
-    fontSize: typography.sizeMd,
+    borderColor: status.danger,
+    color: status.danger,
+    fontSize: font.body,
   },
   notice: {
-    padding: spacing.sm,
-    borderRadius: "6px",
-    borderWidth: "1px",
+    padding: space.sm,
+    borderRadius: radius.control,
+    borderWidth: stroke.default,
     borderStyle: "solid",
-    borderColor: colors.border,
-    color: colors.textMuted,
-    fontSize: typography.sizeMd,
+    borderColor: border.default,
+    color: text.muted,
+    fontSize: font.body,
   },
   emptyHint: {
-    padding: spacing.md,
-    borderRadius: "6px",
-    borderWidth: "1px",
+    padding: space.md,
+    borderRadius: radius.control,
+    borderWidth: stroke.default,
     borderStyle: "dashed",
-    borderColor: colors.border,
-    color: colors.textMuted,
-    fontSize: typography.sizeMd,
+    borderColor: border.default,
+    color: text.muted,
+    fontSize: font.body,
   },
-  fieldLabel: { fontSize: typography.sizeSm, color: colors.textMuted },
-  fieldError: { fontSize: typography.sizeSm, color: colors.danger },
-  actions: { display: "flex", gap: spacing.sm },
+  fieldLabel: { fontSize: font.caption, color: text.muted },
+  fieldError: { fontSize: font.caption, color: status.danger },
+  fieldBlock: { display: "flex", flexDirection: "column", gap: space.xs },
+  fieldDescription: { margin: 0, fontSize: font.caption, color: text.muted },
+  readOnlyValue: { fontSize: font.body, color: text.default },
 });
-
-export function syncErrorMessage(cause: unknown): string {
-  if (
-    cause instanceof SyncRejectedError ||
-    (cause instanceof Error && cause.name === "SyncRejectedError")
-  ) {
-    const code = (cause as { code?: string }).code ?? "unknown";
-    return `保存できませんでした（${code}）: ${cause.message}`;
-  }
-  return "保存できませんでした。接続状態を確認して再試行してください。";
-}
 
 // conflict ack(ok:false, code:"conflict")から競合フィールド一覧を取り出す。
 // それ以外のエラーは空配列(既存のエラーバナー経路へ)。
-export function syncConflictFields(cause: unknown): string[] {
+function syncConflictFields(cause: unknown): string[] {
   const isRejection =
     cause instanceof SyncRejectedError ||
     (cause instanceof Error && cause.name === "SyncRejectedError");
@@ -117,8 +108,31 @@ function conflictExcerpt(value: unknown): string {
   if (value === undefined) {
     return "（空）";
   }
-  const text = JSON.stringify(value);
-  return text.length <= 120 ? text : `${text.slice(0, 120)}…`;
+  const json = JSON.stringify(value);
+  return json.length <= 120 ? json : `${json.slice(0, 120)}…`;
+}
+
+/** 競合で「あとで決める」「取り込む」を選んだ。保存は完了していない(呼び出し側は通知しない) */
+export class SaveDeferredError extends Error {
+  constructor() {
+    super("save deferred");
+    this.name = "SaveDeferredError";
+  }
+}
+
+/** save() の中の検証で弾かれた(エラーはフィールドに表示済み) */
+export class ValidationFailedError extends Error {
+  constructor() {
+    super("validation failed");
+    this.name = "ValidationFailedError";
+  }
+}
+
+export interface RecordFormHandle {
+  /** 変換と検証。エラーがあればフィールドに表示し、最初のエラーへスクロールして false */
+  validate(): boolean;
+  /** 検証 → onSubmit → dirty の基準を進める。競合は本文のダイアログで解決し、「残す」なら再送して成功、それ以外は SaveDeferredError を投げる。他の失敗は cause をそのまま投げる */
+  save(): Promise<void>;
 }
 
 export interface RecordFormProps {
@@ -127,11 +141,20 @@ export interface RecordFormProps {
   registry: CollectionRegistry;
   /** null = 新規作成 */
   record: SyncRecord | null;
-  submitLabel: string;
   onSubmit: (input: Record<string, unknown>) => Promise<void>;
+  /** 下書きが保存済みの姿から変わったかを通知する(変化時だけ) */
+  onDirtyChange: (dirty: boolean) => void;
+  /** 閲覧者向け。全フィールドを読み取り専用にし、本文のツールバーを出さない */
+  isReadOnly?: boolean | undefined;
   /** アセット操作(アップロード・プレビュー)。省略時はアセット UI を出さず従来表示に落ちる */
   assets?: AssetServices | undefined;
+  /** 画面側の保存ボタンから validate / save を呼ぶためのハンドル。フォームは送信ボタンを持たない */
+  ref: Ref<RecordFormHandle>;
 }
+
+// "kept" = あなたの編集を残す(再送する)、"deferred" = あとで決める / 取り込む、
+// "saved" = 自己競合ガードで保存済みと判明した(再送しない)
+type ConflictOutcome = "kept" | "deferred" | "saved";
 
 interface PendingConflict {
   fieldKeys: string[];
@@ -144,14 +167,22 @@ export function RecordForm({
   types,
   registry,
   record,
-  submitLabel,
   onSubmit,
+  onDirtyChange,
+  isReadOnly,
   assets,
+  ref,
 }: RecordFormProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [banner, setBanner] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [conflict, setConflict] = useState<PendingConflict | null>(null);
+  // 競合ダイアログの解決待ち。save() が待ち、ダイアログのボタンが解決する
+  const conflictResolver = useRef<((outcome: ConflictOutcome) => void) | null>(null);
+  const formElement = useRef<HTMLFormElement | null>(null);
+  // validate() が false のとき、エラー表示の描画後に最初のエラーへ移るための印
+  const scrollToError = useRef(false);
+  const lastDirty = useRef(false);
   // 本文画像挿入: ツールバーの「画像」→ ダイアログ → insert(挿入関数は state に保持)
   const [imageInsert, setImageInsert] = useState<((item: AssetSelectItem) => void) | null>(null);
   // §12 必須②: dirty 判定の基準。マウント時のスナップショットから始め、保存成功・
@@ -174,46 +205,107 @@ export function RecordForm({
       label: labelForRecord(types, candidate),
     }));
 
-  const form = useForm({
-    defaultValues: initialDraft,
-    onSubmit: async ({ value }) => {
-      setBanner(null);
-      setNotice(null);
-      // 編集(record あり)は dirty キーのみ書き戻す(§12 必須②)。新規作成は全量。
-      const converted = fromDraftValues(
-        contentType,
-        value,
-        record?.input ?? {},
-        record !== null ? initialDraft : undefined,
-      );
-      if (!converted.ok) {
-        setFieldErrors(converted.fieldErrors);
-        const formLevel = converted.fieldErrors[""];
-        if (formLevel !== undefined) {
-          setBanner(formLevel);
-        }
+  // 送信ボタンは持たない(保存は公開ボックスからハンドル経由)。値は form が保持するだけ
+  const form = useForm({ defaultValues: initialDraft });
+  const values = useStore(form.store, (state) => state.values);
+
+  const dirty = isDraftDirty(initialDraft, values);
+  useEffect(() => {
+    if (lastDirty.current !== dirty) {
+      lastDirty.current = dirty;
+      onDirtyChange(dirty);
+    }
+  }, [dirty, onDirtyChange]);
+
+  // validate() が false を返した直後の描画で、最初の aria-invalid へスクロールして focus する
+  useEffect(() => {
+    if (!scrollToError.current) {
+      return;
+    }
+    scrollToError.current = false;
+    const target = formElement.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
+    if (target === null || target === undefined) {
+      return;
+    }
+    // jsdom には scrollIntoView が無い
+    if (typeof target.scrollIntoView === "function") {
+      target.scrollIntoView({ block: "center" });
+    }
+    target.focus();
+  }, [fieldErrors]);
+
+  // 編集(record あり)は dirty キーのみ書き戻す(§12 必須②)。新規作成は全量。
+  const convert = () => {
+    const value = form.state.values;
+    const converted = fromDraftValues(
+      contentType,
+      value,
+      record?.input ?? {},
+      record !== null ? initialDraft : undefined,
+    );
+    return { value, converted };
+  };
+
+  const validate = (): boolean => {
+    const { converted } = convert();
+    if (!converted.ok) {
+      setFieldErrors(converted.fieldErrors);
+      setBanner(converted.fieldErrors[""] ?? null);
+      scrollToError.current = true;
+      return false;
+    }
+    setFieldErrors({});
+    setBanner(null);
+    return true;
+  };
+
+  const save = async (): Promise<void> => {
+    if (conflictResolver.current !== null) {
+      // 競合ダイアログの解決待ち中は新しい保存を始めない
+      throw new SaveDeferredError();
+    }
+    if (!validate()) {
+      throw new ValidationFailedError();
+    }
+    const { value, converted } = convert();
+    if (!converted.ok) {
+      throw new ValidationFailedError();
+    }
+    setNotice(null);
+    try {
+      await onSubmit(converted.input);
+      // 保存成功: dirty 判定の基準を「今保存した姿」へ進める(次回以降の保存が
+      // 直前保存分を再送して他者の後続変更を巻き戻すのを防ぐ)
+      setInitialDraft(value);
+      return;
+    } catch (cause) {
+      const conflictFields = syncConflictFields(cause);
+      if (conflictFields.length === 0) {
+        throw cause;
+      }
+      const outcome = await new Promise<ConflictOutcome>((resolve) => {
+        conflictResolver.current = resolve;
+        setConflict({
+          fieldKeys: conflictFields,
+          submittedInput: converted.input,
+          submittedDraft: value,
+        });
+      });
+      conflictResolver.current = null;
+      if (outcome === "deferred") {
+        throw new SaveDeferredError();
+      }
+      if (outcome === "saved") {
         return;
       }
-      setFieldErrors({});
-      try {
-        await onSubmit(converted.input);
-        // 保存成功: dirty 判定の基準を「今保存した姿」へ進める(次回以降の保存が
-        // 直前保存分を再送して他者の後続変更を巻き戻すのを防ぐ)
-        setInitialDraft(value);
-      } catch (cause) {
-        const conflictFields = syncConflictFields(cause);
-        if (conflictFields.length > 0) {
-          setConflict({
-            fieldKeys: conflictFields,
-            submittedInput: converted.input,
-            submittedDraft: value,
-          });
-          return;
-        }
-        setBanner(syncErrorMessage(cause));
-      }
-    },
-  });
+      // draft は自分の版のまま。他者の変更は既に store に確定しているため、再送信の
+      // baseFieldVersions は最新へ進み、今度はクリーンな上書き(手動裁定の LWW)として通る。
+      await onSubmit(converted.input);
+      setInitialDraft(value);
+    }
+  };
+
+  useImperativeHandle(ref, () => ({ validate, save }));
 
   // §8 の自己競合ガード: conflict ack は「ack 消失後の再送が、適用済みの自分自身の変更と
   // 衝突した」だけのことがある。手元 store の最新 record と突き合わせ、全競合フィールドが
@@ -229,6 +321,7 @@ export function RecordForm({
     if (real.length === 0) {
       setInitialDraft(conflict.submittedDraft);
       setConflict(null);
+      conflictResolver.current?.("saved");
     }
   }, [conflict, record]);
 
@@ -240,7 +333,7 @@ export function RecordForm({
           (key) => !draftValueEquals(latestInput[key], conflict.submittedInput[key]),
         );
 
-  const adoptServer = () => {
+  const adoptTheirs = () => {
     if (conflict === null) {
       return;
     }
@@ -261,31 +354,30 @@ export function RecordForm({
     setNotice(
       "サーバー版を反映しました。他に未保存の変更が残っている場合は改めて保存してください。",
     );
+    // 他のフィールドに未保存の変更が残り得るため、保存は完了扱いにしない
+    conflictResolver.current?.("deferred");
   };
 
   const keepMine = () => {
     setConflict(null);
-    // draft は自分の版のまま。他者の変更は既に store に確定しているため、再送信の
-    // baseFieldVersions は最新へ進み、今度はクリーンな上書き(手動裁定の LWW)として通る。
-    void form.handleSubmit();
+    conflictResolver.current?.("kept");
+  };
+
+  const decideLater = () => {
+    setConflict(null);
+    conflictResolver.current?.("deferred");
   };
 
   return (
     <form
+      ref={formElement}
       {...stylex.props(styles.form)}
       // isRequired を TextField に渡すと native required 属性が付き、ブラウザ(jsdom 含む)の
-      // 制約検証が submit イベント自体を止めてしまい TanStack Form + zod の検証まで届かない。
-      // 検証は変換層(record-form-values)に一本化するため native 検証を無効化する。
+      // 制約検証が submit イベント自体を止めてしまう。検証は変換層(record-form-values)に
+      // 一本化するため native 検証を無効化する。
       noValidate
-      onSubmit={(event) => {
-        event.preventDefault();
-        // 競合ダイアログ表示中は新しい送信を受け付けない(Enter キー経由の送信も含む)。
-        // keepMine は form.handleSubmit() を直接呼ぶためこのガードの影響を受けない。
-        if (conflict !== null) {
-          return;
-        }
-        void form.handleSubmit();
-      }}
+      // 保存は公開ボックスからハンドル経由。Enter での送信はページ遷移を防ぐだけ
+      onSubmit={(event) => event.preventDefault()}
     >
       {banner !== null && (
         <div role="alert" {...stylex.props(styles.banner)}>
@@ -297,15 +389,18 @@ export function RecordForm({
           {notice}
         </div>
       )}
-      {conflict !== null && realConflictKeys.length > 0 && (
+      {conflict !== null && record !== null && realConflictKeys.length > 0 && (
         <ConflictDialog
+          isOpen
           conflicts={realConflictKeys.map((key) => ({
             fieldKey: key,
             mine: conflictExcerpt(conflict.submittedInput[key]),
             theirs: conflictExcerpt(latestInput[key]),
           }))}
+          theirsSavedAt={record.updatedAt}
           onKeepMine={keepMine}
-          onAdoptServer={adoptServer}
+          onAdoptTheirs={adoptTheirs}
+          onDecideLater={decideLater}
         />
       )}
       {contentType.fields.map((field) => (
@@ -324,22 +419,20 @@ export function RecordForm({
               registry={registry}
               mentionCandidates={mentionCandidates}
               assets={assets}
+              isReadOnly={isReadOnly === true}
               locked={
                 contentType.key === ASSET_TYPE_KEY &&
                 (ASSET_SYSTEM_MANAGED_FIELD_KEYS as readonly string[]).includes(field.key)
               }
               onRequestAssetImage={
-                assets === undefined ? undefined : (insert) => setImageInsert(() => insert)
+                assets === undefined || isReadOnly === true
+                  ? undefined
+                  : (insert) => setImageInsert(() => insert)
               }
             />
           )}
         </form.Field>
       ))}
-      <div {...stylex.props(styles.actions)}>
-        <Button type="submit" isDisabled={conflict !== null}>
-          {submitLabel}
-        </Button>
-      </div>
       {imageInsert !== null && assets !== undefined && (
         <AssetSelectDialog
           registry={registry}
@@ -356,6 +449,31 @@ export function RecordForm({
   );
 }
 
+interface PendingConflict {
+  fieldKeys: string[];
+  submittedInput: Record<string, unknown>;
+  submittedDraft: DraftValues;
+}
+
+// text / json 以外の型(自前のラベルを持つ部品)に補足説明を添える。ラベルの直下ではなく部品の下に出る
+function WithDescription({
+  description,
+  children,
+}: {
+  description: string | undefined;
+  children: ReactNode;
+}) {
+  if (description === undefined) {
+    return children;
+  }
+  return (
+    <div {...stylex.props(styles.fieldBlock)}>
+      {children}
+      <p {...stylex.props(styles.fieldDescription)}>{description}</p>
+    </div>
+  );
+}
+
 function FieldInput({
   field,
   value,
@@ -366,6 +484,7 @@ function FieldInput({
   mentionCandidates,
   assets,
   locked,
+  isReadOnly,
   onRequestAssetImage,
 }: {
   field: FieldDefinition;
@@ -377,64 +496,84 @@ function FieldInput({
   mentionCandidates: RichTextMentionItem[];
   assets: AssetServices | undefined;
   locked: boolean;
+  isReadOnly: boolean;
   onRequestAssetImage: ((insert: (item: AssetSelectItem) => void) => void) | undefined;
 }) {
+  const label = field.label ?? field.key;
+  const description = field.description;
   switch (field.type) {
     case "text":
       return (
         <TextField
-          label={field.key}
+          label={label}
+          {...(description !== undefined && { description })}
           value={typeof value === "string" ? value : ""}
           onChange={onChange}
           isRequired={field.required ?? false}
           isInvalid={error !== undefined}
           errorMessage={error}
           isDisabled={locked}
+          isReadOnly={isReadOnly}
         />
       );
     case "number":
       return (
         <TextField
-          label={field.key}
+          label={label}
+          {...(description !== undefined && { description })}
           value={typeof value === "string" ? value : ""}
           onChange={onChange}
           inputMode="numeric"
           isInvalid={error !== undefined}
           errorMessage={error}
           isDisabled={locked}
+          isReadOnly={isReadOnly}
         />
       );
     case "datetime":
       return (
         <TextField
-          label={field.key}
+          label={label}
           value={typeof value === "string" ? value : ""}
           onChange={onChange}
           // design-spec §5: 格納は UTC ISO8601('Z' 終端)。表示層の TZ 変換は将来課題。
           // バリデーションエラーは metamodel 側の「Invalid input」のみで形式が伝わらないため、
           // placeholder と description で期待形式を補足する(バリデーション自体は変更しない)。
+          // フィールド定義の description があればそちらを優先する。
           placeholder="2026-10-01T00:20:00Z"
-          description="UTC の Z 終端 ISO 8601 形式のみ受け付けます(例: 2026-10-01T00:20:00Z)"
+          description={
+            description ?? "UTC の Z 終端 ISO 8601 形式のみ受け付けます(例: 2026-10-01T00:20:00Z)"
+          }
           isInvalid={error !== undefined}
           errorMessage={error}
           isDisabled={locked}
+          isReadOnly={isReadOnly}
         />
       );
     case "boolean":
       return (
-        <Checkbox isSelected={value === true} onChange={onChange} isDisabled={locked}>
-          {field.key}
-        </Checkbox>
+        <WithDescription description={description}>
+          <Checkbox
+            isSelected={value === true}
+            onChange={onChange}
+            isDisabled={locked}
+            isReadOnly={isReadOnly}
+          >
+            {label}
+          </Checkbox>
+        </WithDescription>
       );
     case "json":
       return (
         <TextArea
-          label={field.key}
+          label={label}
+          {...(description !== undefined && { description })}
           value={typeof value === "string" ? value : ""}
           onChange={onChange}
           isInvalid={error !== undefined}
           errorMessage={error}
           isDisabled={locked}
+          isReadOnly={isReadOnly}
         />
       );
     case "select": {
@@ -444,37 +583,46 @@ function FieldInput({
       }));
       if (field.config.multiple === true) {
         return (
-          <CheckboxGroup
-            label={field.key}
-            options={options}
-            value={Array.isArray(value) ? (value as string[]) : []}
-            onChange={onChange}
-            errorMessage={error}
-          />
+          <WithDescription description={description}>
+            <CheckboxGroup
+              label={label}
+              options={options}
+              value={Array.isArray(value) ? (value as string[]) : []}
+              onChange={onChange}
+              errorMessage={error}
+              isReadOnly={isReadOnly}
+            />
+          </WithDescription>
         );
       }
       return (
-        <Select
-          label={field.key}
-          items={options}
-          selectedValue={typeof value === "string" ? value : ""}
-          onChange={onChange}
-          placeholder="(未設定)"
-          errorMessage={error}
-        />
+        <WithDescription description={description}>
+          <Select
+            label={label}
+            items={options}
+            selectedValue={typeof value === "string" ? value : ""}
+            onChange={onChange}
+            placeholder="(未設定)"
+            errorMessage={error}
+            isReadOnly={isReadOnly}
+          />
+        </WithDescription>
       );
     }
     case "richtext":
       return (
-        <RichTextEditor
-          label={field.key}
-          value={asRichTextValue(value)}
-          onChange={onChange}
-          mentionCandidates={mentionCandidates}
-          errorMessage={error}
-          onRequestAssetImage={onRequestAssetImage}
-          resolveAssetUrl={assets?.resolveUrl}
-        />
+        <WithDescription description={description}>
+          <RichTextEditor
+            label={label}
+            value={asRichTextValue(value)}
+            onChange={onChange}
+            mentionCandidates={mentionCandidates}
+            errorMessage={error}
+            onRequestAssetImage={onRequestAssetImage}
+            resolveAssetUrl={assets?.resolveUrl}
+            isReadOnly={isReadOnly}
+          />
+        </WithDescription>
       );
     case "relation":
       // Phase 8 裁定: メディアフィールド = allowedTypes ["asset"] の関係フィールド。
@@ -485,26 +633,32 @@ function FieldInput({
         field.config.allowedTypes[0] === ASSET_TYPE_KEY
       ) {
         return (
-          <AssetRelationPicker
+          <WithDescription description={description}>
+            <AssetRelationPicker
+              field={field}
+              value={value}
+              onChange={onChange}
+              error={error}
+              types={types}
+              registry={registry}
+              assets={assets}
+              isReadOnly={isReadOnly}
+            />
+          </WithDescription>
+        );
+      }
+      return (
+        <WithDescription description={description}>
+          <RelationPicker
             field={field}
             value={value}
             onChange={onChange}
             error={error}
             types={types}
             registry={registry}
-            assets={assets}
+            isReadOnly={isReadOnly}
           />
-        );
-      }
-      return (
-        <RelationPicker
-          field={field}
-          value={value}
-          onChange={onChange}
-          error={error}
-          types={types}
-          registry={registry}
-        />
+        </WithDescription>
       );
   }
 }
@@ -516,6 +670,7 @@ function RelationPicker({
   error,
   types,
   registry,
+  isReadOnly,
 }: {
   field: Extract<FieldDefinition, { type: "relation" }>;
   value: unknown;
@@ -523,16 +678,39 @@ function RelationPicker({
   error: string | undefined;
   types: ContentTypeDefinition[];
   registry: CollectionRegistry;
+  isReadOnly: boolean;
 }) {
+  const label = field.label ?? field.key;
   const candidates = useRelationCandidates(registry, field.config.allowedTypes);
   const options = candidates.map((candidate) => ({
     value: relationDraftKey({ type: candidate.type, id: candidate.id }),
     label: labelForRecord(types, candidate),
   }));
+  if (isReadOnly) {
+    // 閲覧者向け: ラベルと選択中の名前の文字だけ
+    const selectedKeys = Array.isArray(value)
+      ? (value as string[])
+      : typeof value === "string"
+        ? [value]
+        : [];
+    const names = selectedKeys
+      .filter((key) => key !== "")
+      .map((key) => options.find((option) => option.value === key)?.label ?? key);
+    return (
+      <div {...stylex.props(styles.fieldBlock)}>
+        <span {...stylex.props(styles.fieldLabel)}>{label}</span>
+        {names.map((name, index) => (
+          <span key={`${name}-${index}`} {...stylex.props(styles.readOnlyValue)}>
+            {name}
+          </span>
+        ))}
+      </div>
+    );
+  }
   if (candidates.length === 0) {
     return (
       <div>
-        <span {...stylex.props(styles.fieldLabel)}>{field.key}</span>
+        <span {...stylex.props(styles.fieldLabel)}>{label}</span>
         <div {...stylex.props(styles.emptyHint)}>
           参照できるレコードがありません（許可型: {field.config.allowedTypes.join(", ")}）
         </div>
@@ -543,7 +721,7 @@ function RelationPicker({
   if (field.config.cardinality === "many") {
     return (
       <CheckboxGroup
-        label={field.key}
+        label={label}
         options={options}
         value={Array.isArray(value) ? (value as string[]) : []}
         onChange={onChange}
@@ -553,7 +731,7 @@ function RelationPicker({
   }
   return (
     <Select
-      label={field.key}
+      label={label}
       items={options}
       selectedValue={typeof value === "string" ? value : ""}
       onChange={onChange}

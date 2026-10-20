@@ -2,13 +2,14 @@ import { ASSET_TYPE_DEFINITION, type ContentTypeDefinition } from "@plyrs/metamo
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { SyncEngine, SyncRejectedError } from "@plyrs/sync-client";
 import { CollectionRegistry } from "@plyrs/sync-client/tanstack";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { AssetServices } from "../lib/asset-services";
 import { labelForRecord } from "../lib/record-label";
 import { pendingConnect } from "../test-utils/fake-socket";
-import { RecordForm, syncErrorMessage } from "./record-form";
+import { RecordForm, SaveDeferredError, type RecordFormHandle } from "./record-form";
 
 const authorType: ContentTypeDefinition = {
   id: "018f2b6a-7a0a-7000-8000-000000000010",
@@ -49,6 +50,26 @@ const articleType: ContentTypeDefinition = {
 
 const types = [articleType, authorType];
 
+const handle = createRef<RecordFormHandle>();
+
+// 公開ボックスの保存ボタン相当。競合ダイアログの解決待ちで止まることがあるため await しない
+function startSave(): Promise<void> {
+  let pending!: Promise<void>;
+  act(() => {
+    if (handle.current === null) {
+      throw new Error("handle is not attached");
+    }
+    pending = handle.current.save();
+  });
+  return pending;
+}
+
+async function saveForm(): Promise<void> {
+  await act(async () => {
+    await startSave();
+  });
+}
+
 function author(id: string, name: string): SyncRecord {
   return {
     id,
@@ -84,7 +105,8 @@ describe("RecordForm", () => {
         types={types}
         registry={buildRegistry()}
         record={null}
-        submitLabel="保存"
+        onDirtyChange={() => {}}
+        ref={handle}
         onSubmit={async () => {}}
       />,
     );
@@ -108,15 +130,16 @@ describe("RecordForm", () => {
         types={types}
         registry={buildRegistry()}
         record={null}
-        submitLabel="保存"
+        onDirtyChange={() => {}}
+        ref={handle}
         onSubmit={onSubmit}
       />,
     );
     const user = userEvent.setup();
     await user.type(screen.getByRole("textbox", { name: "title" }), "hello");
     await user.click(screen.getByRole("checkbox", { name: /山田/ }));
-    await user.click(screen.getByRole("button", { name: "保存" }));
-    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    await saveForm();
+    expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit.mock.calls[0]?.[0]).toStrictEqual({
       title: "hello",
       featured: false,
@@ -132,11 +155,16 @@ describe("RecordForm", () => {
         types={types}
         registry={buildRegistry()}
         record={null}
-        submitLabel="保存"
+        onDirtyChange={() => {}}
+        ref={handle}
         onSubmit={onSubmit}
       />,
     );
-    await userEvent.setup().click(screen.getByRole("button", { name: "保存" }));
+    let valid = true;
+    act(() => {
+      valid = handle.current?.validate() ?? true;
+    });
+    expect(valid).toBe(false);
     // 空文字は record-form-values の setOrOmit でキー自体が省略されるため、zod は
     // min(1) の "too small" ではなく必須キー欠落の invalid_type("Invalid input: expected
     // string, received undefined")を返す(zod v4 実メッセージに合わせて正規表現を調整。
@@ -147,7 +175,7 @@ describe("RecordForm", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("surfaces onSubmit failures as an error banner (裁定 6 最小表現)", async () => {
+  it("save は onSubmit の失敗を cause のまま投げ、画面にエラー文は出さない", async () => {
     const onSubmit = vi.fn(async () => {
       throw Object.assign(new Error("title: too long"), {
         name: "SyncRejectedError",
@@ -161,14 +189,103 @@ describe("RecordForm", () => {
         types={types}
         registry={buildRegistry()}
         record={null}
-        submitLabel="保存"
+        onDirtyChange={() => {}}
+        ref={handle}
         onSubmit={onSubmit}
       />,
     );
     const user = userEvent.setup();
     await user.type(screen.getByRole("textbox", { name: "title" }), "x");
-    await user.click(screen.getByRole("button", { name: "保存" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/保存できませんでした/);
+    let caught: unknown;
+    await act(async () => {
+      caught = await startSave().catch((cause: unknown) => cause);
+    });
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toBe("title: too long");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("onDirtyChange は入力で true、save の後に false になる", async () => {
+    const onDirtyChange = vi.fn<(dirty: boolean) => void>();
+    render(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={buildRegistry()}
+        record={null}
+        onDirtyChange={onDirtyChange}
+        ref={handle}
+        onSubmit={async () => {}}
+      />,
+    );
+    const user = userEvent.setup();
+    await user.type(screen.getByRole("textbox", { name: "title" }), "hello");
+    await vi.waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true));
+    await saveForm();
+    await vi.waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
+  });
+
+  it("validate は必須の空欄にエラーを出して false を返し、保存しない", async () => {
+    const onSubmit = vi.fn(async () => {});
+    render(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={buildRegistry()}
+        record={null}
+        onDirtyChange={() => {}}
+        ref={handle}
+        onSubmit={onSubmit}
+      />,
+    );
+    let valid = true;
+    act(() => {
+      valid = handle.current?.validate() ?? true;
+    });
+    expect(valid).toBe(false);
+    expect(onSubmit).not.toHaveBeenCalled();
+    // 最初のエラーの入力欄へフォーカスが移る
+    await vi.waitFor(() => expect(screen.getByRole("textbox", { name: "title" })).toHaveFocus());
+    await expect(startSave()).rejects.toThrow();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("isReadOnly は入力欄を readonly にし本文のツールバーを出さない", async () => {
+    render(
+      <RecordForm
+        contentType={articleType}
+        types={types}
+        registry={buildRegistry()}
+        record={articleRecord({ title: "t", body: bodyEnvelope("本文") })}
+        onDirtyChange={() => {}}
+        ref={handle}
+        isReadOnly
+        onSubmit={async () => {}}
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "title" })).toHaveAttribute("readonly");
+    await screen.findByRole("textbox", { name: "body" });
+    expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+  });
+
+  it("フィールドの label と description を出す", () => {
+    const labeled: ContentTypeDefinition = {
+      ...articleType,
+      fields: [{ key: "title", type: "text", label: "タイトル", description: "一覧に使います" }],
+    };
+    render(
+      <RecordForm
+        contentType={labeled}
+        types={[labeled]}
+        registry={buildRegistry()}
+        record={null}
+        onDirtyChange={() => {}}
+        ref={handle}
+        onSubmit={async () => {}}
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "タイトル" })).toBeInTheDocument();
+    expect(screen.getByText("一覧に使います")).toBeInTheDocument();
   });
 });
 
@@ -197,7 +314,8 @@ describe("datetime フィールドの形式ヒント", () => {
         types={[eventType]}
         registry={buildEventRegistry()}
         record={null}
-        submitLabel="保存"
+        onDirtyChange={() => {}}
+        ref={handle}
         onSubmit={async () => {}}
       />,
     );
@@ -212,21 +330,6 @@ describe("labelForRecord", () => {
     expect(labelForRecord(types, author("a1", "山田"))).toBe("山田");
     const noName = author("018f2b6a-7a0a-7000-8000-000000000012", "");
     expect(labelForRecord(types, { ...noName, input: {} })).toMatch(/^018f2b6a/);
-  });
-});
-
-describe("syncErrorMessage", () => {
-  it("formats SyncRejectedError with its code", () => {
-    const error = Object.assign(new Error("boom"), {
-      name: "SyncRejectedError",
-      code: "unique_violation",
-      conflicts: [],
-    });
-    expect(syncErrorMessage(error)).toMatch(/unique_violation/);
-  });
-
-  it("falls back for unknown errors", () => {
-    expect(syncErrorMessage(new Error("x"))).toMatch(/保存できませんでした/);
   });
 });
 
@@ -264,10 +367,9 @@ function conflictError() {
   ]);
 }
 
-async function editBodyAndSave(user: ReturnType<typeof userEvent.setup>) {
+async function editBody(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole("textbox", { name: "body" });
   await user.click(screen.getByRole("button", { name: "見出し1" }));
-  await user.click(screen.getByRole("button", { name: "保存" }));
 }
 
 describe("RecordForm dirty-only 保存(§12 必須②)", () => {
@@ -281,7 +383,8 @@ describe("RecordForm dirty-only 保存(§12 必須②)", () => {
         types={types}
         registry={registry}
         record={initial}
-        submitLabel="保存"
+        onDirtyChange={() => {}}
+        ref={handle}
         onSubmit={onSubmit}
       />,
     );
@@ -300,12 +403,13 @@ describe("RecordForm dirty-only 保存(§12 必須②)", () => {
         types={types}
         registry={registry}
         record={updated}
-        submitLabel="保存"
+        onDirtyChange={() => {}}
+        ref={handle}
         onSubmit={onSubmit}
       />,
     );
-    await user.click(screen.getByRole("button", { name: "保存" }));
-    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    await saveForm();
+    expect(onSubmit).toHaveBeenCalledTimes(1);
     const input = onSubmit.mock.calls[0]?.[0];
     expect(input?.["title"]).toBe("自分の新タイトル");
     // 触っていない body は他者の版が生き残る(巻き戻さない)
@@ -320,15 +424,16 @@ describe("RecordForm dirty-only 保存(§12 必須②)", () => {
         types={types}
         registry={buildRegistry()}
         record={articleRecord({ title: "t", body: bodyEnvelope("本文") })}
-        submitLabel="保存"
+        onDirtyChange={() => {}}
+        ref={handle}
         onSubmit={onSubmit}
       />,
     );
     const user = userEvent.setup();
     await screen.findByRole("textbox", { name: "body" });
     await user.click(screen.getByRole("button", { name: "見出し1" }));
-    await user.click(screen.getByRole("button", { name: "保存" }));
-    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    await saveForm();
+    expect(onSubmit).toHaveBeenCalledTimes(1);
     const body = onSubmit.mock.calls[0]?.[0]?.["body"] as {
       schemaVersion: number;
       doc: { content: Array<{ type: string }> };
@@ -338,187 +443,150 @@ describe("RecordForm dirty-only 保存(§12 必須②)", () => {
   });
 });
 
-describe("RecordForm 本文競合(裁定 3)", () => {
-  it("adopts the server version: resets the editor without re-submitting", async () => {
+function conflictForm(
+  registry: CollectionRegistry,
+  record: SyncRecord,
+  onSubmit: (input: Record<string, unknown>) => Promise<void>,
+) {
+  return (
+    <RecordForm
+      contentType={articleType}
+      types={types}
+      registry={registry}
+      record={record}
+      onDirtyChange={() => {}}
+      ref={handle}
+      onSubmit={onSubmit}
+    />
+  );
+}
+
+const THEIRS_META = { fieldVersions: { title: 1, body: 2 }, version: 2, seq: 3 };
+
+describe("RecordForm 本文競合(裁定 3 / R10)", () => {
+  it("「あとで決める」を選ぶと save は SaveDeferredError を投げ、下書きは残る", async () => {
     const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
       throw conflictError();
     });
     const registry = buildRegistry();
-    const initial = articleRecord({ title: "t", body: bodyEnvelope("旧本文") });
     const view = render(
-      <RecordForm
-        contentType={articleType}
-        types={types}
-        registry={registry}
-        record={initial}
-        submitLabel="保存"
-        onSubmit={onSubmit}
-      />,
+      conflictForm(registry, articleRecord({ title: "t", body: bodyEnvelope("旧本文") }), onSubmit),
     );
     const user = userEvent.setup();
-    await editBodyAndSave(user);
-    // rollback 後の record プロップ = 他者の版(broadcast が先に適用されている)
-    const serverSide = articleRecord(
-      { title: "t", body: bodyEnvelope("他者の本文") },
-      { fieldVersions: { title: 1, body: 2 }, version: 2, seq: 3 },
-    );
+    await editBody(user);
+    const pending = startSave();
+    const settled = pending.catch((cause: unknown) => cause);
     view.rerender(
-      <RecordForm
-        contentType={articleType}
-        types={types}
-        registry={registry}
-        record={serverSide}
-        submitLabel="保存"
-        onSubmit={onSubmit}
-      />,
+      conflictForm(
+        registry,
+        articleRecord({ title: "t", body: bodyEnvelope("他者の本文") }, THEIRS_META),
+        onSubmit,
+      ),
     );
-    const dialog = await screen.findByRole("alertdialog", { name: "本文の競合" });
-    expect(dialog).toHaveTextContent("自分の版");
+    const dialog = await screen.findByRole("dialog", { name: "本文が他の人の編集と重なりました" });
     expect(dialog).toHaveTextContent("他者の本文");
-    await user.click(screen.getByRole("button", { name: "サーバー版を採用" }));
-    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
-    expect(screen.getByRole("textbox", { name: "body" })).toHaveTextContent("他者の本文");
-    expect(onSubmit).toHaveBeenCalledTimes(1); // 再送はしない
+    await user.click(screen.getByRole("button", { name: "あとで決める" }));
+    expect(await settled).toBeInstanceOf(SaveDeferredError);
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    // 下書き(見出し化した自分の本文)は残っている
+    expect(screen.getByRole("textbox", { name: "body" }).querySelector("h1")).not.toBeNull();
   });
 
-  it("keeps mine: re-submits the same draft as a clean overwrite", async () => {
+  it("「ほかの人の編集を取り込む」でサーバー版をエディタに写し、再送せず SaveDeferredError", async () => {
+    const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
+      throw conflictError();
+    });
+    const registry = buildRegistry();
+    const view = render(
+      conflictForm(registry, articleRecord({ title: "t", body: bodyEnvelope("旧本文") }), onSubmit),
+    );
+    const user = userEvent.setup();
+    await editBody(user);
+    const settled = startSave().catch((cause: unknown) => cause);
+    view.rerender(
+      conflictForm(
+        registry,
+        articleRecord({ title: "t", body: bodyEnvelope("他者の本文") }, THEIRS_META),
+        onSubmit,
+      ),
+    );
+    await screen.findByRole("dialog", { name: "本文が他の人の編集と重なりました" });
+    await user.click(screen.getByRole("button", { name: "ほかの人の編集を取り込む" }));
+    expect(await settled).toBeInstanceOf(SaveDeferredError);
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("textbox", { name: "body" })).toHaveTextContent("他者の本文");
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("「あなたの編集を残す」を選ぶと再送して save が成功する", async () => {
     const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>();
     onSubmit.mockRejectedValueOnce(conflictError());
     onSubmit.mockResolvedValueOnce(undefined);
     const registry = buildRegistry();
-    const initial = articleRecord({ title: "t", body: bodyEnvelope("旧本文") });
     const view = render(
-      <RecordForm
-        contentType={articleType}
-        types={types}
-        registry={registry}
-        record={initial}
-        submitLabel="保存"
-        onSubmit={onSubmit}
-      />,
+      conflictForm(registry, articleRecord({ title: "t", body: bodyEnvelope("旧本文") }), onSubmit),
     );
     const user = userEvent.setup();
-    await editBodyAndSave(user);
+    await editBody(user);
+    const pending = startSave();
     view.rerender(
-      <RecordForm
-        contentType={articleType}
-        types={types}
-        registry={registry}
-        record={articleRecord(
-          { title: "t", body: bodyEnvelope("他者の本文") },
-          { fieldVersions: { title: 1, body: 2 }, version: 2, seq: 3 },
-        )}
-        submitLabel="保存"
-        onSubmit={onSubmit}
-      />,
+      conflictForm(
+        registry,
+        articleRecord({ title: "t", body: bodyEnvelope("他者の本文") }, THEIRS_META),
+        onSubmit,
+      ),
     );
-    await screen.findByRole("alertdialog");
-    await user.click(screen.getByRole("button", { name: "自分の版で上書き保存" }));
-    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
+    await screen.findByRole("dialog", { name: "本文が他の人の編集と重なりました" });
+    await user.click(screen.getByRole("button", { name: "あなたの編集を残す" }));
+    await expect(pending).resolves.toBeUndefined();
+    expect(onSubmit).toHaveBeenCalledTimes(2);
     const secondBody = onSubmit.mock.calls[1]?.[0]?.["body"] as {
       doc: { content: Array<{ type: string }> };
     };
     expect(secondBody.doc.content[0]?.type).toBe("heading");
-    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
-  it("blocks further submits while the conflict dialog is open", async () => {
-    const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
-      throw conflictError();
-    });
-    const registry = buildRegistry();
-    render(
-      <RecordForm
-        contentType={articleType}
-        types={types}
-        registry={registry}
-        record={articleRecord({ title: "t", body: bodyEnvelope("旧本文") })}
-        submitLabel="保存"
-        onSubmit={onSubmit}
-      />,
-    );
-    const user = userEvent.setup();
-    await editBodyAndSave(user);
-    await screen.findByRole("alertdialog", { name: "本文の競合" });
-    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: "保存" }));
-    expect(onSubmit).toHaveBeenCalledTimes(1);
-  });
-
-  it("adopts a server-side body deletion by clearing the editor", async () => {
+  it("サーバー側で本文が削除されていたら、取り込みでエディタを空にする", async () => {
     const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
       throw conflictError();
     });
     const registry = buildRegistry();
     const view = render(
-      <RecordForm
-        contentType={articleType}
-        types={types}
-        registry={registry}
-        record={articleRecord({ title: "t", body: bodyEnvelope("旧本文") })}
-        submitLabel="保存"
-        onSubmit={onSubmit}
-      />,
+      conflictForm(registry, articleRecord({ title: "t", body: bodyEnvelope("旧本文") }), onSubmit),
     );
     const user = userEvent.setup();
-    await editBodyAndSave(user);
-    // rollback 後の最新 record = サーバー側で本文が削除された版(body キーなし)
-    view.rerender(
-      <RecordForm
-        contentType={articleType}
-        types={types}
-        registry={registry}
-        record={articleRecord(
-          { title: "t" },
-          { fieldVersions: { title: 1, body: 2 }, version: 2, seq: 3 },
-        )}
-        submitLabel="保存"
-        onSubmit={onSubmit}
-      />,
-    );
-    const dialog = await screen.findByRole("alertdialog", { name: "本文の競合" });
+    await editBody(user);
+    const settled = startSave().catch((cause: unknown) => cause);
+    view.rerender(conflictForm(registry, articleRecord({ title: "t" }, THEIRS_META), onSubmit));
+    const dialog = await screen.findByRole("dialog", { name: "本文が他の人の編集と重なりました" });
     expect(dialog).toHaveTextContent("（空）");
-    await user.click(screen.getByRole("button", { name: "サーバー版を採用" }));
-    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
-    // エディタは自分の版(旧本文の見出し化)ではなく空ドキュメントを表示する
+    await user.click(screen.getByRole("button", { name: "ほかの人の編集を取り込む" }));
+    expect(await settled).toBeInstanceOf(SaveDeferredError);
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByRole("textbox", { name: "body" })).not.toHaveTextContent("旧本文");
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it("silently succeeds when the conflicting server value equals my submission (§8 自己競合ガード)", async () => {
+  it("競合したサーバーの値が自分の送信値と同じなら、静かに保存成功にする(§8 自己競合ガード)", async () => {
     const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
       throw conflictError();
     });
     const registry = buildRegistry();
-    const initial = articleRecord({ title: "t", body: bodyEnvelope("旧本文") });
     const view = render(
-      <RecordForm
-        contentType={articleType}
-        types={types}
-        registry={registry}
-        record={initial}
-        submitLabel="保存"
-        onSubmit={onSubmit}
-      />,
+      conflictForm(registry, articleRecord({ title: "t", body: bodyEnvelope("旧本文") }), onSubmit),
     );
     const user = userEvent.setup();
-    await editBodyAndSave(user);
-    // ack 消失後の再送シナリオ: サーバーの現在値 = 自分が送った版
+    await editBody(user);
+    const pending = startSave();
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     const myBody = onSubmit.mock.calls[0]?.[0]?.["body"] as Record<string, unknown>;
     view.rerender(
-      <RecordForm
-        contentType={articleType}
-        types={types}
-        registry={registry}
-        record={articleRecord(
-          { title: "t", body: myBody },
-          { fieldVersions: { title: 1, body: 2 }, version: 2, seq: 3 },
-        )}
-        submitLabel="保存"
-        onSubmit={onSubmit}
-      />,
+      conflictForm(registry, articleRecord({ title: "t", body: myBody }, THEIRS_META), onSubmit),
     );
-    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await expect(pending).resolves.toBeUndefined();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
@@ -594,13 +662,14 @@ describe("アセット関係フィールド (Phase 8 裁定: メディア UI)", 
         types={[mediaType, assetTypeDefinition]}
         registry={registryWithAsset}
         record={null}
-        submitLabel="作成"
+        onDirtyChange={() => {}}
+        ref={handle}
         onSubmit={onSubmit}
         assets={assetServicesStub()}
       />,
     );
     await user.click(screen.getByRole("button", { name: "アセットを選択" }));
-    const dialog = await screen.findByRole("dialog", { name: "アセットを選択" });
+    const dialog = await screen.findByRole("dialog", { name: "メディアを選択" });
     expect(dialog).toHaveTextContent("hero.png");
     await user.click(screen.getByRole("button", { name: /hero\.png/ }));
     // 選択結果がフィールドに表示される
@@ -615,7 +684,8 @@ describe("アセット関係フィールド (Phase 8 裁定: メディア UI)", 
         types={[mediaType, assetTypeDefinition]}
         registry={registryWithAsset}
         record={null}
-        submitLabel="作成"
+        onDirtyChange={() => {}}
+        ref={handle}
         onSubmit={onSubmit}
       />,
     );
@@ -630,7 +700,8 @@ describe("アセット関係フィールド (Phase 8 裁定: メディア UI)", 
         types={[assetTypeDefinition]}
         registry={registryWithAsset}
         record={assetRecord}
-        submitLabel="保存"
+        onDirtyChange={() => {}}
+        ref={handle}
         onSubmit={onSubmit}
         assets={assetServicesStub()}
       />,

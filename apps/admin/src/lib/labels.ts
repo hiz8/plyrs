@@ -195,6 +195,8 @@ export const DIALOGS = {
   cancel: "キャンセル",
 } as const;
 
+export const ASSET_PICKER_LABELS = { selectTitle: "メディアを選択" } as const;
+
 export const LIST_LABELS = {
   tabs: {
     all: "すべて",

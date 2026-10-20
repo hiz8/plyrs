@@ -3,57 +3,46 @@ import { useRef, useState } from "react";
 import type { ContentTypeDefinition, FieldDefinition } from "@plyrs/metamodel";
 import { ASSET_TYPE_KEY } from "@plyrs/metamodel";
 import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
-import { Button } from "@plyrs/ui";
-import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
+import { Button, ModalDialog } from "@plyrs/ui";
+import { bg, border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "../lib/asset-services";
+import { ASSET_PICKER_LABELS } from "../lib/labels";
 import { labelForRecord } from "../lib/record-label";
 import { parseRelationDraftKey, relationDraftKey } from "../lib/record-form-values";
 import { useRelationCandidates } from "../lib/use-collection";
 import { AssetThumb } from "./asset-thumb";
 
 const styles = stylex.create({
-  dialog: {
-    padding: spacing.md,
-    borderRadius: "6px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    display: "flex",
-    flexDirection: "column",
-    gap: spacing.sm,
-    maxWidth: "480px",
-  },
-  dialogTitle: { fontSize: typography.sizeMd, fontWeight: 600, margin: 0 },
+  content: { display: "flex", flexDirection: "column", gap: space.sm },
   grid: {
     display: "flex",
     flexDirection: "column",
-    gap: spacing.xs,
+    gap: space.xs,
     maxHeight: "280px",
     overflowY: "auto",
   },
   candidate: {
     display: "flex",
     alignItems: "center",
-    gap: spacing.sm,
-    padding: spacing.xs,
-    borderRadius: "4px",
-    borderWidth: "1px",
+    gap: space.sm,
+    padding: space.xs,
+    borderRadius: radius.control,
+    borderWidth: stroke.default,
     borderStyle: "solid",
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
+    borderColor: border.default,
+    backgroundColor: bg.canvas,
     cursor: "pointer",
     textAlign: "left",
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizeMd,
-    color: colors.text,
+    fontFamily: font.family,
+    fontSize: font.body,
+    color: text.default,
   },
-  muted: { color: colors.textMuted, fontSize: typography.sizeSm },
-  error: { color: colors.danger, fontSize: typography.sizeSm },
-  fieldLabel: { fontSize: typography.sizeSm, color: colors.textMuted },
-  selected: { display: "flex", flexDirection: "column", gap: spacing.xs },
-  selectedRow: { display: "flex", alignItems: "center", gap: spacing.sm },
-  actions: { display: "flex", gap: spacing.sm, alignItems: "center" },
+  muted: { color: text.muted, fontSize: font.caption },
+  error: { color: status.danger, fontSize: font.caption },
+  fieldLabel: { fontSize: font.caption, color: text.muted },
+  selected: { display: "flex", flexDirection: "column", gap: space.xs },
+  selectedRow: { display: "flex", alignItems: "center", gap: space.sm },
+  actions: { display: "flex", gap: space.sm, alignItems: "center" },
 });
 
 export interface AssetSelectItem {
@@ -100,41 +89,52 @@ export function AssetSelectDialog({
   }
 
   return (
-    <div role="dialog" aria-label="アセットを選択" {...stylex.props(styles.dialog)}>
-      <h2 {...stylex.props(styles.dialogTitle)}>アセットを選択</h2>
-      <input
-        ref={fileInputRef}
-        type="file"
-        aria-label="新しいアセットをアップロード"
-        onChange={(event) => void upload(event.currentTarget.files)}
-      />
-      {error !== null && <span {...stylex.props(styles.error)}>{error}</span>}
-      {candidates.length === 0 ? (
-        <p {...stylex.props(styles.muted)}>アセットがまだありません。アップロードしてください。</p>
-      ) : (
-        <div {...stylex.props(styles.grid)}>
-          {candidates.map((candidate) => {
-            const label = labelForRecord(types, candidate);
-            return (
-              <button
-                key={candidate.id}
-                type="button"
-                {...stylex.props(styles.candidate)}
-                onClick={() => onSelect({ id: candidate.id, label })}
-              >
-                <AssetThumb record={candidate} resolveUrl={assets.resolveUrl} />
-                <span>{label}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      <div {...stylex.props(styles.actions)}>
+    <ModalDialog
+      title={ASSET_PICKER_LABELS.selectTitle}
+      isOpen
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose();
+        }
+      }}
+      footer={
         <Button variant="secondary" onPress={onClose}>
           閉じる
         </Button>
+      }
+    >
+      <div {...stylex.props(styles.content)}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          aria-label="新しいアセットをアップロード"
+          onChange={(event) => void upload(event.currentTarget.files)}
+        />
+        {error !== null && <span {...stylex.props(styles.error)}>{error}</span>}
+        {candidates.length === 0 ? (
+          <p {...stylex.props(styles.muted)}>
+            アセットがまだありません。アップロードしてください。
+          </p>
+        ) : (
+          <div {...stylex.props(styles.grid)}>
+            {candidates.map((candidate) => {
+              const label = labelForRecord(types, candidate);
+              return (
+                <button
+                  key={candidate.id}
+                  type="button"
+                  {...stylex.props(styles.candidate)}
+                  onClick={() => onSelect({ id: candidate.id, label })}
+                >
+                  <AssetThumb record={candidate} resolveUrl={assets.resolveUrl} />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
-    </div>
+    </ModalDialog>
   );
 }
 
@@ -148,6 +148,7 @@ export function AssetRelationPicker({
   types,
   registry,
   assets,
+  isReadOnly,
 }: {
   field: Extract<FieldDefinition, { type: "relation" }>;
   value: unknown;
@@ -156,6 +157,8 @@ export function AssetRelationPicker({
   types: ContentTypeDefinition[];
   registry: CollectionRegistry;
   assets: AssetServices;
+  /** 閲覧者向け。ラベルと選択中の名前の文字だけを描く */
+  isReadOnly?: boolean | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const candidates = useRelationCandidates(registry, [ASSET_TYPE_KEY]);
@@ -188,9 +191,28 @@ export function AssetRelationPicker({
     }
   }
 
+  const fieldName = field.label ?? field.key;
+
+  if (isReadOnly === true) {
+    return (
+      <div {...stylex.props(styles.selected)}>
+        <span {...stylex.props(styles.fieldLabel)}>{fieldName}</span>
+        {selectedKeys.map((key) => {
+          const ref = parseRelationDraftKey(key);
+          const record = candidates.find((candidate) => candidate.id === ref?.id);
+          return (
+            <span key={key}>
+              {record === undefined ? (ref?.id.slice(0, 8) ?? key) : labelForRecord(types, record)}
+            </span>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div {...stylex.props(styles.selected)}>
-      <span {...stylex.props(styles.fieldLabel)}>{field.key}</span>
+      <span {...stylex.props(styles.fieldLabel)}>{fieldName}</span>
       {selectedKeys.map((key) => {
         const ref = parseRelationDraftKey(key);
         const record = candidates.find((candidate) => candidate.id === ref?.id);

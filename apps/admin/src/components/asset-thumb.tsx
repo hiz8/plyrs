@@ -1,17 +1,17 @@
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useState } from "react";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import { colors, typography } from "@plyrs/ui/tokens.stylex";
+import { border, font, radius, stroke, text } from "@plyrs/ui/semantic.stylex";
 
 const styles = stylex.create({
   image: {
     width: "48px",
     height: "48px",
     objectFit: "cover",
-    borderRadius: "4px",
-    borderWidth: "1px",
+    borderRadius: radius.control,
+    borderWidth: stroke.default,
     borderStyle: "solid",
-    borderColor: colors.border,
+    borderColor: border.default,
   },
   fallback: {
     display: "inline-flex",
@@ -19,12 +19,12 @@ const styles = stylex.create({
     justifyContent: "center",
     width: "48px",
     height: "48px",
-    borderRadius: "4px",
-    borderWidth: "1px",
+    borderRadius: radius.control,
+    borderWidth: stroke.default,
     borderStyle: "solid",
-    borderColor: colors.border,
-    color: colors.textMuted,
-    fontSize: typography.sizeSm,
+    borderColor: border.default,
+    color: text.muted,
+    fontSize: font.caption,
     textTransform: "uppercase",
   },
 });

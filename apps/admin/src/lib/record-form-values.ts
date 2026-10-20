@@ -62,6 +62,17 @@ export function draftValueEquals(a: unknown, b: unknown): boolean {
   return left !== undefined && left === right;
 }
 
+// 保存前の基準(initial)と今の下書き(current)が違うか。両方のキーの和集合で比べる
+export function isDraftDirty(initial: DraftValues, current: DraftValues): boolean {
+  const keys = new Set([...Object.keys(initial), ...Object.keys(current)]);
+  for (const key of keys) {
+    if (!draftValueEquals(initial[key], current[key])) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function isRelationRef(value: unknown): value is { type: string; id: string } {
   return (
     typeof value === "object" &&

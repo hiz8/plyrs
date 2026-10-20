@@ -1,6 +1,7 @@
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { describe, expect, it } from "vitest";
 import {
+  isDraftDirty,
   asRichTextValue,
   draftValueEquals,
   fromDraftValues,
@@ -313,5 +314,15 @@ describe("asRichTextValue / isEmptyRichTextValue / draftValueEquals", () => {
     expect(draftValueEquals(undefined, undefined)).toBe(true);
     expect(draftValueEquals(undefined, "")).toBe(false);
     expect(draftValueEquals(bodyEnvelope("x"), bodyEnvelope("x"))).toBe(true);
+  });
+});
+
+describe("isDraftDirty", () => {
+  it("同じ内容なら false、値の違いやキーの増減があれば true", () => {
+    expect(isDraftDirty({ a: "x", b: [1] }, { a: "x", b: [1] })).toBe(false);
+    expect(isDraftDirty({ a: "x" }, { a: "y" })).toBe(true);
+    expect(isDraftDirty({ a: "x" }, { a: "x", b: "z" })).toBe(true);
+    expect(isDraftDirty({ a: "x", b: "z" }, { a: "x" })).toBe(true);
+    expect(isDraftDirty({}, {})).toBe(false);
   });
 });

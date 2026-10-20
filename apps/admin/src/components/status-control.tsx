@@ -5,12 +5,24 @@ import { getRouteApi } from "@tanstack/react-router";
 import { WORKFLOW_STATUSES, type WorkflowStatus } from "@plyrs/metamodel";
 import { Button, Select } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
+import { SyncRejectedError } from "@plyrs/sync-client";
 import { WORKFLOW_STATUS_LABELS } from "../lib/labels";
 import { useCan } from "../lib/use-can";
 import { publicationQueryOptions } from "../lib/queries";
 import { useTenantSync } from "../lib/sync-context";
 import { useCollectionRows } from "../lib/use-collection";
-import { syncErrorMessage } from "./record-form";
+
+// 旧 record-form から移した。編集画面の公開ボックス(Task 8)に置き換わるまでの暫定
+function syncErrorMessage(cause: unknown): string {
+  if (
+    cause instanceof SyncRejectedError ||
+    (cause instanceof Error && cause.name === "SyncRejectedError")
+  ) {
+    const code = (cause as { code?: string }).code ?? "unknown";
+    return `保存できませんでした（${code}）: ${cause.message}`;
+  }
+  return "保存できませんでした。接続状態を確認して再試行してください。";
+}
 
 const styles = stylex.create({
   root: { display: "flex", alignItems: "flex-end", gap: spacing.sm, flexWrap: "wrap" },
