@@ -10,3 +10,17 @@
 body {
   margin: 0;
 }
+
+/* R19: 行の操作はホバー / フォーカス時に出す(StyleX は子孫セレクタを書けない) */
+[data-row-actions] {
+  opacity: 0;
+}
+tr[data-hovered] [data-row-actions],
+tr:focus-within [data-row-actions] {
+  opacity: 1;
+}
+@media (max-width: 959px) {
+  [data-row-actions] {
+    opacity: 1;
+  }
+}

@@ -209,6 +209,7 @@ export const LIST_LABELS = {
   statusFilter: "ステータス",
   statusAll: "すべて",
   search: "タイトルで検索",
+  tableLabel: (type: string) => `${type}の一覧`,
   columns: { title: "タイトル", publication: "公開", status: "ステータス", updated: "更新" },
   changedShort: "公開中・未反映",
   changedLong: "公開中・未反映の変更あり",
