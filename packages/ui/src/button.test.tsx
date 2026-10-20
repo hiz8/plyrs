@@ -35,6 +35,33 @@ describe("Button (react-aria-components + StyleX)", () => {
   });
 });
 
+describe("Button variant=card", () => {
+  it("aria-pressed の見た目のクラスが当たり、disabledReason が読める", () => {
+    const { rerender } = render(
+      <Button variant="card" aria-pressed={false}>
+        カード
+      </Button>,
+    );
+    const off = screen.getByRole("button", { name: "カード" }).className;
+    rerender(
+      <Button variant="card" aria-pressed>
+        カード
+      </Button>,
+    );
+    const on = screen.getByRole("button", { name: "カード" });
+    expect(on).toHaveAttribute("aria-pressed", "true");
+    expect(on.className).not.toBe(off);
+    rerender(
+      <Button variant="card" aria-pressed={false} disabledReason="理由です">
+        カード
+      </Button>,
+    );
+    const disabled = screen.getByRole("button", { name: "カード" });
+    expect(disabled).toHaveAttribute("aria-disabled", "true");
+    expect(disabled).toHaveAccessibleDescription("理由です");
+  });
+});
+
 describe("Button の D1 の見た目", () => {
   it("アイコンは装飾として読み上げず、名前は文字から取る", () => {
     render(<Button icon={Plus}>お知らせを追加</Button>);

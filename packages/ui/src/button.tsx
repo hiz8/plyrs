@@ -58,6 +58,23 @@ const styles = stylex.create({
   secondary: { backgroundColor: bg.canvas, color: text.default, borderColor: border.default },
   secondaryHovered: { backgroundColor: bg.hover, borderColor: border.hover },
   secondaryPressed: { backgroundColor: bg.pressed, borderColor: border.hover },
+  // 種類のカードなど縦に積む選択肢(E33)。選択中は aria-pressed で accent の面と枠
+  card: {
+    height: "auto",
+    width: "100%",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    justifyContent: "flex-start",
+    gap: space.xs,
+    padding: space.inset,
+    textAlign: "start",
+    whiteSpace: "normal",
+    backgroundColor: bg.canvas,
+    color: text.default,
+    borderColor: border.default,
+    borderRadius: radius.item,
+  },
+  cardSelected: { backgroundColor: accent.surface, borderColor: accent.default },
   danger: { backgroundColor: status.danger, color: text.onAccent },
   dangerHovered: { backgroundColor: status.dangerHover },
   dangerPressed: { backgroundColor: status.dangerHover },
@@ -147,12 +164,13 @@ function useDisabledReason(
   };
 }
 
-export type ButtonVariant = "primary" | "secondary" | "danger" | "link" | "dangerLink";
+export type ButtonVariant = "primary" | "secondary" | "card" | "danger" | "link" | "dangerLink";
 export type ButtonSize = "md" | "sm";
 
 const VARIANT_STYLES = {
   primary: [styles.primary, styles.primaryHovered, styles.primaryPressed],
   secondary: [styles.secondary, styles.secondaryHovered, styles.secondaryPressed],
+  card: [styles.card, styles.secondaryHovered, styles.secondaryPressed],
   danger: [styles.danger, styles.dangerHovered, styles.dangerPressed],
   link: [styles.link, styles.linkHovered, styles.linkPressed],
   dangerLink: [styles.dangerLink, styles.dangerLinkHovered, styles.dangerLinkHovered],
@@ -187,10 +205,11 @@ export function Button({
       {...racProps}
       className={stylexRenderProps<ButtonRenderProps>((state) => [
         styles.base,
-        buttonSize === "sm" && styles.sm,
+        buttonSize === "sm" && variant !== "card" && styles.sm,
         normal,
         !isInert && state.isHovered && hovered,
         !isInert && state.isPressed && pressed,
+        variant === "card" && props["aria-pressed"] === true && styles.cardSelected,
         state.isFocusVisible && styles.focusVisible,
         (isInert || state.isDisabled) &&
           (inheritsDisabled ? styles.disabledCursor : styles.disabled),

@@ -13,9 +13,9 @@ import {
   Type,
   type LucideIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button, ICON_SIZE, ModalDialog, TextField } from "@plyrs/ui";
-import { accent, border, font, radius, size, space, stroke, text } from "@plyrs/ui/semantic.stylex";
+import { border, font, space, stroke, text } from "@plyrs/ui/semantic.stylex";
 import { FIELD_LABEL_MAX_LENGTH } from "@plyrs/metamodel";
 import {
   FIELD_KINDS,
@@ -71,39 +71,11 @@ const styles = stylex.create({
     borderTopColor: border.default,
     opacity: 0.7,
   },
-  // 選択中の枠は Button の外側のラッパーに当てる(ui の Button は className 固定のため)。
-  // Button の高さは固定なので、中身はラッパー基準で全面に広げ、ラッパーの最小の高さで行を確保する
-  cardWrap: {
-    position: "relative",
-    minHeight: `calc(${size.control} * 2.5)`,
-    borderWidth: stroke.default,
-    borderStyle: "solid",
-    borderColor: border.default,
-    borderRadius: radius.item,
-  },
-  cardWrapRow: { minHeight: `calc(${size.control} * 1.25)` },
-  cardWrapSelected: {
-    borderColor: accent.default,
-    backgroundColor: accent.surface,
-  },
-  cardWrapFocus: {
-    ":focus-within": {
-      outlineWidth: stroke.focus,
-      outlineStyle: "solid",
-      outlineColor: accent.default,
-    },
-  },
   cardContent: {
-    position: "absolute",
-    insetBlock: 0,
-    insetInline: 0,
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-start",
     gap: space.xs,
-    padding: space.inset,
-    textAlign: "start",
-    whiteSpace: "normal",
   },
   cardContentRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
   cardName: { fontSize: font.body, fontWeight: font.weightMedium, color: text.default },
@@ -139,27 +111,18 @@ function KindCard({
   const Icon = KIND_ICONS[kind];
   const labels = FIELD_KIND_LABELS[kind];
   return (
-    <div
-      {...stylex.props(
-        styles.cardWrap,
-        isRow === true && styles.cardWrapRow,
-        isSelected && styles.cardWrapSelected,
-        styles.cardWrapFocus,
-      )}
+    <Button
+      variant="card"
+      aria-pressed={isSelected}
+      onPress={onSelect}
+      {...(disabledReason === undefined ? {} : { disabledReason })}
     >
-      <Button
-        variant="secondary"
-        aria-pressed={isSelected}
-        onPress={onSelect}
-        {...(disabledReason === undefined ? {} : { disabledReason })}
-      >
-        <span {...stylex.props(styles.cardContent, isRow === true && styles.cardContentRow)}>
-          <Icon size={ICON_SIZE.inline} aria-hidden="true" />
-          <span {...stylex.props(styles.cardName)}>{labels.name}</span>
-          <span {...stylex.props(styles.cardDescription)}>{labels.description}</span>
-        </span>
-      </Button>
-    </div>
+      <span {...stylex.props(styles.cardContent, isRow === true && styles.cardContentRow)}>
+        <Icon size={ICON_SIZE.inline} aria-hidden="true" />
+        <span {...stylex.props(styles.cardName)}>{labels.name}</span>
+        <span {...stylex.props(styles.cardDescription)}>{labels.description}</span>
+      </span>
+    </Button>
   );
 }
 
@@ -169,6 +132,7 @@ function AddFieldForm({
   hasSlug,
   onAdd,
 }: Omit<AddFieldDialogProps, "isOpen">) {
+  const formId = useId();
   const [step, setStep] = useState<1 | 2>(1);
   const [kind, setKind] = useState<FieldKind | null>(null);
   // 2 段目の入力の持ち主の種類。種類が変わったときだけ入力を初期化する
@@ -221,7 +185,7 @@ function AddFieldForm({
           </Button>
         </div>
         {cancelButton}
-        <Button variant="primary" isDisabled={!canAdd} onPress={submit}>
+        <Button variant="primary" type="submit" form={formId} isDisabled={!canAdd}>
           {ADD_FIELD_LABELS.add}
         </Button>
       </>
@@ -280,6 +244,7 @@ function AddFieldForm({
           </>
         ) : (
           <form
+            id={formId}
             {...stylex.props(styles.form)}
             onSubmit={(event) => {
               event.preventDefault();
