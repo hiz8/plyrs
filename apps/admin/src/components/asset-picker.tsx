@@ -9,7 +9,7 @@ import type { AssetServices } from "../lib/asset-services";
 import { ASSET_PICKER_LABELS } from "../lib/labels";
 import { labelForRecord } from "../lib/record-label";
 import { parseRelationDraftKey, relationDraftKey } from "../lib/record-form-values";
-import { useRelationCandidates } from "../lib/use-collection";
+import { useRecordsOfTypes } from "../lib/use-collection";
 import { AssetThumb } from "./asset-thumb";
 
 const styles = stylex.create({
@@ -66,7 +66,9 @@ export function AssetSelectDialog({
   onSelect: (item: AssetSelectItem) => void;
   onClose: () => void;
 }) {
-  const candidates = useRelationCandidates(registry, [ASSET_TYPE_KEY]);
+  const candidates = useRecordsOfTypes(registry, [ASSET_TYPE_KEY]).toSorted((a, b) =>
+    a.id.localeCompare(b.id),
+  );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -161,7 +163,9 @@ export function AssetRelationPicker({
   isReadOnly?: boolean | undefined;
 }) {
   const [open, setOpen] = useState(false);
-  const candidates = useRelationCandidates(registry, [ASSET_TYPE_KEY]);
+  const candidates = useRecordsOfTypes(registry, [ASSET_TYPE_KEY]).toSorted((a, b) =>
+    a.id.localeCompare(b.id),
+  );
   const many = field.config.cardinality === "many";
   const selectedKeys: string[] = many
     ? Array.isArray(value)

@@ -33,7 +33,7 @@ import {
   type DraftValues,
 } from "../lib/record-form-values";
 import { richTextPlainText } from "../lib/richtext-text";
-import { useRelationCandidates } from "../lib/use-collection";
+import { useRecordsOfTypes } from "../lib/use-collection";
 import { AssetRelationPicker, AssetSelectDialog, type AssetSelectItem } from "./asset-picker";
 import { ConflictDialog } from "./conflict-dialog";
 
@@ -194,10 +194,10 @@ export function RecordForm({
 
   // 本文中 record 参照(@)の候補: 同期済みの全型のコレクションを束ねて購読する
   // (relation picker と同じフックを全型キーで使い回す)。自分自身への参照は候補から外す。
-  const mentionSource = useRelationCandidates(
+  const mentionSource = useRecordsOfTypes(
     registry,
     types.map((type) => type.key),
-  );
+  ).toSorted((a, b) => a.id.localeCompare(b.id));
   const mentionCandidates: RichTextMentionItem[] = mentionSource
     .filter((candidate) => candidate.id !== record?.id)
     .map((candidate) => ({
@@ -685,7 +685,9 @@ function RelationPicker({
   isReadOnly: boolean;
 }) {
   const label = field.label ?? field.key;
-  const candidates = useRelationCandidates(registry, field.config.allowedTypes);
+  const candidates = useRecordsOfTypes(registry, field.config.allowedTypes).toSorted((a, b) =>
+    a.id.localeCompare(b.id),
+  );
   const options = candidates.map((candidate) => ({
     value: relationDraftKey({ type: candidate.type, id: candidate.id }),
     label: labelForRecord(types, candidate),

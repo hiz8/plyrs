@@ -54,6 +54,10 @@ export interface RecordEditorToolbarContribution extends SlotContributionBase {
 export interface HomeWidgetContribution extends SlotContributionBase {
   title: string;
   render: ComponentType;
+  /** 2 列のグリッドでの幅。既定 half(1 列) */
+  size?: "half" | "full";
+  /** 指定があれば、そのモジュールが有効なテナントでだけ描く */
+  moduleId?: string;
 }
 
 export interface SlotContributions {

@@ -28,30 +28,26 @@ export function useCollectionRows(
   return rows;
 }
 
-// relation picker の候補: allowedTypes すべてのコレクションを束ねて購読する。
+// typeKeys のコレクションを束ねて購読する(relation picker の候補・ホームの集計で共用)。
 // フックはループで呼べないため、複数コレクションを 1 つの effect で購読する。
-export function useRelationCandidates(
+// 並びは束ねた順のまま返す。順序が要るなら呼び出し側で決める。
+export function useRecordsOfTypes(
   registry: CollectionRegistry,
-  allowedTypes: readonly string[],
+  typeKeys: readonly string[],
 ): SyncRecord[] {
   const [rows, setRows] = useState<SyncRecord[]>([]);
   // 配列の identity 揺れで effect が空回りしないよう、結合キーで依存させる。
   // 区切り文字は "," 固定(type key は /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$/ の形で "," を
   // 含み得ないため衝突しない。空文字区切りだと ["ab","c"] と ["a","bc"] が同じキーになってしまう)。
-  const typesKey = allowedTypes.join(",");
+  const typesKey = typeKeys.join(",");
   useEffect(() => {
-    // exhaustive-deps 対策: 依存配列は typesKey のみ。allowedTypes への参照を effect 内に
-    // 残さないよう、typesKey を分解した types を使う(allowedTypes は typesKey から再構成可能)。
+    // exhaustive-deps 対策: 依存配列は typesKey のみ。typeKeys への参照を effect 内に
+    // 残さないよう、typesKey を分解した types を使う(typeKeys は typesKey から再構成可能)。
     const types = typesKey.length === 0 ? [] : typesKey.split(",");
     const collections = types
       .map((typeKey) => registry.get(typeKey))
       .filter((collection) => collection !== undefined);
-    const recompute = () =>
-      setRows(
-        collections
-          .flatMap((collection) => collection.toArray)
-          .toSorted((a, b) => a.id.localeCompare(b.id)),
-      );
+    const recompute = () => setRows(collections.flatMap((collection) => collection.toArray));
     recompute();
     const subscriptions = collections.map((collection) =>
       collection.subscribeChanges(() => recompute(), { includeInitialState: true }),

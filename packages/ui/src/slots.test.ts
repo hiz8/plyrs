@@ -59,4 +59,18 @@ describe("SlotRegistry (design-spec §9.9 論点P 初版)", () => {
       "B",
     ]);
   });
+
+  it("home:widget は size と moduleId を持てる", () => {
+    const registry = createSlotRegistry();
+    registry.register("home:widget", {
+      id: "booking.today",
+      title: "今日の予約",
+      order: 0,
+      render: Widget,
+      size: "full",
+      moduleId: "booking",
+    });
+    expect(registry.get("home:widget")[0]?.size).toBe("full");
+    expect(registry.get("home:widget")[0]?.moduleId).toBe("booking");
+  });
 });
