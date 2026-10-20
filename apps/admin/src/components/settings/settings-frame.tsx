@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { useNavigate } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Tabs } from "@plyrs/ui";
 import { space } from "@plyrs/ui/semantic.stylex";
 import { currentCrumb, homeCrumb, settingsCrumb } from "../../lib/breadcrumbs";
@@ -21,7 +21,11 @@ const TAB_TO = {
 
 const TAB_ORDER: readonly SettingsTab[] = ["general", "content-types", "members", "modules"];
 
+// タブを選ぶとルートが変わり枠が作り直されるため、選んだタブを次の枠へ引き継いでフォーカスを戻す
+let pendingTabFocus: SettingsTab | null = null;
+
 const styles = stylex.create({
+  frame: { display: "contents" },
   content: {
     display: "flex",
     flexDirection: "column",
@@ -48,6 +52,24 @@ export function SettingsFrame({
 }) {
   const navigate = useNavigate();
   const labels = SETTINGS_LABELS;
+  const frameRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const container = frameRef.current;
+    if (pendingTabFocus !== tab || container === null) return;
+    pendingTabFocus = null;
+    // RAC のタブは collection の構築後に DOM へ出るため、現れるまで待ってからフォーカスする
+    const focusSelected = () => {
+      const el = container.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+      el?.focus();
+      return el !== null;
+    };
+    if (focusSelected()) return;
+    const observer = new MutationObserver(() => {
+      if (focusSelected()) observer.disconnect();
+    });
+    observer.observe(container, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [tab]);
   let body: ReactNode = children;
   if (error !== undefined) {
     body = <CardError message={error.message} onRetry={error.onRetry} />;
@@ -62,27 +84,30 @@ export function SettingsFrame({
         primaryAction={primaryAction}
       />
       <PageBody>
-        <Tabs
-          label={labels.tabsName}
-          items={TAB_ORDER.map((id) => ({ id, label: labels.tabs[id] }))}
-          selectedKey={tab}
-          // 矢印キーでは移るだけ。選ぶと URL が変わりフォーカスが外れるため、Enter / Space で決める
-          keyboardActivation="manual"
-          onSelectionChange={(id) =>
-            void navigate({ to: TAB_TO[id as SettingsTab], params: { tenantSlug: slug } })
-          }
-        >
-          {(id) =>
-            id === tab ? (
-              <div
-                aria-busy={isLoading === true ? true : undefined}
-                {...stylex.props(styles.content)}
-              >
-                {body}
-              </div>
-            ) : null
-          }
-        </Tabs>
+        <div ref={frameRef} {...stylex.props(styles.frame)}>
+          <Tabs
+            label={labels.tabsName}
+            items={TAB_ORDER.map((id) => ({ id, label: labels.tabs[id] }))}
+            selectedKey={tab}
+            // 矢印キーでは移るだけ。選ぶと URL が変わりフォーカスが外れるため、Enter / Space で決める
+            keyboardActivation="manual"
+            onSelectionChange={(id) => {
+              pendingTabFocus = id as SettingsTab;
+              void navigate({ to: TAB_TO[id as SettingsTab], params: { tenantSlug: slug } });
+            }}
+          >
+            {(id) =>
+              id === tab ? (
+                <div
+                  aria-busy={isLoading === true ? true : undefined}
+                  {...stylex.props(styles.content)}
+                >
+                  {body}
+                </div>
+              ) : null
+            }
+          </Tabs>
+        </div>
       </PageBody>
     </>
   );

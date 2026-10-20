@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import type { TenantSync } from "../../lib/sync";
 import { TenantSyncProvider } from "../../lib/sync-context";
@@ -43,4 +44,24 @@ it("error があれば本文の代わりに alert と再試行を出す", () => 
   expect(screen.getByRole("alert")).toHaveTextContent("失敗しました");
   expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
   expect(screen.queryByText("本文")).not.toBeInTheDocument();
+});
+
+it("タブを選んで遷移した後、次に描かれた枠は選択中のタブにフォーカスを戻す", async () => {
+  renderFrame({});
+  await userEvent.setup().click(screen.getByRole("tab", { name: "一般" }));
+  cleanup();
+  render(
+    <TenantSyncProvider sync={sync}>
+      <SettingsFrame tab="general" slug="blog">
+        <p>本文</p>
+      </SettingsFrame>
+    </TenantSyncProvider>,
+  );
+  // RAC のタブは collection 構築後に DOM へ出るため、フォーカスは少し遅れる
+  await waitFor(() => expect(screen.getByRole("tab", { name: "一般" })).toHaveFocus());
+});
+
+it("タブを選ばずに描いた枠はフォーカスを動かさない", () => {
+  renderFrame({});
+  expect(screen.getByRole("tab", { name: "メンバー" })).not.toHaveFocus();
 });
