@@ -90,11 +90,13 @@ function MembersPage() {
   const remove = useMutation({
     mutationFn: (member: MemberSummary) => adminApi.removeMember(tenant.id, member.userId),
     onSuccess: (_result, member) => {
-      void invalidateMembers();
       toaster.success(labels.removed(member.email));
       if (member.userId === selfId) {
+        // 外された本人の members 取得は 403 になるため、再取得せず tenants だけ取り直して移る
         void invalidateTenants();
         void navigate({ to: "/tenants" });
+      } else {
+        void invalidateMembers();
       }
     },
     onError: (cause) => {

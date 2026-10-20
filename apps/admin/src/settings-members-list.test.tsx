@@ -34,13 +34,14 @@ function routesWith(members: unknown[], extra = {}) {
 }
 
 describe("設定 › メンバー(一覧)", () => {
-  it("メンバーを参加日順に出し、自分の行に「自分」、ロール説明カードが 3 枚", async () => {
-    renderAt("/t/blog/settings/members", socketHarness(), routesWith([owner, viewer, owner2]));
+  it("メンバーを API の順のまま出し、自分の行に「自分」、ロール説明カードが 3 枚", async () => {
+    renderAt("/t/blog/settings/members", socketHarness(), routesWith([viewer, owner, owner2]));
     const table = await screen.findByRole("grid", { name: "メンバーの一覧" });
     const rows = within(table).getAllByRole("row");
-    expect(rows[1]).toHaveTextContent("owner@example.com");
-    expect(rows[1]).toHaveTextContent("自分");
-    expect(rows[2]).toHaveTextContent("viewer@example.com");
+    // viewer(2 件目より新しい)が先頭。並べ替えず API の順のまま出す
+    expect(rows[1]).toHaveTextContent("viewer@example.com");
+    expect(rows[2]).toHaveTextContent("owner@example.com");
+    expect(rows[2]).toHaveTextContent("自分");
     expect(rows[3]).toHaveTextContent("second@example.com");
     expect(screen.getByText(/すべての操作に加えて/)).toBeInTheDocument();
     expect(
