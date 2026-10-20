@@ -66,6 +66,8 @@ export function SettingsFrame({
           label={labels.tabsName}
           items={TAB_ORDER.map((id) => ({ id, label: labels.tabs[id] }))}
           selectedKey={tab}
+          // 矢印キーでは移るだけ。選ぶと URL が変わりフォーカスが外れるため、Enter / Space で決める
+          keyboardActivation="manual"
           onSelectionChange={(id) =>
             void navigate({ to: TAB_TO[id as SettingsTab], params: { tenantSlug: slug } })
           }

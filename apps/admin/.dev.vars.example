@@ -2,5 +2,5 @@
 # 裁定 10(2026-07-18): E2E がコアジャーニー(publish → 公開 read)を検証するための dev 限定転送。
 # 本番は 6a 裁定どおり /public/v1 を admin から配信しない(wrangler.jsonc の既定値は "0")。
 DEV_PROXY_PUBLIC=1
-# 公開 API のオリジン(設定 › 一般に表示)。空 = 同一オリジン。DEV_PROXY_PUBLIC の転送先
+# 設定 › 一般に表示する公開 API の URL のオリジン(案 G 3 章・裁定 G1)。空 = 同一オリジン
 PUBLIC_API_ORIGIN=

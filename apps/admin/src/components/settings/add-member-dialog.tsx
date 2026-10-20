@@ -44,6 +44,8 @@ export interface AddMemberDialogProps {
   onSubmit: (email: string, role: Role) => void;
   isPending: boolean;
   failure: AddMemberFailure;
+  /** 入力を直したら、直前の失敗の表示を消す */
+  onClearFailure?: () => void;
   signupUrl: string;
 }
 
@@ -52,6 +54,7 @@ function AddMemberForm({
   onSubmit,
   isPending,
   failure,
+  onClearFailure,
   signupUrl,
 }: Omit<AddMemberDialogProps, "isOpen">) {
   const [email, setEmail] = useState("");
@@ -88,7 +91,10 @@ function AddMemberForm({
           type="email"
           description={MEMBER_LABELS.addDialog.emailHelp}
           value={email}
-          onChange={setEmail}
+          onChange={(value) => {
+            setEmail(value);
+            if (failure !== null) onClearFailure?.();
+          }}
           isRequired
           autoComplete="off"
           {...(failure?.kind === "already_member"

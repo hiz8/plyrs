@@ -1,17 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
-import {
-  Avatar,
-  Badge,
-  Button,
-  Cell,
-  Column,
-  Row,
-  Skeleton,
-  Table,
-  TableBody,
-  TableHeader,
-} from "@plyrs/ui";
-import { font, size, space, text } from "@plyrs/ui/semantic.stylex";
+import { Avatar, Badge, Button, Cell, Column, Row, Table, TableBody, TableHeader } from "@plyrs/ui";
+import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import type { MemberSummary } from "../../lib/admin-api";
 import { formatDate } from "../../lib/datetime";
 import { MEMBER_LABELS } from "../../lib/labels";
@@ -23,7 +12,6 @@ const styles = stylex.create({
   who: { display: "flex", alignItems: "center", gap: space.sm, minWidth: 0 },
   email: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
   muted: { color: text.muted, fontSize: font.caption },
-  skeleton: { display: "flex", flexDirection: "column", gap: space.sm },
 });
 
 export interface MembersTableProps {
@@ -73,7 +61,7 @@ export function MembersTable({ rows, onChangeRole, onRemove, isBusy = false }: M
                   </Button>
                 ) : (
                   <RoleSelect
-                    label={`${member.email}のロール`}
+                    label={MEMBER_LABELS.roleOf(member.email)}
                     value={isRole(member.role) ? member.role : "viewer"}
                     onChange={(role) => onChangeRole(member, role)}
                     isDisabled={isBusy}
@@ -92,7 +80,7 @@ export function MembersTable({ rows, onChangeRole, onRemove, isBusy = false }: M
                   <Button
                     variant="dangerLink"
                     size="sm"
-                    aria-label={`${member.email}を外す`}
+                    aria-label={MEMBER_LABELS.removeOf(member.email)}
                     isDisabled={isBusy}
                     onPress={() => onRemove(member)}
                   >
@@ -105,16 +93,5 @@ export function MembersTable({ rows, onChangeRole, onRemove, isBusy = false }: M
         }}
       </TableBody>
     </Table>
-  );
-}
-
-// 読み込み中(読み上げない)
-export function MembersTableSkeleton() {
-  return (
-    <div aria-hidden="true" {...stylex.props(styles.skeleton)}>
-      {[0, 1, 2].map((index) => (
-        <Skeleton key={index} height={size.row} width="100%" />
-      ))}
-    </div>
   );
 }

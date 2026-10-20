@@ -72,11 +72,13 @@ function MembersPage() {
   const changeRole = useMutation({
     mutationFn: (input: { member: MemberSummary; role: Role }) =>
       adminApi.changeMemberRole(tenant.id, input.member.userId, input.role),
-    onSuccess: (_result, { member, role }) => {
+    onSuccess: async (_result, { member, role }) => {
       void invalidateMembers();
       toaster.success(labels.roleChanged(member.email, roleLabel(role)));
       if (member.userId === selfId && isDowngrade(member.role, role)) {
-        void invalidateTenants();
+        // 移る先の beforeLoad は ensureQueryData で tenants を読むため、先に取り直して新しい
+        // ロールをキャッシュへ入れてから移る(invalidate だけでは古い値が返る)
+        await queryClient.refetchQueries({ queryKey: ["tenants"] });
         void navigate({ to: "/t/$tenantSlug", params: { tenantSlug } });
       }
     },
@@ -156,6 +158,7 @@ function MembersPage() {
         onSubmit={(email, role) => add.mutate({ email, role })}
         isPending={add.isPending}
         failure={addFailure}
+        onClearFailure={() => setAddFailure(null)}
         signupUrl={`${window.location.origin}/signup`}
       />
       <DemoteMemberDialog

@@ -46,7 +46,7 @@ export function DemoteMemberDialog({
         </DialogNote>
         {target?.isSelf === true ? (
           <DialogNote tone="warning" icon={TriangleAlert}>
-            {MEMBER_LABELS.lockout(otherOwners.join("、"))}
+            {MEMBER_LABELS.lockout(otherOwners.join(MEMBER_LABELS.ownersJoin))}
           </DialogNote>
         ) : null}
       </div>
@@ -91,7 +91,7 @@ export function RemoveMemberDialog({
         </p>
         {isSelf ? (
           <DialogNote tone="warning" icon={TriangleAlert}>
-            {MEMBER_LABELS.lockout(otherOwners.join("、"))}
+            {MEMBER_LABELS.lockout(otherOwners.join(MEMBER_LABELS.ownersJoin))}
           </DialogNote>
         ) : null}
       </div>

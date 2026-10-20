@@ -418,6 +418,7 @@ export const SETTINGS_LABELS = {
 export const CLIPBOARD_LABELS = {
   copied: "コピーしました",
   copyFailed: "コピーできませんでした",
+  copyOf: (label: string) => `${label}をコピー`,
 } as const;
 
 export const MEMBER_LABELS = {
@@ -466,6 +467,9 @@ export const MEMBER_LABELS = {
     `この操作のあと、設定を開けなくなります。戻すには他の管理者(${owners})に追加してもらう必要があります`,
   removed: (email: string) => `${email} をメンバーから外しました`,
   removeFailed: "メンバーを外せませんでした",
+  roleOf: (email: string) => `${email}のロール`,
+  removeOf: (email: string) => `${email}を外す`,
+  ownersJoin: "、",
 } as const;
 
 export const MODULE_LABELS = {
@@ -479,6 +483,7 @@ export const MODULE_LABELS = {
   loadFailed: "モジュール一覧を取得できませんでした",
   justEnabled: "有効にしました。",
   addType: (type: string) => `${type}を追加`,
+  linkArrow: " ›",
   enabledToast: (name: string) => `${name}を有効にしました`,
   disabledToast: (name: string) => `${name}を無効にしました`,
   enableFailed: "モジュールを有効にできませんでした",
@@ -531,5 +536,4 @@ export const ACCOUNT_LABELS = {
     switch: "切り替える",
     loadFailed: "所属しているサイトを取得できませんでした",
   },
-  retry: "再試行",
 } as const;

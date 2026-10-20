@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
 import { toaster } from "@plyrs/ui";
 import { space } from "@plyrs/ui/semantic.stylex";
@@ -26,13 +26,17 @@ export const Route = createFileRoute("/t/$tenantSlug/settings/general")({
 function GeneralPage() {
   const { tenant, api, adminApi, queryClient } = Route.useRouteContext();
   const { tenantSlug } = Route.useParams();
+  const router = useRouter();
   const labels = SETTINGS_LABELS;
   const config = useQuery(configQueryOptions(api));
   const types = useSyncTypes(useTenantSync());
   const rename = useMutation({
     mutationFn: (name: string) => adminApi.renameSite(tenant.id, name),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["tenants"] });
+    onSuccess: async () => {
+      // ルートの beforeLoad は ensureQueryData で tenants を読むため、invalidate だけでは古い
+      // キャッシュが返る。先に取り直してから router を無効化し、context の tenant を更新する
+      await queryClient.refetchQueries({ queryKey: ["tenants"] });
+      await router.invalidate();
       toaster.success(labels.site.saved);
     },
     onError: (cause) => toaster.error(errorMessage(cause, labels.site.saveFailed)),

@@ -3,7 +3,7 @@ import { Copy } from "lucide-react";
 import { Button } from "@plyrs/ui";
 import { border, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
 import { copyText } from "../../lib/clipboard";
-import { SETTINGS_LABELS } from "../../lib/labels";
+import { CLIPBOARD_LABELS, SETTINGS_LABELS } from "../../lib/labels";
 
 const styles = stylex.create({
   field: { display: "flex", flexDirection: "column", gap: space.xs, minWidth: 0 },
@@ -38,7 +38,7 @@ export function CopyField({ label, value, help }: { label: string; value: string
           variant="secondary"
           size="sm"
           icon={Copy}
-          aria-label={`${label}をコピー`}
+          aria-label={CLIPBOARD_LABELS.copyOf(label)}
           onPress={() => void copyText(value)}
         >
           {SETTINGS_LABELS.publicApi.copy}

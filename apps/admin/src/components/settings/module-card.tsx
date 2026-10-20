@@ -149,7 +149,8 @@ export function ModuleCard({
                   state.isFocusVisible && styles.bandFocus,
                 ])}
               >
-                {link.label} ›
+                {link.label}
+                {MODULE_LABELS.linkArrow}
               </Link>
             ))}
           </div>

@@ -74,7 +74,7 @@ function AccountPage() {
   }
 
   let sites;
-  if (tenants.isError) {
+  if (tenants.isLoadingError) {
     sites = <CardError message={labels.sites.loadFailed} onRetry={() => void tenants.refetch()} />;
   } else if (tenants.data === undefined) {
     sites = <CardLoading rows={2} />;

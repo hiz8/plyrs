@@ -12,7 +12,7 @@ export default createServerEntry({
     if (route === "config") {
       // 案 G 3 章、裁定 G1: デプロイ単位で固定の値を画面へ渡す
       return Response.json(
-        { publicApiOrigin: env.PUBLIC_API_ORIGIN },
+        { publicApiOrigin: env.PUBLIC_API_ORIGIN ?? "" },
         { headers: { "cache-control": "no-store" } },
       );
     }

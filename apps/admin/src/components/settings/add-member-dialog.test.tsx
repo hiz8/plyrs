@@ -73,3 +73,22 @@ it("URL をコピーを押すと signupUrl を clipboard に書く", async () =>
   expect(writeText).toHaveBeenCalledWith("https://app.example.com/signup");
   Reflect.deleteProperty(navigator, "clipboard");
 });
+
+it("失敗の表示中にメール欄へ入力すると onClearFailure を呼ぶ", async () => {
+  const onClearFailure = vi.fn();
+  render(
+    <AddMemberDialog
+      isOpen
+      onOpenChange={vi.fn()}
+      onSubmit={vi.fn()}
+      isPending={false}
+      failure={{ kind: "already_member" }}
+      onClearFailure={onClearFailure}
+      signupUrl="https://app.example.com/signup"
+    />,
+  );
+  await userEvent
+    .setup()
+    .type(screen.getByRole("textbox", { name: MEMBER_LABELS.addDialog.email }), "a");
+  expect(onClearFailure).toHaveBeenCalled();
+});

@@ -68,4 +68,5 @@
 - `Toaster.clear()`(溜まった通知をすべて消す)
 - `HomeWidgetContribution`(`size?: "half" | "full"`、`moduleId?: string`。型だけの変更で見た目は無し)
 - `SegmentedControl`(RAC RadioGroup ベースの 3 択 pill。案 G 6.2 のテーマ切り替え用、裁定 G2)
+- `Tabs`(`keyboardActivation?: "automatic" | "manual"`。manual は矢印キーでフォーカスだけ動かし、Enter / Space で選ぶ。URL を移るタブ用、設定のタブ)
 - 再同期は V4-F の最後にまとめて行う

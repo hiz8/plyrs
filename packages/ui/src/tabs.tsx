@@ -95,13 +95,29 @@ export interface TabsProps {
   items: TabItem[];
   selectedKey: string;
   onSelectionChange: (key: string) => void;
+  /**
+   * 矢印キーで選択まで進めるか。既定の automatic は、フォーカスの移動と同時に選ぶ。
+   * 選ぶと画面が変わる(URL を移る)タブは manual にし、Enter / Space で決めさせる
+   */
+  keyboardActivation?: "automatic" | "manual";
   /** 選ばれたタブの中身。URL の状態から描く画面が多いため、id だけを渡す */
   children: (id: string) => ReactNode;
 }
 
-export function Tabs({ label, items, selectedKey, onSelectionChange, children }: TabsProps) {
+export function Tabs({
+  label,
+  items,
+  selectedKey,
+  onSelectionChange,
+  keyboardActivation = "automatic",
+  children,
+}: TabsProps) {
   return (
-    <RacTabs selectedKey={selectedKey} onSelectionChange={(key) => onSelectionChange(String(key))}>
+    <RacTabs
+      selectedKey={selectedKey}
+      onSelectionChange={(key) => onSelectionChange(String(key))}
+      keyboardActivation={keyboardActivation}
+    >
       <TabList aria-label={label} className={stylex.props(styles.list).className ?? ""}>
         {items.map((item) => (
           <Tab
