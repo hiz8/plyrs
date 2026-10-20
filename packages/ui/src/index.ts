@@ -47,6 +47,7 @@ export {
   type ModalDialogProps,
 } from "./dialog";
 export { Drawer, type DrawerProps } from "./drawer";
+export { SidePanel, type SidePanelProps } from "./side-panel";
 export {
   ToastRegion,
   createToaster,

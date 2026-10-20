@@ -71,4 +71,5 @@
 - `Tabs`(`keyboardActivation?: "automatic" | "manual"`。manual は矢印キーでフォーカスだけ動かし、Enter / Space で選ぶ。URL を移るタブ用、設定のタブ)
 - `SortableList`(新規。RAC GridList + useDragAndDrop の並べ替え。つまみ + キーボード DnD、行の間に点線の DropIndicator、E1)
 - `ModalDialog`(`size?: "md" | "lg"`。lg は幅 640px、既定 md は 440px、E23)
+- `SidePanel`(新規。非モーダルの右パネル 420px、狭い画面は全面のシート、E2)
 - 再同期は V4-F の最後にまとめて行う
