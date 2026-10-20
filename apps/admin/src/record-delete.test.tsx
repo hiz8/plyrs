@@ -1,5 +1,6 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { EDITOR_LABELS } from "./lib/labels";
 import {
   article,
   authedRoutes,
@@ -42,6 +43,10 @@ describe("コンテンツの削除", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "削除する" }));
 
+    // 確認後すぐ一覧へ移る。確定を待つ間も「見つかりませんでした」には置き換わらない
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/content/article"));
+    expect(screen.queryByText(EDITOR_LABELS.notFound)).toBeNull();
+
     const pushOf = () =>
       harness
         .latest()
@@ -61,7 +66,7 @@ describe("コンテンツの削除", () => {
       },
     });
 
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/content/article"));
+    expect(screen.queryByText(EDITOR_LABELS.notFound)).toBeNull();
     const toasts = within(await screen.findByRole("region", { name: "通知" }));
     expect(await toasts.findByText("削除しました")).toBeInTheDocument();
   });

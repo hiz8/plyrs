@@ -74,6 +74,12 @@ const styles = stylex.create({
 
 const tenantRoute = getRouteApi("/t/$tenantSlug");
 
+function showSaveFailed(cause: unknown) {
+  // 競合の「あとで決める」「取り込む」は利用者が選んだ結果なので通知しない
+  if (cause instanceof SaveDeferredError) return;
+  toaster.error(errorMessage(cause, TOASTS.saveFailed));
+}
+
 export interface RecordEditorProps {
   tenantSlug: string;
   contentType: ContentTypeDefinition;
@@ -108,6 +114,11 @@ export function RecordEditor({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [unpublishOpen, setUnpublishOpen] = useState(false);
   const [pendingArchive, setPendingArchive] = useState(false);
+  // 作成画面で選んだステータス(作成時の status に使う。編集画面では record.status が正)
+  const [draftStatus, setDraftStatus] = useState<WorkflowStatus>("draft");
+  // 下書き保存の実行中(連打で record が二重に作られるのを防ぐ。ref は同一 tick の連打用)
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   // 確認ダイアログから実行した操作の進行中(ダイアログの isPending と公開ボックスの無効化に使う)
   const [busy, setBusy] = useState<"delete" | "unpublish" | "archive" | null>(null);
 
@@ -130,7 +141,14 @@ export function RecordEditor({
     canWrite,
     canPublish,
     canDelete,
-    phase: busy === "delete" ? "deleting" : saveAndPublish.phase,
+    phase:
+      busy === "delete"
+        ? "deleting"
+        : saveAndPublish.phase !== "idle"
+          ? saveAndPublish.phase
+          : saving
+            ? "saving"
+            : "idle",
   });
 
   const currentId = (): string | undefined => record?.id ?? createdId.current ?? undefined;
@@ -164,7 +182,7 @@ export function RecordEditor({
       type: typeKey,
       input,
       fieldVersions: {},
-      status: "draft",
+      status: draftStatus,
       seq: 0,
       version: 0,
       deletedAt: null,
@@ -204,20 +222,19 @@ export function RecordEditor({
     toaster.success(TOASTS.published);
   }
 
-  function showSaveFailed(cause: unknown) {
-    // 競合の「あとで決める」「取り込む」は利用者が選んだ結果なので通知しない
-    if (cause instanceof SaveDeferredError) return;
-    toaster.error(errorMessage(cause, TOASTS.saveFailed));
-  }
-
   async function onSecondary() {
     const form = formRef.current;
-    if (form === null || !form.validate()) return;
+    if (savingRef.current || form === null || !form.validate()) return;
+    savingRef.current = true;
+    setSaving(true);
     try {
       await form.save();
     } catch (cause) {
       showSaveFailed(cause);
       return;
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
     toaster.success(TOASTS.saved);
     const id = currentId();
@@ -225,6 +242,7 @@ export function RecordEditor({
   }
 
   async function onPrimary() {
+    if (savingRef.current) return;
     if (isAsset) {
       await onSecondary();
       return;
@@ -259,6 +277,11 @@ export function RecordEditor({
   }
 
   function onStatusChange(next: WorkflowStatus) {
+    // 作成画面はまだ record が無いので、作成時の status として覚えるだけにする
+    if (isNew) {
+      setDraftStatus(next);
+      return;
+    }
     // 公開中のアーカイブは確認を挟む(公開は維持されるため)
     if (next === "archived" && publication.data?.published === true) {
       setPendingArchive(true);
@@ -311,19 +334,9 @@ export function RecordEditor({
   async function confirmDelete() {
     const id = currentId();
     if (id === undefined) return;
-    setBusy("delete");
-    try {
-      const tx = collection.delete(id);
-      await tx.isPersisted.promise;
-      await invalidatePublication(id);
-    } catch (cause) {
-      setBusy(null);
-      setDeleteOpen(false);
-      toaster.error(errorMessage(cause, TOASTS.deleteFailed));
-      return;
-    }
-    toaster.success(TOASTS.deleted);
-    // 削除後は編集画面が無くなるので、離脱の確認は通さない
+    setDeleteOpen(false);
+    // 削除は楽観的に行が消えるので、編集画面が「見つかりません」に置き換わる前に移動する
+    // (削除後は編集画面が無くなるので、離脱の確認は通さない)
     if (isAsset) {
       await navigate({ to: "/t/$tenantSlug/media", params: { tenantSlug }, ignoreBlocker: true });
     } else {
@@ -333,6 +346,15 @@ export function RecordEditor({
         ignoreBlocker: true,
       });
     }
+    try {
+      const tx = collection.delete(id);
+      await tx.isPersisted.promise;
+      await invalidatePublication(id);
+    } catch (cause) {
+      toaster.error(errorMessage(cause, TOASTS.deleteFailed));
+      return;
+    }
+    toaster.success(TOASTS.deleted);
   }
 
   // 編集は record があれば更新、作成画面は insert。どちらも確定(isPersisted)まで待つ
@@ -351,7 +373,7 @@ export function RecordEditor({
       : EDITOR_LABELS.viewTitle(contentType.name);
   const currentLabel = isNew
     ? EDITOR_LABELS.crumbNew
-    : canWrite || isAsset
+    : canWrite
       ? EDITOR_LABELS.crumbEdit
       : EDITOR_LABELS.crumbView;
   const breadcrumbs = [
@@ -406,7 +428,7 @@ export function RecordEditor({
             <aside {...stylex.props(styles.side)}>
               <PublishBox
                 view={view}
-                status={record?.status ?? "draft"}
+                status={record?.status ?? draftStatus}
                 onPrimary={() => void onPrimary()}
                 onSecondary={() => void onSecondary()}
                 onStatusChange={onStatusChange}
@@ -437,7 +459,6 @@ export function RecordEditor({
             onOpenChange={setDeleteOpen}
             tone="danger"
             confirmLabel={DIALOGS.delete.confirm}
-            isPending={busy === "delete"}
             onConfirm={() => void confirmDelete()}
           >
             <p>{DIALOGS.delete.body(labelForRecord(types, record))}</p>
@@ -472,7 +493,9 @@ export function RecordEditor({
       <ModalDialog
         title={DIALOGS.leave.title}
         isOpen={blocker.status === "blocked"}
-        onOpenChange={() => {}}
+        onOpenChange={(open) => {
+          if (!open) blocker.reset?.();
+        }}
         role="alertdialog"
         isDismissable={false}
         showCloseButton={false}

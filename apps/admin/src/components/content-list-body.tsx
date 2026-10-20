@@ -131,7 +131,17 @@ export function ContentListBody({
                   filters === "" ? undefined : LIST_LABELS.noResults.description(filters)
                 }
                 action={
-                  <Button variant="link" onPress={() => updateQuery(DEFAULT_LIST_QUERY)}>
+                  <Button
+                    variant="link"
+                    onPress={() =>
+                      updateQuery({
+                        tab: DEFAULT_LIST_QUERY.tab,
+                        status: DEFAULT_LIST_QUERY.status,
+                        q: DEFAULT_LIST_QUERY.q,
+                        page: 1,
+                      })
+                    }
+                  >
                     {LIST_LABELS.noResults.clear}
                   </Button>
                 }

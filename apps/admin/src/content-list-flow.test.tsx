@@ -138,9 +138,10 @@ describe("一覧（/t/$tenantSlug/content/$typeKey）", () => {
   });
 
   it("範囲外の page は最後のページに寄せ、未知の tab は既定に戻す", async () => {
-    const records = Array.from({ length: 20 }, (_, i) => article(id(i + 1), `記事 ${i + 1}`));
+    const records = Array.from({ length: 21 }, (_, i) => article(id(i + 1), `記事 ${i + 1}`));
     await setup(`${BASE}?page=99&tab=xxx`, records);
-    expect(await rowCount()).toBe(20);
+    // 21 件は 2 ページ目に 1 行だけ残る
+    expect(await rowCount()).toBe(1);
     expect(screen.getByRole("tab", { name: /^すべて/ })).toHaveAttribute("aria-selected", "true");
   });
 
@@ -156,7 +157,9 @@ describe("一覧（/t/$tenantSlug/content/$typeKey）", () => {
 
   it("絞り込みで 0 件のときはタブを残し、解除で戻る", async () => {
     const { records, publications } = threeRecords();
-    const { router, user } = await setup(`${BASE}?q=zzz&status=draft`, records, { publications });
+    const { router, user } = await setup(`${BASE}?q=zzz&status=draft&perPage=50`, records, {
+      publications,
+    });
     const status = (
       await screen.findByText("「zzz」に一致する記事はありません")
     ).closest<HTMLElement>('[role="status"]');
@@ -166,7 +169,8 @@ describe("一覧（/t/$tenantSlug/content/$typeKey）", () => {
     expect(screen.getAllByRole("tab")).toHaveLength(5);
     expect(screen.queryByRole("grid")).not.toBeInTheDocument();
     await user.click(within(status).getByRole("button", { name: "絞り込みを解除" }));
-    await vi.waitFor(() => expect(urlSearch(router)).toEqual({}));
+    // 並べ替えと件数は保つ
+    await vi.waitFor(() => expect(urlSearch(router)).toEqual({ perPage: "50" }));
     expect(await rowCount()).toBe(3);
   });
 

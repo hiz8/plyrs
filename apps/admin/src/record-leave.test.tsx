@@ -31,7 +31,20 @@ describe("編集画面の離脱", () => {
       within(dialog).getByRole("button", { name: "編集を続ける" }),
     );
 
-    fireEvent.click(within(dialog).getByRole("button", { name: "破棄して移動" }));
+    // Esc は「編集を続ける」と同じ扱いで閉じて留まる
+    await userEvent.keyboard("{Escape}");
+    await vi.waitFor(() =>
+      expect(
+        screen.queryByRole("alertdialog", { name: "保存していない変更があります" }),
+      ).toBeNull(),
+    );
+    expect(router.state.location.pathname).toBe(`/t/blog/content/article/${RECORD_1}`);
+    act(() => {
+      router.history.push("/t/blog/media");
+    });
+    const again = await screen.findByRole("alertdialog", { name: "保存していない変更があります" });
+
+    fireEvent.click(within(again).getByRole("button", { name: "破棄して移動" }));
 
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/media"));
   });

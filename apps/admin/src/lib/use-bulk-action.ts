@@ -102,13 +102,13 @@ export function bulkResultMessage(
   const ok = result.succeeded.length;
   const failed = result.failed.length;
   if (failed === 0) {
-    return { tone: "success", title: `${ok} 件を${BULK_LABELS.done[kind]}` };
+    return { tone: "success", title: BULK_LABELS.resultDone(ok, kind) };
   }
   if (ok === 0) {
-    return { tone: "danger", title: `${failed} 件は${BULK_LABELS.failed[kind]}` };
+    return { tone: "danger", title: BULK_LABELS.resultFailed(failed, kind) };
   }
   return {
     tone: "danger",
-    title: `${ok} 件を${BULK_LABELS.done[kind]}。${failed} 件は${BULK_LABELS.failed[kind]}`,
+    title: `${BULK_LABELS.resultDone(ok, kind)}${BULK_LABELS.sentenceJoin}${BULK_LABELS.resultFailed(failed, kind)}`,
   };
 }

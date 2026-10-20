@@ -23,7 +23,13 @@ import {
   type ListRow,
 } from "../../../../../lib/content-list";
 import { errorMessage } from "../../../../../lib/error-messages";
-import { BULK_LABELS, DIALOGS, LIST_LABELS, TOASTS } from "../../../../../lib/labels";
+import {
+  BULK_LABELS,
+  DIALOGS,
+  EDITOR_LABELS,
+  LIST_LABELS,
+  TOASTS,
+} from "../../../../../lib/labels";
 import { publicationsQueryKey, publicationsQueryOptions } from "../../../../../lib/queries";
 import { labelForRecord } from "../../../../../lib/record-label";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
@@ -111,7 +117,7 @@ function RecordListPage() {
       <>
         <TenantPageHeader title={typeKey} breadcrumbs={[homeCrumb(tenantSlug)]} />
         <PageBody>
-          <p {...stylex.props(styles.muted)}>未知のコンテンツタイプです: {typeKey}</p>
+          <p {...stylex.props(styles.muted)}>{EDITOR_LABELS.unknownType(typeKey)}</p>
         </PageBody>
       </>
     );
@@ -199,7 +205,7 @@ function RecordListPage() {
 
   const addButton = (
     <Button icon={Plus} onPress={goNew}>
-      {typeName}を追加
+      {LIST_LABELS.add(typeName)}
     </Button>
   );
 
@@ -208,7 +214,7 @@ function RecordListPage() {
     canWrite && (selected.size > 0 || bulk.progress !== null || bulk.failure !== null);
   const bulkBar = showBulkBar ? (
     <BulkBar
-      selectedCount={selected.size}
+      selectedCount={selectedIds.length}
       pageCount={view.items.length}
       onSelectPage={() => setSelected(new Set(view.items.map((r) => r.record.id)))}
       onClear={() => {

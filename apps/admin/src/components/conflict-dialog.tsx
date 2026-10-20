@@ -42,6 +42,8 @@ const styles = stylex.create({
 
 export interface ConflictChoice {
   fieldKey: string;
+  /** 表示するフィールド名(field.label ?? field.key) */
+  label: string;
   /** 自分の版の抜粋(プレーンテキスト) */
   mine: string;
   /** サーバー版(= 手元 store の最新 record)の抜粋 */
@@ -95,7 +97,7 @@ export function ConflictDialog({
         <p {...stylex.props(styles.description)}>{DIALOGS.conflict.body(savedAgo)}</p>
         {conflicts.map((conflict) => (
           <div key={conflict.fieldKey} {...stylex.props(styles.field)}>
-            <span {...stylex.props(styles.fieldKey)}>{conflict.fieldKey}</span>
+            <span {...stylex.props(styles.fieldKey)}>{conflict.label}</span>
             <div {...stylex.props(styles.columns)}>
               <section {...stylex.props(styles.card)}>
                 <h3 {...stylex.props(styles.cardTitle)}>{DIALOGS.conflict.mine}</h3>

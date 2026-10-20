@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { EDITOR_LABELS } from "./lib/labels";
@@ -45,13 +45,24 @@ function publishBox() {
 }
 
 // 作成画面の ID は実行時に決まるため、publish / publication は URL の形で受ける
-function routesForNewRecord(publish: Handler) {
+function routesForNewRecord(publish: Handler, requested: string[] = []) {
   const routes = authedRoutes();
   return new Proxy(routes, {
     get(target, key: string) {
+      requested.push(key);
       if (/^\/v1\/t\/t1\/records\/[^/]+\/publish$/.test(key)) return publish;
       if (/^\/v1\/t\/t1\/records\/[^/]+\/publication$/.test(key) && !(key in target)) {
-        return vi.fn(() => jsonResponse(200, { published: false }));
+        // publish の後は公開中として返す(置き換え後の公開ボックスの状態を確かめる)
+        return vi.fn(() =>
+          requested.some((path) => path.endsWith("/publish"))
+            ? jsonResponse(200, {
+                published: true,
+                publishedAt: "2026-10-20T01:00:00Z",
+                publishedBy: "u1",
+                sourceVersion: 1,
+              })
+            : jsonResponse(200, { published: false }),
+        );
       }
       return target[key];
     },
@@ -98,7 +109,12 @@ describe("record 新規作成", () => {
   it("作成画面の公開は作成の確定後に公開し、編集画面の URL に置き換える", async () => {
     const harness = socketHarness();
     const publish: Handler = vi.fn(() => jsonResponse(200, { ok: true }));
-    const router = renderAt("/t/blog/content/article/new", harness, routesForNewRecord(publish));
+    const requested: string[] = [];
+    const router = renderAt(
+      "/t/blog/content/article/new",
+      harness,
+      routesForNewRecord(publish, requested),
+    );
     await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
     await bootstrapped(harness.latest(), []);
 
@@ -118,10 +134,38 @@ describe("record 新規作成", () => {
       result: { ok: true, record: article(change.recordId, "公開する記事", { seq: 11 }) },
     });
     await vi.waitFor(() => expect(publish).toHaveBeenCalledTimes(1));
+    // 公開先は作成した record の ID
+    expect(requested).toContain(`/v1/t/t1/records/${change.recordId}/publish`);
     await vi.waitFor(() =>
       expect(router.state.location.pathname).toBe(`/t/blog/content/article/${change.recordId}`),
     );
     expect(await (await toasts()).findByText("公開しました")).toBeInTheDocument();
+    // 置き換え後の公開ボックスは公開中の状態(バッジと「更新」)になる
+    await vi.waitFor(() => {
+      expect(publishBox().getByText("公開中")).toBeInTheDocument();
+      expect(publishBox().getByRole("button", { name: "更新" })).toBeInTheDocument();
+    });
+  });
+
+  it("作成画面で下書き保存を続けて 2 回押しても push は 1 回", async () => {
+    const harness = socketHarness();
+    renderAt("/t/blog/content/article/new", harness, routesForNewRecord(vi.fn()));
+    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
+    await bootstrapped(harness.latest(), []);
+
+    const user = userEvent.setup();
+    await user.type(await screen.findByRole("textbox", { name: "title" }), "連打する記事");
+    const button = publishBox().getByRole("button", { name: "下書き保存" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    await vi.waitFor(() => expect(pushOf(harness)).toBeDefined());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const pushes = harness
+      .latest()
+      .parsed()
+      .filter((message) => (message as { type: string }).type === "push");
+    expect(pushes).toHaveLength(1);
   });
 });
 

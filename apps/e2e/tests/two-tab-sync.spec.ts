@@ -51,7 +51,7 @@ test("two tabs stay in sync over the WS push channel", async ({ page, context })
   await titleInputA.clear();
   await titleInputA.fill(titleFromA);
   await page
-    .getByRole("region", { name: "公開" })
+    .getByRole("region", { name: "公開", exact: true })
     .getByRole("button", { name: "下書き保存" })
     .click();
 
@@ -66,7 +66,7 @@ test("two tabs stay in sync over the WS push channel", async ({ page, context })
   await titleInputB.clear();
   await titleInputB.fill(titleFromB);
   await pageB
-    .getByRole("region", { name: "公開" })
+    .getByRole("region", { name: "公開", exact: true })
     .getByRole("button", { name: "下書き保存" })
     .click();
 

@@ -197,7 +197,16 @@ export const DIALOGS = {
 
 export const ASSET_PICKER_LABELS = { selectTitle: "メディアを選択" } as const;
 
+export const RECORD_FORM_LABELS = {
+  unset: "(未設定)",
+  empty: "（空）",
+  noCandidates: "参照できるコンテンツがありません",
+  adoptedNotice:
+    "サーバー版を反映しました。他に未保存の変更が残っている場合は改めて保存してください。",
+} as const;
+
 export const LIST_LABELS = {
+  add: (type: string) => `${type}を追加`,
   tabs: {
     all: "すべて",
     published: "公開中",
@@ -239,6 +248,8 @@ export const LIST_LABELS = {
   retry: "再試行",
 } as const;
 
+type BulkKindKey = "publish" | "unpublish" | "status" | "delete";
+
 // running / retry / done / failed のキーは BulkKind(lib/use-bulk-action.ts)と揃える
 export const BULK_LABELS = {
   region: "一括操作",
@@ -259,6 +270,9 @@ export const BULK_LABELS = {
     status: "ステータスを変更しています…",
     delete: "削除しています…",
   },
+  resultDone: (n: number, kind: BulkKindKey) => `${n} 件を${BULK_LABELS.done[kind]}`,
+  resultFailed: (n: number, kind: BulkKindKey) => `${n} 件は${BULK_LABELS.failed[kind]}`,
+  sentenceJoin: "。",
   progress: (done: number, total: number) => `${done} / ${total} 件`,
   cancel: "残りを中止",
   retry: {

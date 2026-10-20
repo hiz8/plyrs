@@ -123,25 +123,25 @@ export async function createArticleRecord(page: Page, title: string): Promise<vo
   await page.getByRole("textbox", { name: "title" }).fill(title);
   // 下部固定バーにも同名のボタンがあるため、公開ボックス(region「公開」)に絞る。
   await page
-    .getByRole("region", { name: "公開" })
+    .getByRole("region", { name: "公開", exact: true })
     .getByRole("button", { name: "下書き保存" })
     .click();
   // 作成後は編集画面(/content/article/<id>)に留まる。サイドバーの「一覧」で一覧へ戻る。
   await page.waitForURL(/\/content\/article\/[0-9a-f-]{36}$/);
   await page.getByRole("complementary").getByRole("link", { name: "一覧", exact: true }).click();
-  await expect(page.getByRole("cell", { name: title })).toBeVisible();
+  await expect(page.getByRole("rowheader", { name: title })).toBeVisible();
 }
 
 /** レコード一覧から title のレコードを開き、エディタページの URL を返す。 */
 export async function openRecordEditor(page: Page, title: string): Promise<string> {
   // 行には「編集」リンクもあるので、名前がタイトルのリンクに限定する。
   await page.getByRole("link", { name: title, exact: true }).click();
-  await expect(page.getByRole("region", { name: "公開" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "公開", exact: true })).toBeVisible();
   return page.url();
 }
 
 export async function publishRecord(page: Page): Promise<void> {
-  const box = page.getByRole("region", { name: "公開" });
+  const box = page.getByRole("region", { name: "公開", exact: true });
   await box.getByRole("button", { name: "公開", exact: true }).click();
   await expect(box.getByText("公開中", { exact: true })).toBeVisible();
 }

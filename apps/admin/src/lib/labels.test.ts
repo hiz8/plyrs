@@ -25,14 +25,14 @@ describe("labels", () => {
   });
 
   it("一覧のタブ文言が LIST_TABS を網羅する", () => {
-    expect(Object.keys(LIST_LABELS.tabs).sort()).toEqual([...LIST_TABS].sort());
+    expect(Object.keys(LIST_LABELS.tabs).toSorted()).toEqual(LIST_TABS.toSorted());
   });
 
   it("一括操作の文言は 4 種の操作で揃っている", () => {
-    const keys = Object.keys(BULK_LABELS.actions).sort();
-    expect(Object.keys(BULK_LABELS.running).sort()).toEqual(keys);
-    expect(Object.keys(BULK_LABELS.retry).sort()).toEqual(keys);
-    expect(Object.keys(BULK_LABELS.done).sort()).toEqual(keys);
-    expect(Object.keys(BULK_LABELS.failed).sort()).toEqual(keys);
+    const keys = Object.keys(BULK_LABELS.actions).toSorted();
+    expect(Object.keys(BULK_LABELS.running).toSorted()).toEqual(keys);
+    expect(Object.keys(BULK_LABELS.retry).toSorted()).toEqual(keys);
+    expect(Object.keys(BULK_LABELS.done).toSorted()).toEqual(keys);
+    expect(Object.keys(BULK_LABELS.failed).toSorted()).toEqual(keys);
   });
 });

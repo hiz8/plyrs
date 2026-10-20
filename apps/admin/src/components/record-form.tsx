@@ -21,6 +21,7 @@ import {
 } from "@plyrs/ui";
 import { border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "../lib/asset-services";
+import { RECORD_FORM_LABELS } from "../lib/labels";
 import { labelForRecord } from "../lib/record-label";
 import {
   asRichTextValue,
@@ -106,7 +107,7 @@ function conflictExcerpt(value: unknown): string {
     return richTextPlainText(envelope);
   }
   if (value === undefined) {
-    return "（空）";
+    return RECORD_FORM_LABELS.empty;
   }
   const json = JSON.stringify(value);
   return json.length <= 120 ? json : `${json.slice(0, 120)}…`;
@@ -361,9 +362,7 @@ export function RecordForm({
       form.setFieldValue(key, adopted[key]);
     }
     setConflict(null);
-    setNotice(
-      "サーバー版を反映しました。他に未保存の変更が残っている場合は改めて保存してください。",
-    );
+    setNotice(RECORD_FORM_LABELS.adoptedNotice);
     // 他のフィールドに未保存の変更が残り得るため、保存は完了扱いにしない
     conflictResolver.current?.("deferred");
   };
@@ -404,6 +403,7 @@ export function RecordForm({
           isOpen
           conflicts={realConflictKeys.map((key) => ({
             fieldKey: key,
+            label: contentType.fields.find((entry) => entry.key === key)?.label ?? key,
             mine: conflictExcerpt(conflict.submittedInput[key]),
             theirs: conflictExcerpt(latestInput[key]),
           }))}
@@ -606,7 +606,7 @@ function FieldInput({
             items={options}
             selectedValue={typeof value === "string" ? value : ""}
             onChange={onChange}
-            placeholder="(未設定)"
+            placeholder={RECORD_FORM_LABELS.unset}
             errorMessage={error}
             isReadOnly={isReadOnly}
           />
@@ -715,9 +715,7 @@ function RelationPicker({
     return (
       <div>
         <span {...stylex.props(styles.fieldLabel)}>{label}</span>
-        <div {...stylex.props(styles.emptyHint)}>
-          参照できるレコードがありません（許可型: {field.config.allowedTypes.join(", ")}）
-        </div>
+        <div {...stylex.props(styles.emptyHint)}>{RECORD_FORM_LABELS.noCandidates}</div>
         {error !== undefined && <span {...stylex.props(styles.fieldError)}>{error}</span>}
       </div>
     );
@@ -739,7 +737,7 @@ function RelationPicker({
       items={options}
       selectedValue={typeof value === "string" ? value : ""}
       onChange={onChange}
-      placeholder="(未設定)"
+      placeholder={RECORD_FORM_LABELS.unset}
       errorMessage={error}
     />
   );

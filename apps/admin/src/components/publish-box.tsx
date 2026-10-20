@@ -193,7 +193,11 @@ function StateRow({ view }: { view: PublishBoxView }) {
         {state.kind === "new" && (
           <span {...stylex.props(styles.notSaved)}>{PUBLISH_BOX.notSaved}</span>
         )}
-        {state.kind === "loading" && <Skeleton width={96} height={20} />}
+        {state.kind === "loading" && (
+          <span role="status" aria-label={PUBLISH_BOX.loading}>
+            <Skeleton width={96} height={20} />
+          </span>
+        )}
         {state.kind === "unpublished" && <PublicationBadge state="unpublished" />}
         {state.kind === "published" && (
           <>

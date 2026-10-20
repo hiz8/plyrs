@@ -102,3 +102,16 @@ it("PublishBar は閲覧者では何も描かず、書き込み可なら操作�
   expect(within(region).getByRole("button", { name: "公開" })).toBeTruthy();
   expect(within(region).getByText("未保存の変更があります")).toBeTruthy();
 });
+
+it("新規(作成画面)でもステータスを選べて onStatusChange に値を渡す", async () => {
+  const user = userEvent.setup();
+  const h = setup({ isNew: true, publication: undefined });
+  await user.click(screen.getByRole("button", { name: /ステータス/ }));
+  await user.click(await screen.findByRole("option", { name: "レビュー中" }));
+  expect(h.onStatusChange).toHaveBeenCalledWith("in_review");
+});
+
+it("公開状態の取得中は読み上げ名の付いた status を出す", () => {
+  setup({ publication: undefined });
+  expect(screen.getByRole("status", { name: "公開状態を確認しています…" })).toBeTruthy();
+});
