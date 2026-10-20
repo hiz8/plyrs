@@ -72,7 +72,7 @@ describe("Sidebar", () => {
     );
     expect(screen.getByRole("link", { name: "設定" })).toHaveAttribute(
       "href",
-      "/t/blog/settings/content-types",
+      "/t/blog/settings/general",
     );
   });
 

@@ -167,7 +167,7 @@ export function Sidebar(props: SidebarProps) {
   });
   const settingsEntry: NavEntry = {
     key: "settings",
-    href: `${base}/settings/content-types`,
+    href: `${base}/settings/general`,
     matchPrefix: `${base}/settings`,
   };
   const entries: NavEntry[] = [

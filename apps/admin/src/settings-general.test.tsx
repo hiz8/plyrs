@@ -1,0 +1,70 @@
+import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+import {
+  articleType,
+  authedRoutes,
+  bootstrapped,
+  jsonResponse,
+  renderAt,
+  socketHarness,
+} from "./test-utils/records-harness";
+
+describe("設定 › 一般", () => {
+  it("/settings は一般へ転送し、h1「設定」とタブ 4 つが出て、一般が選ばれている", async () => {
+    const router = renderAt("/t/blog/settings", socketHarness());
+    expect(await screen.findByRole("heading", { level: 1, name: "設定" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/t/blog/settings/general");
+    expect(screen.getAllByRole("tab")).toHaveLength(4);
+    expect(screen.getByRole("tab", { name: "一般" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("サイト名を保存すると PATCH /v1/t/t1/site を呼び、tenants を取り直してトーストを出す", async () => {
+    const patch = vi.fn((_init?: RequestInit) => jsonResponse(200, { ok: true, name: "新名称" }));
+    const routes = authedRoutes({ "/v1/t/t1/site": patch });
+    const tenants = routes["/auth/tenants"];
+    renderAt("/t/blog/settings/general", socketHarness(), routes);
+    const user = userEvent.setup();
+    const input = await screen.findByRole("textbox", { name: "サイト名" });
+    const callsBefore = tenants?.mock.calls.length ?? 0;
+    await user.clear(input);
+    await user.type(input, "新名称");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(patch).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(String(patch.mock.calls[0]?.[0]?.body))).toStrictEqual({ name: "新名称" });
+    await waitFor(() => expect(tenants?.mock.calls.length ?? 0).toBeGreaterThan(callsBefore));
+    expect(
+      await within(screen.getByRole("region", { name: "通知" })).findByText("保存しました"),
+    ).toBeInTheDocument();
+  });
+
+  it("公開 API のベース URL は /_config のオリジンと slug から作り、型があれば例の行も出す", async () => {
+    const harness = socketHarness();
+    const routes = authedRoutes({
+      "/_config": vi.fn(() => jsonResponse(200, { publicApiOrigin: "https://api.example" })),
+    });
+    renderAt("/t/blog/settings/general", harness, routes);
+    await vi.waitFor(() => harness.latest());
+    await bootstrapped(harness.latest(), [], [articleType]);
+    expect(await screen.findByText("https://api.example/public/v1/blog/")).toBeInTheDocument();
+    expect(await screen.findByText("例: 記事の一覧")).toBeInTheDocument();
+    expect(
+      screen.getByText("https://api.example/public/v1/blog/records/article"),
+    ).toBeInTheDocument();
+  });
+
+  it("編集者が /settings/general を開くとホームへ転送される", async () => {
+    const router = renderAt(
+      "/t/blog/settings/general",
+      socketHarness(),
+      authedRoutes({}, "editor"),
+    );
+    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog"));
+  });
+
+  it("タブを押すと URL が変わる", async () => {
+    const router = renderAt("/t/blog/settings/general", socketHarness());
+    await userEvent.setup().click(await screen.findByRole("tab", { name: "モジュール" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/settings/modules"));
+  });
+});

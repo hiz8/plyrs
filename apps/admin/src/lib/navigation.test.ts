@@ -75,7 +75,7 @@ describe("activeNavKey", () => {
     { key: "home", href: "/t/blog" },
     { key: "type:news", href: "/t/blog/content/news" },
     { key: "media", href: "/t/blog/media" },
-    { key: "settings", href: "/t/blog/settings/content-types", matchPrefix: "/t/blog/settings" },
+    { key: "settings", href: "/t/blog/settings/general", matchPrefix: "/t/blog/settings" },
   ];
   it.each([
     ["/t/blog", "home"],

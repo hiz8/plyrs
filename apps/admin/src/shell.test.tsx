@@ -334,7 +334,7 @@ describe("旧 URL のリダイレクト (案 A 6 章)", () => {
   });
 
   it.each([
-    ["/t/blog/settings", "/t/blog/settings/content-types"],
+    ["/t/blog/settings", "/t/blog/settings/general"],
     ["/t/blog/content", "/t/blog"],
   ])("末尾を削った %s は Not Found にせず %s へ転送する", async (from, to) => {
     const router = renderAt(from, authedRoutes());

@@ -123,7 +123,11 @@ describe("content_type ビルダー", () => {
       expect(body.id).toMatch(/^[0-9a-f]{8}-/);
     });
     // 保存後は一覧へ戻る
-    expect(await screen.findByRole("heading", { name: "コンテンツタイプ" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "設定" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "コンテンツタイプ" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("prefills the edit form, disables the key, and shows the migration warning", async () => {
