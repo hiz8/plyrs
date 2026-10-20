@@ -4,7 +4,7 @@ import type { SyncRecord } from "@plyrs/sync-protocol";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { render } from "@testing-library/react";
 import { vi, expect } from "vitest";
-import { createAppContext, getRouter } from "../router";
+import { createAppContext, getRouter, type RouterContext } from "../router";
 import { baseAuthedRoutes, blogTenantOf, jsonResponse, stubFetch, type Handler } from "./api-stubs";
 import { FakeSocket } from "./fake-socket";
 
@@ -104,13 +104,21 @@ export async function bootstrapped(
   socket.deliver({ type: "sync", records, serverSeq: 10, complete: true });
 }
 
-export function renderAt(path: string, harness: SocketHarness, routes = authedRoutes()) {
+export function renderAt(
+  path: string,
+  harness: SocketHarness,
+  routes = authedRoutes(),
+  // スロットへの登録など、描画前に context を触りたいテスト向け
+  setup?: (context: RouterContext) => void,
+) {
+  const context = createAppContext(stubFetch(routes), {
+    connect: () => harness.connect,
+    // 取得失敗のテストがリトライの待ちで遅くならないようにする
+    queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  });
+  setup?.(context);
   const router = getRouter({
-    context: createAppContext(stubFetch(routes), {
-      connect: () => harness.connect,
-      // 取得失敗のテストがリトライの待ちで遅くならないようにする
-      queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }),
-    }),
+    context,
     history: createMemoryHistory({ initialEntries: [path] }),
   });
   renderRouter(router);

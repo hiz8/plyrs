@@ -162,7 +162,7 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
 
   it("非所属の slug は、所属が 1 件なら唯一のサイトへ転送する(Review Focus 2)", async () => {
     const router = renderAt("/t/ghost/settings/content-types", authedRoutes());
-    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/content/article"));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog"));
   });
 
   it("非所属の slug は、所属が複数ならサイト選択へ戻す", async () => {
@@ -335,42 +335,9 @@ describe("旧 URL のリダイレクト (案 A 6 章)", () => {
 
   it.each([
     ["/t/blog/settings", "/t/blog/settings/content-types"],
-    ["/t/blog/content", "/t/blog/content/article"],
+    ["/t/blog/content", "/t/blog"],
   ])("末尾を削った %s は Not Found にせず %s へ転送する", async (from, to) => {
     const router = renderAt(from, authedRoutes());
     await waitFor(() => expect(router.state.location.pathname).toBe(to));
-  });
-});
-
-describe("ホームの暫定(案 A 9 章、2026-10-19 裁定)", () => {
-  it("利用者の型があれば先頭の型の一覧へ転送する", async () => {
-    const router = renderAt("/t/blog", authedRoutes());
-    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/content/article"));
-  });
-
-  it("型が無い管理者は設定のコンテンツタイプへ転送する", async () => {
-    const router = renderAt(
-      "/t/blog",
-      authedRoutes({
-        "/v1/t/t1/content-types": vi.fn(() => jsonResponse(200, { contentTypes: [] })),
-      }),
-    );
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe("/t/blog/settings/content-types"),
-    );
-  });
-
-  it("型が無い編集者には案内だけの暫定画面を出す", async () => {
-    renderAt(
-      "/t/blog",
-      authedRoutes({
-        "/auth/tenants": vi.fn(() =>
-          jsonResponse(200, { tenants: [{ ...blogTenant, role: "editor" }] }),
-        ),
-        "/v1/t/t1/content-types": vi.fn(() => jsonResponse(200, { contentTypes: [] })),
-      }),
-    );
-    expect(await screen.findByRole("heading", { level: 1, name: "ホーム" })).toBeInTheDocument();
-    expect(screen.getByText("コンテンツの種類がまだありません")).toBeInTheDocument();
   });
 });
