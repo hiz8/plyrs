@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { Info, Pencil } from "lucide-react";
+import { Info, Pencil, RotateCw } from "lucide-react";
 import { useId } from "react";
 import { WORKFLOW_STATUSES, type WorkflowStatus } from "@plyrs/metamodel";
 import { Button, ICON_SIZE, Select, Skeleton } from "@plyrs/ui";
@@ -114,6 +114,8 @@ export interface PublishBoxProps {
   onStatusChange: (next: WorkflowStatus) => void;
   onUnpublish: () => void;
   onDelete: () => void;
+  /** 公開状態の取得に失敗したときの再試行 */
+  onRetryPublication?: () => void;
 }
 
 const STATUS_ITEMS = WORKFLOW_STATUSES.map((value) => ({
@@ -183,7 +185,13 @@ function Buttons({
   );
 }
 
-function StateRow({ view }: { view: PublishBoxView }) {
+function StateRow({
+  view,
+  onRetryPublication,
+}: {
+  view: PublishBoxView;
+  onRetryPublication: (() => void) | undefined;
+}) {
   const state = view.state;
   if (state.kind === "asset") return null;
   return (
@@ -197,6 +205,21 @@ function StateRow({ view }: { view: PublishBoxView }) {
           <span role="status" aria-label={PUBLISH_BOX.loading}>
             <Skeleton width={96} height={20} />
           </span>
+        )}
+        {state.kind === "error" && (
+          <>
+            <span role="alert" {...stylex.props(styles.muted)}>
+              {PUBLISH_BOX.loadFailed}
+            </span>
+            <Button
+              variant="link"
+              size="sm"
+              icon={RotateCw}
+              {...(onRetryPublication === undefined ? {} : { onPress: onRetryPublication })}
+            >
+              {PUBLISH_BOX.retry}
+            </Button>
+          </>
         )}
         {state.kind === "unpublished" && <PublicationBadge state="unpublished" />}
         {state.kind === "published" && (
@@ -220,6 +243,7 @@ export function PublishBox({
   onStatusChange,
   onUnpublish,
   onDelete,
+  onRetryPublication,
 }: PublishBoxProps) {
   const titleId = useId();
   return (
@@ -227,7 +251,7 @@ export function PublishBox({
       <h2 id={titleId} {...stylex.props(styles.title)}>
         {PUBLISH_BOX.title}
       </h2>
-      <StateRow view={view} />
+      <StateRow view={view} onRetryPublication={onRetryPublication} />
       <Notes view={view} />
       {view.showStatus && (
         <Select

@@ -23,11 +23,9 @@ it("暗幕を押すと閉じる", async () => {
       <a href="/x">項目</a>
     </Drawer>,
   );
-  const dialog = await screen.findByRole("dialog", { name: "メニュー" });
-  // Dialog -> Modal -> ModalOverlay(暗幕)
-  const overlay = dialog.parentElement?.parentElement;
-  if (overlay == null) throw new Error("暗幕が見つからない");
-  await userEvent.setup().click(overlay);
+  await screen.findByRole("dialog", { name: "メニュー" });
+  // RAC の isDismissable はモーダルの外の pointerdown で閉じる
+  await userEvent.setup().click(document.body);
   expect(onOpenChange).toHaveBeenCalledWith(false);
 });
 

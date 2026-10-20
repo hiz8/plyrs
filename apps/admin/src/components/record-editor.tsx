@@ -135,6 +135,7 @@ export function RecordEditor({
     isNew,
     isAsset,
     publication: isNew || isAsset ? undefined : publication.data,
+    publicationError: publication.isError,
     recordVersion: record?.version ?? 0,
     dirty,
     connected,
@@ -434,6 +435,7 @@ export function RecordEditor({
                 onStatusChange={onStatusChange}
                 onUnpublish={() => setUnpublishOpen(true)}
                 onDelete={() => setDeleteOpen(true)}
+                onRetryPublication={() => void publication.refetch()}
               />
               {record !== null &&
                 panels.map((contribution) => (

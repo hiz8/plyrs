@@ -13,6 +13,7 @@ const spin = stylex.keyframes({
 const styles = stylex.create({
   root: { display: "flex", flexDirection: "column", gap: space.xs, fontFamily: font.family },
   header: { display: "flex", justifyContent: "space-between", gap: space.sm, fontSize: font.body },
+  headerEnd: { justifyContent: "flex-end" },
   label: { color: text.default },
   value: { color: text.muted },
   track: {
@@ -54,6 +55,8 @@ export interface ProgressBarProps {
   /** 右上の件数などの文言(aria-valuetext にも使う) */
   valueLabel?: string;
   tone?: "accent" | "success";
+  /** 見た目の題を出さない(aria-label は残す)。近くに同じ文言がある場合の二重読み上げ・二重表示の回避 */
+  isLabelHidden?: boolean;
 }
 
 export function ProgressBar({
@@ -62,6 +65,7 @@ export function ProgressBar({
   maxValue = 100,
   valueLabel,
   tone = "accent",
+  isLabelHidden = false,
 }: ProgressBarProps) {
   return (
     <RacProgressBar
@@ -73,10 +77,12 @@ export function ProgressBar({
     >
       {({ percentage = 0, valueText }) => (
         <>
-          <div {...stylex.props(styles.header)}>
-            <span aria-hidden="true" {...stylex.props(styles.label)}>
-              {label}
-            </span>
+          <div {...stylex.props(styles.header, isLabelHidden && styles.headerEnd)}>
+            {!isLabelHidden && (
+              <span aria-hidden="true" {...stylex.props(styles.label)}>
+                {label}
+              </span>
+            )}
             <span aria-hidden="true" {...stylex.props(styles.value)}>
               {valueText}
             </span>

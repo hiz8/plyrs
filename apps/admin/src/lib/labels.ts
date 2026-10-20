@@ -109,6 +109,8 @@ export const PUBLISH_BOX = {
   actionsRegion: "公開の操作",
   notSaved: "まだ保存されていません",
   loading: "公開状態を確認しています…",
+  loadFailed: "公開状態を取得できませんでした",
+  retry: "再試行",
   publishedAt: (absolute: string) => `${absolute} に公開`,
   changed: "未反映の変更があります",
   unsaved: "未保存の変更があります",
@@ -301,4 +303,12 @@ export const BULK_LABELS = {
     title: (n: number) => `${n} 件の公開を取り下げますか？`,
     body: "サイトから見えなくなります。内容は下書きとして残り、あとから再び公開できます。",
   },
+} as const;
+
+// router の defaultErrorComponent(最終防衛線)
+export const ERROR_SCREEN = {
+  title: "エラーが発生しました",
+  fallback:
+    "ページを表示できませんでした。再読み込みしても直らない場合は、時間をおいてお試しください",
+  reload: "再読み込み",
 } as const;

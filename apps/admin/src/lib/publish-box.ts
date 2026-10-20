@@ -10,6 +10,8 @@ export interface PublishBoxInput {
   isAsset: boolean;
   /** undefined = 取得前(新規・asset では常に undefined) */
   publication: PublicationState | undefined;
+  /** 公開状態の取得に失敗した(新規・asset では無視する) */
+  publicationError?: boolean;
   recordVersion: number;
   dirty: boolean;
   connected: boolean;
@@ -36,6 +38,7 @@ export interface PublishBoxButton {
 export type PublishBoxState =
   | { kind: "new" }
   | { kind: "loading" }
+  | { kind: "error" }
   | { kind: "unpublished" }
   | { kind: "asset" }
   | { kind: "published"; publishedAt: string; changed: boolean };
@@ -74,6 +77,7 @@ export function publishBoxView(input: PublishBoxInput): PublishBoxView {
   let state: PublishBoxState;
   if (isAsset) state = { kind: "asset" };
   else if (isNew) state = { kind: "new" };
+  else if (input.publicationError === true) state = { kind: "error" };
   else if (publication === undefined) state = { kind: "loading" };
   else if (publication.published) {
     state = { kind: "published", publishedAt: publication.publishedAt, changed };
@@ -120,7 +124,7 @@ export function publishBoxView(input: PublishBoxInput): PublishBoxView {
     ? button(
         "publish",
         PUBLISH_BOX.publish,
-        !idle || state.kind === "loading" || !connected,
+        !idle || state.kind === "loading" || state.kind === "error" || !connected,
         reason,
       )
     : null;

@@ -52,6 +52,8 @@ export interface Toaster {
   success(title: string): string;
   error(title: string, action?: ToastAction): string;
   close(key: string): void;
+  /** 溜まった通知をすべて消す(テストの後始末など) */
+  clear(): void;
 }
 
 export function createToaster(): Toaster {
@@ -64,6 +66,7 @@ export function createToaster(): Toaster {
         action === undefined ? { tone: "danger", title } : { tone: "danger", title, action },
       ),
     close: (key) => queue.close(key),
+    clear: () => queue.clear(),
   };
 }
 

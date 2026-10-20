@@ -107,6 +107,26 @@ describe("公開ボックス(/t/$tenantSlug/content/$typeKey/$recordId)", () => 
     expect(await (await toasts()).findByText("公開しました")).toBeInTheDocument();
   });
 
+  it("公開状態の取得に失敗するとエラー文と再試行が出て、再試行で公開ボックスが描かれる", async () => {
+    const harness = socketHarness();
+    let calls = 0;
+    const user = await openEditor(
+      harness,
+      authedRoutes({
+        [`/v1/t/t1/records/${RECORD_1}/publication`]: vi.fn(() =>
+          ++calls === 1
+            ? jsonResponse(500, { error: "internal" })
+            : jsonResponse(200, { published: false }),
+        ),
+      }),
+    );
+    expect(await publishBox().findByRole("alert")).toHaveTextContent(
+      "公開状態を取得できませんでした",
+    );
+    await user.click(publishBox().getByRole("button", { name: "再試行" }));
+    expect(await publishBox().findByText("未公開")).toBeInTheDocument();
+  });
+
   it("未保存の編集がある状態の更新は、push の ack の後に publish を呼ぶ", async () => {
     const harness = socketHarness();
     const publish: Handler = vi.fn(() => jsonResponse(200, { ok: true }));

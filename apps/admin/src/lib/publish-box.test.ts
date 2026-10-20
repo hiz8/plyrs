@@ -22,6 +22,12 @@ const published = (sourceVersion: number) =>
   }) as const;
 
 describe("publishBoxView", () => {
+  it("公開状態の取得に失敗すると error 状態になり主ボタンは無効", () => {
+    const view = publishBoxView({ ...base, publication: undefined, publicationError: true });
+    expect(view.state).toStrictEqual({ kind: "error" });
+    expect(view.primary?.isDisabled).toBe(true);
+  });
+
   it("新規は公開が主ボタン、下書き保存が補助で、削除と取り下げは出ない", () => {
     const view = publishBoxView({ ...base, isNew: true, publication: undefined, dirty: true });
     expect(view.state).toEqual({ kind: "new" });

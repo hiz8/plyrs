@@ -47,3 +47,10 @@ it("一部失敗は「公開をもう一度試す」を出す", async () => {
   await userEvent.click(screen.getByRole("button", { name: "公開をもう一度試す" }));
   expect(onRetry).toHaveBeenCalled();
 });
+
+it("実行中の文言は progressbar の名前として 1 回だけ読み上げる", () => {
+  setup({ progress: { kind: "publish", done: 2, total: 8, onCancel: vi.fn() } });
+  expect(screen.getByRole("progressbar", { name: "公開しています…" })).toBeInTheDocument();
+  // Spinner の見た目の文字だけ(aria-hidden)
+  expect(screen.getAllByText("公開しています…")).toHaveLength(1);
+});

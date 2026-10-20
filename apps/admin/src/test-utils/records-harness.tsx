@@ -3,62 +3,36 @@ import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { render } from "@testing-library/react";
-import { vi, expect, type Mock } from "vitest";
+import { vi, expect } from "vitest";
 import { createAppContext, getRouter } from "../router";
+import { baseAuthedRoutes, blogTenantOf, jsonResponse, stubFetch, type Handler } from "./api-stubs";
 import { FakeSocket } from "./fake-socket";
 
 // records-flow / publish-box-flow など、編集・作成画面を router 経由で試すテストの共通の下地。
 // RAC の Modal を開く場面はここでは扱わない(ファイルを分ける)
 
-export function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
-
-export type Handler = Mock<(init?: RequestInit) => Response | Promise<Response>>;
-
-export function stubFetch(routes: Record<string, Handler>): typeof fetch {
-  return async (input, init) => {
-    const path =
-      typeof input === "string"
-        ? // クエリ文字列(?type=article など)はルートの照合に含めない
-          (input.split("?")[0] ?? input)
-        : input instanceof URL
-          ? input.pathname
-          : new URL(input.url).pathname;
-    const handler = routes[path];
-    if (handler === undefined) {
-      throw new Error(`unexpected fetch: ${path}`);
-    }
-    return handler(init ?? undefined);
-  };
-}
+export { jsonResponse, stubFetch, type Handler };
 
 export const RECORD_1 = "018f2b6a-7a0a-7000-8000-000000000101";
 
 export function blogTenant(role = "owner") {
-  return { id: "t1", slug: "blog", name: "Blog", role };
+  return blogTenantOf(role);
 }
 
 export function authedRoutes(
   overrides: Record<string, Handler> = {},
   role = "owner",
 ): Record<string, Handler> {
-  return {
-    "/auth/turnstile-config": vi.fn(() => jsonResponse(200, { siteKey: null })),
-    "/auth/tenants": vi.fn(() => jsonResponse(200, { tenants: [blogTenant(role)] })),
-    "/auth/me": vi.fn(() => jsonResponse(200, { userId: "u1", email: "owner@example.com" })),
-    "/auth/token": vi.fn(() => jsonResponse(200, { token: "jwt-abc", expiresIn: 900 })),
-    "/v1/t/t1/modules": vi.fn(() => jsonResponse(200, { modules: [] })),
-    "/v1/t/t1/content-types": vi.fn(() => jsonResponse(200, { contentTypes: [] })),
-    "/v1/t/t1/publications": vi.fn(() => jsonResponse(200, { publications: [], nextCursor: null })),
-    [`/v1/t/t1/records/${RECORD_1}/publication`]: vi.fn(() =>
-      jsonResponse(200, { published: false }),
-    ),
-    ...overrides,
-  };
+  return baseAuthedRoutes(
+    {
+      "/v1/t/t1/content-types": vi.fn(() => jsonResponse(200, { contentTypes: [] })),
+      [`/v1/t/t1/records/${RECORD_1}/publication`]: vi.fn(() =>
+        jsonResponse(200, { published: false }),
+      ),
+      ...overrides,
+    },
+    role,
+  );
 }
 
 export const articleType: ContentTypeDefinition = {
@@ -115,12 +89,16 @@ export function socketHarness() {
 
 export type SocketHarness = ReturnType<typeof socketHarness>;
 
-export async function bootstrapped(socket: FakeSocket, records: SyncRecord[]) {
+export async function bootstrapped(
+  socket: FakeSocket,
+  records: SyncRecord[],
+  types: ContentTypeDefinition[] = [articleType],
+) {
   await vi.waitFor(() => expect(socket.parsed()).toContainEqual({ type: "hello", checkpoint: 0 }));
   socket.deliver({
     type: "welcome",
     protocolVersion: 1,
-    contentTypes: [articleType],
+    contentTypes: types,
     serverSeq: 10,
   });
   socket.deliver({ type: "sync", records, serverSeq: 10, complete: true });

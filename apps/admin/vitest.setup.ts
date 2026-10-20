@@ -9,7 +9,7 @@ import { toaster } from "@plyrs/ui";
 afterEach(() => {
   cleanup();
   // トーストはモジュール共有のキューに溜まる。前のテストの通知が次のテストの画面に残らないようにする
-  toaster.queue.clear();
+  toaster.clear();
 });
 
 // 14 ファイル並列実行時の CPU 競合で findBy*（既定 1 秒）が確率的に切れる。

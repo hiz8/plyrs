@@ -82,10 +82,13 @@ export function BulkBar({
     >
       {progress !== null ? (
         <>
-          <Spinner label={BULK_LABELS.running[progress.kind]} />
+          <span aria-hidden="true">
+            <Spinner label={BULK_LABELS.running[progress.kind]} />
+          </span>
           <div {...stylex.props(styles.progress)}>
             <ProgressBar
               label={BULK_LABELS.running[progress.kind]}
+              isLabelHidden
               value={progress.done}
               maxValue={progress.total}
               valueLabel={BULK_LABELS.progress(progress.done, progress.total)}

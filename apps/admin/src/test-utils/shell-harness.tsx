@@ -1,36 +1,14 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { render } from "@testing-library/react";
-import { vi, type Mock } from "vitest";
+import { vi } from "vitest";
 import { createAppContext, getRouter } from "../router";
+import { baseAuthedRoutes, blogTenantOf, jsonResponse, stubFetch, type Handler } from "./api-stubs";
 import { pendingConnect } from "./fake-socket";
 
 // shell*.test.tsx の共通の下地。RAC の Modal(ドロワー)を開くテストは、同じファイルの 2 本目以降で
 // jsdom が戻らなくなる(原因未確認)ため、ドロワーの場面ごとにファイルを分けている
 
-export function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
-
-export type Handler = Mock<(init?: RequestInit) => Response>;
-
-export function stubFetch(routes: Record<string, Handler>): typeof fetch {
-  return async (input, init) => {
-    const path =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.pathname
-          : new URL(input.url).pathname;
-    const handler = routes[path];
-    if (handler === undefined) {
-      throw new Error(`unexpected fetch: ${path}`);
-    }
-    return handler(init ?? undefined);
-  };
-}
+export { jsonResponse, stubFetch, type Handler };
 
 export function renderAt(
   path: string,
@@ -45,17 +23,10 @@ export function renderAt(
   return router;
 }
 
-export const blogTenant = { id: "t1", slug: "blog", name: "Blog", role: "owner" };
+export const blogTenant = blogTenantOf();
 
 export function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, Handler> {
-  return {
-    // 未認証時は /login に落ちる。その loader が無条件で叩くため、ここでの関心事でなくても
-    // 常に無効(siteKey: null)を用意しておく。
-    "/auth/turnstile-config": vi.fn(() => jsonResponse(200, { siteKey: null })),
-    "/auth/tenants": vi.fn(() => jsonResponse(200, { tenants: [blogTenant] })),
-    "/auth/me": vi.fn(() => jsonResponse(200, { userId: "u1", email: "owner@example.com" })),
-    "/v1/t/t1/modules": vi.fn(() => jsonResponse(200, { modules: [] })),
-    "/auth/token": vi.fn(() => jsonResponse(200, { token: "jwt-abc", expiresIn: 900 })),
+  return baseAuthedRoutes({
     "/v1/t/t1/content-types": vi.fn(() =>
       jsonResponse(200, {
         contentTypes: [
@@ -81,5 +52,5 @@ export function authedRoutes(overrides: Record<string, Handler> = {}): Record<st
       }),
     ),
     ...overrides,
-  };
+  });
 }

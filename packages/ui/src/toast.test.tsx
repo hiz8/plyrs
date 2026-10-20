@@ -9,6 +9,13 @@ afterEach(() => {
 });
 
 describe("トースト(h-common-surface.md 11 章)", () => {
+  it("clear は溜まった通知を消す", () => {
+    const t = createToaster();
+    t.success("保存しました");
+    t.clear();
+    expect(t.queue.visibleToasts).toHaveLength(0);
+  });
+
   it("成功は status で読み上げ、5 秒で消える", () => {
     vi.useFakeTimers();
     const toaster = createToaster();
