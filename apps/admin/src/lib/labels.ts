@@ -412,9 +412,12 @@ export const SETTINGS_LABELS = {
     example: (type: string) => `例: ${type}の一覧`,
     exampleHelp: "型の API 名は設定 › コンテンツタイプで確認できます",
     copy: "コピー",
-    copied: "コピーしました",
-    copyFailed: "コピーできませんでした",
   },
+} as const;
+
+export const CLIPBOARD_LABELS = {
+  copied: "コピーしました",
+  copyFailed: "コピーできませんでした",
 } as const;
 
 export const MEMBER_LABELS = {

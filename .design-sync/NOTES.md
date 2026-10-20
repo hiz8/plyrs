@@ -64,6 +64,7 @@
 
 ## V4 で変えた部品
 - `ProgressBar`(`isLabelHidden`: `aria-label` は残し、見た目の題を描かず値の文字だけ右寄せにする)
+- `Select`(`isLabelHidden`: ラベルを VisuallyHidden で包み、アクセシブルネームだけ残して見た目を出さない。表の行内の選択用)
 - `Toaster.clear()`(溜まった通知をすべて消す)
 - `HomeWidgetContribution`(`size?: "half" | "full"`、`moduleId?: string`。型だけの変更で見た目は無し)
 - `SegmentedControl`(RAC RadioGroup ベースの 3 択 pill。案 G 6.2 のテーマ切り替え用、裁定 G2)

@@ -1,26 +1,17 @@
 import * as stylex from "@stylexjs/stylex";
 import { CircleAlert, Copy } from "lucide-react";
 import { useState } from "react";
-import { Button, ICON_SIZE, ModalDialog, TextField, toaster } from "@plyrs/ui";
+import { Button, ModalDialog, TextField } from "@plyrs/ui";
 import { border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
-import { DIALOGS, MEMBER_LABELS, ROLE_DESCRIPTIONS, SETTINGS_LABELS } from "../../lib/labels";
+import { copyText } from "../../lib/clipboard";
+import { DIALOGS, MEMBER_LABELS, ROLE_DESCRIPTIONS } from "../../lib/labels";
 import type { Role } from "../../lib/permissions";
+import { DialogNote } from "./dialog-note";
 import { RoleSelect } from "./role-select";
 
 const styles = stylex.create({
   form: { display: "flex", flexDirection: "column", gap: space.inset },
-  alertBox: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.sm,
-    padding: space.inset,
-    backgroundColor: status.dangerSurface,
-    borderRadius: radius.container,
-    fontSize: font.caption,
-    color: text.default,
-  },
-  alertHead: { display: "flex", alignItems: "flex-start", gap: space.sm },
-  alertIcon: { color: status.danger, display: "inline-flex", flexShrink: 0 },
+  alertBody: { display: "flex", flexDirection: "column", gap: space.sm },
   urlRow: { display: "flex", alignItems: "center", gap: space.sm, minWidth: 0 },
   code: {
     flex: 1,
@@ -46,18 +37,6 @@ export type AddMemberFailure =
   | { kind: "already_member" }
   | { kind: "other"; message: string }
   | null;
-
-async function copy(value: string): Promise<void> {
-  try {
-    if (navigator.clipboard === undefined) {
-      throw new Error("clipboard unavailable");
-    }
-    await navigator.clipboard.writeText(value);
-    toaster.success(SETTINGS_LABELS.publicApi.copied);
-  } catch {
-    toaster.error(SETTINGS_LABELS.publicApi.copyFailed);
-  }
-}
 
 export interface AddMemberDialogProps {
   isOpen: boolean;
@@ -117,26 +96,23 @@ function AddMemberForm({
             : {})}
         />
         {failure?.kind === "unregistered" ? (
-          <div role="alert" {...stylex.props(styles.alertBox)}>
-            <div {...stylex.props(styles.alertHead)}>
-              <span {...stylex.props(styles.alertIcon)}>
-                <CircleAlert size={ICON_SIZE.inline} aria-hidden="true" />
-              </span>
+          <DialogNote tone="danger" icon={CircleAlert} role="alert">
+            <div {...stylex.props(styles.alertBody)}>
               <span>{MEMBER_LABELS.addDialog.unregistered}</span>
+              <div {...stylex.props(styles.urlRow)}>
+                <code {...stylex.props(styles.code)}>{signupUrl}</code>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={Copy}
+                  onPress={() => void copyText(signupUrl)}
+                >
+                  {MEMBER_LABELS.addDialog.copyUrl}
+                </Button>
+              </div>
+              <span {...stylex.props(styles.hint)}>{MEMBER_LABELS.addDialog.unregisteredHint}</span>
             </div>
-            <div {...stylex.props(styles.urlRow)}>
-              <code {...stylex.props(styles.code)}>{signupUrl}</code>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={Copy}
-                onPress={() => void copy(signupUrl)}
-              >
-                {MEMBER_LABELS.addDialog.copyUrl}
-              </Button>
-            </div>
-            <span {...stylex.props(styles.hint)}>{MEMBER_LABELS.addDialog.unregisteredHint}</span>
-          </div>
+          </DialogNote>
         ) : null}
         <RoleSelect label={MEMBER_LABELS.addDialog.role} value={role} onChange={setRole} />
         <p {...stylex.props(styles.description)}>{ROLE_DESCRIPTIONS[role]}</p>

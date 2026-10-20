@@ -120,3 +120,19 @@ it("size=sm でも従来どおり選べる", () => {
   );
   expect(screen.getByRole("button", { name: /ステータス/ })).toBeInTheDocument();
 });
+
+it("isLabelHidden でもトリガーの名前にラベルが入り、ラベルの文字は見た目に出ない", () => {
+  render(
+    <Select
+      label="ステータス"
+      items={[{ value: "draft", label: "下書き" }]}
+      selectedValue="draft"
+      onChange={() => {}}
+      isLabelHidden
+    />,
+  );
+  expect(screen.getByRole("button", { name: /ステータス/ })).toBeInTheDocument();
+  const hidden = screen.getByText("ステータス").closest("span[style]");
+  expect(hidden).not.toBeNull();
+  expect(hidden).toHaveStyle({ width: "1px", height: "1px" });
+});

@@ -7,6 +7,7 @@ import {
   Popover,
   Select as RacSelect,
   SelectValue,
+  VisuallyHidden,
   type ListBoxItemRenderProps,
 } from "react-aria-components";
 import { stylexRenderProps } from "./compose";
@@ -125,6 +126,8 @@ export interface SelectProps {
   isReadOnly?: boolean;
   /** sm は高さ size.controlSm・文字 font.caption(公開ボックス用) */
   size?: "md" | "sm";
+  /** 見た目のラベルを出さない(アクセシブルネームには残す。表の行内など、周りの文脈で意味が分かる所用) */
+  isLabelHidden?: boolean;
 }
 
 export function Select({
@@ -137,14 +140,27 @@ export function Select({
   errorMessage,
   isReadOnly,
   size: controlSize = "md",
+  isLabelHidden = false,
 }: SelectProps) {
+  const labelNode = <FieldLabel>{label}</FieldLabel>;
+  const labelContent = isLabelHidden ? (
+    <VisuallyHidden elementType="span">{labelNode}</VisuallyHidden>
+  ) : (
+    labelNode
+  );
   const isInvalid = errorMessage !== undefined;
   if (isReadOnly === true) {
     // RAC の Select に isReadOnly は無いため、Select 自体を描かない(隠し input も出ない)
     const selected = items.find((item) => item.value === selectedValue);
     return (
       <div role="group" aria-label={label} className={fieldClassName()}>
-        <FieldLabel elementType="span">{label}</FieldLabel>
+        {isLabelHidden ? (
+          <VisuallyHidden elementType="span">
+            <FieldLabel elementType="span">{label}</FieldLabel>
+          </VisuallyHidden>
+        ) : (
+          <FieldLabel elementType="span">{label}</FieldLabel>
+        )}
         <span
           {...stylex.props(
             styles.readOnlyValue,
@@ -167,7 +183,7 @@ export function Select({
     >
       {({ isOpen, isFocusVisible, isDisabled: disabled }) => (
         <>
-          <FieldLabel>{label}</FieldLabel>
+          {labelContent}
           <RacButton
             className={stylexRenderProps<{ isHovered: boolean }>((state) => [
               styles.trigger,

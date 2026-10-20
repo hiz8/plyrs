@@ -11,7 +11,7 @@ import {
   TableBody,
   TableHeader,
 } from "@plyrs/ui";
-import { font, space, text } from "@plyrs/ui/semantic.stylex";
+import { font, size, space, text } from "@plyrs/ui/semantic.stylex";
 import type { MemberSummary } from "../../lib/admin-api";
 import { formatDate } from "../../lib/datetime";
 import { MEMBER_LABELS } from "../../lib/labels";
@@ -66,6 +66,7 @@ export function MembersTable({ rows, onChangeRole, onRemove, isBusy = false }: M
                     variant="link"
                     size="sm"
                     disabledReason={MEMBER_LABELS.lastOwnerReason}
+                    // 無効理由を見せるだけのボタン。押しても何も起きない
                     onPress={() => {}}
                   >
                     {MEMBER_LABELS.lastOwner}
@@ -77,6 +78,7 @@ export function MembersTable({ rows, onChangeRole, onRemove, isBusy = false }: M
                     onChange={(role) => onChangeRole(member, role)}
                     isDisabled={isBusy}
                     size="sm"
+                    isLabelHidden
                   />
                 )}
               </Cell>
@@ -111,7 +113,7 @@ export function MembersTableSkeleton() {
   return (
     <div aria-hidden="true" {...stylex.props(styles.skeleton)}>
       {[0, 1, 2].map((index) => (
-        <Skeleton key={index} height={36} width="100%" />
+        <Skeleton key={index} height={size.row} width="100%" />
       ))}
     </div>
   );

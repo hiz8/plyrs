@@ -1,9 +1,11 @@
 import * as stylex from "@stylexjs/stylex";
-import { Banner, ConfirmDialog } from "@plyrs/ui";
+import { Clock, TriangleAlert } from "lucide-react";
+import { ConfirmDialog } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { MEMBER_LABELS, roleLabel } from "../../lib/labels";
 import { demoteBody } from "../../lib/members";
 import type { Role } from "../../lib/permissions";
+import { DialogNote } from "./dialog-note";
 
 const styles = stylex.create({
   body: { display: "flex", flexDirection: "column", gap: space.sm },
@@ -26,6 +28,7 @@ export function DemoteMemberDialog({
   const to = target?.to ?? "viewer";
   return (
     <ConfirmDialog
+      // target が null の間(閉じている間)は title を空にしておく
       title={target === null ? "" : MEMBER_LABELS.demote.title(target.email, roleLabel(to))}
       isOpen={target !== null}
       onOpenChange={(open) => {
@@ -38,9 +41,13 @@ export function DemoteMemberDialog({
     >
       <div {...stylex.props(styles.body)}>
         <p {...stylex.props(styles.text)}>{demoteBody(to)}</p>
-        <Banner tone="warning">{MEMBER_LABELS.demote.delay}</Banner>
+        <DialogNote tone="warning" icon={Clock}>
+          {MEMBER_LABELS.demote.delay}
+        </DialogNote>
         {target?.isSelf === true ? (
-          <Banner tone="warning">{MEMBER_LABELS.lockout(otherOwners.join("、"))}</Banner>
+          <DialogNote tone="warning" icon={TriangleAlert}>
+            {MEMBER_LABELS.lockout(otherOwners.join("、"))}
+          </DialogNote>
         ) : null}
       </div>
     </ConfirmDialog>
@@ -67,6 +74,7 @@ export function RemoveMemberDialog({
   const email = target?.email ?? "";
   return (
     <ConfirmDialog
+      // target が null の間(閉じている間)は title を空にしておく
       title={target === null ? "" : isSelf ? labels.selfTitle : labels.title(email)}
       isOpen={target !== null}
       onOpenChange={(open) => {
@@ -82,7 +90,9 @@ export function RemoveMemberDialog({
           {isSelf ? labels.selfBody(email, siteName) : labels.body}
         </p>
         {isSelf ? (
-          <Banner tone="warning">{MEMBER_LABELS.lockout(otherOwners.join("、"))}</Banner>
+          <DialogNote tone="warning" icon={TriangleAlert}>
+            {MEMBER_LABELS.lockout(otherOwners.join("、"))}
+          </DialogNote>
         ) : null}
       </div>
     </ConfirmDialog>

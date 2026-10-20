@@ -50,3 +50,26 @@ it("ロールを変えると説明が入れ替わる", async () => {
   expect(screen.getByText(ROLE_DESCRIPTIONS.viewer)).toBeInTheDocument();
   expect(screen.queryByText(ROLE_DESCRIPTIONS.editor)).not.toBeInTheDocument();
 });
+
+it("already_member の文は入力欄と aria-describedby で結ばれる", () => {
+  renderDialog({ kind: "already_member" });
+  const input = screen.getByRole("textbox", { name: MEMBER_LABELS.addDialog.email });
+  const message = screen.getByText(MEMBER_LABELS.addDialog.alreadyMember);
+  expect(input.getAttribute("aria-describedby")?.split(" ")).toContain(message.id);
+});
+
+it("other は role=alert で message を出す", () => {
+  renderDialog({ kind: "other", message: "通信に失敗しました" });
+  expect(screen.getByRole("alert")).toHaveTextContent("通信に失敗しました");
+});
+
+it("URL をコピーを押すと signupUrl を clipboard に書く", async () => {
+  const user = userEvent.setup();
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  // userEvent.setup() が clipboard を差し替えるので、その後に自前のものを載せる
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  renderDialog({ kind: "unregistered" });
+  await user.click(screen.getByRole("button", { name: MEMBER_LABELS.addDialog.copyUrl }));
+  expect(writeText).toHaveBeenCalledWith("https://app.example.com/signup");
+  Reflect.deleteProperty(navigator, "clipboard");
+});

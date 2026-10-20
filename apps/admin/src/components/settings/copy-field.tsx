@@ -1,7 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
 import { Copy } from "lucide-react";
-import { Button, toaster } from "@plyrs/ui";
+import { Button } from "@plyrs/ui";
 import { border, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
+import { copyText } from "../../lib/clipboard";
 import { SETTINGS_LABELS } from "../../lib/labels";
 
 const styles = stylex.create({
@@ -27,18 +28,6 @@ const styles = stylex.create({
   help: { fontSize: font.caption, color: text.muted },
 });
 
-async function copy(value: string): Promise<void> {
-  try {
-    if (navigator.clipboard === undefined) {
-      throw new Error("clipboard unavailable");
-    }
-    await navigator.clipboard.writeText(value);
-    toaster.success(SETTINGS_LABELS.publicApi.copied);
-  } catch {
-    toaster.error(SETTINGS_LABELS.publicApi.copyFailed);
-  }
-}
-
 export function CopyField({ label, value, help }: { label: string; value: string; help?: string }) {
   return (
     <div {...stylex.props(styles.field)}>
@@ -50,7 +39,7 @@ export function CopyField({ label, value, help }: { label: string; value: string
           size="sm"
           icon={Copy}
           aria-label={`${label}をコピー`}
-          onPress={() => void copy(value)}
+          onPress={() => void copyText(value)}
         >
           {SETTINGS_LABELS.publicApi.copy}
         </Button>

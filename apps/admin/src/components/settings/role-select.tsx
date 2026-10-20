@@ -11,12 +11,14 @@ export function RoleSelect({
   onChange,
   isDisabled,
   size,
+  isLabelHidden,
 }: {
   label: string;
   value: Role;
   onChange: (role: Role) => void;
   isDisabled?: boolean;
   size?: "md" | "sm";
+  isLabelHidden?: boolean;
 }) {
   return (
     <Select
@@ -28,6 +30,7 @@ export function RoleSelect({
       }}
       {...(isDisabled === undefined ? {} : { isDisabled })}
       {...(size === undefined ? {} : { size })}
+      {...(isLabelHidden === undefined ? {} : { isLabelHidden })}
     />
   );
 }
