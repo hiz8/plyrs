@@ -7,13 +7,22 @@ import type { Collection } from "@tanstack/db";
 import { v7 as uuidv7 } from "uuid";
 import { ASSET_TYPE_KEY, type ContentTypeDefinition, type WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import { ICON_SIZE, RelativeTime, toaster } from "@plyrs/ui";
+import {
+  Banner,
+  Button,
+  ConfirmDialog,
+  ICON_SIZE,
+  ModalDialog,
+  RelativeTime,
+  toaster,
+} from "@plyrs/ui";
 import { bg, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "../lib/asset-services";
 import { contentTypeCrumb, currentCrumb, homeCrumb, mediaCrumb } from "../lib/breadcrumbs";
 import { formatDateTime } from "../lib/datetime";
 import { errorMessage } from "../lib/error-messages";
-import { EDITOR_LABELS, PUBLISH_BOX, TOASTS } from "../lib/labels";
+import { DIALOGS, EDITOR_LABELS, PUBLISH_BOX, TOASTS } from "../lib/labels";
+import { labelForRecord } from "../lib/record-label";
 import { publishBoxView } from "../lib/publish-box";
 import { publicationQueryOptions, publicationsQueryKey } from "../lib/queries";
 import { useSaveAndPublish } from "../lib/save-and-publish";
@@ -95,8 +104,12 @@ export function RecordEditor({
   const createdId = useRef<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const saveAndPublish = useSaveAndPublish();
-  // 離脱の確認ダイアログは Task 9。ここでは遷移の拒否と beforeunload の登録だけ
-  useLeaveGuard(dirty);
+  const blocker = useLeaveGuard(dirty);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [unpublishOpen, setUnpublishOpen] = useState(false);
+  const [pendingArchive, setPendingArchive] = useState(false);
+  // 確認ダイアログから実行した操作の進行中(ダイアログの isPending と公開ボックスの無効化に使う)
+  const [busy, setBusy] = useState<"delete" | "unpublish" | "archive" | null>(null);
 
   const isNew = record === null;
   const isAsset = contentType.key === ASSET_TYPE_KEY;
@@ -117,7 +130,7 @@ export function RecordEditor({
     canWrite,
     canPublish,
     canDelete,
-    phase: saveAndPublish.phase,
+    phase: busy === "delete" ? "deleting" : saveAndPublish.phase,
   });
 
   const currentId = (): string | undefined => record?.id ?? createdId.current ?? undefined;
@@ -245,13 +258,18 @@ export function RecordEditor({
     // validate / offline はフィールドのエラーとボタンの無効化で伝わっている
   }
 
-  async function onStatusChange(next: WorkflowStatus) {
-    const id = currentId();
-    if (id === undefined) return;
+  function onStatusChange(next: WorkflowStatus) {
+    // 公開中のアーカイブは確認を挟む(公開は維持されるため)
     if (next === "archived" && publication.data?.published === true) {
-      // TODO(Task 9): 公開中のアーカイブは確認ダイアログを挟む
+      setPendingArchive(true);
       return;
     }
+    void updateStatus(next);
+  }
+
+  async function updateStatus(next: WorkflowStatus) {
+    const id = currentId();
+    if (id === undefined) return;
     try {
       const tx = collection.update(id, (draft) => {
         draft.status = next;
@@ -262,6 +280,59 @@ export function RecordEditor({
       return;
     }
     toaster.success(TOASTS.statusChanged);
+  }
+
+  async function confirmArchive() {
+    setBusy("archive");
+    try {
+      await updateStatus("archived");
+    } finally {
+      setBusy(null);
+      setPendingArchive(false);
+    }
+  }
+
+  async function confirmUnpublish() {
+    const id = currentId();
+    if (id === undefined) return;
+    setBusy("unpublish");
+    try {
+      await adminApi.unpublishRecord(tenant.id, id);
+      await invalidatePublication(id);
+      toaster.success(TOASTS.unpublished);
+    } catch (cause) {
+      toaster.error(errorMessage(cause, TOASTS.unpublishFailed));
+    } finally {
+      setBusy(null);
+      setUnpublishOpen(false);
+    }
+  }
+
+  async function confirmDelete() {
+    const id = currentId();
+    if (id === undefined) return;
+    setBusy("delete");
+    try {
+      const tx = collection.delete(id);
+      await tx.isPersisted.promise;
+      await invalidatePublication(id);
+    } catch (cause) {
+      setBusy(null);
+      setDeleteOpen(false);
+      toaster.error(errorMessage(cause, TOASTS.deleteFailed));
+      return;
+    }
+    toaster.success(TOASTS.deleted);
+    // 削除後は編集画面が無くなるので、離脱の確認は通さない
+    if (isAsset) {
+      await navigate({ to: "/t/$tenantSlug/media", params: { tenantSlug }, ignoreBlocker: true });
+    } else {
+      await navigate({
+        to: "/t/$tenantSlug/content/$typeKey",
+        params: { tenantSlug, typeKey },
+        ignoreBlocker: true,
+      });
+    }
   }
 
   // 編集は record があれば更新、作成画面は insert。どちらも確定(isPersisted)まで待つ
@@ -338,9 +409,9 @@ export function RecordEditor({
                 status={record?.status ?? "draft"}
                 onPrimary={() => void onPrimary()}
                 onSecondary={() => void onSecondary()}
-                onStatusChange={(next) => void onStatusChange(next)}
-                onUnpublish={() => {}}
-                onDelete={() => {}}
+                onStatusChange={onStatusChange}
+                onUnpublish={() => setUnpublishOpen(true)}
+                onDelete={() => setDeleteOpen(true)}
               />
               {record !== null &&
                 panels.map((contribution) => (
@@ -358,6 +429,66 @@ export function RecordEditor({
         onPrimary={() => void onPrimary()}
         onSecondary={() => void onSecondary()}
       />
+      {record !== null && (
+        <>
+          <ConfirmDialog
+            title={DIALOGS.delete.title(contentType.name)}
+            isOpen={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            tone="danger"
+            confirmLabel={DIALOGS.delete.confirm}
+            isPending={busy === "delete"}
+            onConfirm={() => void confirmDelete()}
+          >
+            <p>{DIALOGS.delete.body(labelForRecord(types, record))}</p>
+            {publication.data?.published === true && (
+              <Banner tone="warning">{DIALOGS.delete.publishedWarning(contentType.name)}</Banner>
+            )}
+          </ConfirmDialog>
+          <ConfirmDialog
+            title={DIALOGS.unpublish.title}
+            isOpen={unpublishOpen}
+            onOpenChange={setUnpublishOpen}
+            tone="danger"
+            confirmLabel={DIALOGS.unpublish.confirm}
+            isPending={busy === "unpublish"}
+            onConfirm={() => void confirmUnpublish()}
+          >
+            <p>{DIALOGS.unpublish.body(labelForRecord(types, record))}</p>
+          </ConfirmDialog>
+          <ConfirmDialog
+            title={DIALOGS.archivePublished.title}
+            isOpen={pendingArchive}
+            onOpenChange={setPendingArchive}
+            tone="danger"
+            confirmLabel={DIALOGS.archivePublished.confirm}
+            isPending={busy === "archive"}
+            onConfirm={() => void confirmArchive()}
+          >
+            <p>{DIALOGS.archivePublished.body(contentType.name)}</p>
+          </ConfirmDialog>
+        </>
+      )}
+      <ModalDialog
+        title={DIALOGS.leave.title}
+        isOpen={blocker.status === "blocked"}
+        onOpenChange={() => {}}
+        role="alertdialog"
+        isDismissable={false}
+        showCloseButton={false}
+        footer={
+          <>
+            <Button variant="dangerLink" onPress={() => blocker.proceed?.()}>
+              {DIALOGS.leave.discard}
+            </Button>
+            <Button autoFocus onPress={() => blocker.reset?.()}>
+              {DIALOGS.leave.stay}
+            </Button>
+          </>
+        }
+      >
+        <p>{DIALOGS.leave.body}</p>
+      </ModalDialog>
     </>
   );
 }
