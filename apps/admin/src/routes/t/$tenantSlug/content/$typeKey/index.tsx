@@ -23,17 +23,16 @@ import {
   type ListRow,
 } from "../../../../../lib/content-list";
 import { errorMessage } from "../../../../../lib/error-messages";
-import {
-  BULK_LABELS,
-  DIALOGS,
-  LIST_LABELS,
-  TOASTS,
-} from "../../../../../lib/labels";
+import { BULK_LABELS, DIALOGS, LIST_LABELS, TOASTS } from "../../../../../lib/labels";
 import { publicationsQueryKey, publicationsQueryOptions } from "../../../../../lib/queries";
 import { labelForRecord } from "../../../../../lib/record-label";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
 import { useCan } from "../../../../../lib/use-can";
-import { bulkResultMessage, useBulkAction, type BulkKind } from "../../../../../lib/use-bulk-action";
+import {
+  bulkResultMessage,
+  useBulkAction,
+  type BulkKind,
+} from "../../../../../lib/use-bulk-action";
 import { useCollectionRows } from "../../../../../lib/use-collection";
 
 const styles = stylex.create({

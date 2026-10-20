@@ -127,7 +127,9 @@ export function ContentListBody({
                 size="compact"
                 icon={Search}
                 title={LIST_LABELS.noResults.title(query.q, typeName)}
-                description={filters === "" ? undefined : LIST_LABELS.noResults.description(filters)}
+                description={
+                  filters === "" ? undefined : LIST_LABELS.noResults.description(filters)
+                }
                 action={
                   <Button variant="link" onPress={() => updateQuery(DEFAULT_LIST_QUERY)}>
                     {LIST_LABELS.noResults.clear}

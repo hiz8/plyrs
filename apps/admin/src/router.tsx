@@ -65,7 +65,15 @@ export function createAppContext(
         await tokens.getToken(tenantId, { forceRefresh: true });
       },
     });
-  return { queryClient: options?.queryClient ?? new QueryClient(), api, adminApi, superApi, tokens, slots, sync };
+  return {
+    queryClient: options?.queryClient ?? new QueryClient(),
+    api,
+    adminApi,
+    superApi,
+    tokens,
+    slots,
+    sync,
+  };
 }
 
 export function getRouter(options?: { context?: RouterContext; history?: RouterHistory }) {
