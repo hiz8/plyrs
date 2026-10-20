@@ -111,7 +111,7 @@ export async function createArticleType(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { name: "コンテンツタイプ" })).toBeVisible();
 }
 
-/** コンテンツタイプ一覧から article のレコード一覧へ入り、1 件作成する。 */
+/** コンテンツタイプ一覧から article の編集画面を開いて 1 件下書き保存し、一覧へ戻る。 */
 export async function createArticleRecord(page: Page, title: string): Promise<void> {
   // テナントには asset 型(システム管理)も同居しており「レコード」リンクが複数行にまたがるため、
   // article 行に絞る(article/asset は互いに部分文字列でないので row 名の正規表現で一意)。
@@ -121,18 +121,27 @@ export async function createArticleRecord(page: Page, title: string): Promise<vo
     .click();
   await page.getByRole("button", { name: "記事を追加" }).click();
   await page.getByRole("textbox", { name: "title" }).fill(title);
-  await page.getByRole("button", { name: "作成" }).click();
+  // 下部固定バーにも同名のボタンがあるため、公開ボックス(region「公開」)に絞る。
+  await page
+    .getByRole("region", { name: "公開" })
+    .getByRole("button", { name: "下書き保存" })
+    .click();
+  // 作成後は編集画面(/content/article/<id>)に留まる。サイドバーの「一覧」で一覧へ戻る。
+  await page.waitForURL(/\/content\/article\/[0-9a-f-]{36}$/);
+  await page.getByRole("complementary").getByRole("link", { name: "一覧", exact: true }).click();
   await expect(page.getByRole("cell", { name: title })).toBeVisible();
 }
 
 /** レコード一覧から title のレコードを開き、エディタページの URL を返す。 */
 export async function openRecordEditor(page: Page, title: string): Promise<string> {
-  await page.getByRole("link", { name: title }).click();
-  await expect(page.getByRole("button", { name: "公開" })).toBeVisible();
+  // 行には「編集」リンクもあるので、名前がタイトルのリンクに限定する。
+  await page.getByRole("link", { name: title, exact: true }).click();
+  await expect(page.getByRole("region", { name: "公開" })).toBeVisible();
   return page.url();
 }
 
 export async function publishRecord(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "公開" }).click();
-  await expect(page.getByText("公開中", { exact: false })).toBeVisible();
+  const box = page.getByRole("region", { name: "公開" });
+  await box.getByRole("button", { name: "公開", exact: true }).click();
+  await expect(box.getByText("公開中", { exact: true })).toBeVisible();
 }

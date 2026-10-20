@@ -50,7 +50,10 @@ test("two tabs stay in sync over the WS push channel", async ({ page, context })
   const titleInputA = page.getByRole("textbox", { name: "title" });
   await titleInputA.clear();
   await titleInputA.fill(titleFromA);
-  await page.getByRole("button", { name: "保存" }).click();
+  await page
+    .getByRole("region", { name: "公開" })
+    .getByRole("button", { name: "下書き保存" })
+    .click();
 
   // B(一覧を開いたまま、reload なし)に反映されることを確認(WS push 経由)。
   await expect(pageB.getByRole("link", { name: titleFromA })).toBeVisible({ timeout: 15_000 });
@@ -62,7 +65,10 @@ test("two tabs stay in sync over the WS push channel", async ({ page, context })
   const titleInputB = pageB.getByRole("textbox", { name: "title" });
   await titleInputB.clear();
   await titleInputB.fill(titleFromB);
-  await pageB.getByRole("button", { name: "保存" }).click();
+  await pageB
+    .getByRole("region", { name: "公開" })
+    .getByRole("button", { name: "下書き保存" })
+    .click();
 
   await expect(page.getByRole("link", { name: titleFromB })).toBeVisible({ timeout: 15_000 });
 
