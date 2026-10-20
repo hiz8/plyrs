@@ -56,12 +56,14 @@ export function SettingsFrame({
   useEffect(() => {
     const container = frameRef.current;
     if (pendingTabFocus !== tab || container === null) return;
-    pendingTabFocus = null;
     // RAC のタブは collection の構築後に DOM へ出るため、現れるまで待ってからフォーカスする
     const focusSelected = () => {
       const el = container.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
-      el?.focus();
-      return el !== null;
+      if (el === null) return false;
+      el.focus();
+      // 成功してから消す(StrictMode の effect 再実行でも取りこぼさない)
+      pendingTabFocus = null;
+      return true;
     };
     if (focusSelected()) return;
     const observer = new MutationObserver(() => {
