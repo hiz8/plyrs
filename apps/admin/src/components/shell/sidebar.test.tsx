@@ -34,6 +34,7 @@ function renderSidebar(overrides: Partial<SidebarProps> = {}) {
     syncState: "ready",
     pathname: "/t/blog/content/news",
     onSwitchTenant: vi.fn(),
+    onOpenAccount: vi.fn(),
     onOpenTenantList: vi.fn(),
     onLogout: vi.fn(),
     ...overrides,

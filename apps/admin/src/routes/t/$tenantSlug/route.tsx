@@ -147,6 +147,8 @@ function ShellLayout() {
     syncState,
     pathname,
     onSwitchTenant: (slug) => void navigate({ to: "/t/$tenantSlug", params: { tenantSlug: slug } }),
+    onOpenAccount: () =>
+      void navigate({ to: "/t/$tenantSlug/account", params: { tenantSlug: tenant.slug } }),
     onOpenTenantList: () => void navigate({ to: "/tenants" }),
     onLogout: () => void logout(),
   };

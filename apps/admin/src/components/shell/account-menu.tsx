@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { ArrowUpDown, ChevronUp, LogOut } from "lucide-react";
+import { ArrowRightLeft, ChevronUp, LogOut, UserCog } from "lucide-react";
 import { Button, type ButtonRenderProps } from "react-aria-components";
 import {
   Avatar,
@@ -54,17 +54,30 @@ const styles = stylex.create({
 export interface AccountMenuProps {
   email: string | undefined;
   canSwitchSite: boolean;
+  onOpenAccount: () => void;
   onOpenSiteList: () => void;
   onLogout: () => void;
 }
 
-export function AccountMenu({ email, canSwitchSite, onOpenSiteList, onLogout }: AccountMenuProps) {
+export function AccountMenu({
+  email,
+  canSwitchSite,
+  onOpenAccount,
+  onOpenSiteList,
+  onLogout,
+}: AccountMenuProps) {
   return (
     <Menu
       label={NAV_LABELS.account}
       placement="top start"
       onAction={(id) =>
-        id === "sites" ? onOpenSiteList() : id === "logout" ? onLogout() : undefined
+        id === "account"
+          ? onOpenAccount()
+          : id === "sites"
+            ? onOpenSiteList()
+            : id === "logout"
+              ? onLogout()
+              : undefined
       }
       trigger={
         <Button
@@ -86,9 +99,13 @@ export function AccountMenu({ email, canSwitchSite, onOpenSiteList, onLogout }: 
       }
     >
       <MenuSection {...(email === undefined ? {} : { title: email })}>
+        <MenuItem id="account" icon={UserCog}>
+          {NAV_LABELS.accountSettings}
+        </MenuItem>
+        <MenuSeparator />
         {canSwitchSite && (
           <>
-            <MenuItem id="sites" icon={ArrowUpDown}>
+            <MenuItem id="sites" icon={ArrowRightLeft}>
               {NAV_LABELS.switchSite}
             </MenuItem>
             <MenuSeparator />

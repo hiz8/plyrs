@@ -22,6 +22,7 @@ import { Route as SuperDlqRouteImport } from './routes/super/dlq'
 import { Route as SuperAuditRouteImport } from './routes/super/audit'
 import { Route as TTenantSlugRouteRouteImport } from './routes/t/$tenantSlug/route'
 import { Route as TTenantSlugIndexRouteImport } from './routes/t/$tenantSlug/index'
+import { Route as TTenantSlugAccountRouteImport } from './routes/t/$tenantSlug/account'
 import { Route as SuperTenantsTenantIdRouteImport } from './routes/super/tenants.$tenantId'
 import { Route as TTenantSlugSettingsRouteRouteImport } from './routes/t/$tenantSlug/settings/route'
 import { Route as TTenantSlugSettingsIndexRouteImport } from './routes/t/$tenantSlug/settings/index'
@@ -100,6 +101,11 @@ const TTenantSlugRouteRoute = TTenantSlugRouteRouteImport.update({
 const TTenantSlugIndexRoute = TTenantSlugIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => TTenantSlugRouteRoute,
+} as any)
+const TTenantSlugAccountRoute = TTenantSlugAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => TTenantSlugRouteRoute,
 } as any)
 const SuperTenantsTenantIdRoute = SuperTenantsTenantIdRouteImport.update({
@@ -199,6 +205,7 @@ export interface FileRoutesByFullPath {
   '/super/': typeof SuperIndexRoute
   '/t/$tenantSlug/settings': typeof TTenantSlugSettingsRouteRouteWithChildren
   '/super/tenants/$tenantId': typeof SuperTenantsTenantIdRoute
+  '/t/$tenantSlug/account': typeof TTenantSlugAccountRoute
   '/t/$tenantSlug/': typeof TTenantSlugIndexRoute
   '/t/$tenantSlug/settings/general': typeof TTenantSlugSettingsGeneralRoute
   '/t/$tenantSlug/settings/members': typeof TTenantSlugSettingsMembersRoute
@@ -225,6 +232,7 @@ export interface FileRoutesByTo {
   '/super/users': typeof SuperUsersRoute
   '/super': typeof SuperIndexRoute
   '/super/tenants/$tenantId': typeof SuperTenantsTenantIdRoute
+  '/t/$tenantSlug/account': typeof TTenantSlugAccountRoute
   '/t/$tenantSlug': typeof TTenantSlugIndexRoute
   '/t/$tenantSlug/settings/general': typeof TTenantSlugSettingsGeneralRoute
   '/t/$tenantSlug/settings/members': typeof TTenantSlugSettingsMembersRoute
@@ -255,6 +263,7 @@ export interface FileRoutesById {
   '/super/': typeof SuperIndexRoute
   '/t/$tenantSlug/settings': typeof TTenantSlugSettingsRouteRouteWithChildren
   '/super/tenants/$tenantId': typeof SuperTenantsTenantIdRoute
+  '/t/$tenantSlug/account': typeof TTenantSlugAccountRoute
   '/t/$tenantSlug/': typeof TTenantSlugIndexRoute
   '/t/$tenantSlug/settings/general': typeof TTenantSlugSettingsGeneralRoute
   '/t/$tenantSlug/settings/members': typeof TTenantSlugSettingsMembersRoute
@@ -286,6 +295,7 @@ export interface FileRouteTypes {
     | '/super/'
     | '/t/$tenantSlug/settings'
     | '/super/tenants/$tenantId'
+    | '/t/$tenantSlug/account'
     | '/t/$tenantSlug/'
     | '/t/$tenantSlug/settings/general'
     | '/t/$tenantSlug/settings/members'
@@ -312,6 +322,7 @@ export interface FileRouteTypes {
     | '/super/users'
     | '/super'
     | '/super/tenants/$tenantId'
+    | '/t/$tenantSlug/account'
     | '/t/$tenantSlug'
     | '/t/$tenantSlug/settings/general'
     | '/t/$tenantSlug/settings/members'
@@ -341,6 +352,7 @@ export interface FileRouteTypes {
     | '/super/'
     | '/t/$tenantSlug/settings'
     | '/super/tenants/$tenantId'
+    | '/t/$tenantSlug/account'
     | '/t/$tenantSlug/'
     | '/t/$tenantSlug/settings/general'
     | '/t/$tenantSlug/settings/members'
@@ -457,6 +469,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/t/$tenantSlug/'
       preLoaderRoute: typeof TTenantSlugIndexRouteImport
+      parentRoute: typeof TTenantSlugRouteRoute
+    }
+    '/t/$tenantSlug/account': {
+      id: '/t/$tenantSlug/account'
+      path: '/account'
+      fullPath: '/t/$tenantSlug/account'
+      preLoaderRoute: typeof TTenantSlugAccountRouteImport
       parentRoute: typeof TTenantSlugRouteRoute
     }
     '/super/tenants/$tenantId': {
@@ -613,6 +632,7 @@ const TTenantSlugSettingsRouteRouteWithChildren =
 
 interface TTenantSlugRouteRouteChildren {
   TTenantSlugSettingsRouteRoute: typeof TTenantSlugSettingsRouteRouteWithChildren
+  TTenantSlugAccountRoute: typeof TTenantSlugAccountRoute
   TTenantSlugIndexRoute: typeof TTenantSlugIndexRoute
   TTenantSlugContentIndexRoute: typeof TTenantSlugContentIndexRoute
   TTenantSlugMediaIndexRoute: typeof TTenantSlugMediaIndexRoute
@@ -623,6 +643,7 @@ interface TTenantSlugRouteRouteChildren {
 
 const TTenantSlugRouteRouteChildren: TTenantSlugRouteRouteChildren = {
   TTenantSlugSettingsRouteRoute: TTenantSlugSettingsRouteRouteWithChildren,
+  TTenantSlugAccountRoute: TTenantSlugAccountRoute,
   TTenantSlugIndexRoute: TTenantSlugIndexRoute,
   TTenantSlugContentIndexRoute: TTenantSlugContentIndexRoute,
   TTenantSlugMediaIndexRoute: TTenantSlugMediaIndexRoute,

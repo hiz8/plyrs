@@ -125,6 +125,7 @@ export interface SidebarProps {
   syncState: SyncIndicatorState;
   pathname: string;
   onSwitchTenant: (slug: string) => void;
+  onOpenAccount: () => void;
   onOpenTenantList: () => void;
   onLogout: () => void;
   /** 項目を押したときに呼ぶ。ドロワー側だけが渡し、同じ URL への遷移でも閉じられるようにする */
@@ -320,6 +321,7 @@ export function Sidebar(props: SidebarProps) {
         <AccountMenu
           email={props.email}
           canSwitchSite={props.tenants.length > 1}
+          onOpenAccount={props.onOpenAccount}
           onOpenSiteList={props.onOpenTenantList}
           onLogout={props.onLogout}
         />
