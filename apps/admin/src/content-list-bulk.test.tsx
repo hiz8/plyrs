@@ -119,6 +119,21 @@ describe("一覧の一括操作", () => {
     );
   });
 
+  it("一部失敗の後に解除すると BulkBar が消える", async () => {
+    const { user } = await setup({
+      [publishPath(ID_A)]: vi.fn(() => jsonResponse(200, { ok: true })),
+      [publishPath(ID_B)]: vi.fn(() => jsonResponse(500, { error: "internal" })),
+    });
+    await selectBoth(user);
+    await user.click(screen.getByRole("button", { name: "一括公開" }));
+    expect(await screen.findByRole("button", { name: "再試行" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "解除" }));
+    await vi.waitFor(() =>
+      expect(screen.queryByRole("region", { name: "一括操作" })).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("button", { name: "再試行" })).not.toBeInTheDocument();
+  });
+
   it("ステータスの一括変更は status を push する", async () => {
     const { harness, user, grid } = await setup({}, "ready");
     await user.click(grid.getAllByRole("checkbox")[1] as HTMLElement);

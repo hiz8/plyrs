@@ -25,6 +25,19 @@ describe("useBulkAction", () => {
     expect(result.current.retry()).toBeNull();
   });
 
+  it("dismiss で failure が消え retry が null になる", async () => {
+    const { result } = renderHook(() => useBulkAction());
+    await act(() =>
+      result.current.run("publish", ["a"], async () => {
+        throw new Error("x");
+      }),
+    );
+    expect(result.current.failure).not.toBeNull();
+    act(() => result.current.dismiss());
+    expect(result.current.failure).toBeNull();
+    expect(result.current.retry()).toBeNull();
+  });
+
   it("cancel で残りを skipped にする", async () => {
     const { result } = renderHook(() => useBulkAction());
     const calls: string[] = [];

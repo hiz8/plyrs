@@ -27,6 +27,8 @@ export interface BulkActionState {
   ) => Promise<BulkResult>;
   /** 残りを中止(実行中の 1 件は待つ) */
   cancel: () => void;
+  /** 失敗の記憶を捨てる(実行中は何もしない)。選択の解除やクエリ変更で呼ぶ */
+  dismiss: () => void;
   /** failure の ids で同じ action を再実行する */
   retry: () => Promise<BulkResult> | null;
 }
@@ -75,6 +77,12 @@ export function useBulkAction(): BulkActionState {
     controller.current?.abort();
   }, []);
 
+  const dismiss = useCallback(() => {
+    if (running.current !== null) return;
+    failureRef.current = null;
+    setFailure(null);
+  }, []);
+
   const retry = useCallback((): Promise<BulkResult> | null => {
     const current = failureRef.current;
     const action = lastAction.current;
@@ -84,7 +92,7 @@ export function useBulkAction(): BulkActionState {
     return run(current.kind, current.ids, action);
   }, [run]);
 
-  return { progress, failure, run, cancel, retry };
+  return { progress, failure, run, cancel, dismiss, retry };
 }
 
 export function bulkResultMessage(

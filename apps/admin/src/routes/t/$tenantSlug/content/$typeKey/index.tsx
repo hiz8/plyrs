@@ -84,6 +84,8 @@ function RecordListPage() {
   useEffect(() => {
     setSelected(new Set());
     setFailedIds(new Set());
+    bulk.dismiss();
+    // bulk.dismiss は安定した参照。クエリが変わったときだけ走らせる
   }, [queryKey]);
 
   const publicationMap = useMemo(
@@ -180,6 +182,11 @@ function RecordListPage() {
     setRowDeleting(true);
     try {
       await collection.delete(rowDelete.record.id).isPersisted.promise;
+      const deletedId = rowDelete.record.id;
+      const without = (ids: ReadonlySet<string>) =>
+        new Set([...ids].filter((x) => x !== deletedId));
+      setSelected(without);
+      setFailedIds(without);
       await invalidatePublications();
       toaster.success(TOASTS.deleted);
     } catch (cause) {
@@ -207,6 +214,7 @@ function RecordListPage() {
       onClear={() => {
         setSelected(new Set());
         setFailedIds(new Set());
+        bulk.dismiss();
       }}
       onAction={onBulkAction}
       progress={bulk.progress === null ? null : { ...bulk.progress, onCancel: bulk.cancel }}
@@ -218,7 +226,9 @@ function RecordListPage() {
               onRetry: () => {
                 const kind = bulk.failure?.kind;
                 const retrying = bulk.retry();
-                if (kind !== undefined && retrying !== null) void retrying.then(afterRun(kind));
+                if (kind === undefined || retrying === null) return;
+                setFailedIds(new Set());
+                void retrying.then(afterRun(kind));
               },
             }
       }
