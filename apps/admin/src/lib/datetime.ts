@@ -22,6 +22,7 @@ export interface FormatOptions {
 
 // 一覧の行ごとに呼ばれるため、Intl のインスタンスは timeZone ごとに使い回す
 const absoluteFormats = new Map<string, Intl.DateTimeFormat>();
+const dateOnlyFormats = new Map<string, Intl.DateTimeFormat>();
 const dayPartFormats = new Map<string, Intl.DateTimeFormat>();
 
 function cached(
@@ -55,6 +56,21 @@ export function formatAbsolute(date: Date, timeZone?: string): string {
         hour: "2-digit",
         minute: "2-digit",
         hourCycle: "h23",
+        timeZone,
+      }),
+  ).format(date);
+}
+
+// 日付だけ(参加日など)。「2026/07/16」の形
+export function formatDate(date: Date, timeZone?: string): string {
+  return cached(
+    dateOnlyFormats,
+    timeZone,
+    () =>
+      new Intl.DateTimeFormat("ja-JP", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
         timeZone,
       }),
   ).format(date);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAbsolute, formatDateTime } from "./datetime";
+import { formatAbsolute, formatDate, formatDateTime } from "./datetime";
 
 const TZ = "Asia/Tokyo";
 // 2026-10-17 10:00 JST
@@ -84,5 +84,11 @@ describe("formatAbsolute", () => {
   it("タイムゾーンに従い 24 時間制で表す", () => {
     expect(formatAbsolute(new Date("2026-10-17T15:05:00Z"), TZ)).toBe("2026/10/18 00:05");
     expect(formatAbsolute(new Date("2026-10-17T15:05:00Z"), "UTC")).toBe("2026/10/17 15:05");
+  });
+});
+
+describe("formatDate", () => {
+  it("formatDate は日付だけを 2026/07/16 の形で返す", () => {
+    expect(formatDate(new Date("2026-07-16T03:00:00Z"), "Asia/Tokyo")).toBe("2026/07/16");
   });
 });

@@ -85,3 +85,14 @@ describe("errorCodeOf", () => {
     expect(errorCodeOf(null)).toBeUndefined();
   });
 });
+
+describe("メンバー管理のコード", () => {
+  it("last_owner / already_member / user_not_found の文がある", () => {
+    for (const code of ["last_owner", "already_member", "user_not_found"]) {
+      expect(errorMessage(new ApiError(409, code, "raw"), FALLBACK)).toBe(ERROR_MESSAGES[code]);
+    }
+    expect(ERROR_MESSAGES.last_owner).toContain("最後の管理者");
+    expect(ERROR_MESSAGES.already_member).toContain("既にメンバー");
+    expect(ERROR_MESSAGES.user_not_found).toContain("登録されていません");
+  });
+});

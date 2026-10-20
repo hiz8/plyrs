@@ -28,6 +28,13 @@ export const ROLE_LABELS: Record<Role, string> = {
   viewer: "閲覧者",
 };
 
+// 案 G 4 章(G10): ロールごとにできることの説明
+export const ROLE_DESCRIPTIONS: Record<Role, string> = {
+  owner: "すべての操作に加えて、設定(コンテンツタイプ・メンバー・モジュール)を変更できます",
+  editor: "コンテンツとメディアの作成・編集・公開ができます。設定は変更できません",
+  viewer: "コンテンツとメディアを見るだけです。作成・編集・公開はできません",
+};
+
 // TenantSummary.role などサーバーから文字列で届く値向け。未知のロールは値をそのまま出す。
 export function roleLabel(role: string): string {
   return isRole(role) ? ROLE_LABELS[role] : role;
@@ -121,6 +128,7 @@ export const NAV_LABELS = {
   content: "コンテンツ",
   media: "メディア",
   settings: "設定",
+  accountSettings: "アカウント設定",
   list: "一覧",
   add: "新規追加",
   createFirstType: "最初のコンテンツタイプを作成",
@@ -369,4 +377,156 @@ export const ERROR_SCREEN = {
   fallback:
     "ページを表示できませんでした。再読み込みしても直らない場合は、時間をおいてお試しください",
   reload: "再読み込み",
+} as const;
+
+// 案 G(設定とアカウント)の文言
+export const SETTINGS_LABELS = {
+  title: "設定",
+  tabsName: "設定の項目",
+  tabs: {
+    general: "一般",
+    "content-types": TERMS.contentType,
+    members: "メンバー",
+    modules: TERMS.module,
+  },
+  loadFailed: "設定を読み込めませんでした",
+  retry: "再試行",
+  site: {
+    title: "サイト",
+    name: "サイト名",
+    nameHelp: "サイドバーとサイト選択に表示します",
+    nameRequired: "サイト名を入力してください",
+    nameTooLong: "サイト名は 100 文字以内で入力してください",
+    slug: "サイトの識別子",
+    slugHelp:
+      "公開 API の URL に含まれるため変更できません。公開済みのページに埋め込まれた URL が壊れるのを防ぐためです",
+    save: "保存",
+    saved: "保存しました",
+    saveFailed: "保存できませんでした",
+  },
+  publicApi: {
+    title: "公開 API",
+    description:
+      "サイトを作るフロントエンドの開発者に伝える URL です。公開したコンテンツだけが返ります",
+    baseUrl: "ベース URL",
+    example: (type: string) => `例: ${type}の一覧`,
+    exampleHelp: "型の API 名は設定 › コンテンツタイプで確認できます",
+    copy: "コピー",
+    copied: "コピーしました",
+    copyFailed: "コピーできませんでした",
+  },
+} as const;
+
+export const MEMBER_LABELS = {
+  add: "メンバーを追加",
+  tableLabel: "メンバーの一覧",
+  columns: { email: "メールアドレス", role: "ロール", joined: "参加日", actions: "操作" },
+  self: "自分",
+  lastOwner: "最後の管理者",
+  lastOwnerReason:
+    "このサイトを管理できる人がいなくなるため、ロールの変更と削除はできません。先に別のメンバーを管理者にしてください",
+  remove: "外す",
+  loadFailed: "メンバー一覧を取得できませんでした",
+  addDialog: {
+    title: "メンバーを追加",
+    email: "メールアドレス",
+    emailHelp: "plyrs に登録済みの人を追加できます",
+    role: "ロール",
+    submit: "追加する",
+    unregistered:
+      "このメールアドレスのユーザーは登録されていません。先にサインアップを依頼してください。",
+    copyUrl: "URL をコピー",
+    unregisteredHint: "サインアップが済んだら、同じメールアドレスでもう一度追加してください",
+    alreadyMember: "このメールアドレスは既にメンバーです",
+    failed: "メンバーを追加できませんでした",
+  },
+  added: (email: string) => `${email} を追加しました`,
+  roleChanged: (email: string, role: string) => `${email} を${role}にしました`,
+  roleChangeFailed: "ロールを変更できませんでした",
+  demote: {
+    title: (email: string, role: string) => `${email} を${role}にしますか？`,
+    toViewer: "コンテンツの作成・編集・公開ができなくなります。",
+    toEditor: "設定(コンテンツタイプ・メンバー・モジュール)を変更できなくなります。",
+    delay: "反映まで最大 15 分かかります。すぐに止めたい場合は、いったんメンバーから外してください",
+    confirm: (role: string) => `${role}にする`,
+  },
+  removeDialog: {
+    title: (email: string) => `${email} をメンバーから外しますか？`,
+    body: "すぐにアクセスできなくなります。作成・編集したコンテンツは残ります。",
+    confirm: "外す",
+    selfTitle: "自分をこのサイトから外しますか？",
+    selfBody: (email: string, site: string) =>
+      `${email} は「${site}」にアクセスできなくなります。作成・編集したコンテンツは残ります。`,
+    selfConfirm: "自分を外す",
+  },
+  lockout: (owners: string) =>
+    `この操作のあと、設定を開けなくなります。戻すには他の管理者(${owners})に追加してもらう必要があります`,
+  removed: (email: string) => `${email} をメンバーから外しました`,
+  removeFailed: "メンバーを外せませんでした",
+} as const;
+
+export const MODULE_LABELS = {
+  description:
+    "モジュールを有効にすると、サイドバーに専用の項目と、それ用のコンテンツタイプが増えます",
+  empty: "モジュールはありません",
+  enabled: "有効",
+  disabled: "無効",
+  enable: "有効にする",
+  disable: "無効にする",
+  loadFailed: "モジュール一覧を取得できませんでした",
+  justEnabled: "有効にしました。",
+  addType: (type: string) => `${type}を追加`,
+  enabledToast: (name: string) => `${name}を有効にしました`,
+  disabledToast: (name: string) => `${name}を無効にしました`,
+  enableFailed: "モジュールを有効にできませんでした",
+  disableFailed: "モジュールを無効にできませんでした",
+  disableDialog: {
+    title: (name: string) => `${name}モジュールを無効にしますか？`,
+    body: (name: string) =>
+      `サイドバーから「${name}」が消え、公開サイトのこのモジュールの API は応答しなくなります。`,
+    keep: (counts: string) =>
+      `モジュールのコンテンツ(${counts})は削除されません。再び有効化すると元に戻ります`,
+    keepUnknown: "モジュールのコンテンツは削除されません。再び有効化すると元に戻ります",
+  },
+  count: (name: string, n: number) => `${name} ${n} 件`,
+  countJoin: "、",
+} as const;
+
+export const ACCOUNT_LABELS = {
+  title: "アカウント設定",
+  email: {
+    title: "メールアドレス",
+    help: "ログインに使うメールアドレスです。変更は確認メールが必要になるため、現在は変更できません",
+    loadFailed: "メールアドレスを取得できませんでした",
+  },
+  password: {
+    title: "パスワードの変更",
+    current: "現在のパスワード",
+    next: "新しいパスワード",
+    nextHelp: "12 文字以上",
+    confirm: "新しいパスワード(確認)",
+    note: "変更すると、他の端末のセッションはすべてログアウトされます",
+    submit: "パスワードを変更",
+    tooShort: "12 文字以上で入力してください",
+    mismatch: "新しいパスワードが一致しません",
+    changed: "パスワードを変更しました",
+    changedWithRevoked: (n: number) =>
+      `パスワードを変更しました。他の端末 ${n} 件をログアウトしました`,
+    failed: "パスワードを変更できませんでした",
+  },
+  theme: {
+    title: "テーマ",
+    label: "テーマ",
+    system: "自動",
+    light: "ライト",
+    dark: "ダーク",
+    help: "「自動」は OS の設定に従います。選択はこのブラウザに記憶され、他の端末には引き継がれません",
+  },
+  sites: {
+    title: "所属しているサイト",
+    current: "現在のサイト",
+    switch: "切り替える",
+    loadFailed: "所属しているサイトを取得できませんでした",
+  },
+  retry: "再試行",
 } as const;

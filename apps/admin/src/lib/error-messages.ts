@@ -51,6 +51,12 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   // サイト(super の作成画面)
   slug_taken: "このサイトの識別子は既に使われています",
   unknown_owner: "指定したメールアドレスのユーザーが見つかりません",
+  // メンバー管理(案 G 4 章、裁定 G14)
+  last_owner:
+    "最後の管理者のため、ロールの変更と削除はできません。先に別のメンバーを管理者にしてください",
+  already_member: "このメールアドレスは既にメンバーです",
+  user_not_found:
+    "このメールアドレスのユーザーは登録されていません。先にサインアップを依頼してください",
 };
 
 export const NETWORK_ERROR_MESSAGE =

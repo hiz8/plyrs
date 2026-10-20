@@ -11,7 +11,7 @@ it("各段の href は tenantSlug 配下、現在地は href を持たない", (
   expect(settingsCrumb("blog")).toEqual({
     id: "settings",
     label: "設定",
-    href: "/t/blog/settings/content-types",
+    href: "/t/blog/settings/general",
   });
   expect(currentCrumb("編集")).toEqual({ id: "current", label: "編集" });
 });

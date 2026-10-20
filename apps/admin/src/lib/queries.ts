@@ -39,6 +39,16 @@ export function contentTypesQueryOptions(adminApi: AdminApi, tenantId: string) {
   });
 }
 
+// 案 G 4 章: メンバーの変更の直後に必ず取り直す(古い一覧で最後の管理者の判定を誤らない)
+export function membersQueryOptions(adminApi: AdminApi, tenantId: string) {
+  return queryOptions({
+    queryKey: ["members", tenantId],
+    queryFn: () => adminApi.listMembers(tenantId),
+    staleTime: 0,
+    retry: 1,
+  });
+}
+
 // 案 D 9 章: 公開は同期経路を通らないため、他の利用者の公開は即時には届かない。
 // 画面にフォーカスが戻ったときの再取得(React Query の既定)と、自分の公開・取り下げ直後の
 // invalidate(publicationsQueryKey の前方一致。公開版を消すレコード削除も含む)で補う。

@@ -25,7 +25,7 @@ export const mediaCrumb = (slug: string): BreadcrumbItem => ({
 export const settingsCrumb = (slug: string): BreadcrumbItem => ({
   id: "settings",
   label: NAV_LABELS.settings,
-  href: `/t/${slug}/settings/content-types`,
+  href: `/t/${slug}/settings/general`,
 });
 
 export const settingsContentTypesCrumb = (slug: string): BreadcrumbItem => ({

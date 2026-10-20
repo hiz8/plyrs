@@ -45,6 +45,18 @@ export function baseAuthedRoutes(
     "/auth/me": vi.fn(() => jsonResponse(200, { userId: "u1", email: "owner@example.com" })),
     "/_config": vi.fn(() => jsonResponse(200, { publicApiOrigin: "" })),
     "/auth/token": vi.fn(() => jsonResponse(200, { token: "jwt-abc", expiresIn: 900 })),
+    "/v1/t/t1/members": vi.fn(() =>
+      jsonResponse(200, {
+        members: [
+          {
+            userId: "u1",
+            email: "owner@example.com",
+            role: "owner",
+            createdAt: "2026-07-16T00:00:00Z",
+          },
+        ],
+      }),
+    ),
     "/v1/t/t1/modules": vi.fn(() => jsonResponse(200, { modules: [] })),
     "/v1/t/t1/publications": vi.fn(() => jsonResponse(200, { publications: [], nextCursor: null })),
     ...overrides,
