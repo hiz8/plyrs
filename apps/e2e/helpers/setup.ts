@@ -126,7 +126,8 @@ export async function createArticleRecord(page: Page, title: string): Promise<vo
     .getByRole("row", { name: /article/ })
     .getByRole("link", { name: "レコード" })
     .click();
-  await page.getByRole("button", { name: "記事を追加" }).click();
+  // 一覧が 0 件のときは空状態にも「記事を追加」があるため、見出しの右(先頭)のボタンに絞る(V3 の案 D 空状態)。
+  await page.getByRole("button", { name: "記事を追加" }).first().click();
   await page.getByRole("textbox", { name: "title" }).fill(title);
   // 下部固定バーにも同名のボタンがあるため、公開ボックス(region「公開」)に絞る。
   await page

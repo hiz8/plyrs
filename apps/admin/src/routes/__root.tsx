@@ -35,11 +35,13 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
     links: [{ rel: "stylesheet", href: appCss }],
     // dev 専用: StyleX の HMR runtime(@stylexjs/unplugin README "Dev HTML injection")。
+    // README の baseline(inline の import('virtual:stylex:runtime'))は index.html を Vite が
+    // 変換する前提で、SSR のシェルではブラウザが virtual: スキームの URL として解決に失敗し
+    // runtime が動かない(画面遷移で後から読み込んだモジュールの CSS が当たらず、E2E の
+    // 下部固定バーが幅 1280px でも出た。2026-10-20)。Vite が仮想モジュールを配る /@id/ の形で読む。
     // dev の stylesheet link はここではなく RootShell の <head> に置く
     // (React 19 が head() の stylesheet を保留し、jsdom で完了しないため)
-    scripts: import.meta.env.DEV
-      ? [{ type: "module", children: "import('virtual:stylex:runtime')" }]
-      : [],
+    scripts: import.meta.env.DEV ? [{ type: "module", src: "/@id/virtual:stylex:runtime" }] : [],
   }),
   shellComponent: RootShell,
   component: RootComponent,
