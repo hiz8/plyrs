@@ -22,7 +22,8 @@ export function stubFetch(routes: Record<string, Handler>): typeof fetch {
   return async (input, init) => {
     const path =
       typeof input === "string"
-        ? input
+        ? // クエリ文字列(?type=article など)はルートの照合に含めない
+          (input.split("?")[0] ?? input)
         : input instanceof URL
           ? input.pathname
           : new URL(input.url).pathname;

@@ -326,9 +326,9 @@ describe("旧 URL のリダイレクト (案 A 6 章)", () => {
   });
 
   it("クエリとハッシュを引き継ぎ、旧 URL を履歴に残さない", async () => {
-    const router = renderAt("/t/blog/records/article?x=1#field", authedRoutes());
+    const router = renderAt("/t/blog/records/article?tab=published#field", authedRoutes());
     await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/content/article"));
-    expect(router.history.location.search).toBe("?x=1");
+    expect(router.history.location.search).toBe("?tab=published");
     expect(router.history.location.hash).toBe("#field");
     expect(router.history.length).toBe(1);
   });

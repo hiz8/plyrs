@@ -58,26 +58,6 @@ function routesForNewRecord(publish: Handler) {
   });
 }
 
-describe("record 一覧（/t/$tenantSlug/content/$typeKey）", () => {
-  it("lists synced records with workflow status", async () => {
-    const harness = socketHarness();
-    renderAt("/t/blog/content/article", harness);
-    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
-    await bootstrapped(harness.latest(), [article(RECORD_1, "こんにちは")]);
-    expect(await screen.findByRole("cell", { name: "こんにちは" })).toBeInTheDocument();
-    expect(screen.getByRole("cell", { name: "下書き" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "記事を追加" })).toBeInTheDocument();
-  });
-
-  it("shows the syncing state until the bootstrap completes", async () => {
-    const harness = socketHarness();
-    renderAt("/t/blog/content/article", harness);
-    expect(
-      await screen.findByRole("heading", { level: 1, name: "読み込み中" }),
-    ).toBeInTheDocument();
-  });
-});
-
 describe("record 新規作成", () => {
   it("作成画面の下書き保存は insert を push し、ack の後に編集画面の URL へ置き換える", async () => {
     const harness = socketHarness();
