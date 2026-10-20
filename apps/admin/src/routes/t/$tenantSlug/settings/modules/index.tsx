@@ -1,25 +1,24 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@plyrs/ui";
-import { border, font, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
-import { PageBody, TenantPageHeader } from "../../../../../components/tenant-page-header";
-import { currentCrumb, homeCrumb, settingsCrumb } from "../../../../../lib/breadcrumbs";
-import { TERMS } from "../../../../../lib/labels";
+import { Puzzle } from "lucide-react";
+import { useState } from "react";
+import { EmptyState, toaster } from "@plyrs/ui";
+import { font, space, text } from "@plyrs/ui/semantic.stylex";
+import { DisableModuleDialog } from "../../../../../components/settings/disable-module-dialog";
+import { ModuleCard } from "../../../../../components/settings/module-card";
+import { SettingsFrame } from "../../../../../components/settings/settings-frame";
+import type { ModuleSummary } from "../../../../../lib/admin-api";
+import { errorMessage } from "../../../../../lib/error-messages";
+import { MODULE_LABELS } from "../../../../../lib/labels";
+import { moduleAddLinks, moduleContentCounts } from "../../../../../lib/modules";
 import { modulesQueryOptions } from "../../../../../lib/queries";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
+import { useRecordsOfTypes } from "../../../../../lib/use-collection";
 
 const styles = stylex.create({
-  table: { borderCollapse: "collapse", width: "100%", fontSize: font.body },
-  cell: {
-    textAlign: "left",
-    padding: space.sm,
-    borderBottomWidth: stroke.default,
-    borderBottomStyle: "solid",
-    borderBottomColor: border.default,
-    verticalAlign: "middle",
-  },
-  muted: { color: text.muted },
-  error: { color: status.danger, fontSize: font.body },
+  list: { display: "flex", flexDirection: "column", gap: space.md },
+  description: { margin: 0, fontSize: font.body, color: text.muted },
 });
 
 export const Route = createFileRoute("/t/$tenantSlug/settings/modules/")({
@@ -27,70 +26,88 @@ export const Route = createFileRoute("/t/$tenantSlug/settings/modules/")({
 });
 
 function ModulesPage() {
-  const { tenant, adminApi } = Route.useRouteContext();
+  const { tenant, adminApi, queryClient } = Route.useRouteContext();
   const { tenantSlug } = Route.useParams();
-  const queryClient = useQueryClient();
+  const labels = MODULE_LABELS;
   const modules = useQuery(modulesQueryOptions(adminApi, tenant.id));
+  const sync = useTenantSync();
+  const types = useSyncTypes(sync);
+  const hasSynced = useSyncHasSynced(sync);
+  const list = modules.data ?? [];
+  const navKeys = list.filter((m) => m.enabled).flatMap((m) => m.navTypes);
+  const records = useRecordsOfTypes(sync.registry, navKeys);
+
+  const [justEnabled, setJustEnabled] = useState<string | null>(null);
+  const [disableTarget, setDisableTarget] = useState<ModuleSummary | null>(null);
+
   const toggle = useMutation({
-    mutationFn: ({ moduleId, enabled }: { moduleId: string; enabled: boolean }) =>
-      adminApi.setModuleEnabled(tenant.id, moduleId, enabled),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["modules", tenant.id] }),
+    mutationFn: ({ module, enabled }: { module: ModuleSummary; enabled: boolean }) =>
+      adminApi.setModuleEnabled(tenant.id, module.moduleId, enabled),
+    onSuccess: (_result, { module, enabled }) => {
+      void queryClient.invalidateQueries({ queryKey: ["modules", tenant.id] });
+      if (enabled) {
+        setJustEnabled(module.moduleId);
+        toaster.success(labels.enabledToast(module.name));
+      } else {
+        setJustEnabled(null);
+        toaster.success(labels.disabledToast(module.name));
+      }
+    },
+    onError: (cause, { enabled }) => {
+      toaster.error(errorMessage(cause, enabled ? labels.enableFailed : labels.disableFailed));
+    },
+    onSettled: () => setDisableTarget(null),
   });
 
   return (
-    <>
-      {/* h-common-surface.md 2 章 / a-navigation.md 5 章: 見出し・パンくず・主操作は PageHeader に集約 */}
-      <TenantPageHeader
-        title={TERMS.module}
-        breadcrumbs={[homeCrumb(tenantSlug), settingsCrumb(tenantSlug), currentCrumb(TERMS.module)]}
+    <SettingsFrame
+      tab="modules"
+      slug={tenantSlug}
+      isLoading={modules.isPending}
+      error={
+        modules.isLoadingError
+          ? {
+              message: errorMessage(modules.error, labels.loadFailed),
+              onRetry: () => void modules.refetch(),
+            }
+          : undefined
+      }
+    >
+      <p {...stylex.props(styles.description)}>{labels.description}</p>
+      {list.length === 0 ? (
+        <EmptyState icon={Puzzle} title={labels.empty} />
+      ) : (
+        <div {...stylex.props(styles.list)}>
+          {list.map((module) => (
+            <ModuleCard
+              key={module.moduleId}
+              module={module}
+              addLinks={moduleAddLinks(module.navTypes, types, tenantSlug)}
+              justEnabled={justEnabled === module.moduleId}
+              isBusy={toggle.isPending}
+              onEnable={() => toggle.mutate({ module, enabled: true })}
+              onDisable={() => setDisableTarget(module)}
+            />
+          ))}
+        </div>
+      )}
+      <DisableModuleDialog
+        target={
+          disableTarget === null
+            ? null
+            : {
+                module: disableTarget,
+                counts: hasSynced
+                  ? moduleContentCounts(records, disableTarget.navTypes, types)
+                  : null,
+              }
+        }
+        onConfirm={() => {
+          if (disableTarget !== null) toggle.mutate({ module: disableTarget, enabled: false });
+        }}
+        onCancel={() => setDisableTarget(null)}
+        isPending={toggle.isPending}
       />
-      <PageBody>
-        {modules.isError ? (
-          <p {...stylex.props(styles.error)}>モジュール一覧を取得できませんでした</p>
-        ) : null}
-        {modules.isPending ? <p {...stylex.props(styles.muted)}>読み込み中…</p> : null}
-        {modules.data ? (
-          <table {...stylex.props(styles.table)}>
-            <caption {...stylex.props(styles.muted)}>
-              有効化したモジュールだけがこのテナントで動作します
-            </caption>
-            <thead>
-              <tr>
-                <th {...stylex.props(styles.cell)}>名前</th>
-                <th {...stylex.props(styles.cell)}>状態</th>
-                <th {...stylex.props(styles.cell)}>バージョン</th>
-                <th {...stylex.props(styles.cell)}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {modules.data.map((module) => (
-                <tr key={module.moduleId}>
-                  <td {...stylex.props(styles.cell)}>
-                    {module.name} <span {...stylex.props(styles.muted)}>({module.moduleId})</span>
-                  </td>
-                  <td {...stylex.props(styles.cell)}>{module.enabled ? "有効" : "無効"}</td>
-                  <td {...stylex.props(styles.cell)}>
-                    v{module.version}(適用済み v{module.appliedVersion})
-                  </td>
-                  <td {...stylex.props(styles.cell)}>
-                    <Button
-                      isDisabled={toggle.isPending}
-                      onPress={() =>
-                        toggle.mutate({ moduleId: module.moduleId, enabled: !module.enabled })
-                      }
-                    >
-                      {module.enabled ? "無効化" : "有効化"}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : null}
-        {toggle.isError ? (
-          <p {...stylex.props(styles.error)}>操作に失敗しました(権限を確認してください)</p>
-        ) : null}
-      </PageBody>
-    </>
+    </SettingsFrame>
   );
 }
