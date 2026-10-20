@@ -51,6 +51,7 @@
 - react-aria-components が持つ部品(Dialog / Modal / Breadcrumbs / Menu / Table / Tabs / SearchField / Tooltip / DropZone / FileTrigger / ProgressBar など)を土台にし、見た目だけを StyleX で揃える。キーボード操作とスクリーンリーダー対応を部品側で担保するため
 - V3(2026-10-20): 入力部品に `isReadOnly`(閲覧者の読み取り専用表示。枠線なし・下罫線だけ、`RichTextEditor` はツールバー無し)(R2)、`Select` に `size="sm"`、`PageHeader` に `meta`(見出しの右の補足)を足した。表の中のリンクは RAC の `Link` を admin から直接使う(R23)
 - V4-B(2026-10-20): ホームの枠の中のリンクも RAC の `Link` を admin から直接使う(B10)。枠内の 0 件表示は `EmptyState` を使わない(B8)。`ProgressBar` に `isLabelHidden`、`Toaster` に `clear()` を足した
+- V4-G(2026-10-20): `SegmentedControl`(3 択の pill)を足した(G2)。所属サイトの「切り替える」と有効化直後の「{型名}を追加 ›」も RAC の `Link` を admin から直接使う(G28)
 - トーストは react-aria-components 1.21.1 では `UNSTABLE_Toast` / `UNSTABLE_ToastRegion` / `UNSTABLE_ToastQueue` としてだけ提供されている。これを `packages/ui/src/toast.tsx` の中だけで import して包み、外へは自前の API(`createToaster` / `ToastRegion`)を出す(V1、2026-10-18)。読み上げ・フォーカス移動・F6 での移動を RAC に任せ、将来の破壊的変更は 1 ファイルに閉じ込める。トーストの地は `bg.raised` とし、成功 / エラーはアイコンの色で示す
 
 ## 4. 文言
@@ -96,6 +97,8 @@
 | 接続の切断             | シェルに 1 か所だけバナーを出す(全画面共通)。現在は画面ごとに `ConnectionBanner` を置いている。サイドバー下部の同期状態も警告色にする([案 A](./a-navigation.md) 3.3) |
 | 画面全体のエラー       | 既存の `ErrorScreen` を使い、再読み込みとホームへ戻るボタンを置く(「ホームへ戻る」は V4-B で見送り、B15) |
 | 操作の失敗             | トースト(エラー色)。入力内容の問題はフィールドの下に表示する                                                                                                         |
+
+- (2026-10-20、V4-G)設定・アカウントの取得失敗は中身の位置に `role="alert"` の文と「再試行」を出す(G23)
 
 - 接続の切断(2026-10-19): バナーはヘッダー(パンくず・見出し・罫線)と本文の間(`PageHeader` の `banner`)。文言は「サーバーとの接続が切れています。再接続しています… 編集内容はこの端末に保存され、再接続後に送信されます」、操作は小型の枠線ボタン「今すぐ再接続」(D2 の S3)
 
@@ -157,3 +160,4 @@ Lucide(`lucide-react`)を使う(D1 で確定、2026-10-17。[tech-selection.md](
 - 2026-10-19: V2 の計画で接続バナーの位置と文言、主操作の文言、同期前のスケルトンを確定
 - 2026-10-20: V3 の計画で、入力部品の `isReadOnly`(閲覧者の読み取り専用)、`Select` の `size="sm"`、`PageHeader` の `meta` を足し、表の中のリンクは RAC の `Link` を admin から直接使う例外を認めた(3 章、R2・R23)
 - 2026-10-20: V4-B の計画で、ホームの枠の中のリンクは RAC の `Link` を直接使い、枠内の 0 件表示は `EmptyState` を使わない(3 章、B8・B10)。`ProgressBar` に `isLabelHidden`、`Toaster` に `clear()` を足した(B17)。`ErrorScreen` の「ホームへ戻る」は router 全体の `defaultErrorComponent` でサイトの slug が分からないため見送り、「再読み込み」だけにする(6 章、B15)
+- 2026-10-20: V4-G の計画で、3 択の pill `SegmentedControl` を足し(G2)、所属サイトの「切り替える」と有効化直後の「{型名}を追加 ›」も RAC の `Link` を直接使う(G28)。設定・アカウントの取得失敗は中身の位置に `role="alert"` の文と「再試行」(G23)
