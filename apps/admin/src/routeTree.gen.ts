@@ -27,6 +27,7 @@ import { Route as TTenantSlugSettingsRouteRouteImport } from './routes/t/$tenant
 import { Route as TTenantSlugSettingsIndexRouteImport } from './routes/t/$tenantSlug/settings/index'
 import { Route as TTenantSlugMediaIndexRouteImport } from './routes/t/$tenantSlug/media/index'
 import { Route as TTenantSlugContentIndexRouteImport } from './routes/t/$tenantSlug/content/index'
+import { Route as TTenantSlugSettingsMembersRouteImport } from './routes/t/$tenantSlug/settings/members'
 import { Route as TTenantSlugSettingsGeneralRouteImport } from './routes/t/$tenantSlug/settings/general'
 import { Route as TTenantSlugSettingsModulesIndexRouteImport } from './routes/t/$tenantSlug/settings/modules/index'
 import { Route as TTenantSlugSettingsContentTypesIndexRouteImport } from './routes/t/$tenantSlug/settings/content-types/index'
@@ -128,6 +129,12 @@ const TTenantSlugContentIndexRoute = TTenantSlugContentIndexRouteImport.update({
   path: '/content/',
   getParentRoute: () => TTenantSlugRouteRoute,
 } as any)
+const TTenantSlugSettingsMembersRoute =
+  TTenantSlugSettingsMembersRouteImport.update({
+    id: '/members',
+    path: '/members',
+    getParentRoute: () => TTenantSlugSettingsRouteRoute,
+  } as any)
 const TTenantSlugSettingsGeneralRoute =
   TTenantSlugSettingsGeneralRouteImport.update({
     id: '/general',
@@ -194,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/super/tenants/$tenantId': typeof SuperTenantsTenantIdRoute
   '/t/$tenantSlug/': typeof TTenantSlugIndexRoute
   '/t/$tenantSlug/settings/general': typeof TTenantSlugSettingsGeneralRoute
+  '/t/$tenantSlug/settings/members': typeof TTenantSlugSettingsMembersRoute
   '/t/$tenantSlug/content/': typeof TTenantSlugContentIndexRoute
   '/t/$tenantSlug/media/': typeof TTenantSlugMediaIndexRoute
   '/t/$tenantSlug/settings/': typeof TTenantSlugSettingsIndexRoute
@@ -219,6 +227,7 @@ export interface FileRoutesByTo {
   '/super/tenants/$tenantId': typeof SuperTenantsTenantIdRoute
   '/t/$tenantSlug': typeof TTenantSlugIndexRoute
   '/t/$tenantSlug/settings/general': typeof TTenantSlugSettingsGeneralRoute
+  '/t/$tenantSlug/settings/members': typeof TTenantSlugSettingsMembersRoute
   '/t/$tenantSlug/content': typeof TTenantSlugContentIndexRoute
   '/t/$tenantSlug/media': typeof TTenantSlugMediaIndexRoute
   '/t/$tenantSlug/settings': typeof TTenantSlugSettingsIndexRoute
@@ -248,6 +257,7 @@ export interface FileRoutesById {
   '/super/tenants/$tenantId': typeof SuperTenantsTenantIdRoute
   '/t/$tenantSlug/': typeof TTenantSlugIndexRoute
   '/t/$tenantSlug/settings/general': typeof TTenantSlugSettingsGeneralRoute
+  '/t/$tenantSlug/settings/members': typeof TTenantSlugSettingsMembersRoute
   '/t/$tenantSlug/content/': typeof TTenantSlugContentIndexRoute
   '/t/$tenantSlug/media/': typeof TTenantSlugMediaIndexRoute
   '/t/$tenantSlug/settings/': typeof TTenantSlugSettingsIndexRoute
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/super/tenants/$tenantId'
     | '/t/$tenantSlug/'
     | '/t/$tenantSlug/settings/general'
+    | '/t/$tenantSlug/settings/members'
     | '/t/$tenantSlug/content/'
     | '/t/$tenantSlug/media/'
     | '/t/$tenantSlug/settings/'
@@ -303,6 +314,7 @@ export interface FileRouteTypes {
     | '/super/tenants/$tenantId'
     | '/t/$tenantSlug'
     | '/t/$tenantSlug/settings/general'
+    | '/t/$tenantSlug/settings/members'
     | '/t/$tenantSlug/content'
     | '/t/$tenantSlug/media'
     | '/t/$tenantSlug/settings'
@@ -331,6 +343,7 @@ export interface FileRouteTypes {
     | '/super/tenants/$tenantId'
     | '/t/$tenantSlug/'
     | '/t/$tenantSlug/settings/general'
+    | '/t/$tenantSlug/settings/members'
     | '/t/$tenantSlug/content/'
     | '/t/$tenantSlug/media/'
     | '/t/$tenantSlug/settings/'
@@ -481,6 +494,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTenantSlugContentIndexRouteImport
       parentRoute: typeof TTenantSlugRouteRoute
     }
+    '/t/$tenantSlug/settings/members': {
+      id: '/t/$tenantSlug/settings/members'
+      path: '/members'
+      fullPath: '/t/$tenantSlug/settings/members'
+      preLoaderRoute: typeof TTenantSlugSettingsMembersRouteImport
+      parentRoute: typeof TTenantSlugSettingsRouteRoute
+    }
     '/t/$tenantSlug/settings/general': {
       id: '/t/$tenantSlug/settings/general'
       path: '/general'
@@ -564,6 +584,7 @@ const SuperRouteRouteWithChildren = SuperRouteRoute._addFileChildren(
 
 interface TTenantSlugSettingsRouteRouteChildren {
   TTenantSlugSettingsGeneralRoute: typeof TTenantSlugSettingsGeneralRoute
+  TTenantSlugSettingsMembersRoute: typeof TTenantSlugSettingsMembersRoute
   TTenantSlugSettingsIndexRoute: typeof TTenantSlugSettingsIndexRoute
   TTenantSlugSettingsContentTypesNewRoute: typeof TTenantSlugSettingsContentTypesNewRoute
   TTenantSlugSettingsContentTypesIndexRoute: typeof TTenantSlugSettingsContentTypesIndexRoute
@@ -574,6 +595,7 @@ interface TTenantSlugSettingsRouteRouteChildren {
 const TTenantSlugSettingsRouteRouteChildren: TTenantSlugSettingsRouteRouteChildren =
   {
     TTenantSlugSettingsGeneralRoute: TTenantSlugSettingsGeneralRoute,
+    TTenantSlugSettingsMembersRoute: TTenantSlugSettingsMembersRoute,
     TTenantSlugSettingsIndexRoute: TTenantSlugSettingsIndexRoute,
     TTenantSlugSettingsContentTypesNewRoute:
       TTenantSlugSettingsContentTypesNewRoute,

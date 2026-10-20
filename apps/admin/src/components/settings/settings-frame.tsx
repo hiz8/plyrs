@@ -12,6 +12,13 @@ export type SettingsTab = "general" | "content-types" | "members" | "modules";
 
 export const SETTINGS_MAX_WIDTH = "880px";
 
+const TAB_TO = {
+  general: "/t/$tenantSlug/settings/general",
+  "content-types": "/t/$tenantSlug/settings/content-types",
+  members: "/t/$tenantSlug/settings/members",
+  modules: "/t/$tenantSlug/settings/modules",
+} as const satisfies Record<SettingsTab, string>;
+
 const TAB_ORDER: readonly SettingsTab[] = ["general", "content-types", "members", "modules"];
 
 const styles = stylex.create({
@@ -59,8 +66,9 @@ export function SettingsFrame({
           label={labels.tabsName}
           items={TAB_ORDER.map((id) => ({ id, label: labels.tabs[id] }))}
           selectedKey={tab}
-          // Task 7 で members が揃ったら型付きの to に替える
-          onSelectionChange={(id) => void navigate({ href: `/t/${slug}/settings/${id}` })}
+          onSelectionChange={(id) =>
+            void navigate({ to: TAB_TO[id as SettingsTab], params: { tenantSlug: slug } })
+          }
         >
           {(id) =>
             id === tab ? (
