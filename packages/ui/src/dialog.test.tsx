@@ -97,4 +97,24 @@ describe("ModalDialog", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
+
+  it("size=lg は幅 640px の Modal を描く", () => {
+    const { unmount } = render(
+      <ModalDialog isOpen onOpenChange={() => {}} title="MD">
+        中身
+      </ModalDialog>,
+    );
+    const mdClass = screen.getByRole("dialog").parentElement?.className ?? "";
+    unmount();
+    render(
+      <ModalDialog isOpen onOpenChange={() => {}} title="LG" size="lg">
+        中身
+      </ModalDialog>,
+    );
+    const lgClass = screen.getByRole("dialog").parentElement?.className ?? "";
+    // StyleX は幅の違いを別のクラスにする。lg だけが違うクラスを持つ(atomic class 数は同じ)
+    expect(lgClass).not.toBe("");
+    expect(lgClass).not.toBe(mdClass);
+    expect(lgClass.split(" ")).toHaveLength(mdClass.split(" ").length);
+  });
 });

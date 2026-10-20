@@ -31,6 +31,7 @@ const styles = stylex.create({
     boxShadow: elevation.modal,
     outline: "none",
   },
+  modalLg: { width: "640px" },
   dialog: {
     display: "flex",
     flexDirection: "column",
@@ -63,6 +64,8 @@ export interface ModalDialogProps {
   /** 暗幕のクリックで閉じるか */
   isDismissable?: boolean;
   showCloseButton?: boolean;
+  /** md = 440px(既定)、lg = 640px(E23。種類の選択など入力が多いダイアログ) */
+  size?: "md" | "lg";
 }
 
 export function ModalDialog({
@@ -74,6 +77,7 @@ export function ModalDialog({
   role = "dialog",
   isDismissable = true,
   showCloseButton = true,
+  size = "md",
 }: ModalDialogProps) {
   return (
     <ModalOverlay
@@ -82,7 +86,9 @@ export function ModalDialog({
       isDismissable={isDismissable}
       className={stylex.props(styles.overlay).className ?? ""}
     >
-      <Modal className={stylex.props(styles.modal).className ?? ""}>
+      <Modal
+        className={stylex.props(styles.modal, size === "lg" && styles.modalLg).className ?? ""}
+      >
         <Dialog role={role} className={stylex.props(styles.dialog).className ?? ""}>
           <div {...stylex.props(styles.header)}>
             <Heading slot="title" {...stylex.props(styles.title)}>

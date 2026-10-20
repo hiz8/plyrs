@@ -83,3 +83,9 @@ export {
   type SegmentedControlProps,
   type SegmentedItem,
 } from "./segmented-control";
+export {
+  SortableList,
+  reorderIds,
+  type SortableItem,
+  type SortableListProps,
+} from "./sortable-list";
