@@ -1,17 +1,16 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
 import { useMemo } from "react";
-import { v7 as uuidv7 } from "uuid";
-import type { SyncRecord } from "@plyrs/sync-protocol";
 import { text } from "@plyrs/ui/semantic.stylex";
 import {
   PageBody,
   PageLoading,
   TenantPageHeader,
 } from "../../../../../components/tenant-page-header";
-import { contentTypeCrumb, currentCrumb, homeCrumb } from "../../../../../lib/breadcrumbs";
-import { RecordForm } from "../../../../../components/record-form";
+import { RecordEditor } from "../../../../../components/record-editor";
 import { createAssetServices } from "../../../../../lib/asset-services";
+import { homeCrumb } from "../../../../../lib/breadcrumbs";
+import { EDITOR_LABELS } from "../../../../../lib/labels";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
 
 const styles = stylex.create({
@@ -28,7 +27,6 @@ function NewRecordPage() {
   const sync = useTenantSync();
   const types = useSyncTypes(sync);
   const hasSynced = useSyncHasSynced(sync);
-  const navigate = useNavigate();
   const assets = useMemo(() => createAssetServices(adminApi, tenant.id), [adminApi, tenant.id]);
   const contentType = types.find((type) => type.key === typeKey);
   const collection = sync.registry.get(typeKey);
@@ -43,55 +41,20 @@ function NewRecordPage() {
       <>
         <TenantPageHeader title={typeKey} breadcrumbs={[homeCrumb(tenantSlug)]} />
         <PageBody>
-          <p {...stylex.props(styles.muted)}>未知のコンテンツタイプです: {typeKey}</p>
+          <p {...stylex.props(styles.muted)}>{EDITOR_LABELS.unknownType(typeKey)}</p>
         </PageBody>
       </>
     );
   }
 
   return (
-    <>
-      {/* h-common-surface.md 2 章 / a-navigation.md 5 章: パンくずは home › 型 › 新規追加 */}
-      <TenantPageHeader
-        title={`${contentType.name}を追加`}
-        breadcrumbs={[
-          homeCrumb(tenantSlug),
-          contentTypeCrumb(tenantSlug, contentType),
-          currentCrumb("新規追加"),
-        ]}
-      />
-      <PageBody>
-        <RecordForm
-          contentType={contentType}
-          types={types}
-          registry={sync.registry}
-          record={null}
-          submitLabel="作成"
-          assets={assets}
-          onSubmit={async (input) => {
-            // design-spec §5: ID はクライアント生成（UUIDv7）。updatedAt/updatedBy/seq/version は
-            // サーバー権威 — ack の確定レコードで上書きされる仮値を入れる。
-            const record: SyncRecord = {
-              id: uuidv7(),
-              type: typeKey,
-              input,
-              fieldVersions: {},
-              status: "draft",
-              seq: 0,
-              version: 0,
-              deletedAt: null,
-              updatedAt: new Date().toISOString(),
-              updatedBy: "",
-            };
-            const tx = collection.insert(record);
-            await tx.isPersisted.promise;
-            await navigate({
-              to: "/t/$tenantSlug/content/$typeKey",
-              params: { tenantSlug, typeKey },
-            });
-          }}
-        />
-      </PageBody>
-    </>
+    <RecordEditor
+      tenantSlug={tenantSlug}
+      contentType={contentType}
+      types={types}
+      collection={collection}
+      record={null}
+      assets={assets}
+    />
   );
 }

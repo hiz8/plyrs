@@ -1,11 +1,12 @@
 import { ASSET_TYPE_DEFINITION, type ContentTypeDefinition } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { createMemoryHistory } from "@tanstack/react-router";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { createAppContext, getRouter } from "./router";
 import { FakeSocket } from "./test-utils/fake-socket";
+import { renderRouter } from "./test-utils/records-harness";
 
 // richtext-flow.test.tsx と同じヘルパー様式(このリポジトリはテストファイル間でヘルパーを
 // 共有しない既存方針 — コピーで良い)。
@@ -149,7 +150,7 @@ function renderAssetsList(
     context: createAppContext(stubFetch(routes), { connect: () => harness.connect }),
     history: createMemoryHistory({ initialEntries: ["/t/blog/media"] }),
   });
-  render(<RouterProvider router={router} />);
+  renderRouter(router);
   return router;
 }
 
@@ -161,7 +162,7 @@ function renderNewRecord(
     context: createAppContext(stubFetch(routes), { connect: () => harness.connect }),
     history: createMemoryHistory({ initialEntries: ["/t/blog/content/article/new"] }),
   });
-  render(<RouterProvider router={router} />);
+  renderRouter(router);
   return router;
 }
 
@@ -258,7 +259,11 @@ describe("メディアフィールドと本文画像 (record 編集)", () => {
     await user.type(await screen.findByRole("textbox", { name: "title" }), "新しい記事");
     await user.click(screen.getByRole("button", { name: "アセットを選択" }));
     await user.click(await screen.findByRole("button", { name: /one\.png/ }));
-    await user.click(screen.getByRole("button", { name: "作成" }));
+    await user.click(
+      within(screen.getByRole("region", { name: "公開" })).getByRole("button", {
+        name: "下書き保存",
+      }),
+    );
 
     await vi.waitFor(() => expect(pushes(harness.latest()).length).toBe(1));
     const change = pushes(harness.latest())[0];
@@ -279,7 +284,11 @@ describe("メディアフィールドと本文画像 (record 編集)", () => {
     await user.type(await screen.findByRole("textbox", { name: "title" }), "本文画像テスト");
     await user.click(screen.getByRole("button", { name: "画像" }));
     await user.click(await screen.findByRole("button", { name: /one\.png/ }));
-    await user.click(screen.getByRole("button", { name: "作成" }));
+    await user.click(
+      within(screen.getByRole("region", { name: "公開" })).getByRole("button", {
+        name: "下書き保存",
+      }),
+    );
 
     await vi.waitFor(() => expect(pushes(harness.latest()).length).toBe(1));
     const change = pushes(harness.latest())[0];

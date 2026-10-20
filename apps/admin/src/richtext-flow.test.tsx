@@ -1,11 +1,13 @@
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { createMemoryHistory } from "@tanstack/react-router";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, type Mock } from "vitest";
+import { DIALOGS } from "./lib/labels";
 import { createAppContext, getRouter } from "./router";
 import { FakeSocket } from "./test-utils/fake-socket";
+import { renderRouter } from "./test-utils/records-harness";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -119,7 +121,7 @@ function renderEditor(harness: ReturnType<typeof socketHarness>) {
     context: createAppContext(stubFetch(authedRoutes()), { connect: () => harness.connect }),
     history: createMemoryHistory({ initialEntries: [`/t/blog/content/article/${RECORD_1}`] }),
   });
-  render(<RouterProvider router={router} />);
+  renderRouter(router);
   return router;
 }
 
@@ -146,7 +148,11 @@ function pushes(socket: FakeSocket): PushedChange[] {
 async function toggleHeadingAndSave(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole("textbox", { name: "body" });
   await user.click(screen.getByRole("button", { name: "見出し1" }));
-  await user.click(screen.getByRole("button", { name: "保存" }));
+  await user.click(
+    within(screen.getByRole("region", { name: "公開" })).getByRole("button", {
+      name: "下書き保存",
+    }),
+  );
 }
 
 describe("richtext のワイヤレベル編集(/t/$tenantSlug/content/$typeKey/$recordId)", () => {
@@ -212,7 +218,11 @@ describe("richtext のワイヤレベル編集(/t/$tenantSlug/content/$typeKey/$
       }),
     });
 
-    await user.click(screen.getByRole("button", { name: "保存" }));
+    await user.click(
+      within(screen.getByRole("region", { name: "公開" })).getByRole("button", {
+        name: "下書き保存",
+      }),
+    );
     await vi.waitFor(() => expect(pushes(harness.latest()).length).toBe(1));
     const change = pushes(harness.latest())[0];
     if (change === undefined) throw new Error("expected a pushed change");
@@ -257,10 +267,10 @@ describe("本文競合の手動解決(裁定 3)", () => {
   it("adopting the server version resets the editor without a second push", async () => {
     const harness = socketHarness();
     const { user } = await conflictSetup(harness);
-    const dialog = await screen.findByRole("alertdialog", { name: "本文の競合" });
+    const dialog = await screen.findByRole("dialog", { name: DIALOGS.conflict.title });
     expect(dialog).toHaveTextContent("他者の本文");
-    await user.click(screen.getByRole("button", { name: "サーバー版を採用" }));
-    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "ほかの人の編集を取り込む" }));
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByRole("textbox", { name: "body" })).toHaveTextContent("他者の本文");
     expect(pushes(harness.latest()).length).toBe(1); // 再送なし
   });
@@ -268,8 +278,8 @@ describe("本文競合の手動解決(裁定 3)", () => {
   it("keeping mine re-pushes with the advanced base version and wins", async () => {
     const harness = socketHarness();
     const { user, change } = await conflictSetup(harness);
-    await screen.findByRole("alertdialog", { name: "本文の競合" });
-    await user.click(screen.getByRole("button", { name: "自分の版で上書き保存" }));
+    await screen.findByRole("dialog", { name: DIALOGS.conflict.title });
+    await user.click(screen.getByRole("button", { name: "あなたの編集を残す" }));
     await vi.waitFor(() => expect(pushes(harness.latest()).length).toBe(2));
     const second = pushes(harness.latest())[1];
     if (second === undefined) throw new Error("expected a second push");
@@ -290,7 +300,7 @@ describe("本文競合の手動解決(裁定 3)", () => {
         }),
       },
     });
-    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -325,7 +335,7 @@ describe("本文競合の手動解決(裁定 3)", () => {
       },
     });
     // ダイアログもエラーバナーも出ない(実質成功として静かに閉じる)
-    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

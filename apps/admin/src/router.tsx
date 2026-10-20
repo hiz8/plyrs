@@ -4,9 +4,6 @@ import { createSlotRegistry, type SlotRegistry } from "@plyrs/ui";
 import type { ConnectFn } from "@plyrs/sync-client";
 import { createBrowserConnect } from "@plyrs/sync-client/browser";
 import { ErrorScreen } from "./components/error-screen";
-import { PublicationPanel } from "./components/publication-panel";
-import { PublishToolbar } from "./components/publish-toolbar";
-import { StatusControl } from "./components/status-control";
 import { createAdminApi, type AdminApi } from "./lib/admin-api";
 import { createApiClient, type ApiClient } from "./lib/api-client";
 import { createSuperApi, type SuperApi } from "./lib/super-api";
@@ -54,16 +51,8 @@ export function createAppContext(
   const superApi = createSuperApi(fetchImpl);
   const slots = createSlotRegistry();
   // 案 A 4 章: コアの項目はサイドバーが型定義から生成する。nav:item はモジュール独自の画面用に残す
-  // 裁定 5(2026-07-17): コア自身が record-editor スロットに登録する(ドッグフーディング)。
-  // モジュール(Phase 9)も同じ register 経路で操作・パネルを足す。
-  slots.register("record-editor:toolbar", { id: "core.publish", order: 0, render: PublishToolbar });
-  slots.register("record-editor:toolbar", { id: "core.status", order: 1, render: StatusControl });
-  slots.register("record-editor:panel", {
-    id: "core.publication",
-    title: "公開状態",
-    order: 0,
-    render: PublicationPanel,
-  });
+  // コアの項目はサイドバーが型定義から生成し、公開の操作は編集画面の公開ボックスが持つ。
+  // record-editor:toolbar / panel と nav:item はモジュール(Phase 9)が register 経路で足す
   const connectFor = options?.connect ?? ((tenantId: string) => browserConnect(tenantId, tokens));
   const sync: SyncFactory = (tenantId) =>
     createTenantSync({

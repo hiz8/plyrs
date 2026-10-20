@@ -1,125 +1,61 @@
-import type { ContentTypeDefinition } from "@plyrs/metamodel";
-import type { SyncRecord } from "@plyrs/sync-protocol";
-import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi, type Mock } from "vitest";
-import { createAppContext, getRouter } from "./router";
-import { FakeSocket } from "./test-utils/fake-socket";
+import { describe, expect, it, vi } from "vitest";
+import { EDITOR_LABELS } from "./lib/labels";
+import {
+  article,
+  articleType,
+  authedRoutes,
+  bootstrapped,
+  jsonResponse,
+  RECORD_1,
+  renderAt,
+  socketHarness,
+  type Handler,
+  type SocketHarness,
+} from "./test-utils/records-harness";
 
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
-
-type Handler = Mock<(init?: RequestInit) => Response>;
-
-function stubFetch(routes: Record<string, Handler>): typeof fetch {
-  return async (input, init) => {
-    const path =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.pathname
-          : new URL(input.url).pathname;
-    const handler = routes[path];
-    if (handler === undefined) {
-      throw new Error(`unexpected fetch: ${path}`);
-    }
-    return handler(init ?? undefined);
-  };
-}
-
-const blogTenant = { id: "t1", slug: "blog", name: "Blog", role: "owner" };
-
-function authedRoutes(overrides: Record<string, Handler> = {}): Record<string, Handler> {
-  return {
-    "/auth/tenants": vi.fn(() => jsonResponse(200, { tenants: [blogTenant] })),
-    "/auth/token": vi.fn(() => jsonResponse(200, { token: "jwt-abc", expiresIn: 900 })),
-    "/v1/t/t1/content-types": vi.fn(() => jsonResponse(200, { contentTypes: [] })),
-    // Task 11: エディタルートが record-editor:toolbar/panel スロット経由で
-    // publication を fetch するようになったため、既存のエディタ系テストにも要スタブ。
-    [`/v1/t/t1/records/${RECORD_1}/publication`]: vi.fn(() =>
-      jsonResponse(200, { published: false }),
-    ),
-    ...overrides,
-  };
-}
-
-const articleType: ContentTypeDefinition = {
-  id: "018f2b6a-7a0a-7000-8000-000000000001",
-  key: "article",
-  name: "記事",
-  source: "user",
-  version: 1,
-  fields: [{ key: "title", type: "text", required: true }],
+type Push = {
+  changes: {
+    recordId: string;
+    typeKey?: string;
+    changeId: string;
+    input: Record<string, unknown>;
+    changedFields: string[];
+    baseFieldVersions: Record<string, number>;
+    status?: string;
+  }[];
 };
 
-function article(id: string, title: string, overrides: Partial<SyncRecord> = {}): SyncRecord {
-  return {
-    id,
-    type: "article",
-    input: { title },
-    fieldVersions: { title: 1 },
-    status: "draft",
-    seq: 2,
-    version: 1,
-    deletedAt: null,
-    updatedAt: "2026-07-17T00:00:00Z",
-    updatedBy: "u1",
-    ...overrides,
-  };
+function pushOf(harness: SocketHarness): Push | undefined {
+  return harness
+    .latest()
+    .parsed()
+    .find((message) => (message as { type: string }).type === "push") as Push | undefined;
 }
 
-const RECORD_1 = "018f2b6a-7a0a-7000-8000-000000000101";
+// 通知の領域は最初のトーストが出るまで描かれない
+async function toasts() {
+  return within(await screen.findByRole("region", { name: "通知" }));
+}
 
-// ソケットを test 側で握るヘルパー。エンジンの接続確立ごとに新しい FakeSocket を返す。
-function socketHarness() {
-  const sockets: FakeSocket[] = [];
-  const connect = async () => {
-    const socket = new FakeSocket();
-    sockets.push(socket);
-    return socket;
-  };
-  return {
-    sockets,
-    connect,
-    // noUncheckedIndexedAccess: 呼び出し側は必ず接続確立後に呼ぶ前提(実行時には未到達)。
-    // `!` は使わず、他の未定義ガード同様に明示 throw で境界を扱う。
-    latest: (): FakeSocket => {
-      const socket = sockets[sockets.length - 1];
-      if (socket === undefined) {
-        throw new Error("expected at least one connected socket");
+// 下部固定バーにも同名のボタンがあるため、公開ボックスの中で探す
+function publishBox() {
+  return within(screen.getByRole("region", { name: "公開" }));
+}
+
+// 作成画面の ID は実行時に決まるため、publish / publication は URL の形で受ける
+function routesForNewRecord(publish: Handler) {
+  const routes = authedRoutes();
+  return new Proxy(routes, {
+    get(target, key: string) {
+      if (/^\/v1\/t\/t1\/records\/[^/]+\/publish$/.test(key)) return publish;
+      if (/^\/v1\/t\/t1\/records\/[^/]+\/publication$/.test(key) && !(key in target)) {
+        return vi.fn(() => jsonResponse(200, { published: false }));
       }
-      return socket;
+      return target[key];
     },
-  };
-}
-
-async function bootstrapped(socket: FakeSocket, records: SyncRecord[]) {
-  await vi.waitFor(() => expect(socket.parsed()).toContainEqual({ type: "hello", checkpoint: 0 }));
-  socket.deliver({
-    type: "welcome",
-    protocolVersion: 1,
-    contentTypes: [articleType],
-    serverSeq: 10,
   });
-  socket.deliver({ type: "sync", records, serverSeq: 10, complete: true });
-}
-
-function renderAt(
-  path: string,
-  harness: ReturnType<typeof socketHarness>,
-  routes = authedRoutes(),
-) {
-  const router = getRouter({
-    context: createAppContext(stubFetch(routes), { connect: () => harness.connect }),
-    history: createMemoryHistory({ initialEntries: [path] }),
-  });
-  render(<RouterProvider router={router} />);
-  return router;
 }
 
 describe("record 一覧（/t/$tenantSlug/content/$typeKey）", () => {
@@ -143,60 +79,74 @@ describe("record 一覧（/t/$tenantSlug/content/$typeKey）", () => {
 });
 
 describe("record 新規作成", () => {
-  it("inserts a record through the collection and pushes it to the socket", async () => {
+  it("作成画面の下書き保存は insert を push し、ack の後に編集画面の URL へ置き換える", async () => {
     const harness = socketHarness();
-    renderAt("/t/blog/content/article/new", harness);
+    const router = renderAt("/t/blog/content/article/new", harness, routesForNewRecord(vi.fn()));
     await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
     await bootstrapped(harness.latest(), []);
 
     const user = userEvent.setup();
     await user.type(await screen.findByRole("textbox", { name: "title" }), "新しい記事");
-    await user.click(screen.getByRole("button", { name: "作成" }));
+    await user.click(publishBox().getByRole("button", { name: "下書き保存" }));
 
-    // push が飛び、input に title が載る
     await vi.waitFor(() => {
-      const push = harness
-        .latest()
-        .parsed()
-        .find((message) => (message as { type: string }).type === "push") as
-        | {
-            changes: {
-              recordId: string;
-              typeKey: string;
-              input: Record<string, unknown>;
-              changeId: string;
-              status?: string;
-            }[];
-          }
-        | undefined;
-      expect(push).toBeDefined();
-      expect(push?.changes[0]).toMatchObject({
+      expect(pushOf(harness)?.changes[0]).toMatchObject({
         typeKey: "article",
         input: { title: "新しい記事" },
         status: "draft",
       });
     });
-
-    // ack を返すと一覧へ遷移し、確定レコードが表示される
-    const push = harness
-      .latest()
-      .parsed()
-      .find((message) => (message as { type: string }).type === "push") as {
-      changes: { recordId: string; changeId: string }[];
-    };
-    const change = push.changes[0];
+    const change = pushOf(harness)?.changes[0];
     if (change === undefined) throw new Error("expected a pushed change");
+    // ack の前は作成画面のまま
+    expect(router.state.location.pathname).toBe("/t/blog/content/article/new");
+
     harness.latest().deliver({
       type: "ack",
       changeId: change.changeId,
       result: { ok: true, record: article(change.recordId, "新しい記事", { seq: 11, version: 1 }) },
     });
-    expect(await screen.findByRole("cell", { name: "新しい記事" })).toBeInTheDocument();
+    await vi.waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/t/blog/content/article/${change.recordId}`),
+    );
+    expect(await (await toasts()).findByText("保存しました")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "記事を編集" }),
+    ).toBeInTheDocument();
+  });
+
+  it("作成画面の公開は作成の確定後に公開し、編集画面の URL に置き換える", async () => {
+    const harness = socketHarness();
+    const publish: Handler = vi.fn(() => jsonResponse(200, { ok: true }));
+    const router = renderAt("/t/blog/content/article/new", harness, routesForNewRecord(publish));
+    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
+    await bootstrapped(harness.latest(), []);
+
+    const user = userEvent.setup();
+    await user.type(await screen.findByRole("textbox", { name: "title" }), "公開する記事");
+    await user.click(publishBox().getByRole("button", { name: "公開" }));
+
+    await vi.waitFor(() => expect(pushOf(harness)).toBeDefined());
+    const change = pushOf(harness)?.changes[0];
+    if (change === undefined) throw new Error("expected a pushed change");
+    // push の ack を待つ間は公開を呼ばない
+    expect(publish).not.toHaveBeenCalled();
+
+    harness.latest().deliver({
+      type: "ack",
+      changeId: change.changeId,
+      result: { ok: true, record: article(change.recordId, "公開する記事", { seq: 11 }) },
+    });
+    await vi.waitFor(() => expect(publish).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/t/blog/content/article/${change.recordId}`),
+    );
+    expect(await (await toasts()).findByText("公開しました")).toBeInTheDocument();
   });
 });
 
 describe("record エディタ", () => {
-  it("edits an existing record and pushes only the changed field", async () => {
+  it("編集画面の「下書き保存」は変更したフィールドだけを push する", async () => {
     const harness = socketHarness();
     renderAt(`/t/blog/content/article/${RECORD_1}`, harness);
     await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
@@ -206,22 +156,10 @@ describe("record エディタ", () => {
     const input = await screen.findByRole("textbox", { name: "title" });
     await user.clear(input);
     await user.type(input, "新タイトル");
-    await user.click(screen.getByRole("button", { name: "保存" }));
+    await user.click(publishBox().getByRole("button", { name: "下書き保存" }));
 
     await vi.waitFor(() => {
-      const push = harness
-        .latest()
-        .parsed()
-        .find((message) => (message as { type: string }).type === "push") as
-        | {
-            changes: {
-              recordId: string;
-              changedFields: string[];
-              baseFieldVersions: Record<string, number>;
-            }[];
-          }
-        | undefined;
-      expect(push?.changes[0]).toMatchObject({
+      expect(pushOf(harness)?.changes[0]).toMatchObject({
         recordId: RECORD_1,
         changedFields: ["title"],
         baseFieldVersions: { title: 1 },
@@ -229,61 +167,35 @@ describe("record エディタ", () => {
     });
   });
 
-  it("shows a not-found message for a missing record after sync completes", async () => {
+  it("閲覧者には読み取り専用のフォームと「表示」のパンくずが出て、ボタンが無い", async () => {
+    const harness = socketHarness();
+    renderAt(`/t/blog/content/article/${RECORD_1}`, harness, authedRoutes({}, "viewer"));
+    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
+    await bootstrapped(harness.latest(), [article(RECORD_1, "読むだけ")]);
+
+    expect(await screen.findByRole("textbox", { name: "title" })).toHaveAttribute("readonly");
+    expect(publishBox().queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByText(EDITOR_LABELS.crumbView)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "記事を表示" })).toBeInTheDocument();
+  });
+
+  it("存在しない id は見つからない旨を出す", async () => {
     const harness = socketHarness();
     renderAt(`/t/blog/content/article/${RECORD_1}`, harness);
     await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
     await bootstrapped(harness.latest(), []);
-    expect(await screen.findByText(/レコードが見つかりません/)).toBeInTheDocument();
+    expect(await screen.findByText(EDITOR_LABELS.notFound)).toBeInTheDocument();
   });
 
-  it("deletes the record after confirmation and navigates back to the list", async () => {
+  it("未知の型は見つからない旨を出す", async () => {
     const harness = socketHarness();
-    renderAt(`/t/blog/content/article/${RECORD_1}`, harness);
-    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
-    await bootstrapped(harness.latest(), [article(RECORD_1, "消える記事")]);
-
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "削除" }));
-    await user.click(await screen.findByRole("button", { name: "削除を確定" }));
-
-    await vi.waitFor(() => {
-      const push = harness
-        .latest()
-        .parsed()
-        .find((message) => (message as { type: string }).type === "push") as
-        | { changes: { op: string; recordId: string; changeId: string }[] }
-        | undefined;
-      expect(push?.changes[0]).toMatchObject({ op: "delete", recordId: RECORD_1 });
-    });
-    const push = harness
-      .latest()
-      .parsed()
-      .find((message) => (message as { type: string }).type === "push") as {
-      changes: { changeId: string }[];
-    };
-    const change = push.changes[0];
-    if (change === undefined) throw new Error("expected a pushed change");
-    harness.latest().deliver({
-      type: "ack",
-      changeId: change.changeId,
-      result: {
-        ok: true,
-        record: article(RECORD_1, "", { seq: 12, deletedAt: "2026-07-17T01:00:00Z", input: {} }),
-      },
-    });
-    expect(await screen.findByText(/レコードはまだありません/)).toBeInTheDocument();
-  });
-
-  it("shows the unknown-type message for a type that does not exist", async () => {
-    const harness = socketHarness();
-    renderAt("/t/blog/content/ghost", harness);
+    renderAt("/t/blog/content/ghost/new", harness);
     await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
     await bootstrapped(harness.latest(), []);
-    expect(await screen.findByText(/未知のコンテンツタイプ/)).toBeInTheDocument();
+    expect(await screen.findByText(EDITOR_LABELS.unknownType("ghost"))).toBeInTheDocument();
   });
 
-  it("keeps the form mounted with unsaved input across a disconnect (§12 必須①)", async () => {
+  it("未保存の入力は切断をまたいで残る(§12 必須①)", async () => {
     const harness = socketHarness();
     renderAt(`/t/blog/content/article/${RECORD_1}`, harness);
     await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
