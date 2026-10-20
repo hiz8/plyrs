@@ -1,7 +1,17 @@
 import * as stylex from "@stylexjs/stylex";
 import { Menu } from "lucide-react";
 import { IconButton } from "@plyrs/ui";
-import { bg, border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
+import {
+  bg,
+  border,
+  font,
+  layer,
+  radius,
+  space,
+  status,
+  stroke,
+  text,
+} from "@plyrs/ui/semantic.stylex";
 import { NAV_LABELS, SYNC_INDICATOR_LABELS } from "../../lib/labels";
 import type { SyncIndicatorState } from "../../lib/sync-indicator";
 
@@ -12,6 +22,9 @@ const styles = stylex.create({
     alignItems: "center",
     gap: space.sm,
     height: "48px",
+    position: "sticky",
+    top: 0,
+    zIndex: layer.dropdown,
     flex: "none",
     paddingInline: space.sm,
     boxSizing: "border-box",

@@ -14,6 +14,7 @@ import { Sidebar, type SidebarProps } from "../../../components/shell/sidebar";
 import { TopBar } from "../../../components/shell/top-bar";
 import { ApiError } from "../../../lib/api-client";
 import { resetClientSession } from "../../../lib/client-session";
+import { NAV_LABELS } from "../../../lib/labels";
 import { legacyPathname } from "../../../lib/legacy-redirect";
 import { meQueryOptions, modulesQueryOptions, tenantsQueryOptions } from "../../../lib/queries";
 import {
@@ -170,7 +171,12 @@ function ShellLayout() {
           </TenantSyncProvider>
         </main>
       </div>
-      <Drawer isOpen={drawerOpen} onOpenChange={setDrawerOpen} label="メニュー" offsetTop={48}>
+      <Drawer
+        isOpen={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        label={NAV_LABELS.menu}
+        offsetTop={48}
+      >
         <Sidebar {...sidebarProps} onNavigate={() => setDrawerOpen(false)} />
       </Drawer>
     </div>

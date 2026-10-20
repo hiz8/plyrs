@@ -102,7 +102,7 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     socket?.deliver({ type: "sync", records: [], serverSeq: 1, complete: true });
     expect(await screen.findByRole("link", { name: "記事" })).toHaveAttribute(
       "aria-current",
-      "page",
+      "true",
     );
     expect(screen.getByRole("link", { name: "一覧" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "新規追加" })).toBeInTheDocument();
@@ -276,7 +276,7 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
   it("ドロワーを開いて項目を選ぶと閉じる(Review Focus 5)", async () => {
     const router = renderAt("/t/blog/settings/content-types", authedRoutes());
     const toggle = await screen.findByRole("button", { name: "メニューを開く" });
-    const overflowBefore = document.body.style.overflow;
+    const overflowBefore = document.documentElement.style.overflow;
     // 開く操作だけ fireEvent: 上のコメントと同じ理由で、user-event のポインタ列だと戻らない
     // fireEvent.click はフォーカスを動かさないので、開く前に明示してフォーカス復帰を観測できるようにする
     toggle.focus();
@@ -295,7 +295,7 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     expect(router.state.location.pathname).toBe("/t/blog/media");
     // モーダルの後始末: 外側の aria-hidden が外れ、スクロール固定が戻り、フォーカスが開閉ボタンへ戻る
     expect(screen.getByRole("main")).toBeInTheDocument();
-    expect(document.body.style.overflow).toBe(overflowBefore);
+    expect(document.documentElement.style.overflow).toBe(overflowBefore);
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "メニューを開く" }));
   });
 });

@@ -16,6 +16,7 @@ import {
 import { ApiError } from "../lib/api-client";
 import { resetClientSession } from "../lib/client-session";
 import { roleLabel, SITE_SELECT } from "../lib/labels";
+import { can } from "../lib/permissions";
 import { meQueryOptions, tenantsQueryOptions } from "../lib/queries";
 
 // サイト選択画面(a-navigation.md 8 章 / D2 S8)。所属が 1 件なら選ぶ余地が無いので転送する。
@@ -151,7 +152,7 @@ function TenantsPage() {
           <>
             <p {...stylex.props(styles.description)}>
               {email === undefined
-                ? `${tenants.length} つのサイトに所属しています`
+                ? SITE_SELECT.descriptionWithoutEmail(tenants.length)
                 : SITE_SELECT.description(email, tenants.length)}
             </p>
             <ul {...stylex.props(styles.list)}>
@@ -164,7 +165,7 @@ function TenantsPage() {
                   >
                     <Avatar size="md" name={tenant.name} />
                     <span {...stylex.props(styles.name)}>{tenant.name}</span>
-                    <Badge tone={tenant.role === "owner" ? "accent" : "neutral"}>
+                    <Badge tone={can(tenant.role, "member:manage") ? "accent" : "neutral"}>
                       {roleLabel(tenant.role)}
                     </Badge>
                     <ChevronRight

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { VisuallyHidden } from "react-aria-components";
 import { PageHeader, Skeleton, type PageHeaderProps } from "@plyrs/ui";
 import { space } from "@plyrs/ui/semantic.stylex";
+import { LOADING_LABEL } from "../lib/labels";
 import { syncIndicatorState } from "../lib/sync-indicator";
 import { useSyncHasSynced, useSyncStatus, useTenantSync } from "../lib/sync-context";
 import { ConnectionBanner } from "./connection-banner";
@@ -43,14 +44,14 @@ export function PageLoading({ breadcrumbs }: Pick<PageHeaderProps, "breadcrumbs"
       <TenantPageHeader
         title={
           <>
-            <VisuallyHidden>読み込み中</VisuallyHidden>
+            <VisuallyHidden>{LOADING_LABEL}</VisuallyHidden>
             <Skeleton width={160} height={24} />
           </>
         }
         breadcrumbs={breadcrumbs}
       />
       <PageBody>
-        <div role="status" aria-label="読み込み中" {...stylex.props(styles.loading)}>
+        <div aria-hidden="true" {...stylex.props(styles.loading)}>
           <Skeleton height={14} width="100%" />
           <Skeleton height={14} width="80%" />
           <Skeleton height={14} width="60%" />

@@ -66,6 +66,7 @@ export const NAV_LABELS = {
   add: "新規追加",
   createFirstType: "最初のコンテンツタイプを作成",
   noTypes: "コンテンツの種類がまだありません。サイトの管理者に作成を依頼してください",
+  menu: "メニュー",
   openMenu: "メニューを開く",
   closeMenu: "メニューを閉じる",
   switchSite: "サイトを切り替え",
@@ -91,6 +92,10 @@ export const SITE_SELECT = {
   title: "サイトを選択",
   description: (email: string, count: number) =>
     `${email} として ${count} つのサイトに所属しています`,
+  descriptionWithoutEmail: (count: number) => `${count} つのサイトに所属しています`,
   none: "サイトは運営者が発行します",
   otherAccount: "別のアカウントでログイン",
 } as const;
+
+// 初回同期前などの読み込み中の読み上げ
+export const LOADING_LABEL = "読み込み中";

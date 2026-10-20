@@ -54,6 +54,8 @@ export interface NavEntry {
   key: string;
   href: string;
   matchPrefix?: string;
+  // true なら pathname が href と一致するときだけ当てる(前方一致しない)
+  exact?: boolean;
 }
 
 // pathname に当てはまる項目のうち、(matchPrefix ?? href) が最長のものの key。
@@ -62,7 +64,8 @@ export function activeNavKey(entries: readonly NavEntry[], pathname: string): st
   for (const entry of entries) {
     const base = entry.matchPrefix ?? entry.href;
     const matches =
-      pathname === entry.href || pathname === entry.matchPrefix || pathname.startsWith(`${base}/`);
+      pathname === entry.href ||
+      (entry.exact !== true && (pathname === entry.matchPrefix || pathname.startsWith(`${base}/`)));
     if (matches && (best === null || base.length > best.length)) {
       best = { key: entry.key, length: base.length };
     }

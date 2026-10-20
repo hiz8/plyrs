@@ -54,6 +54,6 @@ it("初回同期の前はスケルトンの見出しと読み込み中の本文�
     </TenantSyncProvider>,
   );
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("読み込み中");
-  expect(screen.getByRole("status", { name: "読み込み中" })).toBeInTheDocument();
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "ホーム" })).toHaveAttribute("href", "/t/blog");
 });

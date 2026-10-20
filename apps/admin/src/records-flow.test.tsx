@@ -136,7 +136,9 @@ describe("record 一覧（/t/$tenantSlug/content/$typeKey）", () => {
   it("shows the syncing state until the bootstrap completes", async () => {
     const harness = socketHarness();
     renderAt("/t/blog/content/article", harness);
-    expect(await screen.findByRole("status", { name: "読み込み中" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "読み込み中" }),
+    ).toBeInTheDocument();
   });
 });
 

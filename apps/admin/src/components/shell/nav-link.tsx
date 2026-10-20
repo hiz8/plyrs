@@ -68,7 +68,8 @@ export interface NavLinkProps {
   href: string;
   label: string;
   icon?: LucideIcon;
-  isCurrent: boolean;
+  /** true: 現在地(塗る)/ "ancestor": 現在地を子に持つ親(aria-current="true"、塗らない) */
+  isCurrent: boolean | "ancestor";
   /** 押されたときに呼ぶ(ドロワーを閉じる用。同じ URL への遷移でも確実に呼ばれる) */
   onNavigate?: () => void;
 }
@@ -86,12 +87,12 @@ function Item({
       href={href}
       onPress={onNavigate}
       // 現在地の 1 項目だけに付ける(他に aria-current="false" は付けない)
-      aria-current={isCurrent ? "page" : undefined}
+      aria-current={isCurrent === "ancestor" ? "true" : isCurrent ? "page" : undefined}
       className={stylexRenderProps<LinkRenderProps>((state) => [
         styles.link,
         child && styles.child,
         state.isHovered && styles.hovered,
-        isCurrent && styles.current,
+        isCurrent === true && styles.current,
         state.isFocusVisible && styles.focusVisible,
       ])}
     >

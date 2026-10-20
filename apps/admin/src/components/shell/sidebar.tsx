@@ -171,7 +171,7 @@ export function Sidebar(props: SidebarProps) {
     matchPrefix: `${base}/settings`,
   };
   const entries: NavEntry[] = [
-    { key: "home", href: base },
+    { key: "home", href: base, exact: true },
     ...contentTypes.map((t) => typeEntry(t.key)),
     { key: "media", href: `${base}/media` },
     ...groups.flatMap((g) => g.types.map((t) => typeEntry(t.key))),
@@ -194,7 +194,8 @@ export function Sidebar(props: SidebarProps) {
             href={entry.href}
             label={t.name}
             icon={FileText}
-            isCurrent={isActive}
+            // 子の「一覧」が page を持つので、親は祖先として true にする
+            isCurrent={isActive ? "ancestor" : false}
             onNavigate={onNavigate}
           />
           {isActive && (

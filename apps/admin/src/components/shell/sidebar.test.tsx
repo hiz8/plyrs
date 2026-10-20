@@ -60,7 +60,7 @@ describe("Sidebar", () => {
     ]);
     expect(within(nav).getByRole("link", { name: "お知らせ" })).toHaveAttribute(
       "aria-current",
-      "page",
+      "true",
     );
     expect(within(nav).getByRole("link", { name: "一覧" })).toHaveAttribute(
       "href",
@@ -78,8 +78,14 @@ describe("Sidebar", () => {
 
   it("編集画面でも親の型が現在地になり、子項目は現在地にならない", () => {
     renderSidebar({ pathname: "/t/blog/content/news/0190a1b2-c3d4-7000-8000-000000000001" });
-    expect(screen.getByRole("link", { name: "お知らせ" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "お知らせ" })).toHaveAttribute("aria-current", "true");
     expect(screen.getByRole("link", { name: "一覧" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("一覧が現在地のとき親の型は aria-current=true、子の一覧は page", () => {
+    renderSidebar({ pathname: "/t/blog/content/news" });
+    expect(screen.getByRole("link", { name: "お知らせ" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("link", { name: "一覧" })).toHaveAttribute("aria-current", "page");
   });
 
   it("閲覧者には設定と新規追加を出さない", () => {

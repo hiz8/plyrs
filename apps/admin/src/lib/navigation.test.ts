@@ -90,3 +90,13 @@ describe("activeNavKey", () => {
     expect(activeNavKey(entries, pathname)).toBe(key);
   });
 });
+
+it("exact の項目は前方一致しない(同期前にホームが現在地にならない)", () => {
+  const entries = [
+    { key: "home", href: "/t/blog", exact: true },
+    { key: "type:article", href: "/t/blog/content/article" },
+  ];
+  expect(activeNavKey(entries, "/t/blog/content/article")).toBe("type:article");
+  expect(activeNavKey(entries, "/t/blog/media")).toBeNull();
+  expect(activeNavKey(entries, "/t/blog")).toBe("home");
+});
