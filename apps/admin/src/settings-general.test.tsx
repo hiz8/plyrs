@@ -67,4 +67,19 @@ describe("設定 › 一般", () => {
     await userEvent.setup().click(await screen.findByRole("tab", { name: "モジュール" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/settings/modules"));
   });
+
+  it("/_config の取得に失敗すると公開 API のカードに alert と再試行が出て、再試行でベース URL が出る", async () => {
+    const config = vi
+      .fn()
+      .mockImplementationOnce(() => jsonResponse(500, { error: "boom" }))
+      .mockImplementation(() => jsonResponse(200, { publicApiOrigin: "https://api.example" }));
+    renderAt("/t/blog/settings/general", socketHarness(), authedRoutes({ "/_config": config }));
+    const card = await screen.findByRole("region", { name: "公開 API" });
+    expect(await within(card).findByRole("alert")).toHaveTextContent("設定を読み込めませんでした");
+    await userEvent.setup().click(within(card).getByRole("button", { name: "再試行" }));
+    expect(
+      await within(card).findByText("https://api.example/public/v1/blog/"),
+    ).toBeInTheDocument();
+    expect(within(card).queryByRole("alert")).not.toBeInTheDocument();
+  });
 });

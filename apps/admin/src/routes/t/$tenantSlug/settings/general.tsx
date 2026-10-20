@@ -1,8 +1,9 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
-import { Button, Skeleton, toaster } from "@plyrs/ui";
-import { font, space, status } from "@plyrs/ui/semantic.stylex";
+import { toaster } from "@plyrs/ui";
+import { space } from "@plyrs/ui/semantic.stylex";
+import { CardError, CardLoading } from "../../../../components/settings/card-state";
 import { CopyField } from "../../../../components/settings/copy-field";
 import { SettingsCard } from "../../../../components/settings/settings-card";
 import { SettingsFrame } from "../../../../components/settings/settings-frame";
@@ -16,7 +17,6 @@ import { useSyncTypes, useTenantSync } from "../../../../lib/sync-context";
 
 const styles = stylex.create({
   stack: { display: "flex", flexDirection: "column", gap: space.md },
-  alert: { margin: 0, fontSize: font.body, color: status.danger },
 });
 
 export const Route = createFileRoute("/t/$tenantSlug/settings/general")({
@@ -41,25 +41,9 @@ function GeneralPage() {
   const firstType = sidebarContentTypes(types)[0];
   let publicApi;
   if (config.isLoadingError) {
-    publicApi = (
-      <div {...stylex.props(styles.stack)}>
-        <p role="alert" {...stylex.props(styles.alert)}>
-          {labels.loadFailed}
-        </p>
-        <div>
-          <Button variant="secondary" onPress={() => void config.refetch()}>
-            {labels.retry}
-          </Button>
-        </div>
-      </div>
-    );
+    publicApi = <CardError message={labels.loadFailed} onRetry={() => void config.refetch()} />;
   } else if (config.data === undefined) {
-    publicApi = (
-      <div aria-hidden="true" {...stylex.props(styles.stack)}>
-        <Skeleton height={14} width="100%" />
-        <Skeleton height={14} width="80%" />
-      </div>
-    );
+    publicApi = <CardLoading rows={2} />;
   } else {
     const origin = resolvePublicOrigin(config.data.publicApiOrigin, window.location.origin);
     publicApi = (

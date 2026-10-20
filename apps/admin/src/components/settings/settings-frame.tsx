@@ -1,11 +1,12 @@
 import * as stylex from "@stylexjs/stylex";
 import { useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { Button, Skeleton, Tabs } from "@plyrs/ui";
-import { font, space, status } from "@plyrs/ui/semantic.stylex";
+import { Tabs } from "@plyrs/ui";
+import { space } from "@plyrs/ui/semantic.stylex";
 import { currentCrumb, homeCrumb, settingsCrumb } from "../../lib/breadcrumbs";
 import { SETTINGS_LABELS } from "../../lib/labels";
 import { PageBody, TenantPageHeader } from "../tenant-page-header";
+import { CardError, CardLoading } from "./card-state";
 
 export type SettingsTab = "general" | "content-types" | "members" | "modules";
 
@@ -21,8 +22,6 @@ const styles = stylex.create({
     maxWidth: SETTINGS_MAX_WIDTH,
     paddingTop: space.lg,
   },
-  loading: { display: "flex", flexDirection: "column", gap: space.sm },
-  alert: { margin: 0, fontSize: font.body, color: status.danger },
 });
 
 export function SettingsFrame({
@@ -44,26 +43,9 @@ export function SettingsFrame({
   const labels = SETTINGS_LABELS;
   let body: ReactNode = children;
   if (error !== undefined) {
-    body = (
-      <>
-        <p role="alert" {...stylex.props(styles.alert)}>
-          {error.message}
-        </p>
-        <div>
-          <Button variant="secondary" onPress={error.onRetry}>
-            {labels.retry}
-          </Button>
-        </div>
-      </>
-    );
+    body = <CardError message={error.message} onRetry={error.onRetry} />;
   } else if (isLoading === true) {
-    body = (
-      <div aria-hidden="true" {...stylex.props(styles.loading)}>
-        <Skeleton height={14} width="100%" />
-        <Skeleton height={14} width="80%" />
-        <Skeleton height={14} width="60%" />
-      </div>
-    );
+    body = <CardLoading />;
   }
   return (
     <>
@@ -77,6 +59,7 @@ export function SettingsFrame({
           label={labels.tabsName}
           items={TAB_ORDER.map((id) => ({ id, label: labels.tabs[id] }))}
           selectedKey={tab}
+          // Task 7 で members が揃ったら型付きの to に替える
           onSelectionChange={(id) => void navigate({ href: `/t/${slug}/settings/${id}` })}
         >
           {(id) =>
