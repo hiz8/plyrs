@@ -124,6 +124,20 @@ it("編集は変更が無いと保存が無効で、表示名を変えると有�
   );
 });
 
+it("暗黙のタイトルのパネルを変更せずに適用しても保存は無効のまま", async () => {
+  const user = userEvent.setup();
+  setup();
+  const titleRow = screen.getByRole("row", { name: /タイトル/ });
+  await user.click(within(titleRow).getByRole("button", { name: editor.editField }));
+  const panel = await screen.findByRole("dialog", { name: "タイトル" });
+  await user.click(within(panel).getByRole("button", { name: FIELD_PANEL_LABELS.apply }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "タイトル" })).not.toBeInTheDocument(),
+  );
+  expect(screen.getByRole("button", { name: editor.save })).toBeDisabled();
+  expect(within(titleRow).getByText(CONTENT_TYPE_LABELS.tags.title)).toBeInTheDocument();
+});
+
 it("パネルの適用でタイトルに使うが移り、行のタグが変わる", async () => {
   const user = userEvent.setup();
   setup();

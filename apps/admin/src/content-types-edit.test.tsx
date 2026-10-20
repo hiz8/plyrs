@@ -76,6 +76,8 @@ describe("設定 › コンテンツタイプ(編集)", () => {
       key: "article",
       fields: [{ key: "title", required: true }],
     });
+    // 暗黙のタイトルは適用しても titleField に書き込まれない
+    expect(putBody().titleField).toBeUndefined();
   });
 
   it("一覧に表示する列を足すと listColumns が PUT に入る", async () => {

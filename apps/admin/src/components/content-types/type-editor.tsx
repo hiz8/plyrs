@@ -157,7 +157,10 @@ export function TypeEditor({
       const renamed = oldKey !== null && oldKey !== applied.key;
       let titleField = current.titleField;
       if (options.isTitle) {
-        titleField = applied.key;
+        // 暗黙のタイトル(指定無し・最初のテキスト)は適用しても明示値に変えない
+        const isImplicit =
+          current.titleField === null && effectiveTitleField(current) === applied.key;
+        titleField = isImplicit ? null : applied.key;
       } else if (titleField === oldKey) {
         titleField = null;
       }
