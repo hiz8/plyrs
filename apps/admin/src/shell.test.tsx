@@ -76,9 +76,8 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
     expect(screen.queryByRole("link", { name: "最初のコンテンツタイプを作成" })).toBeNull();
     // ヘッダーの廃止(サイト名のリンクは無い)
     expect(screen.queryByRole("link", { name: /Blog/ })).not.toBeInTheDocument();
-    expect(await screen.findByRole("cell", { name: "article" })).toBeInTheDocument();
-    expect(screen.getByRole("cell", { name: "記事" })).toBeInTheDocument();
-    expect(screen.getByRole("cell", { name: "2" })).toBeInTheDocument(); // フィールド数
+    expect(await screen.findByText("API 名: article")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "記事" })).toBeInTheDocument();
     // Bearer トークンが付与されている（token-manager 経由）
     const listCall = routes["/v1/t/t1/content-types"]?.mock.calls[0]?.[0] as RequestInit;
     expect(new Headers(listCall.headers).get("authorization")).toBe("Bearer jwt-abc");
@@ -212,8 +211,9 @@ describe("認証済みシェル (/t/$tenantSlug)", () => {
   });
 
   it("shows the error screen when a loader fails with a server error", async () => {
+    // 一覧(settings/content-types)は枠の中にエラーを出すため、loader で失敗をルートのエラーにする編集画面で試す
     renderAt(
-      "/t/blog/settings/content-types",
+      "/t/blog/settings/content-types/article/edit",
       authedRoutes({
         "/v1/t/t1/content-types": vi.fn(() => jsonResponse(500, { error: "boom" })),
       }),
