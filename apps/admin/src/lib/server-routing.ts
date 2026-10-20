@@ -2,13 +2,17 @@ import { isApiPath } from "./api-paths";
 
 // server.ts は cloudflare:workers を import するため vitest で直接テストできない —
 // 判定だけこの純関数に切り出す(api-paths.ts と同じ理由)。
-export type ServerRoute = "api" | "shell" | "ssr";
+export type ServerRoute = "api" | "shell" | "ssr" | "config";
 
 export function resolveServerRoute(
   request: Request,
   opts: { devProxyPublic: boolean },
 ): ServerRoute {
   const { pathname } = new URL(request.url);
+  // 公開 API のオリジン(設定 › 一般)。api の接頭辞判定より前に見る
+  if (pathname === "/_config") {
+    return "config";
+  }
   if (isApiPath(pathname)) {
     return "api";
   }

@@ -9,6 +9,16 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 describe("api client (same-origin 相対パス・fetch 注入)", () => {
+  it("getConfig は /_config を読む", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, { publicApiOrigin: "https://api.example" }));
+    const api = createApiClient(fetchImpl);
+    expect(await api.getConfig()).toStrictEqual({ publicApiOrigin: "https://api.example" });
+    const [path] = fetchImpl.mock.calls[0] as [string];
+    expect(path).toBe("/_config");
+  });
+
   it("posts credentials to /auth/login", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { userId: "u1" }));
     const api = createApiClient(fetchImpl);

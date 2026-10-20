@@ -22,6 +22,15 @@ export function meQueryOptions(api: ApiClient) {
   });
 }
 
+// デプロイ単位で固定(案 G 3 章、裁定 G1)
+export function configQueryOptions(api: ApiClient) {
+  return queryOptions({
+    queryKey: ["config"],
+    queryFn: () => api.getConfig(),
+    staleTime: Infinity,
+  });
+}
+
 export function contentTypesQueryOptions(adminApi: AdminApi, tenantId: string) {
   return queryOptions({
     queryKey: ["content-types", tenantId],

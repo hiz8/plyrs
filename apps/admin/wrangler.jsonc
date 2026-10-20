@@ -8,7 +8,8 @@
   "services": [{ "binding": "API", "service": "plyrs-api" }],
   // 裁定 10(2026-07-18): /public/v1 の dev 限定転送スイッチ。既定は無効(本番挙動)。
   // ローカル E2E は apps/admin/.dev.vars で "1" に上書きする(.dev.vars.example 参照)。
-  "vars": { "DEV_PROXY_PUBLIC": "0" },
+  // 案 G 3 章、裁定 G1: 設定 › 一般の公開 API の URL。空文字は同一オリジン。
+  "vars": { "DEV_PROXY_PUBLIC": "0", "PUBLIC_API_ORIGIN": "" },
   // SPA シェル配信(防御 A): server.ts が _shell.html を fetch するための assets
   // binding。directory は @cloudflare/vite-plugin がビルド出力から自動注入するため書かない。
   "assets": { "binding": "ASSETS" },
@@ -17,13 +18,19 @@
     "preview": {
       "name": "plyrs-admin-preview",
       "services": [{ "binding": "API", "service": "plyrs-api-preview" }],
-      "vars": { "DEV_PROXY_PUBLIC": "0" },
+      "vars": {
+        "DEV_PROXY_PUBLIC": "0",
+        "PUBLIC_API_ORIGIN": "https://plyrs-api-preview.hiz.workers.dev",
+      },
       "assets": { "binding": "ASSETS" },
     },
     "production": {
       "name": "plyrs-admin",
       "services": [{ "binding": "API", "service": "plyrs-api" }],
-      "vars": { "DEV_PROXY_PUBLIC": "0" },
+      "vars": {
+        "DEV_PROXY_PUBLIC": "0",
+        "PUBLIC_API_ORIGIN": "https://plyrs-api.hiz.workers.dev",
+      },
       "assets": { "binding": "ASSETS" },
     },
   },

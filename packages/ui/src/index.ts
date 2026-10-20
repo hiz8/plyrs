@@ -78,3 +78,8 @@ export {
 } from "./table";
 export { DropZone, type DropZoneProps } from "./drop-zone";
 export { PageHeader, type PageHeaderProps } from "./page-header";
+export {
+  SegmentedControl,
+  type SegmentedControlProps,
+  type SegmentedItem,
+} from "./segmented-control";

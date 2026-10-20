@@ -4,6 +4,12 @@ import { resolveServerRoute } from "./server-routing";
 // server.ts は cloudflare:workers を import するため vitest で直接テストできない —
 // 判定だけこの純関数に切り出してテストする(api-paths.ts と同じ理由)。
 describe("resolveServerRoute", () => {
+  it("routes GET /_config to config before the api prefixes", () => {
+    expect(
+      resolveServerRoute(new Request("https://admin.example/_config"), { devProxyPublic: false }),
+    ).toBe("config");
+  });
+
   it("routes document GET requests with Accept: text/html to the shell", () => {
     const request = new Request("https://admin.example.com/super-login", {
       headers: { Accept: "text/html" },

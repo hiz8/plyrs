@@ -15,6 +15,10 @@ export interface Me {
   email: string;
 }
 
+export interface AppConfig {
+  publicApiOrigin: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -97,6 +101,9 @@ export function createApiClient(baseFetch: typeof fetch = (...args) => fetch(...
     // §6: siteKey が null なら Turnstile 無効(フロントは従来 UI のまま何もしない)
     turnstileConfig(): Promise<{ siteKey: string | null }> {
       return requestJson("/auth/turnstile-config");
+    },
+    getConfig(): Promise<AppConfig> {
+      return requestJson("/_config");
     },
     getMe(): Promise<Me> {
       return requestJson("/auth/me");
