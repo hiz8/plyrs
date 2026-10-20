@@ -92,7 +92,7 @@ function Item({
         styles.link,
         child && styles.child,
         state.isHovered && styles.hovered,
-        isCurrent === true && styles.current,
+        isCurrent !== false && styles.current,
         state.isFocusVisible && styles.focusVisible,
       ])}
     >

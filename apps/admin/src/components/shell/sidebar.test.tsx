@@ -82,6 +82,15 @@ describe("Sidebar", () => {
     expect(screen.getByRole("link", { name: "一覧" })).not.toHaveAttribute("aria-current");
   });
 
+  it("編集画面では親の型が現在地の塗りを持ち、他の型とは見た目が違う", () => {
+    renderSidebar({ pathname: "/t/blog/content/news/0190a1b2-c3d4-7000-8000-000000000001" });
+    const parent = screen.getByRole("link", { name: "お知らせ" });
+    const other = screen.getByRole("link", { name: "ブログ" });
+    expect(parent).toHaveAttribute("aria-current", "true");
+    // 同じ NavLink で違うのは現在地のスタイルだけ
+    expect(parent.className).not.toBe(other.className);
+  });
+
   it("一覧が現在地のとき親の型は aria-current=true、子の一覧は page", () => {
     renderSidebar({ pathname: "/t/blog/content/news" });
     expect(screen.getByRole("link", { name: "お知らせ" })).toHaveAttribute("aria-current", "true");
