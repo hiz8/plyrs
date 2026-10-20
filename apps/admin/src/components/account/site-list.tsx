@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
+import { ArrowRightLeft } from "lucide-react";
 import { Link, type LinkRenderProps } from "react-aria-components";
-import { Avatar, Badge, stylexRenderProps } from "@plyrs/ui";
+import { Avatar, Badge, ICON_SIZE, stylexRenderProps } from "@plyrs/ui";
 import { border, focus, font, radius, size, space, stroke, text } from "@plyrs/ui/semantic.stylex";
 import type { TenantSummary } from "../../lib/api-client";
 import { ACCOUNT_LABELS, roleLabel } from "../../lib/labels";
@@ -35,6 +36,7 @@ const styles = stylex.create({
     cursor: "pointer",
     outline: "none",
   },
+  linkInner: { display: "inline-flex", alignItems: "center", gap: space.xs },
   linkFocus: {
     outlineWidth: stroke.focus,
     outlineStyle: "solid",
@@ -72,7 +74,10 @@ export function SiteList({
                 state.isFocusVisible && styles.linkFocus,
               ])}
             >
-              {labels.switch}
+              <span {...stylex.props(styles.linkInner)}>
+                <ArrowRightLeft size={ICON_SIZE.inline} aria-hidden="true" />
+                {labels.switch}
+              </span>
             </Link>
           )}
         </li>

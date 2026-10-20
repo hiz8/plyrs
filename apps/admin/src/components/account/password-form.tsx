@@ -30,6 +30,8 @@ export interface PasswordFormProps {
   fieldErrors: PasswordFieldErrors;
   // 成功のたびに親が増やし、入力を空に戻す
   resetKey: number;
+  // 欄を編集したら、その欄に出ていた API の誤りを親が消す
+  onClearFieldError?: (field: keyof PasswordFieldErrors) => void;
 }
 
 export function PasswordForm({ resetKey, ...props }: PasswordFormProps) {
@@ -40,6 +42,7 @@ function PasswordFormInner({
   onSubmit,
   isPending,
   fieldErrors,
+  onClearFieldError,
 }: Omit<PasswordFormProps, "resetKey">) {
   const labels = ACCOUNT_LABELS.password;
   const [current, setCurrent] = useState("");
@@ -75,7 +78,10 @@ function PasswordFormInner({
           autoComplete="current-password"
           label={labels.current}
           value={current}
-          onChange={setCurrent}
+          onChange={(value) => {
+            setCurrent(value);
+            onClearFieldError?.("current");
+          }}
           isInvalid={fieldErrors.current !== undefined}
           errorMessage={fieldErrors.current ?? ""}
         />
@@ -86,7 +92,11 @@ function PasswordFormInner({
           label={labels.next}
           description={labels.nextHelp}
           value={next}
-          onChange={setNext}
+          onChange={(value) => {
+            setNext(value);
+            setLocalError((e) => ({ ...e, next: undefined }));
+            onClearFieldError?.("next");
+          }}
           isInvalid={nextError !== undefined}
           errorMessage={nextError ?? ""}
         />
@@ -95,7 +105,10 @@ function PasswordFormInner({
           autoComplete="new-password"
           label={labels.confirm}
           value={confirm}
-          onChange={setConfirm}
+          onChange={(value) => {
+            setConfirm(value);
+            setLocalError((e) => ({ ...e, confirm: undefined }));
+          }}
           isInvalid={localError.confirm !== undefined}
           errorMessage={localError.confirm ?? ""}
         />

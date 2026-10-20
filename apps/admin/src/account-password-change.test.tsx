@@ -1,3 +1,4 @@
+// 成功トーストの後、同じファイルの次のテストで jsdom が止まる(shell-harness.tsx のコメントと同じ現象)ため 1 ファイル 1 本
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";

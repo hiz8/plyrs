@@ -98,6 +98,7 @@ function AccountPage() {
               onSubmit={(current, next) => change.mutate({ current, next })}
               isPending={change.isPending}
               fieldErrors={fieldErrors}
+              onClearFieldError={(field) => setFieldErrors((e) => ({ ...e, [field]: undefined }))}
               resetKey={resetKey}
             />
           </SettingsCard>

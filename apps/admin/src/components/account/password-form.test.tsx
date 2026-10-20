@@ -48,3 +48,16 @@ it("通れば onSubmit に現在と新しいパスワードを渡し、fieldErro
   await user.click(submit());
   expect(onSubmit).toHaveBeenCalledWith("old-password", "long-enough-password");
 });
+
+it("欄を打ち直すと、その欄の API の誤りとローカルの不一致の文が消える", async () => {
+  const onClearFieldError = vi.fn();
+  const { user } = setup({ fieldErrors: { current: "現在が違う" }, onClearFieldError });
+  await user.type(current(), "x");
+  expect(onClearFieldError).toHaveBeenCalledWith("current");
+  await user.type(next(), "long-enough-password");
+  await user.type(confirm(), "different-password");
+  await user.click(submit());
+  expect(await screen.findByText("新しいパスワードが一致しません")).toBeInTheDocument();
+  await user.type(confirm(), "!");
+  expect(screen.queryByText("新しいパスワードが一致しません")).not.toBeInTheDocument();
+});
