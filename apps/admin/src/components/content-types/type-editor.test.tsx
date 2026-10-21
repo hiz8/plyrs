@@ -232,3 +232,17 @@ it("表示名を入力してから消すと必須のエラーが出る(初期の
   await user.clear(nameBox());
   expect(screen.getByText(editor.nameRequired)).toBeInTheDocument();
 });
+
+it("表示名の無い保存済みフィールドがあっても、他の変更をすれば保存できる", async () => {
+  const user = userEvent.setup();
+  const legacy = summary({
+    key: "article",
+    name: "記事",
+    fields: [{ key: "title", type: "text" }],
+  });
+  setup({ initial: toTypeDraft(legacy), original: legacy.fields, existingTypes: [legacy] });
+  const save = screen.getByRole("button", { name: editor.save });
+  expect(save).toBeDisabled();
+  await user.type(nameBox(), "ニュース");
+  expect(save).toBeEnabled();
+});

@@ -24,7 +24,7 @@ import {
   type FieldDraft,
   type FieldKind,
 } from "../../lib/content-type-form";
-import { FIELD_KIND_LABELS, FIELD_PANEL_LABELS, TERMS } from "../../lib/labels";
+import { ADD_FIELD_LABELS, FIELD_KIND_LABELS, FIELD_PANEL_LABELS, TERMS } from "../../lib/labels";
 
 const NARROW = "@media (max-width: 959px)";
 const P = FIELD_PANEL_LABELS;
@@ -151,7 +151,11 @@ export function FieldPanel({
   const keyError = local.isNew ? validateFieldKey(local.key, others) : null;
   const showKeyError = submitted || local.label !== "" || local.key !== "";
   const errors = fieldDraftErrors(local);
-  const labelError = errors.find((error) => error.field === "label")?.message ?? null;
+  // 表示名の必須はパネルで適用するときだけ(fieldDraftErrors は既存データの互換のため空を許す)
+  const labelError =
+    label === ""
+      ? ADD_FIELD_LABELS.labelRequired
+      : (errors.find((error) => error.field === "label")?.message ?? null);
   const descriptionError = errors.find((error) => error.field === "description")?.message ?? null;
   const hasMaxLength = kind === "text" || kind === "slug";
   const maxLengthInvalid = hasMaxLength && errors.some((error) => error.field === "maxLength");
@@ -160,7 +164,7 @@ export function FieldPanel({
   const typesMissing =
     kind === "reference" && errors.some((error) => error.field === "allowedTypes");
 
-  const isValid = keyError === null && errors.length === 0;
+  const isValid = keyError === null && labelError === null && errors.length === 0;
 
   const apply = () => {
     setSubmitted(true);

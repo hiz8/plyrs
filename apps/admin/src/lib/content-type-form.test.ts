@@ -423,12 +423,18 @@ const errorFields = (draft: FieldDraft) => fieldDraftErrors(draft).map((error) =
 describe("fieldDraftErrors", () => {
   const P = FIELD_PANEL_LABELS;
 
+  it("表示名が空でも fieldDraftErrors は空(既存データの互換)", () => {
+    expect(
+      fieldDraftErrors({ ...emptyFieldDraft("text", "title", ""), isNew: false }),
+    ).toStrictEqual([]);
+  });
+
   it("完成したフィールドはエラー無し", () => {
     expect(fieldDraftErrors(emptyFieldDraft("text", "title", "タイトル"))).toStrictEqual([]);
   });
 
-  it("表示名は 1〜100 文字、説明は 500 文字以内", () => {
-    expect(errorFields(emptyFieldDraft("text", "a", "  "))).toStrictEqual(["label"]);
+  it("表示名は 100 文字以内(空は既存データの互換で許す)、説明は 500 文字以内", () => {
+    expect(errorFields(emptyFieldDraft("text", "a", "  "))).toStrictEqual([]);
     expect(errorFields(emptyFieldDraft("text", "a", "あ".repeat(101)))).toStrictEqual(["label"]);
     const long = { ...emptyFieldDraft("text", "a", "A"), description: "あ".repeat(501) };
     expect(fieldDraftErrors(long)).toStrictEqual([

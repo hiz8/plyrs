@@ -325,9 +325,8 @@ export function fieldDraftErrors(draft: FieldDraft): FieldDraftError[] {
   const P = FIELD_PANEL_LABELS;
   const errors: FieldDraftError[] = [];
   const label = draft.label.trim();
-  if (label === "") {
-    errors.push({ field: "label", message: ADD_FIELD_LABELS.labelRequired });
-  } else if (label.length > FIELD_LABEL_MAX_LENGTH) {
+  // 表示名が空は型レベルでは許す(V4-E 以前の既存フィールドは表示名を持たない)。パネルの適用時だけ必須にする
+  if (label.length > FIELD_LABEL_MAX_LENGTH) {
     errors.push({
       field: "label",
       message: ADD_FIELD_LABELS.labelTooLong(FIELD_LABEL_MAX_LENGTH),
