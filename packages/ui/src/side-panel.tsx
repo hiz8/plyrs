@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { Dialog, Heading } from "react-aria-components";
 import { IconButton } from "./button";
-import { bg, border, elevation, font, layer, space, stroke, text } from "./semantic.stylex";
+import { bg, border, elevation, font, layer, radius, space, stroke, text } from "./semantic.stylex";
 
 const NARROW = "@media (max-width: 959px)";
 
@@ -14,8 +14,7 @@ const styles = stylex.create({
     top: 0,
     right: 0,
     bottom: 0,
-    // 部品固有の幅(E 5.2 / D3 T2)
-    width: { default: "420px", [NARROW]: "auto" },
+    // 幅は styles.width(px)(部品固有。E 5.2 / D3 T2)
     insetInline: { default: null, [NARROW]: 0 },
     zIndex: layer.dropdown,
     display: "flex",
@@ -26,6 +25,31 @@ const styles = stylex.create({
     borderLeftColor: border.default,
     boxShadow: elevation.modal,
     fontFamily: font.family,
+  },
+  width: (px: number) => ({
+    width: { default: `${px}px`, [NARROW]: "auto" },
+  }),
+  // C2。狭い画面では下から出る高さ 520px の面(全面にしない)
+  sheet: {
+    top: { default: 0, [NARROW]: "auto" },
+    height: { default: null, [NARROW]: "520px" },
+    maxHeight: { default: null, [NARROW]: "100%" },
+    borderLeftWidth: { default: stroke.default, [NARROW]: 0 },
+    borderTopWidth: { default: 0, [NARROW]: stroke.default },
+    borderTopStyle: "solid",
+    borderTopColor: border.default,
+    borderStartStartRadius: { default: null, [NARROW]: radius.container },
+    borderStartEndRadius: { default: null, [NARROW]: radius.container },
+  },
+  handle: {
+    display: { default: "none", [NARROW]: "block" },
+    alignSelf: "center",
+    flexShrink: 0,
+    width: "36px",
+    height: "4px",
+    marginBlockStart: space.xs,
+    borderRadius: radius.full,
+    backgroundColor: border.hover,
   },
   dialog: {
     display: "flex",
@@ -88,6 +112,10 @@ export interface SidePanelProps {
   footer?: ReactNode;
   /** 閉じたときにフォーカスを戻す先(パネルを開いたボタン) */
   returnFocusTo?: RefObject<HTMLElement | null>;
+  /** 幅 px。既定 420(E 5.2)。メディアの詳細は 360(F 4 章) */
+  width?: number;
+  /** 狭い画面(959px 以下)の形。full = 全面のシート(既定、E2)、sheet = 下から出る高さ 520px の面(C2) */
+  narrowLayout?: "full" | "sheet";
 }
 
 export function SidePanel({
@@ -98,6 +126,8 @@ export function SidePanel({
   children,
   footer,
   returnFocusTo,
+  width = 420,
+  narrowLayout = "full",
 }: SidePanelProps) {
   // isOpen が true → false に変わった一度だけフォーカスを戻す
   const wasOpen = useRef(isOpen);
@@ -115,8 +145,12 @@ export function SidePanel({
   };
 
   return (
-    <div {...stylex.props(styles.panel)} onKeyDown={onKeyDown}>
+    <div
+      {...stylex.props(styles.panel, styles.width(width), narrowLayout === "sheet" && styles.sheet)}
+      onKeyDown={onKeyDown}
+    >
       <Dialog className={stylex.props(styles.dialog).className ?? ""}>
+        {narrowLayout === "sheet" && <div aria-hidden="true" {...stylex.props(styles.handle)} />}
         <div {...stylex.props(styles.header)}>
           <div {...stylex.props(styles.headings)}>
             <Heading slot="title" {...stylex.props(styles.title)}>

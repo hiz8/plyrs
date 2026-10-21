@@ -32,6 +32,16 @@ const styles = stylex.create({
     outline: "none",
   },
   modalLg: { width: "640px" },
+  // F15。メディアライブラリ(一覧 + 詳細)用の大きなモーダル
+  modalXl: {
+    width: "1040px",
+    height: "720px",
+    display: "flex",
+    flexDirection: "column",
+    overflowY: "hidden",
+  },
+  dialogXl: { flex: 1, minHeight: 0 },
+  bodyXl: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" },
   dialog: {
     display: "flex",
     flexDirection: "column",
@@ -64,8 +74,8 @@ export interface ModalDialogProps {
   /** 暗幕のクリックで閉じるか */
   isDismissable?: boolean;
   showCloseButton?: boolean;
-  /** md = 440px(既定)、lg = 640px(E23。種類の選択など入力が多いダイアログ) */
-  size?: "md" | "lg";
+  /** md = 440px(既定)、lg = 640px(E23。種類の選択など入力が多いダイアログ)、xl = 1040×720px(F15。本文の中でスクロールを作る) */
+  size?: "md" | "lg" | "xl";
 }
 
 export function ModalDialog({
@@ -87,16 +97,25 @@ export function ModalDialog({
       className={stylex.props(styles.overlay).className ?? ""}
     >
       <Modal
-        className={stylex.props(styles.modal, size === "lg" && styles.modalLg).className ?? ""}
+        className={
+          stylex.props(
+            styles.modal,
+            size === "lg" && styles.modalLg,
+            size === "xl" && styles.modalXl,
+          ).className ?? ""
+        }
       >
-        <Dialog role={role} className={stylex.props(styles.dialog).className ?? ""}>
+        <Dialog
+          role={role}
+          className={stylex.props(styles.dialog, size === "xl" && styles.dialogXl).className ?? ""}
+        >
           <div {...stylex.props(styles.header)}>
             <Heading slot="title" {...stylex.props(styles.title)}>
               {title}
             </Heading>
             {showCloseButton && <IconButton icon={X} label="閉じる" size="sm" slot="close" />}
           </div>
-          <div {...stylex.props(styles.body)}>{children}</div>
+          <div {...stylex.props(styles.body, size === "xl" && styles.bodyXl)}>{children}</div>
           {footer !== undefined && <div {...stylex.props(styles.footer)}>{footer}</div>}
         </Dialog>
       </Modal>

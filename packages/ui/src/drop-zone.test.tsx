@@ -77,3 +77,19 @@ it("無効時は外枠だけを薄くし、中のボタンに opacity を重ね�
   expect(standalone.filter((name) => !inner.includes(name))).toHaveLength(1);
   expect(inner.filter((name) => !standalone.includes(name))).toHaveLength(0);
 });
+
+const classOf = (isFill: boolean) => {
+  const { unmount } = render(<DropZone onFiles={() => {}} isFill={isFill} />);
+  expect(screen.getByText("ここにファイルをドロップ")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "ファイルを選択" })).toBeInTheDocument();
+  const cls = screen.getByText("ここにファイルをドロップ").parentElement?.className ?? "";
+  unmount();
+  return cls;
+};
+
+it("isFill は外枠に別のクラスを足し、ボタンと文言は同じ", () => {
+  const normal = classOf(false);
+  const fill = classOf(true);
+  expect(fill).not.toBe(normal);
+  expect(fill.split(" ").length).toBeGreaterThan(normal.split(" ").length);
+});

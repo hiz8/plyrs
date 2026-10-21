@@ -26,6 +26,17 @@ function Harness({ onConfirm }: { onConfirm: () => void }) {
   );
 }
 
+const classOf = (size: "md" | "lg" | "xl") => {
+  const { unmount } = render(
+    <ModalDialog isOpen onOpenChange={() => {}} title="T" size={size}>
+      中身
+    </ModalDialog>,
+  );
+  const cls = screen.getByRole("dialog").parentElement?.className ?? "";
+  unmount();
+  return cls;
+};
+
 describe("ConfirmDialog", () => {
   it("危険な確認は alertdialog で、キャンセルに初期フォーカスがある", async () => {
     const user = userEvent.setup();
@@ -116,5 +127,13 @@ describe("ModalDialog", () => {
     expect(lgClass).not.toBe("");
     expect(lgClass).not.toBe(mdClass);
     expect(lgClass.split(" ")).toHaveLength(mdClass.split(" ").length);
+  });
+
+  it("size=xl は lg とも md とも違う幅のクラスを持つ", () => {
+    const md = classOf("md");
+    const lg = classOf("lg");
+    const xl = classOf("xl");
+    expect(xl).not.toBe(md);
+    expect(xl).not.toBe(lg);
   });
 });

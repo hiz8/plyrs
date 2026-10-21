@@ -87,3 +87,49 @@ describe("SidePanel のフォーカスと Esc", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 });
+
+const panelOf = () => screen.getByRole("dialog").parentElement as HTMLElement;
+
+describe("SidePanel の width と narrowLayout", () => {
+  it("width と narrowLayout=sheet は別のクラスで描かれる", () => {
+    const { unmount } = render(
+      <SidePanel isOpen onClose={() => {}} title="既定">
+        本文
+      </SidePanel>,
+    );
+    const baseClass = panelOf().className;
+    const baseStyle = panelOf().getAttribute("style") ?? "";
+    unmount();
+    const second = render(
+      <SidePanel isOpen onClose={() => {}} title="幅" width={360}>
+        本文
+      </SidePanel>,
+    );
+    expect(panelOf().getAttribute("style")).toContain("360px");
+    expect(panelOf().getAttribute("style")).not.toBe(baseStyle);
+    expect(baseStyle).toContain("420px");
+    second.unmount();
+    render(
+      <SidePanel isOpen onClose={() => {}} title="シート" narrowLayout="sheet">
+        本文
+      </SidePanel>,
+    );
+    expect(panelOf().className).not.toBe(baseClass);
+  });
+
+  it("sheet のときだけ上端のつまみ(aria-hidden)を描く", () => {
+    const { unmount } = render(
+      <SidePanel isOpen onClose={() => {}} title="既定">
+        本文
+      </SidePanel>,
+    );
+    expect(screen.getByRole("dialog").querySelector("div[aria-hidden='true']")).toBeNull();
+    unmount();
+    render(
+      <SidePanel isOpen onClose={() => {}} title="シート" narrowLayout="sheet">
+        本文
+      </SidePanel>,
+    );
+    expect(screen.getByRole("dialog").querySelectorAll("div[aria-hidden='true']")).toHaveLength(1);
+  });
+});

@@ -9,7 +9,7 @@ import {
 import { Button, DisabledAppearanceInheritedContext } from "./button";
 import { stylexRenderProps } from "./compose";
 import { ICON_SIZE, ICON_STROKE } from "./icon";
-import { accent, border, focus, font, radius, space, stroke, text } from "./semantic.stylex";
+import { accent, bg, border, focus, font, radius, space, stroke, text } from "./semantic.stylex";
 
 // D1 ボード 3e。キーボードでは「ファイルを選択」にフォーカスが移り、Enter で選択が開く
 const styles = stylex.create({
@@ -29,6 +29,17 @@ const styles = stylex.create({
     borderColor: border.hover,
     borderRadius: radius.container,
     outline: "none",
+  },
+  // F16。本文全体に広げ、中身を縦中央に置く
+  fill: { flex: 1, minHeight: 0, justifyContent: "center" },
+  fillIcon: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "64px",
+    height: "64px",
+    borderRadius: radius.full,
+    backgroundColor: bg.surface,
   },
   dropTarget: {
     borderColor: accent.default,
@@ -56,6 +67,8 @@ export interface DropZoneProps {
   description?: string;
   buttonLabel?: string;
   isDisabled?: boolean;
+  /** 本文全体に広げる(F16)。アイコンは 64px の円に入れる */
+  isFill?: boolean;
 }
 
 /** ドロップ項目のうち、このファイルで使う最小の形(RAC の DropItem と構造的に互換) */
@@ -100,6 +113,7 @@ export function DropZone({
   description,
   buttonLabel = "ファイルを選択",
   isDisabled,
+  isFill = false,
 }: DropZoneProps) {
   return (
     <RacDropZone
@@ -122,11 +136,18 @@ export function DropZone({
         state.isDropTarget && styles.dropTarget,
         state.isFocusVisible && styles.focusVisible,
         state.isDisabled && styles.disabled,
+        isFill && styles.fill,
       ])}
     >
       {({ isDropTarget }) => (
         <>
-          <Upload size={ICON_SIZE.empty} strokeWidth={ICON_STROKE.large} aria-hidden="true" />
+          {isFill ? (
+            <span {...stylex.props(styles.fillIcon)}>
+              <Upload size={ICON_SIZE.empty} strokeWidth={ICON_STROKE.large} aria-hidden="true" />
+            </span>
+          ) : (
+            <Upload size={ICON_SIZE.empty} strokeWidth={ICON_STROKE.large} aria-hidden="true" />
+          )}
           <Text
             slot="label"
             {...stylex.props(styles.title, isDropTarget && styles.titleDropTarget)}

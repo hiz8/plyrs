@@ -73,4 +73,8 @@
 - `ModalDialog`(`size?: "md" | "lg"`。lg は幅 640px、既定 md は 440px、E23)
 - `SidePanel`(新規。非モーダルの右パネル 420px、狭い画面は全面のシート、E2。Esc は IME の変換中は閉じない。ルートは `div`(名前の無い complementary を避ける))
 - `Button`(`variant="card"`: 縦に積む選択肢のカード。幅 100%・高さ auto、選択中は `aria-pressed` で accent の面と枠。種類のカード、E33)
+- `SidePanel`(`width` / `narrowLayout="sheet"`: 幅を px で受け、狭い画面は下から出る高さ 520px の面と上端のつまみ。F1)
+- `ModalDialog`(`size="xl"`: 1040×720px、本文は flex 1 で中でスクロールを作れる。F15)
+- `DropZone`(`isFill`: 本文全体に広げ、アイコンを 64px の円に入れる。F16)
+- `FileButton`(新規。FileTrigger + Button。同じファイルを続けて選べる。F39)
 - 再同期は V4-F の最後にまとめて行う

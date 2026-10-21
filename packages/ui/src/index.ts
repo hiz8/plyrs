@@ -78,6 +78,7 @@ export {
   type TableColumnProps,
 } from "./table";
 export { DropZone, type DropZoneProps } from "./drop-zone";
+export { FileButton, type FileButtonProps } from "./file-button";
 export { PageHeader, type PageHeaderProps } from "./page-header";
 export {
   SegmentedControl,
