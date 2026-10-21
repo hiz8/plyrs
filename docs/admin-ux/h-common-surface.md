@@ -53,7 +53,7 @@
 - V4-B(2026-10-20): ホームの枠の中のリンクも RAC の `Link` を admin から直接使う(B10)。枠内の 0 件表示は `EmptyState` を使わない(B8)。`ProgressBar` に `isLabelHidden`、`Toaster` に `clear()` を足した
 - V4-G(2026-10-20): `SegmentedControl`(3 択の pill)を足した(G2)。所属サイトの「切り替える」と有効化直後の「{型名}を追加 ›」も RAC の `Link` を admin から直接使う(G28)
 - V4-G(2026-10-20、実行中の裁定): ダイアログ内の注記は admin の `DialogNote`(Banner はページ用)、`Select` に `isLabelHidden`、`Tabs` に `keyboardActivation`、クリップボードは `lib/clipboard.ts` の `copyText` に集約
-- V4-E(2026-10-20): 並べ替えの `SortableList`(RAC GridList + useDragAndDrop)と非モーダルの右パネル `SidePanel` を足した(E1・E2)。`ModalDialog` に `size="lg"`(E23)。型の一覧の中のリンクも RAC の `Link` を admin から直接使う(E6)
+- V4-E(2026-10-20): 並べ替えの `SortableList`(RAC GridList + useDragAndDrop)と非モーダルの右パネル `SidePanel` を足した(E1・E2)。`ModalDialog` に `size="lg"`(E23)。`Button variant="card"`(縦に積む選択肢のカード。種類のカード、E33)を足した。型の一覧の中のリンクも RAC の `Link` を admin から直接使う(E6)
 - トーストは react-aria-components 1.21.1 では `UNSTABLE_Toast` / `UNSTABLE_ToastRegion` / `UNSTABLE_ToastQueue` としてだけ提供されている。これを `packages/ui/src/toast.tsx` の中だけで import して包み、外へは自前の API(`createToaster` / `ToastRegion`)を出す(V1、2026-10-18)。読み上げ・フォーカス移動・F6 での移動を RAC に任せ、将来の破壊的変更は 1 ファイルに閉じ込める。トーストの地は `bg.raised` とし、成功 / エラーはアイコンの色で示す
 
 ## 4. 文言
@@ -163,4 +163,4 @@ Lucide(`lucide-react`)を使う(D1 で確定、2026-10-17。[tech-selection.md](
 - 2026-10-20: V3 の計画で、入力部品の `isReadOnly`(閲覧者の読み取り専用)、`Select` の `size="sm"`、`PageHeader` の `meta` を足し、表の中のリンクは RAC の `Link` を admin から直接使う例外を認めた(3 章、R2・R23)
 - 2026-10-20: V4-B の計画で、ホームの枠の中のリンクは RAC の `Link` を直接使い、枠内の 0 件表示は `EmptyState` を使わない(3 章、B8・B10)。`ProgressBar` に `isLabelHidden`、`Toaster` に `clear()` を足した(B17)。`ErrorScreen` の「ホームへ戻る」は router 全体の `defaultErrorComponent` でサイトの slug が分からないため見送り、「再読み込み」だけにする(6 章、B15)
 - 2026-10-20: V4-G の計画で、3 択の pill `SegmentedControl` を足し(G2)、所属サイトの「切り替える」と有効化直後の「{型名}を追加 ›」も RAC の `Link` を直接使う(G28)。設定・アカウントの取得失敗は中身の位置に `role="alert"` の文と「再試行」(G23)
-- 2026-10-20: V4-E(2026-10-20): 並べ替えの `SortableList`(RAC GridList + useDragAndDrop)と非モーダルの右パネル `SidePanel` を足した(E1・E2)。`ModalDialog` に `size="lg"`(E23)。型の一覧の中のリンクも RAC の `Link` を admin から直接使う(E6)
+- 2026-10-20: V4-E: 並べ替えの `SortableList`(RAC GridList + useDragAndDrop)と非モーダルの右パネル `SidePanel` を足した(E1・E2)。`ModalDialog` に `size="lg"`(E23)。`Button variant="card"`(縦に積む選択肢のカード。種類のカード、E33)を足した。型の一覧の中のリンクも RAC の `Link` を admin から直接使う(E6)
