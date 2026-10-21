@@ -34,7 +34,12 @@ function ModulesPage() {
   const types = useSyncTypes(sync);
   const hasSynced = useSyncHasSynced(sync);
   const list = modules.data ?? [];
-  const navKeys = list.filter((m) => m.enabled).flatMap((m) => m.navTypes);
+  // 同期の welcome より先にモジュール一覧が届くと、未着の型の key では購読が空のまま固まる。
+  // 届いた型に絞れば、型が届いた時点で key が変わり購読し直す
+  const navKeys = list
+    .filter((m) => m.enabled)
+    .flatMap((m) => m.navTypes)
+    .filter((key) => types.some((type) => type.key === key));
   const records = useRecordsOfTypes(sync.registry, navKeys);
 
   const [justEnabled, setJustEnabled] = useState<string | null>(null);
