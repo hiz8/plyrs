@@ -77,4 +77,7 @@
 - `ModalDialog`(`size="xl"`: 1040×720px、本文は flex 1 で中でスクロールを作れる。F15)
 - `DropZone`(`isFill`: 本文全体に広げ、アイコンを 64px の円に入れる。F16)
 - `FileButton`(新規。FileTrigger + Button。同じファイルを続けて選べる。F39)
+- `TileGrid`(新規。RAC GridList layout="grid"、選択とアクション。F17)
+- `UploadTile`(新規。仮タイルの 5 状態。F9・F10)
+- `FileDropTarget`(新規。画面全体のドロップと暗幕。F35。静的には暗幕を描けない)
 - 再同期は V4-F の最後にまとめて行う

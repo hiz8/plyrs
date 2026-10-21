@@ -91,3 +91,6 @@ export {
   type SortableItem,
   type SortableListProps,
 } from "./sortable-list";
+export { TileGrid, type TileGridProps, type TileItem } from "./tile-grid";
+export { UploadTile, type UploadTileProps, type UploadTileState } from "./upload-tile";
+export { FileDropTarget, type FileDropTargetProps } from "./file-drop-target";
