@@ -69,8 +69,8 @@
 - `HomeWidgetContribution`(`size?: "half" | "full"`、`moduleId?: string`。型だけの変更で見た目は無し)
 - `SegmentedControl`(RAC RadioGroup ベースの 3 択 pill。案 G 6.2 のテーマ切り替え用、裁定 G2)
 - `Tabs`(`keyboardActivation?: "automatic" | "manual"`。manual は矢印キーでフォーカスだけ動かし、Enter / Space で選ぶ。URL を移るタブ用、設定のタブ)
-- `SortableList`(新規。RAC GridList + useDragAndDrop の並べ替え。つまみ + キーボード DnD、行の間に点線の DropIndicator、E1)
+- `SortableList`(新規。RAC GridList + useDragAndDrop の並べ替え。つまみ + キーボード DnD、行の間に点線の DropIndicator、E1。`isBusy` で保存中は DnD だけ止める(つまみは描いたまま。フォーカスを失わないよう GridList を作り直さない)。`isDisabled` は読み取り専用でつまみを描かない)
 - `ModalDialog`(`size?: "md" | "lg"`。lg は幅 640px、既定 md は 440px、E23)
-- `SidePanel`(新規。非モーダルの右パネル 420px、狭い画面は全面のシート、E2)
+- `SidePanel`(新規。非モーダルの右パネル 420px、狭い画面は全面のシート、E2。Esc は IME の変換中は閉じない。ルートは `div`(名前の無い complementary を避ける))
 - `Button`(`variant="card"`: 縦に積む選択肢のカード。幅 100%・高さ auto、選択中は `aria-pressed` で accent の面と枠。種類のカード、E33)
 - 再同期は V4-F の最後にまとめて行う

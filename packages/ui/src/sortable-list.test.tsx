@@ -52,3 +52,27 @@ describe("SortableList", () => {
     expect(onReorder).toHaveBeenCalledWith(["b", "a", "c"]);
   });
 });
+
+describe("SortableList isBusy", () => {
+  it("isBusy の間はつまみが残り onReorder が呼ばれない", async () => {
+    const user = userEvent.setup();
+    const onReorder = vi.fn();
+    render(
+      <SortableList
+        label="並び順"
+        items={ITEMS}
+        renderItem={(item) => <span>{item.textValue}</span>}
+        dragLabel={(item) => `${item.textValue}を並べ替え`}
+        onReorder={onReorder}
+        isBusy
+      />,
+    );
+    const handle = screen.getByRole("button", { name: "Aを並べ替え" });
+    handle.focus();
+    await user.keyboard("{Enter}");
+    await user.keyboard("{ArrowDown}");
+    await user.keyboard("{Enter}");
+    expect(handle).toBeInTheDocument();
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+});

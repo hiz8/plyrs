@@ -150,7 +150,8 @@ export function TypeTable({
       <SortableList
         label={labels.tableLabel}
         items={items}
-        isDisabled={!canManage || isReordering}
+        isDisabled={!canManage}
+        isBusy={isReordering}
         dragLabel={(item) => labels.dragLabel(item.typeRow.row.name)}
         onReorder={onReorder}
         renderItem={({ typeRow }) => {

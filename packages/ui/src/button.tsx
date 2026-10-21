@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import type { LucideIcon } from "lucide-react";
-import { createContext, useContext, useId, type ReactNode } from "react";
+import { createContext, useContext, useId, type ReactNode, type Ref } from "react";
 import {
   Button as RacButton,
   VisuallyHidden,
@@ -182,6 +182,8 @@ export interface ButtonProps extends Omit<RacButtonProps, "className" | "style" 
   /** 文字の左に置く Lucide のアイコン(装飾。読み上げない) */
   icon?: LucideIcon;
   children?: ReactNode;
+  /** フォーカスの戻し先などに使うボタン要素への参照 */
+  ref?: Ref<HTMLButtonElement>;
   /**
    * 押せない理由。指定すると、フォーカスを受けたまま無効として振る舞い(aria-disabled)、
    * 理由をツールチップと aria-describedby で伝える。isDisabled より優先する
@@ -195,6 +197,7 @@ export function Button({
   icon: Icon,
   children,
   disabledReason,
+  ref,
   ...props
 }: ButtonProps) {
   const [normal, hovered, pressed] = VARIANT_STYLES[variant];
@@ -203,6 +206,7 @@ export function Button({
   const button = (
     <RacButton
       {...racProps}
+      ref={ref}
       className={stylexRenderProps<ButtonRenderProps>((state) => [
         styles.base,
         buttonSize === "sm" && variant !== "card" && styles.sm,

@@ -108,13 +108,14 @@ export function SidePanel({
 
   if (!isOpen) return null;
 
-  // モーダルではないので overlay が Esc を処理しない。入力欄の中でも閉じる
-  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === "Escape") onClose();
+  // モーダルではないので overlay が Esc を処理しない。入力欄の中でも閉じる(IME の変換中は閉じない)。
+  // 名前の無い complementary ランドマークを避けるため aside ではなく div にする
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape" && !event.nativeEvent.isComposing) onClose();
   };
 
   return (
-    <aside {...stylex.props(styles.panel)} onKeyDown={onKeyDown}>
+    <div {...stylex.props(styles.panel)} onKeyDown={onKeyDown}>
       <Dialog className={stylex.props(styles.dialog).className ?? ""}>
         <div {...stylex.props(styles.header)}>
           <div {...stylex.props(styles.headings)}>
@@ -128,6 +129,6 @@ export function SidePanel({
         <div {...stylex.props(styles.body)}>{children}</div>
         {footer !== undefined && <div {...stylex.props(styles.footer)}>{footer}</div>}
       </Dialog>
-    </aside>
+    </div>
   );
 }

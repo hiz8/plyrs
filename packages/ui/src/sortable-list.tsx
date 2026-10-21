@@ -97,8 +97,10 @@ export interface SortableListProps<T extends SortableItem> {
   dragLabel: (item: T) => string;
   /** ドロップ後の id の並び(全件) */
   onReorder: (orderedIds: string[]) => void;
-  /** true: DnD を無効にし、つまみを描かない(読み取り専用・保存中) */
+  /** true: DnD を無効にし、つまみを描かない(読み取り専用) */
   isDisabled?: boolean;
+  /** true: つまみは描いたまま DnD だけ止める(保存中。フォーカスを失わないよう GridList を作り直さない) */
+  isBusy?: boolean;
   /** default = size.row(44px)、tall = 48px(フィールドの行) */
   rowHeight?: "default" | "tall";
 }
@@ -126,9 +128,11 @@ export function SortableList<T extends SortableItem>({
   dragLabel,
   onReorder,
   isDisabled = false,
+  isBusy = false,
   rowHeight = "default",
 }: SortableListProps<T>) {
   const { dragAndDropHooks } = useDragAndDrop({
+    isDisabled: isBusy,
     getItems: (keys) =>
       [...keys].map((key) => ({
         "text/plain": items.find((item) => item.id === key)?.textValue ?? "",
@@ -156,7 +160,7 @@ export function SortableList<T extends SortableItem>({
 
   return (
     <GridList
-      // DnD の有無でフックの数が変わるため、切り替えでは作り直す
+      // 読み取り専用(つまみ・フックなし)の切り替えでは作り直す。isBusy では作り直さない
       key={isDisabled ? "static" : "sortable"}
       aria-label={label}
       items={items}
