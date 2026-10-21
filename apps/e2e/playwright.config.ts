@@ -8,15 +8,18 @@ import { defineConfig } from "@playwright/test";
 // helpers/setup.ts が super-console.spec.ts の bootstrap で得た totp secret を
 // apps/e2e/.state/ へ永続化し、後続の spec はそれを読んでログインする。
 //
-// globalSetup は使わない: 実測したところ Playwright は globalSetup の完了を待たず
-// webServer を並行 spawn する。dev サーバーは .dev.vars を起動時に 1 回しか読まないため、
+// 環境の準備(.wrangler リセット・.dev.vars・D1 マイグレーション)に globalSetup は使わない:
+// 実測したところ Playwright は globalSetup の完了を待たず webServer を並行 spawn する。dev サーバーは .dev.vars を起動時に 1 回しか読まないため、
 // globalSetup 経由で書くと「サーバーが空の JWT_SECRET で先に起動してしまう」競合が実際に
 // 発生した(詳細は global-setup.ts のコメントと task-16-report.md 参照)。代わりに
 // package.json の "test" スクリプトが `node global-setup.ts && playwright test` の順で
 // 直接実行し、webServer が spawn される前に .wrangler リセット・.dev.vars 作成・
 // D1 マイグレーション適用を完了させる。
+// globalSetup(warm-up.ts)は、サーバーの応答を自前で待ってから最初のページを 1 回開き、dev の
+// 冷えたコンパイル(V4-E 以降、見出しまで約 28 秒)を spec の前に済ませるためだけに使う。
 export default defineConfig({
   testDir: "./tests",
+  globalSetup: "./warm-up.ts",
   timeout: 60_000,
   // defaultSsr: false 化(src/start.ts)で初回描画がクライアント側になり、dev の
   // コールドコンパイルでは最初の要素表示まで約 8 秒かかる(実測)。既定 5s では不足。

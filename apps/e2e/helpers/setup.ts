@@ -106,7 +106,8 @@ export async function createArticleType(page: Page): Promise<void> {
     "aria-selected",
     "true",
   );
-  await page.getByRole("button", { name: "コンテンツタイプを作成" }).click();
+  // 型が 0 件のときは空状態にも同名のボタンがあるため、見出しの右(先頭)のボタンに絞る(E6)。
+  await page.getByRole("button", { name: "コンテンツタイプを作成" }).first().click();
   await page.getByRole("textbox", { name: /^表示名/ }).fill("記事");
   // 表示名が日本語だと API 名は自動導出できないので手入力する。
   await page.getByRole("textbox", { name: /^API 名/ }).fill("article");
