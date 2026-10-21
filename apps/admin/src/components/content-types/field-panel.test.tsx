@@ -112,6 +112,8 @@ it("選択肢は表で編集し、値が空や重複なら適用できない", a
   expect(screen.getAllByRole("textbox", { name: new RegExp(P.optionValue) })).toHaveLength(2);
   await user.click(screen.getByRole("button", { name: P.apply }));
   expect(onApply).not.toHaveBeenCalled();
+  // 追加した行は表示名も値も空。表示名の側にも値の側にもエラーが出る
+  expect(screen.getByText(P.optionLabelEmpty)).toBeInTheDocument();
   expect(screen.getByText(P.optionValueEmpty)).toBeInTheDocument();
   const second = screen.getAllByRole("textbox", { name: new RegExp(P.optionValue) })[1]!;
   await user.type(second, "red");
@@ -120,6 +122,7 @@ it("選択肢は表で編集し、値が空や重複なら適用できない", a
   expect(screen.getByText(P.optionValueDuplicate("red"))).toBeInTheDocument();
   await user.clear(second);
   await user.type(second, "blue");
+  await user.type(screen.getByRole("textbox", { name: `${P.optionLabel} 2` }), "青");
   await user.click(screen.getByRole("button", { name: P.apply }));
   expect(onApply).toHaveBeenCalledOnce();
 });
@@ -197,4 +200,23 @@ it("draft を別の key に差し替えるとローカルを取り直し、同�
   rerender(<FieldPanel {...props} draft={saved("text", "other", "別")} isTitle />);
   expect(screen.getByRole("textbox", { name: P.maxLength })).toHaveValue("");
   expect(screen.getByRole("checkbox", { name: P.titleField })).toBeChecked();
+});
+
+it("暗黙のタイトルは選択済み・無効表示で、既定である旨を補足する", () => {
+  setup(saved("text", "title", "タイトル"), { isTitle: true, isTitleImplicit: true });
+  const checkbox = screen.getByRole("checkbox", { name: P.titleField });
+  expect(checkbox).toBeChecked();
+  expect(checkbox).toBeDisabled();
+  expect(screen.getByText(P.titleFieldImplicitHelp)).toBeInTheDocument();
+});
+
+it("選択肢の表示名が空のままでは適用できない", async () => {
+  const user = userEvent.setup();
+  const { onApply } = setup({
+    ...saved("select", "color", "色"),
+    options: [{ value: "red", label: "" }],
+  });
+  await user.click(screen.getByRole("button", { name: P.apply }));
+  expect(onApply).not.toHaveBeenCalled();
+  expect(screen.getByText(P.optionLabelEmpty)).toBeInTheDocument();
 });

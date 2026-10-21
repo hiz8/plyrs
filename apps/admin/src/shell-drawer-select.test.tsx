@@ -11,7 +11,7 @@ describe("ドロワー(項目の選択)", () => {
     const router = renderAt("/t/blog/settings/content-types", authedRoutes());
     const toggle = await screen.findByRole("button", { name: "メニューを開く" });
     const overflowBefore = document.documentElement.style.overflow;
-    // 開く操作だけ fireEvent: 上のコメントと同じ理由で、user-event のポインタ列だと戻らない
+    // 開く操作だけ fireEvent: user-event のポインタ列だと RAC Modal の後に autoFocus 付きの画面を描くと jsdom が止まるため、このファイルに分けた
     // fireEvent.click はフォーカスを動かさないので、開く前に明示してフォーカス復帰を観測できるようにする
     toggle.focus();
     fireEvent.click(toggle);

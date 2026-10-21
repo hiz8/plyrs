@@ -1,6 +1,8 @@
 import {
   ASSET_TYPE_KEY,
+  FIELD_DESCRIPTION_MAX_LENGTH,
   FIELD_KEY_PATTERN,
+  FIELD_LABEL_MAX_LENGTH,
   SYSTEM_FIELD_KEYS,
   contentTypeDefinitionSchema,
   type ContentTypeDefinition,
@@ -8,7 +10,7 @@ import {
 } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import type { ContentTypeSummary } from "./admin-api";
-import { CONTENT_TYPE_LABELS } from "./labels";
+import { ADD_FIELD_LABELS, CONTENT_TYPE_LABELS, FIELD_PANEL_LABELS } from "./labels";
 
 // 案 E: 型設計の下書き。画面の判断はここに寄せ、部品は描くだけにする。
 
@@ -313,6 +315,63 @@ export function countFilled(records: readonly SyncRecord[], key: string): number
 
 const NO_INDEXED_KINDS: readonly FieldKind[] = ["asset", "reference", "richtext", "json"];
 
+export interface FieldDraftError {
+  field: "label" | "description" | "maxLength" | "options" | "allowedTypes";
+  message: string;
+}
+
+// E4: パネルの「適用」と型の「保存」が共有するフィールドの検証。key は isNew のときだけパネル側で見る
+export function fieldDraftErrors(draft: FieldDraft): FieldDraftError[] {
+  const P = FIELD_PANEL_LABELS;
+  const errors: FieldDraftError[] = [];
+  const label = draft.label.trim();
+  if (label === "") {
+    errors.push({ field: "label", message: ADD_FIELD_LABELS.labelRequired });
+  } else if (label.length > FIELD_LABEL_MAX_LENGTH) {
+    errors.push({
+      field: "label",
+      message: ADD_FIELD_LABELS.labelTooLong(FIELD_LABEL_MAX_LENGTH),
+    });
+  }
+  if (draft.description.trim().length > FIELD_DESCRIPTION_MAX_LENGTH) {
+    errors.push({
+      field: "description",
+      message: P.descriptionTooLong(FIELD_DESCRIPTION_MAX_LENGTH),
+    });
+  }
+  if (draft.kind === "text" || draft.kind === "slug") {
+    const trimmed = draft.maxLength.trim();
+    if (trimmed !== "") {
+      const n = Number(trimmed);
+      if (!Number.isInteger(n) || n <= 0) {
+        errors.push({ field: "maxLength", message: P.maxLengthInvalid });
+      }
+    }
+  }
+  if (draft.kind === "select") {
+    if (draft.options.length === 0) {
+      errors.push({ field: "options", message: P.optionsRequired });
+    }
+    const seen = new Set<string>();
+    for (const option of draft.options) {
+      if (option.label.trim() === "") {
+        errors.push({ field: "options", message: P.optionLabelEmpty });
+      }
+      if (option.value === "") {
+        errors.push({ field: "options", message: P.optionValueEmpty });
+      } else if (seen.has(option.value)) {
+        errors.push({ field: "options", message: P.optionValueDuplicate(option.value) });
+      } else {
+        seen.add(option.value);
+      }
+    }
+  }
+  if (draft.kind === "reference" && draft.allowedTypes.length === 0) {
+    errors.push({ field: "allowedTypes", message: P.allowedTypesRequired });
+  }
+  return errors;
+}
+
 export function fieldTags(
   draft: FieldDraft,
   titleKey: string | null,
@@ -328,6 +387,7 @@ export function fieldTags(
   if (draft.indexed && !NO_INDEXED_KINDS.includes(draft.kind)) result.push(tags.indexed);
   if (change.requiredAdded) result.push(tags.requiredChanged);
   if (change.kindChanged !== null) result.push(tags.kindChanged);
+  if (fieldDraftErrors(draft).length > 0) result.push(tags.incomplete);
   return result;
 }
 
@@ -364,7 +424,7 @@ function fromFieldDraft(
       if (draft.maxLength.trim() !== "") {
         maxLength = Number(draft.maxLength.trim());
         if (!Number.isInteger(maxLength) || maxLength <= 0) {
-          return { ok: false, error: `${draft.key}: maxLength は正の整数で指定してください` };
+          return { ok: false, error: FIELD_PANEL_LABELS.maxLengthInvalid };
         }
       }
       if (draft.kind === "slug") {

@@ -13,17 +13,18 @@ import {
   TextField,
 } from "@plyrs/ui";
 import { border, font, space, stroke, text } from "@plyrs/ui/semantic.stylex";
-import { FIELD_DESCRIPTION_MAX_LENGTH, FIELD_LABEL_MAX_LENGTH } from "@plyrs/metamodel";
+import { FIELD_LABEL_MAX_LENGTH } from "@plyrs/metamodel";
 import {
   autoFill,
   availableKinds,
   changeKind,
+  fieldDraftErrors,
   keyErrorMessage,
   validateFieldKey,
   type FieldDraft,
   type FieldKind,
 } from "../../lib/content-type-form";
-import { ADD_FIELD_LABELS, FIELD_KIND_LABELS, FIELD_PANEL_LABELS, TERMS } from "../../lib/labels";
+import { FIELD_KIND_LABELS, FIELD_PANEL_LABELS, TERMS } from "../../lib/labels";
 
 const NARROW = "@media (max-width: 959px)";
 const P = FIELD_PANEL_LABELS;
@@ -48,9 +49,15 @@ const styles = stylex.create({
   heading: { margin: 0, fontSize: font.label, fontWeight: font.weightBold, color: text.default },
   optionRow: {
     display: "grid",
-    gridTemplateColumns: { default: "1fr 1fr auto", [NARROW]: "1fr auto" },
+    gridTemplateColumns: "1fr auto",
     gap: space.sm,
     alignItems: "start",
+  },
+  // 表示名と値。広い画面は横に並べ、狭い画面は縦に積む
+  optionFields: {
+    display: "grid",
+    gridTemplateColumns: { default: "1fr 1fr", [NARROW]: "1fr" },
+    gap: space.sm,
   },
   optionList: { display: "flex", flexDirection: "column", gap: space.sm },
   footer: { display: "flex", alignItems: "center", gap: space.sm },
@@ -66,6 +73,8 @@ export interface FieldPanelProps {
   typeOptions: readonly { key: string; name: string }[];
   /** 開いた時点で titleField がこのフィールドか */
   isTitle: boolean;
+  /** 指定が無く最初のテキストが既定でタイトルになっている(E19。チェックは無効表示) */
+  isTitleImplicit?: boolean;
   /** E9 */
   isReadOnly: boolean;
   returnFocusTo: RefObject<HTMLElement | null>;
@@ -84,20 +93,17 @@ function Setting({ help, children }: { help?: string; children: ReactNode }) {
   );
 }
 
-function maxLengthError(value: string): boolean {
-  const trimmed = value.trim();
-  if (trimmed === "") return false;
-  const n = Number(trimmed);
-  return !Number.isInteger(n) || n <= 0;
-}
-
-function optionErrors(options: FieldDraft["options"]): (string | null)[] {
+// 行ごとの表示名と値のエラー(fieldDraftErrors と同じ判定を、行の下に出すために行別に求める)
+function optionErrors(
+  options: FieldDraft["options"],
+): { label: string | null; value: string | null }[] {
   const seen = new Set<string>();
   return options.map((option) => {
-    if (option.value === "") return P.optionValueEmpty;
-    if (seen.has(option.value)) return P.optionValueDuplicate(option.value);
+    const label = option.label.trim() === "" ? P.optionLabelEmpty : null;
+    if (option.value === "") return { label, value: P.optionValueEmpty };
+    if (seen.has(option.value)) return { label, value: P.optionValueDuplicate(option.value) };
     seen.add(option.value);
-    return null;
+    return { label, value: null };
   });
 }
 
@@ -107,6 +113,7 @@ export function FieldPanel({
   others,
   typeOptions,
   isTitle,
+  isTitleImplicit = false,
   isReadOnly,
   returnFocusTo,
   onApply,
@@ -127,7 +134,14 @@ export function FieldPanel({
     setSubmitted(false);
   }, [draftKey]);
 
-  if (draft === null || local === null) return null;
+  // 閉じても SidePanel は外さない(isOpen の true → false でフォーカスを戻すため)
+  if (draft === null || local === null) {
+    return (
+      <SidePanel isOpen={false} onClose={onCancel} title="" returnFocusTo={returnFocusTo}>
+        {null}
+      </SidePanel>
+    );
+  }
 
   const patch = (change: Partial<FieldDraft>) => setLocal({ ...local, ...change });
   const kind = local.kind;
@@ -136,30 +150,17 @@ export function FieldPanel({
   const hasOtherSlug = others.some((other) => other.key === SLUG_KEY);
   const keyError = local.isNew ? validateFieldKey(local.key, others) : null;
   const showKeyError = submitted || local.label !== "" || local.key !== "";
-  const labelError =
-    label === ""
-      ? ADD_FIELD_LABELS.labelRequired
-      : label.length > FIELD_LABEL_MAX_LENGTH
-        ? ADD_FIELD_LABELS.labelTooLong(FIELD_LABEL_MAX_LENGTH)
-        : null;
-  const descriptionError =
-    description.length > FIELD_DESCRIPTION_MAX_LENGTH
-      ? P.descriptionTooLong(FIELD_DESCRIPTION_MAX_LENGTH)
-      : null;
+  const errors = fieldDraftErrors(local);
+  const labelError = errors.find((error) => error.field === "label")?.message ?? null;
+  const descriptionError = errors.find((error) => error.field === "description")?.message ?? null;
   const hasMaxLength = kind === "text" || kind === "slug";
-  const maxLengthInvalid = hasMaxLength && maxLengthError(local.maxLength);
+  const maxLengthInvalid = hasMaxLength && errors.some((error) => error.field === "maxLength");
   const optionError = kind === "select" ? optionErrors(local.options) : [];
   const optionsEmpty = kind === "select" && local.options.length === 0;
-  const typesMissing = kind === "reference" && local.allowedTypes.length === 0;
+  const typesMissing =
+    kind === "reference" && errors.some((error) => error.field === "allowedTypes");
 
-  const isValid =
-    labelError === null &&
-    descriptionError === null &&
-    keyError === null &&
-    !maxLengthInvalid &&
-    !optionsEmpty &&
-    optionError.every((error) => error === null) &&
-    !typesMissing;
+  const isValid = keyError === null && errors.length === 0;
 
   const apply = () => {
     setSubmitted(true);
@@ -331,8 +332,13 @@ export function FieldPanel({
 
         {kind === "text" && (
           <>
-            <Setting help={P.titleFieldHelp}>
-              <Checkbox isSelected={titleOn} onChange={setTitleOn} isReadOnly={isReadOnly}>
+            <Setting help={isTitleImplicit ? P.titleFieldImplicitHelp : P.titleFieldHelp}>
+              <Checkbox
+                isSelected={isTitleImplicit || titleOn}
+                onChange={setTitleOn}
+                isReadOnly={isReadOnly}
+                isDisabled={isTitleImplicit}
+              >
                 {P.titleField}
               </Checkbox>
             </Setting>
@@ -378,22 +384,31 @@ export function FieldPanel({
             <div {...stylex.props(styles.optionList)}>
               {local.options.map((option, index) => {
                 const error = submitted ? (optionError[index] ?? null) : null;
+                const labelMessage = error?.label ?? null;
+                const valueMessage = error?.value ?? null;
                 return (
                   <div key={index} {...stylex.props(styles.optionRow)}>
-                    <TextField
-                      label={`${P.optionLabel} ${index + 1}`}
-                      value={option.label}
-                      onChange={(next) => onOptionLabelChange(index, next)}
-                      isReadOnly={isReadOnly}
-                    />
-                    <TextField
-                      label={`${P.optionValue} ${index + 1}`}
-                      value={option.value}
-                      onChange={(value) => setOption(index, { value })}
-                      isMonospace
-                      isReadOnly={isReadOnly}
-                      {...(error === null ? {} : { isInvalid: true, errorMessage: error })}
-                    />
+                    <div {...stylex.props(styles.optionFields)}>
+                      <TextField
+                        label={`${P.optionLabel} ${index + 1}`}
+                        value={option.label}
+                        onChange={(next) => onOptionLabelChange(index, next)}
+                        isReadOnly={isReadOnly}
+                        {...(labelMessage === null
+                          ? {}
+                          : { isInvalid: true, errorMessage: labelMessage })}
+                      />
+                      <TextField
+                        label={`${P.optionValue} ${index + 1}`}
+                        value={option.value}
+                        onChange={(value) => setOption(index, { value })}
+                        isMonospace
+                        isReadOnly={isReadOnly}
+                        {...(valueMessage === null
+                          ? {}
+                          : { isInvalid: true, errorMessage: valueMessage })}
+                      />
+                    </div>
                     {!isReadOnly && (
                       <IconButton
                         icon={X}

@@ -13,6 +13,7 @@ import {
   emptyFieldDraft,
   emptyTypeDraft,
   fieldChange,
+  fieldDraftErrors,
   fieldTags,
   hasSlugField,
   isTypeDraftDirty,
@@ -24,8 +25,10 @@ import {
   validateFieldKey,
   validateTypeKey,
   keyErrorMessage,
+  type FieldDraft,
   type TypeDraft,
 } from "./content-type-form";
+import { CONTENT_TYPE_LABELS, FIELD_PANEL_LABELS } from "./labels";
 
 const uuid = "018f2b6a-7a0a-7000-8000-000000000001";
 
@@ -368,18 +371,18 @@ describe("変更の検出", () => {
 
   it("fieldTags の順と内容", () => {
     const none = { requiredAdded: false, kindChanged: null };
-    const text = { ...emptyFieldDraft("text", "title", ""), required: true };
+    const text = { ...emptyFieldDraft("text", "title", "T"), required: true };
     expect(fieldTags(text, "title", none)).toStrictEqual(["必須", "タイトルに使う"]);
     const asset = {
-      ...emptyFieldDraft("asset", "p", ""),
+      ...emptyFieldDraft("asset", "p", "P"),
       cardinality: "many" as const,
       indexed: true,
     };
     expect(fieldTags(asset, null, none)).toStrictEqual(["複数"]);
-    expect(fieldTags(emptyFieldDraft("reference", "r", ""), null, none)).toStrictEqual([
-      "1 件だけ",
-    ]);
-    const indexed = { ...emptyFieldDraft("number", "n", ""), indexed: true };
+    expect(
+      fieldTags({ ...emptyFieldDraft("reference", "r", "R"), allowedTypes: ["news"] }, null, none),
+    ).toStrictEqual(["1 件だけ"]);
+    const indexed = { ...emptyFieldDraft("number", "n", "N"), indexed: true };
     expect(fieldTags(indexed, null, none)).toStrictEqual(["絞り込み・並べ替え"]);
     expect(
       fieldTags(text, "title", {
@@ -412,5 +415,65 @@ describe("summaryToDefinition", () => {
       listColumns: ["a"],
       menuOrder: 2,
     });
+  });
+});
+
+const errorFields = (draft: FieldDraft) => fieldDraftErrors(draft).map((error) => error.field);
+
+describe("fieldDraftErrors", () => {
+  const P = FIELD_PANEL_LABELS;
+
+  it("完成したフィールドはエラー無し", () => {
+    expect(fieldDraftErrors(emptyFieldDraft("text", "title", "タイトル"))).toStrictEqual([]);
+  });
+
+  it("表示名は 1〜100 文字、説明は 500 文字以内", () => {
+    expect(errorFields(emptyFieldDraft("text", "a", "  "))).toStrictEqual(["label"]);
+    expect(errorFields(emptyFieldDraft("text", "a", "あ".repeat(101)))).toStrictEqual(["label"]);
+    const long = { ...emptyFieldDraft("text", "a", "A"), description: "あ".repeat(501) };
+    expect(fieldDraftErrors(long)).toStrictEqual([
+      { field: "description", message: P.descriptionTooLong(500) },
+    ]);
+  });
+
+  it("最大文字数は空か正の整数", () => {
+    const base = emptyFieldDraft("text", "a", "A");
+    expect(fieldDraftErrors({ ...base, maxLength: "" })).toStrictEqual([]);
+    expect(fieldDraftErrors({ ...base, maxLength: "10" })).toStrictEqual([]);
+    expect(errorFields({ ...base, maxLength: "0" })).toStrictEqual(["maxLength"]);
+    expect(errorFields({ ...base, maxLength: "1.5" })).toStrictEqual(["maxLength"]);
+  });
+
+  it("select は選択肢 1 件以上・表示名と値が空でなく値が重複しない", () => {
+    const base = emptyFieldDraft("select", "c", "色");
+    expect(fieldDraftErrors(base)).toStrictEqual([
+      { field: "options", message: P.optionsRequired },
+    ]);
+    const messages = fieldDraftErrors({
+      ...base,
+      options: [
+        { value: "", label: "" },
+        { value: "r", label: "赤" },
+        { value: "r", label: "赤2" },
+      ],
+    }).map((error) => error.message);
+    expect(messages).toStrictEqual([
+      P.optionLabelEmpty,
+      P.optionValueEmpty,
+      P.optionValueDuplicate("r"),
+    ]);
+  });
+
+  it("reference は参照できる型が 1 つ以上必要", () => {
+    const base = emptyFieldDraft("reference", "r", "関連");
+    expect(errorFields(base)).toStrictEqual(["allowedTypes"]);
+    expect(fieldDraftErrors({ ...base, allowedTypes: ["news"] })).toStrictEqual([]);
+  });
+
+  it("未完了の行には fieldTags が「設定が未完了」を足す", () => {
+    const none = { requiredAdded: false, kindChanged: null };
+    expect(fieldTags(emptyFieldDraft("select", "c", "色"), null, none)).toContain(
+      CONTENT_TYPE_LABELS.tags.incomplete,
+    );
   });
 });

@@ -69,7 +69,6 @@ const styles = stylex.create({
     borderTopWidth: stroke.default,
     borderTopStyle: "solid",
     borderTopColor: border.default,
-    opacity: 0.7,
   },
   cardContent: {
     display: "flex",

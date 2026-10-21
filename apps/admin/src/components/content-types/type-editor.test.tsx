@@ -188,3 +188,47 @@ it("API 名の重複は型名つきで出る", async () => {
     screen.getByText(CONTENT_TYPE_LABELS.keyErrors.duplicate("asset", "アセット")),
   ).toBeInTheDocument();
 });
+
+async function addSelectField(user: ReturnType<typeof userEvent.setup>) {
+  fireEvent.click(screen.getByRole("button", { name: editor.addField }));
+  const dialog = await screen.findByRole("dialog", { name: ADD_FIELD_LABELS.title });
+  await user.click(
+    within(dialog).getByRole("button", {
+      name: new RegExp(FIELD_KIND_LABELS.select.name.replace(/[()]/g, "\\$&")),
+    }),
+  );
+  await user.click(within(dialog).getByRole("button", { name: ADD_FIELD_LABELS.next }));
+  await user.type(
+    within(dialog).getByRole("textbox", { name: new RegExp(`^${ADD_FIELD_LABELS.label}`) }),
+    "Color",
+  );
+  await user.click(within(dialog).getByRole("button", { name: ADD_FIELD_LABELS.add }));
+  return screen.findByRole("dialog", { name: "Color" });
+}
+
+it("選択肢のフィールドを追加してパネルをキャンセルすると、行に未完了が出て保存が無効のまま", async () => {
+  const user = userEvent.setup();
+  setup();
+  const panel = await addSelectField(user);
+  await user.click(within(panel).getByRole("button", { name: FIELD_PANEL_LABELS.cancel }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Color" })).toBeNull());
+  const row = screen.getByRole("row", { name: /Color/ });
+  expect(within(row).getByText(CONTENT_TYPE_LABELS.tags.incomplete)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: editor.save })).toBeDisabled();
+});
+
+it("追加の後にパネルを閉じると「フィールドを追加」にフォーカスが戻る", async () => {
+  const user = userEvent.setup();
+  setup();
+  const panel = await addSelectField(user);
+  await user.click(within(panel).getByRole("button", { name: FIELD_PANEL_LABELS.cancel }));
+  await waitFor(() => expect(screen.getByRole("button", { name: editor.addField })).toHaveFocus());
+});
+
+it("表示名を入力してから消すと必須のエラーが出る(初期の空では出ない)", async () => {
+  const user = userEvent.setup();
+  setup();
+  expect(screen.queryByText(editor.nameRequired)).not.toBeInTheDocument();
+  await user.clear(nameBox());
+  expect(screen.getByText(editor.nameRequired)).toBeInTheDocument();
+});

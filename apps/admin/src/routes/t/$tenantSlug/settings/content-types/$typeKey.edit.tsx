@@ -56,7 +56,8 @@ function EditContentTypePage() {
       });
       if (!built.ok) {
         // 描画側で検証済みなので通常は来ない(保険)
-        toaster.error(built.errors.join(" "));
+        console.error(built.errors);
+        toaster.error(labels.editor.saveFailed);
         return false;
       }
       await adminApi.putContentType(tenant.id, built.definition);

@@ -23,6 +23,7 @@ const articleSummary = summary({
   id: articleType.id,
   name: "記事",
   version: 2,
+  menuOrder: 3,
   fields: [{ key: "title", type: "text", label: "タイトル" }],
 });
 
@@ -74,6 +75,7 @@ describe("設定 › コンテンツタイプ(編集)", () => {
       id: articleType.id,
       version: 2,
       key: "article",
+      menuOrder: 3,
       fields: [{ key: "title", required: true }],
     });
     // 暗黙のタイトルは適用しても titleField に書き込まれない

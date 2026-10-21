@@ -16,6 +16,7 @@ import {
   autoFill,
   effectiveTitleField,
   emptyFieldDraft,
+  fieldDraftErrors,
   hasSlugField,
   isTypeDraftDirty,
   keyErrorMessage,
@@ -108,7 +109,10 @@ export function TypeEditor({
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ label: string; key: string } | null>(null);
+  const [nameTouched, setNameTouched] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const panelReturnRef = useRef<HTMLElement | null>(null);
+  const addButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const titleKey = effectiveTitleField(draft);
   const editingDraft =
@@ -135,13 +139,18 @@ export function TypeEditor({
     draft.name.trim() !== "" &&
     keyError === null &&
     draft.fields.length >= 1 &&
+    draft.fields.every((field) => fieldDraftErrors(field).length === 0) &&
     !descriptionTooLong &&
     !isPanelOpen;
   const canSubmit = isValid && (isNewType || isTypeDraftDirty(draft, initial)) && !isPending;
 
   const patch = (change: Partial<TypeDraft>) => setDraft((current) => ({ ...current, ...change }));
 
+  const nameMissing = draft.name.trim() === "";
+  const showNameError = nameMissing && (nameTouched || submitAttempted);
+
   const onNameChange = (name: string) => {
+    setNameTouched(true);
     setDraft((current) => ({
       ...current,
       name,
@@ -184,6 +193,8 @@ export function TypeEditor({
       listColumns: current.listColumns.filter((column) => column !== key),
     }));
     setDeleteTarget(null);
+    // 消した行にはフォーカスを戻せないので「フィールドを追加」へ戻す
+    panelReturnRef.current = addButtonRef.current;
     closePanel();
   };
 
@@ -203,7 +214,7 @@ export function TypeEditor({
     }));
 
   const addButton = isReadOnly ? undefined : (
-    <Button variant="secondary" icon={Plus} onPress={() => setAddOpen(true)}>
+    <Button ref={addButtonRef} variant="secondary" icon={Plus} onPress={() => setAddOpen(true)}>
       {editor.addField}
     </Button>
   );
@@ -232,7 +243,10 @@ export function TypeEditor({
               variant="primary"
               isDisabled={!canSubmit}
               disabledReason={isPanelOpen ? editor.panelOpenReason : undefined}
-              onPress={() => void onSubmit(draft)}
+              onPress={() => {
+                setSubmitAttempted(true);
+                void onSubmit(draft);
+              }}
             >
               {isNewType ? editor.create : editor.save}
             </Button>
@@ -250,6 +264,8 @@ export function TypeEditor({
               isRequired={!isReadOnly}
               isReadOnly={isReadOnly}
               autoFocus={isNewType}
+              isInvalid={showNameError}
+              errorMessage={showNameError ? editor.nameRequired : undefined}
             />
             <TextField
               label={editor.key}
@@ -327,6 +343,11 @@ export function TypeEditor({
         others={fieldRefs.filter((field) => field.key !== editingKey)}
         typeOptions={referenceCandidates(existingTypes, isNewType ? null : draft.key)}
         isTitle={editingKey !== null && titleKey === editingKey}
+        isTitleImplicit={
+          editingKey !== null &&
+          draft.titleField === null &&
+          effectiveTitleField(draft) === editingKey
+        }
         isReadOnly={isReadOnly}
         returnFocusTo={panelReturnRef}
         onApply={applyField}
@@ -340,7 +361,7 @@ export function TypeEditor({
         hasSlug={hasSlugField(draft.fields)}
         onAdd={({ kind, key, label }) => {
           setAddOpen(false);
-          panelReturnRef.current = null;
+          panelReturnRef.current = addButtonRef.current;
           const created = emptyFieldDraft(kind, key, label);
           setDraft((current) => ({ ...current, fields: [...current.fields, created] }));
           setEditingKey(created.key);

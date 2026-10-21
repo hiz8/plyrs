@@ -629,6 +629,7 @@ export const CONTENT_TYPE_LABELS = {
     indexed: "絞り込み・並べ替え",
     requiredChanged: "必須に変更",
     kindChanged: "種類を変更",
+    incomplete: "設定が未完了",
   },
   kindChangeArrow: " → ",
   warnings: {
@@ -687,6 +688,8 @@ export const FIELD_PANEL_LABELS = {
   required: "必須",
   titleField: "タイトルに使う",
   titleFieldHelp: "一覧・ホーム・パンくずで、このフィールドの値をタイトルとして表示します",
+  titleFieldImplicitHelp:
+    "最初のテキスト(1 行)が既定でタイトルになります。別のフィールドで「タイトルに使う」を付けると切り替わります",
   indexed: "公開 API で絞り込み・並べ替えに使う",
   indexedHelp: "公開 API の検索条件や並び順に使えるようになります",
   unique: "同じ値を許可しない",
@@ -701,6 +704,7 @@ export const FIELD_PANEL_LABELS = {
   addOption: "選択肢を追加",
   removeOption: (label: string) => `${label || "(空)"}を外す`,
   optionsRequired: "選択肢を 1 件以上入力してください",
+  optionLabelEmpty: "表示名を入力してください",
   optionValueEmpty: "API で使う値を入力してください",
   optionValueDuplicate: (value: string) => `「${value}」が重複しています`,
   multiple: "複数選択",
