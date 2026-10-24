@@ -16,6 +16,8 @@ const PNG_1X1 = Buffer.from(
 // playwright.config.ts の projects/dependencies により core-journey の後に実行される(直列の順序を保つため)。
 // データは core-journey と共有せず、この spec 専用のユーザーとテナント(slug "media")を作る。
 test("upload, edit alt, pick from the editor, and delete", async ({ page }) => {
+  // superLogin の TOTP 窓待ち(最大約 30 秒)+ メディア画面の冷間コンパイルがあるため 60 秒では足りない
+  test.setTimeout(180_000);
   const email = `media+${Date.now()}@example.com`;
   const password = "user-password-123";
 
@@ -31,7 +33,10 @@ test("upload, edit alt, pick from the editor, and delete", async ({ page }) => {
 
   // アップロード(media-library.tsx の FileButton = 隠し input[type=file]。空状態の DropZone にも input があるので先頭)
   await sidebar.getByRole("link", { name: "メディア", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "メディア", level: 1 })).toBeVisible();
+  // warm-up は /super-login しか開かないので、メディアのルートはここで初めてコンパイルされる(冷間は約 28 秒)
+  await expect(page.getByRole("heading", { name: "メディア", level: 1 })).toBeVisible({
+    timeout: 45_000,
+  });
   await page
     .locator('input[type="file"]')
     .first()

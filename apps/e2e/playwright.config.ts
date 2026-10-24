@@ -33,6 +33,8 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 120_000,
   },
+  // media と two-tab-sync はどちらも core-journey にだけ依存し、相互の順序は不定。
+  // テナントとユーザーが別なので干渉しない。
   projects: [
     { name: "super-console", testMatch: /super-console\.spec\.ts/ },
     { name: "core-journey", testMatch: /core-journey\.spec\.ts/, dependencies: ["super-console"] },
