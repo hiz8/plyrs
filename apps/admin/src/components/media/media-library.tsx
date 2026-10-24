@@ -20,6 +20,7 @@ import {
   inUseCount,
   DEFAULT_MEDIA_QUERY,
   type MediaQuery,
+  type MediaRow,
   type MediaView,
 } from "../../lib/media-list";
 import { uploadSummaryMessage } from "../../lib/media";
@@ -130,7 +131,7 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
 
   // F11/F12: 削除の確認の対象。1 件は開いている詳細パネルのファイル、一括は選択中
   const [deleteTarget, setDeleteTarget] = useState<
-    { kind: "one"; id: string } | { kind: "many"; ids: string[] } | null
+    { kind: "one"; id: string; row: MediaRow } | { kind: "many"; ids: string[] } | null
   >(null);
   const [isDeleting, setIsDeleting] = useState(false);
   // F29: パネルを開いた要素。閉じたときにフォーカスを戻す
@@ -151,13 +152,17 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
     saveMediaView(next);
   };
   const open = (id: string) => {
-    const active = document.activeElement;
-    panelReturnRef.current = active instanceof HTMLElement ? active : null;
+    rememberReturn();
     void navigate({
       to: "/t/$tenantSlug/media/$assetId",
       params: { tenantSlug, assetId: id },
       search: asSearch(query),
     });
+  };
+  // F29: パネルを開く前に押していた要素を覚える(グリッドのタイルとリストのリンクで共通)
+  const rememberReturn = () => {
+    const active = document.activeElement;
+    panelReturnRef.current = active instanceof HTMLElement ? active : null;
   };
   const closePanel = () =>
     void navigate({
@@ -207,6 +212,8 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
     if (message.tone === "success") toaster.success(message.title);
     else toaster.error(message.title);
     afterDelete(result.succeeded);
+    // F12: 開いているパネルのファイルが消えたら閉じる
+    if (assetId !== null && result.succeeded.includes(assetId)) closePanel();
   };
   const deleteOne = async (id: string) => {
     setIsDeleting(true);
@@ -232,7 +239,13 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
     else deleteMany(deleteTarget.ids);
   };
 
-  const detailRow = assetId === null ? null : (rows.find((row) => row.id === assetId) ?? null);
+  const liveRow = assetId === null ? null : (rows.find((row) => row.id === assetId) ?? null);
+  // 削除中にトゥームストーンが先に届いても、確認とパネルは削除前の行で描き続ける
+  const detailRow =
+    liveRow ??
+    (isDeleting && deleteTarget?.kind === "one" && deleteTarget.id === assetId
+      ? deleteTarget.row
+      : null);
   const dialogTarget: DeleteMediaTarget | null =
     deleteTarget === null
       ? null
@@ -240,15 +253,9 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
         ? {
             kind: "many",
             ids: deleteTarget.ids,
-            inUse: inUseCount(deleteTarget.ids, orphanIds ?? new Set()),
+            inUse: orphanIds === null ? null : inUseCount(deleteTarget.ids, orphanIds),
           }
-        : detailRow === null
-          ? null
-          : {
-              kind: "one",
-              row: detailRow,
-              usage: usage.dialog,
-            };
+        : { kind: "one", row: deleteTarget.row, usage: usage.dialog };
 
   const isEmpty = rows.length === 0 && !hasMediaFilters(query) && uploads.entries.length === 0;
   const selection = canDelete
@@ -359,6 +366,7 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
                 />
               ) : (
                 <MediaTable
+                  onBeforeOpen={rememberReturn}
                   detailHref={detailHref}
                   rows={visible}
                   resolveUrl={assets.resolveUrl}
@@ -382,7 +390,9 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
         canWrite={canWrite}
         canDelete={canDelete}
         onSave={(input) => (assetId === null ? Promise.resolve() : saveDetail(assetId, input))}
-        onDelete={() => assetId !== null && setDeleteTarget({ kind: "one", id: assetId })}
+        onDelete={() =>
+          detailRow !== null && setDeleteTarget({ kind: "one", id: detailRow.id, row: detailRow })
+        }
         onClose={closePanel}
         returnFocusTo={panelReturnRef}
       />

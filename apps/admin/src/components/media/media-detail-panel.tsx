@@ -155,13 +155,22 @@ export function MediaDetailPanel({
 
   // 入力の取り直しは id にだけ結ぶ。同期で同じ id の行が差し替わっても入力中の値は保つ
   // (V4-E Task 8 の Important)
-  const latest = useRef(row);
-  latest.current = row;
+  // 同じ id の行が差し替わったときは、触っていない欄(下書きが行の旧値のまま)だけ新しい値に追従する
   const rowId = row?.id ?? null;
+  const rowAlt = row?.alt ?? "";
+  const rowCaption = row?.caption ?? "";
+  const previous = useRef({ id: rowId, alt: rowAlt, caption: rowCaption });
   useEffect(() => {
-    setAlt(latest.current?.alt ?? "");
-    setCaption(latest.current?.caption ?? "");
-  }, [rowId]);
+    const before = previous.current;
+    previous.current = { id: rowId, alt: rowAlt, caption: rowCaption };
+    if (before.id !== rowId) {
+      setAlt(rowAlt);
+      setCaption(rowCaption);
+      return;
+    }
+    setAlt((draft) => (draft === before.alt ? rowAlt : draft));
+    setCaption((draft) => (draft === before.caption ? rowCaption : draft));
+  }, [rowId, rowAlt, rowCaption]);
 
   // 閉じても SidePanel は外さない(isOpen の true → false でフォーカスを戻すため)
   if (!isOpen || (row === null && !notFound)) {

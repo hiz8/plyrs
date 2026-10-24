@@ -19,7 +19,14 @@ vi.mock("./components/media/media-filter-select", async () => {
 
 describe("メディアの削除", () => {
   it("使用中のファイルは警告つきの確認を経て削除し、パネルを閉じる", async () => {
-    const remove = vi.fn((_init?: RequestInit) => jsonResponse(200, { ok: true }));
+    // HTTP の応答は手で返す(トゥームストーンの方が先に届く順を作る)
+    const gate: { respond: (response: Response) => void } = { respond: () => undefined };
+    const remove = vi.fn(
+      (_init?: RequestInit) =>
+        new Promise<Response>((resolve) => {
+          gate.respond = resolve;
+        }),
+    );
     const orphans = vi.fn(() => jsonResponse(200, { orphanIds: [ASSET_2] }));
     const harness = socketHarness();
     const router = renderAt(
@@ -66,15 +73,8 @@ describe("メディアの削除", () => {
 
     await vi.waitFor(() => expect(remove).toHaveBeenCalledOnce());
     expect(remove.mock.calls[0]?.[0]?.method).toBe("DELETE");
-    expect(
-      await within(await screen.findByRole("region", { name: "通知" })).findByText("削除しました"),
-    ).toBeInTheDocument();
-    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/media"));
-    expect(router.state.location.search).toEqual({ sort: "name" });
-    // 未使用一覧を取り直す(F12)
-    await vi.waitFor(() => expect(orphans.mock.calls.length).toBeGreaterThan(1));
 
-    // サーバーの確定(トゥームストーン)が届くと一覧から消える
+    // 応答より先にサーバーの確定(トゥームストーン)が届いても、確認とパネルは削除前の行で保たれる
     harness.latest().deliver({
       type: "change",
       record: assetRecord(ASSET_1, "one.png", {
@@ -84,8 +84,24 @@ describe("メディアの削除", () => {
         deletedAt: "2026-07-17T03:00:00Z",
       }),
     });
-    const grid = await screen.findByRole("grid", { name: "メディアの一覧" });
+    // モーダルの間、背景は支援技術から隠れている
+    const grid = await screen.findByRole("grid", { name: "メディアの一覧", hidden: true });
     await waitFor(() => expect(within(grid).queryByText("one.png")).toBeNull());
+    expect(
+      screen.getByRole("alertdialog", { name: "one.png を削除しますか？" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("ファイルが見つかりません。削除された可能性があります")).toBeNull();
+    expect(router.state.location.pathname).toBe(`/t/blog/media/${ASSET_1}`);
+
+    gate.respond(jsonResponse(200, { ok: true }));
+    expect(
+      await within(await screen.findByRole("region", { name: "通知" })).findByText("削除しました"),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/media"));
+    expect(router.state.location.search).toEqual({ sort: "name" });
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    // 未使用一覧を取り直す(F12)
+    await vi.waitFor(() => expect(orphans.mock.calls.length).toBeGreaterThan(1));
     expect(within(grid).getByText("two.png")).toBeInTheDocument();
   });
 });

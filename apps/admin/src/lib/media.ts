@@ -168,7 +168,8 @@ export function resolveUsage(
     const field = definition?.fields.find((candidate) => candidate.key === entry.sourceField);
     resolved.push({
       recordId: entry.sourceId,
-      typeKey,
+      // 型定義が手元に無いときはリンク先を作れないので null(F14)
+      typeKey: definition === undefined ? null : typeKey,
       typeName: definition?.name ?? typeKey ?? "不明な型",
       title: record === undefined ? entry.sourceId.slice(0, 8) : labelForRecord(types, record),
       fieldKey: entry.sourceField,

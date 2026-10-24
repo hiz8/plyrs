@@ -155,6 +155,16 @@ describe("MediaDetailPanel", () => {
     expect(altField()).toHaveValue("別");
   });
 
+  it("触っていない欄は同期の変更に追従する", () => {
+    const { props, rerender } = setup({ row: rowOf(ASSET_1, { alt: "元", caption: "旧" }) });
+    fireEvent.change(altField(), { target: { value: "入力中" } });
+    rerender(
+      <MediaDetailPanel {...props} row={rowOf(ASSET_1, { alt: "元", caption: "新しい文" })} />,
+    );
+    expect(altField()).toHaveValue("入力中");
+    expect(screen.getByRole("textbox", { name: "キャプション" })).toHaveValue("新しい文");
+  });
+
   it("notFound は見つからない文だけ", () => {
     setup({ row: null, notFound: true });
     expect(

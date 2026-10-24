@@ -248,6 +248,19 @@ describe("resolveUsage", () => {
   });
 });
 
+describe("resolveUsage(型定義なし)", () => {
+  it("型定義が無ければ typeKey は null", () => {
+    const [entry] = resolveUsage(
+      [{ sourceId: "abcdefghijkl", sourceType: "gone", sourceField: "hero", origin: "relation" }],
+      [],
+      () => undefined,
+    );
+    expect(entry?.typeKey).toBeNull();
+    expect(entry?.typeName).toBe("gone");
+    expect(entry?.title).toBe("abcdefgh");
+  });
+});
+
 describe("countUsingRecords", () => {
   it("counts distinct records, not relations", () => {
     expect(countUsingRecords([{ sourceId: "a" }, { sourceId: "a" }, { sourceId: "b" }])).toBe(2);

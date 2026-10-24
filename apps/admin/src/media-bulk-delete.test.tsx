@@ -21,11 +21,13 @@ describe("メディアの一括削除", () => {
     const ok = vi.fn(() => jsonResponse(200, { ok: true }));
     const fail = vi.fn(() => jsonResponse(500, { error: "boom" }));
     const harness = socketHarness();
-    renderAt(
-      "/t/blog/media",
+    // 詳細パネルを開いたまま、そのファイルを含めて一括削除する(F12)
+    const router = renderAt(
+      `/t/blog/media/${ASSET_1}`,
       harness,
       mediaRoutes({
         "/v1/t/t1/assets/orphans": vi.fn(() => jsonResponse(200, { orphanIds: [ASSET_2] })),
+        [`/v1/t/t1/assets/${ASSET_1}/usage`]: vi.fn(() => jsonResponse(200, { usage: [] })),
         [`/v1/t/t1/records/${ASSET_1}`]: ok,
         [`/v1/t/t1/records/${ASSET_2}`]: fail,
       }),
@@ -55,6 +57,8 @@ describe("メディアの一括削除", () => {
 
     await vi.waitFor(() => expect(ok).toHaveBeenCalledOnce());
     await vi.waitFor(() => expect(fail).toHaveBeenCalledOnce());
+    // 成功した 1 件がパネルのファイルなので、パネルは閉じて /media に戻る
+    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/media"));
     const toasts = within(await screen.findByRole("region", { name: "通知" }));
     expect(
       await toasts.findByText("1 件を削除しました。1 件は削除できませんでした"),

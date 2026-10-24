@@ -65,4 +65,11 @@ describe("DeleteMediaDialog(状態)", () => {
       within(dialog).getByText("そのうち 2 件はコンテンツで使われています"),
     ).toBeInTheDocument();
   });
+
+  it("一括で使用中の件数が分からないときは確認できなかった旨の注記", () => {
+    renderDialog({ kind: "many", ids: ["a", "b"], inUse: null });
+    const dialog = screen.getByRole("alertdialog");
+    expect(within(dialog).getByText("使用箇所を確認できませんでした")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/そのうち/)).toBeNull();
+  });
 });

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { mediaRow, MEDIA_ID_A, MEDIA_ID_B } from "../../test-utils/media-rows";
 import { MediaTable, type MediaTableProps } from "./media-table";
@@ -56,4 +56,11 @@ it("selection があれば選択列が出る", () => {
     selection: { selectedKeys: new Set(), onSelectionChange: vi.fn(), isDisabled: false },
   });
   expect(screen.getAllByRole("checkbox")).toHaveLength(3);
+});
+
+it("ファイル名のリンクを押すと onBeforeOpen が呼ばれる(F29)", () => {
+  const onBeforeOpen = vi.fn();
+  setup({ onBeforeOpen });
+  fireEvent.click(screen.getByRole("link", { name: "a.png" }));
+  expect(onBeforeOpen).toHaveBeenCalledOnce();
 });

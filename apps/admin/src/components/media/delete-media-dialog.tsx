@@ -16,7 +16,8 @@ export type DeleteMediaTarget =
         | { status: "error" }
         | { status: "ready"; entries: readonly ResolvedUsage[] };
     }
-  | { kind: "many"; ids: string[]; inUse: number };
+  /** inUse が null = 未使用一覧が取れていない(使用中の件数が分からない) */
+  | { kind: "many"; ids: string[]; inUse: number | null };
 
 export interface DeleteMediaDialogProps {
   target: DeleteMediaTarget | null;
@@ -86,7 +87,14 @@ function OneNote({ usage }: { usage: Extract<DeleteMediaTarget, { kind: "one" }>
   );
 }
 
-function ManyNote({ inUse }: { inUse: number }) {
+function ManyNote({ inUse }: { inUse: number | null }) {
+  if (inUse === null) {
+    return (
+      <DialogNote tone="warning" icon={TriangleAlert}>
+        {L.checkFailed}
+      </DialogNote>
+    );
+  }
   if (inUse === 0) return null;
   return (
     <DialogNote tone="warning" icon={TriangleAlert}>

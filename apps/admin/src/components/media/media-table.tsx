@@ -38,6 +38,8 @@ const styles = stylex.create({
 export interface MediaTableProps {
   /** 詳細パネルへの href。絞り込みの search を保つのは呼び出し側(F5) */
   detailHref: (id: string) => string;
+  /** ファイル名のリンクを押す直前(詳細パネルの閉じたときのフォーカス戻し先を覚える。F29) */
+  onBeforeOpen?: () => void;
   rows: readonly MediaRow[];
   resolveUrl: MediaThumbProps["resolveUrl"];
   orphanIds: ReadonlySet<string> | null;
@@ -56,6 +58,7 @@ const COLUMNS = [
 
 export function MediaTable({
   detailHref,
+  onBeforeOpen,
   rows,
   resolveUrl,
   orphanIds,
@@ -105,7 +108,11 @@ export function MediaTable({
                 case "name":
                   return (
                     <Cell>
-                      <Link href={detailHref(row.id)} {...stylex.props(styles.name)}>
+                      <Link
+                        href={detailHref(row.id)}
+                        onPress={() => onBeforeOpen?.()}
+                        {...stylex.props(styles.name)}
+                      >
                         {row.filename}
                       </Link>
                       <div {...stylex.props(styles.alt)}>
