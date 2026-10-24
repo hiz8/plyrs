@@ -74,11 +74,12 @@ export function AssetRelationPicker({
       ? [value]
       : [];
 
-  // F31: many は未選択の id を末尾に足し、one は置き換える。閉じるのはここ
+  // F31(2026-10-24 改定): many はダイアログで確定した選択の順で値を置き換える(外した id は値からも外れる)。
+  // one も置き換え。閉じるのはここ
   function select(items: PickedMedia[]) {
     const keys = items.map((item) => relationDraftKey({ type: ASSET_TYPE_KEY, id: item.id }));
     if (many) {
-      onChange([...selectedKeys, ...keys.filter((key) => !selectedKeys.includes(key))]);
+      onChange(keys);
     } else if (keys[0] !== undefined) {
       onChange(keys[0]);
     }

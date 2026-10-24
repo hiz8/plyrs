@@ -20,7 +20,8 @@ import type { AssetServices } from "../../lib/asset-services";
 import { errorMessage } from "../../lib/error-messages";
 import { MEDIA_LABELS, MEDIA_PICKER_LABELS, TOASTS } from "../../lib/labels";
 import {
-  MEDIA_KINDS,
+  MEDIA_KIND_OPTIONS,
+  isMediaKindOrAll,
   applyMediaQuery,
   buildMediaRows,
   formatBytes,
@@ -113,15 +114,6 @@ export interface MediaPickerDialogProps {
   onClose: () => void;
 }
 
-const KIND_ITEMS = [
-  { value: "all", label: MEDIA_LABELS.kinds.all },
-  ...MEDIA_KINDS.map((kind) => ({ value: kind, label: MEDIA_LABELS.kinds[kind] })),
-];
-
-function isKind(value: string): value is MediaKind | "all" {
-  return value === "all" || (MEDIA_KINDS as readonly string[]).includes(value);
-}
-
 // アップロード直後でレコードが同期で届くまでの仮の項目(F30)
 interface Provisional {
   filename: string;
@@ -176,8 +168,8 @@ export function MediaPickerDialog({
   const [provisionals, setProvisionals] = useState<Record<string, Provisional>>({});
   const [uploadedIds, setUploadedIds] = useState<ReadonlySet<string>>(new Set());
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
-  const [isBusy, setIsBusy] = useState(false);
 
+  // ダイアログを閉じても進行中のアップロードは中断しない(asset は作られるが、選択には入らない)
   const store = useMemo(() => createUploadStore(assets.upload), [assets]);
   const uploads = useUploads(store);
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
@@ -239,25 +231,25 @@ export function MediaPickerDialog({
 
   const altOf = (item: SelectedItem) => drafts[item.id] ?? item.row?.alt ?? "";
 
-  // F31: 変えた代替テキストだけを asset レコードへ書き、失敗しても挿入は続ける
-  async function insert() {
-    setIsBusy(true);
+  // F31(2026-10-24 改定): 変えた代替テキストだけを asset レコードへ書く。update は楽観更新で outbox が
+  // 配信するので、サーバーの確定は待たずに挿入へ進み、失敗は非同期にトーストで知らせる
+  function insert() {
     const collection = registry.get(ASSET_TYPE_KEY);
-    await Promise.all(
-      selectedItems.map(async (item) => {
-        const alt = altOf(item);
-        if (collection === undefined || item.row === undefined || alt === item.row.alt) return;
-        try {
-          const tx = collection.update(item.id, (draft) => {
-            // updateRecord(record-editor.tsx)と同じ境界 cast
-            draft.input = { ...draft.input, alt } as typeof draft.input;
-          });
-          await tx.isPersisted.promise;
-        } catch (cause) {
+    for (const item of selectedItems) {
+      const alt = altOf(item);
+      if (collection === undefined || item.row === undefined || alt === item.row.alt) continue;
+      try {
+        const tx = collection.update(item.id, (draft) => {
+          // updateRecord(record-editor.tsx)と同じ境界 cast
+          draft.input = { ...draft.input, alt } as typeof draft.input;
+        });
+        tx.isPersisted.promise.catch((cause: unknown) => {
           toaster.error(errorMessage(cause, TOASTS.saveFailed));
-        }
-      }),
-    );
+        });
+      } catch (cause) {
+        toaster.error(errorMessage(cause, TOASTS.saveFailed));
+      }
+    }
     onSelect(
       selectedItems.map((item) => ({ id: item.id, label: item.filename, alt: altOf(item) })),
     );
@@ -280,11 +272,7 @@ export function MediaPickerDialog({
           <Button variant="secondary" onPress={onClose}>
             {L.cancel}
           </Button>
-          <Button
-            variant="primary"
-            isDisabled={count === 0 || isBusy}
-            onPress={() => void insert()}
-          >
+          <Button variant="primary" isDisabled={count === 0} onPress={insert}>
             {many ? L.insert(count) : L.useOne}
           </Button>
         </>
@@ -309,10 +297,10 @@ export function MediaPickerDialog({
               <div {...stylex.props(styles.filters)}>
                 <MediaFilterSelect
                   label={MEDIA_LABELS.kindLabel}
-                  items={KIND_ITEMS}
+                  items={MEDIA_KIND_OPTIONS}
                   selectedValue={kind}
                   onChange={(value) => {
-                    if (isKind(value)) setKind(value);
+                    if (isMediaKindOrAll(value)) setKind(value);
                   }}
                 />
                 <div {...stylex.props(styles.search)}>
@@ -332,7 +320,7 @@ export function MediaPickerDialog({
                   <MediaThumb row={row} resolveUrl={assets.resolveUrl} size="tile" />
                 )}
                 renderBadge={({ row }) => {
-                  const index = orderedIds.indexOf(row.id);
+                  const index = selectedItems.findIndex((item) => item.id === row.id);
                   if (many && index >= 0) return <Badge tone="accent">{`${index + 1}`}</Badge>;
                   return uploadedIds.has(row.id) ? (
                     <Badge tone="success" icon={Check}>
@@ -343,16 +331,18 @@ export function MediaPickerDialog({
                 selectionMode={many ? "multiple" : "single"}
                 selectedKeys={new Set(orderedIds)}
                 onSelectionChange={onSelectionChange}
-                leading={uploads.entries.map((entry) => (
-                  <UploadTile
-                    key={entry.key}
-                    name={entry.item.file.name}
-                    state={uploadTileState(entry, {
-                      onRetry: () => store.retry(entry.key),
-                      onRemove: () => store.remove(entry.key),
-                    })}
-                  />
-                ))}
+                leading={uploads.entries
+                  .filter((entry) => entry.item.status !== "done")
+                  .map((entry) => (
+                    <UploadTile
+                      key={entry.key}
+                      name={entry.item.file.name}
+                      state={uploadTileState(entry, {
+                        onRetry: () => store.retry(entry.key),
+                        onRemove: () => store.remove(entry.key),
+                      })}
+                    />
+                  ))}
               />
             </div>
             <section aria-label={L.selectedRegion} {...stylex.props(styles.right)}>

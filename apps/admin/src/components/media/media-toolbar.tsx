@@ -2,8 +2,13 @@ import * as stylex from "@stylexjs/stylex";
 import { Button, SearchField, SegmentedControl } from "@plyrs/ui";
 import { font, space, status, text } from "@plyrs/ui/semantic.stylex";
 import { LayoutGrid, List } from "lucide-react";
-import { MEDIA_KINDS, hasMediaFilters, DEFAULT_MEDIA_QUERY } from "../../lib/media-list";
-import type { MediaKind, MediaQuery, MediaSort, MediaView } from "../../lib/media-list";
+import {
+  MEDIA_KIND_OPTIONS,
+  hasMediaFilters,
+  isMediaKindOrAll,
+  DEFAULT_MEDIA_QUERY,
+} from "../../lib/media-list";
+import type { MediaQuery, MediaSort, MediaView } from "../../lib/media-list";
 import { MEDIA_LABELS } from "../../lib/labels";
 import { MediaFilterSelect } from "./media-filter-select";
 
@@ -34,10 +39,6 @@ export interface MediaToolbarProps {
   usageError: { onRetry: () => void } | null;
 }
 
-const KIND_ITEMS = [
-  { value: "all", label: MEDIA_LABELS.kinds.all },
-  ...MEDIA_KINDS.map((kind) => ({ value: kind, label: MEDIA_LABELS.kinds[kind] })),
-];
 const USAGE_ITEMS = [
   { value: "all", label: MEDIA_LABELS.usage.all },
   { value: "unused", label: MEDIA_LABELS.usage.unused },
@@ -51,9 +52,6 @@ const VIEW_ITEMS = [
   { value: "list", label: MEDIA_LABELS.views.list, icon: List },
 ];
 
-function isKind(value: string): value is MediaKind | "all" {
-  return value === "all" || (MEDIA_KINDS as readonly string[]).includes(value);
-}
 function isSort(value: string): value is MediaSort {
   return value === "newest" || value === "name";
 }
@@ -73,10 +71,10 @@ export function MediaToolbar({
     <div {...stylex.props(styles.root)}>
       <MediaFilterSelect
         label={MEDIA_LABELS.kindLabel}
-        items={KIND_ITEMS}
+        items={MEDIA_KIND_OPTIONS}
         selectedValue={query.kind}
         onChange={(value) => {
-          if (isKind(value)) onQueryChange({ ...query, kind: value });
+          if (isMediaKindOrAll(value)) onQueryChange({ ...query, kind: value });
         }}
       />
       <MediaFilterSelect

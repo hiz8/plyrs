@@ -1,11 +1,22 @@
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import type { ResolvedUsage } from "./media";
+import { MEDIA_LABELS } from "./labels";
 
 // 案 F 3 章: メディアライブラリの一覧の絞り込み・並べ替えと URL クエリとの相互変換。
 // 一覧のデータは同期で手元にあるため、すべて画面側の純関数で行う(content-list.ts と同じ方針)。
 
 export type MediaKind = "image" | "pdf" | "video" | "audio" | "other";
 export const MEDIA_KINDS: readonly MediaKind[] = ["image", "pdf", "video", "audio", "other"];
+
+// 種類の select の選択肢(一覧のツールバーと選択ダイアログで共用)
+export const MEDIA_KIND_OPTIONS: { value: MediaKind | "all"; label: string }[] = [
+  { value: "all", label: MEDIA_LABELS.kinds.all },
+  ...MEDIA_KINDS.map((kind) => ({ value: kind, label: MEDIA_LABELS.kinds[kind] })),
+];
+
+export function isMediaKindOrAll(value: string): value is MediaKind | "all" {
+  return value === "all" || (MEDIA_KINDS as readonly string[]).includes(value);
+}
 
 // F19: MIME の先頭で 5 種に分ける
 export function mediaKindOf(contentType: string): MediaKind {

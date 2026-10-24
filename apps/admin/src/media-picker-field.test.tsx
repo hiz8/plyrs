@@ -72,31 +72,16 @@ it("代替テキストを入れて挿入すると alt が push され、関係�
   await user.type(within(dialog).getByRole("textbox", { name: "代替テキスト" }), "写真");
   await user.click(within(dialog).getByRole("button", { name: "このファイルを使う" }));
 
-  // 代替テキストの保存はサーバーの確定を待ってから挿入に進む
-  await vi.waitFor(() => expect(pushes(harness.latest()).length).toBe(1));
-  const assetChange = pushes(harness.latest())[0];
-  if (assetChange === undefined) throw new Error("expected an asset push");
-  expect(assetChange.recordId).toBe(ASSET_1);
-  expect(assetChange.input["alt"]).toBe("写真");
-  harness.latest().deliver({
-    type: "ack",
-    changeId: assetChange.changeId,
-    result: {
-      ok: true,
-      record: assetRecord(ASSET_1, "one.png", {
-        input: { alt: "写真" },
-        seq: 11,
-        version: 2,
-      }),
-    },
-  });
-
+  // 代替テキストの保存はサーバーの確定を待たない(ack を配る前にダイアログが閉じる)
   await waitFor(() =>
     expect(screen.queryByRole("dialog", { name: "メディアを選択" })).not.toBeInTheDocument(),
   );
   await user.click(saveDraft());
+  // asset の alt も outbox に入っている
   await vi.waitFor(() => expect(pushes(harness.latest()).length).toBe(2));
-  const articleChange = pushes(harness.latest())[1];
+  const assetChange = pushes(harness.latest()).find((change) => change.recordId === ASSET_1);
+  expect(assetChange?.input["alt"]).toBe("写真");
+  const articleChange = pushes(harness.latest()).find((change) => change.recordId !== ASSET_1);
   if (articleChange === undefined) throw new Error("expected an article push");
   expect(articleChange.input["hero"]).toEqual({ type: "asset", id: ASSET_1 });
   expect(articleChange.input["title"]).toBe("新しい記事");

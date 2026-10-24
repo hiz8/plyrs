@@ -8,6 +8,9 @@ import type { AssetServices } from "../../lib/asset-services";
 import type { MediaKind } from "../../lib/media-list";
 import { ASSET_1, ASSET_2, ASSET_3, assetRecord } from "../../test-utils/media-harness";
 import { pendingConnect } from "../../test-utils/fake-socket";
+import { AssetRelationPicker } from "../asset-picker";
+import { relationDraftKey } from "../../lib/record-form-values";
+import { ToastRegion } from "@plyrs/ui";
 import { MediaPickerDialog } from "./media-picker-dialog";
 
 vi.mock("./media-filter-select", async () => {
@@ -35,6 +38,7 @@ function setup(
     selection?: "one" | "many";
     defaultKind?: MediaKind | "all";
     upload?: AssetServices["upload"];
+    persisted?: Promise<void>;
   } = {},
 ) {
   const registry = buildRegistry();
@@ -45,9 +49,9 @@ function setup(
     .spyOn(collection, "update")
     .mockImplementation(
       () =>
-        ({ isPersisted: { promise: Promise.resolve() } }) as unknown as ReturnType<
-          typeof collection.update
-        >,
+        ({
+          isPersisted: { promise: over.persisted ?? Promise.resolve() },
+        }) as unknown as ReturnType<typeof collection.update>,
     );
   const onSelect = vi.fn();
   const onClose = vi.fn();
@@ -56,16 +60,19 @@ function setup(
     resolveUrl: vi.fn(async () => null),
   };
   render(
-    <MediaPickerDialog
-      registry={registry}
-      types={[ASSET_TYPE_DEFINITION]}
-      assets={assets}
-      fieldName="hero"
-      selection={over.selection ?? "many"}
-      defaultKind={over.defaultKind ?? "all"}
-      onSelect={onSelect}
-      onClose={onClose}
-    />,
+    <>
+      <ToastRegion />
+      <MediaPickerDialog
+        registry={registry}
+        types={[ASSET_TYPE_DEFINITION]}
+        assets={assets}
+        fieldName="hero"
+        selection={over.selection ?? "many"}
+        defaultKind={over.defaultKind ?? "all"}
+        onSelect={onSelect}
+        onClose={onClose}
+      />
+    </>,
   );
   return { registry, update, onSelect, onClose };
 }
@@ -152,6 +159,8 @@ it("アップロードが完了すると選択に加わり、印が付き、代�
   });
   const alt = await region.findByRole("textbox", { name: "代替テキスト" });
   await waitFor(() => expect(alt).toHaveFocus());
+  // 仮タイルは出さず、届いた実レコードのタイルに印が付く
+  expect(within(grid()).getAllByText("new.png")).toHaveLength(1);
   expect(within(grid()).getByText("アップロード完了")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "このファイルを使う" })).toBeEnabled();
 });
@@ -170,4 +179,51 @@ it("変えた代替テキストは挿入時に asset レコードへ書き、変
   expect(update).toHaveBeenCalledTimes(1);
   expect(update.mock.calls[0]?.[0]).toBe(ASSET_1);
   expect(onSelect).toHaveBeenCalledWith([{ id: ASSET_1, label: "a.png", alt: "山" }]);
+});
+
+it("保存が確定しなくても挿入は進み、失敗は通知される", async () => {
+  const failed = Promise.reject(new Error("offline"));
+  failed.catch(() => undefined);
+  const { onSelect } = setup({ selection: "one", persisted: failed });
+  const user = userEvent.setup();
+  await user.click(within(grid()).getByText("a.png"));
+  const alt = within(screen.getByRole("region", { name: "選択中のファイル" })).getByRole(
+    "textbox",
+    { name: "代替テキスト" },
+  );
+  await user.type(alt, "山");
+  await user.click(screen.getByRole("button", { name: "このファイルを使う" }));
+  expect(onSelect).toHaveBeenCalledTimes(1);
+  // モーダルが開いている間、外側の通知欄はアクセシビリティツリーから外れるので hidden を許す
+  const toasts = within(await screen.findByRole("region", { name: "通知", hidden: true }));
+  expect(await toasts.findByText(/保存できませんでした/)).toBeInTheDocument();
+});
+
+it("既存の選択を外して挿入すると、フィールドの値から消える", async () => {
+  const registry = buildRegistry();
+  const onChange = vi.fn();
+  const user = userEvent.setup();
+  render(
+    <AssetRelationPicker
+      field={{
+        key: "gallery",
+        type: "relation",
+        config: { allowedTypes: ["asset"], cardinality: "many" },
+      }}
+      value={[
+        relationDraftKey({ type: "asset", id: ASSET_1 }),
+        relationDraftKey({ type: "asset", id: ASSET_2 }),
+      ]}
+      onChange={onChange}
+      error={undefined}
+      types={[ASSET_TYPE_DEFINITION]}
+      registry={registry}
+      assets={{ upload: vi.fn(async () => ({ id: NEW_ID })), resolveUrl: vi.fn(async () => null) }}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "メディアを選択" }));
+  const dialog = await screen.findByRole("dialog", { name: "メディアを選択" });
+  await user.click(within(dialog).getByRole("checkbox", { name: /選択 a\.png/ }));
+  await user.click(within(dialog).getByRole("button", { name: "1 件を挿入" }));
+  expect(onChange).toHaveBeenCalledWith([relationDraftKey({ type: "asset", id: ASSET_2 })]);
 });
