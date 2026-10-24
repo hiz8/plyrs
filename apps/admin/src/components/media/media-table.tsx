@@ -36,7 +36,8 @@ const styles = stylex.create({
 });
 
 export interface MediaTableProps {
-  tenantSlug: string;
+  /** 詳細パネルへの href。絞り込みの search を保つのは呼び出し側(F5) */
+  detailHref: (id: string) => string;
   rows: readonly MediaRow[];
   resolveUrl: MediaThumbProps["resolveUrl"];
   orphanIds: ReadonlySet<string> | null;
@@ -54,7 +55,7 @@ const COLUMNS = [
 ] as const;
 
 export function MediaTable({
-  tenantSlug,
+  detailHref,
   rows,
   resolveUrl,
   orphanIds,
@@ -104,10 +105,7 @@ export function MediaTable({
                 case "name":
                   return (
                     <Cell>
-                      <Link
-                        href={`/t/${tenantSlug}/media/${row.id}`}
-                        {...stylex.props(styles.name)}
-                      >
+                      <Link href={detailHref(row.id)} {...stylex.props(styles.name)}>
                         {row.filename}
                       </Link>
                       <div {...stylex.props(styles.alt)}>

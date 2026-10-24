@@ -14,6 +14,7 @@ export const Route = createFileRoute("/t/$tenantSlug/media")({
 });
 
 function MediaRoute() {
-  const { tenantSlug, assetId } = useParams({ strict: false });
-  return <MediaLibrary tenantSlug={tenantSlug ?? ""} assetId={assetId ?? null} />;
+  const { tenantSlug } = Route.useParams();
+  const { assetId } = useParams({ strict: false });
+  return <MediaLibrary tenantSlug={tenantSlug} assetId={assetId ?? null} />;
 }

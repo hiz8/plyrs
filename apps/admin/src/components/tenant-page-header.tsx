@@ -16,6 +16,8 @@ const styles = stylex.create({
     paddingInline: { default: space.pageGutter, [NARROW]: space.md },
     paddingBlock: space.lg,
   },
+  // F16: 空状態のドロップ領域を本文の残り全部に広げる
+  bodyFill: { flex: 1, display: "flex", flexDirection: "column", minHeight: 0 },
   loading: { display: "flex", flexDirection: "column", gap: space.sm },
 });
 
@@ -33,8 +35,8 @@ export function TenantPageHeader(props: Omit<PageHeaderProps, "banner">) {
   );
 }
 
-export function PageBody({ children }: { children: ReactNode }) {
-  return <div {...stylex.props(styles.body)}>{children}</div>;
+export function PageBody({ children, isFill = false }: { children: ReactNode; isFill?: boolean }) {
+  return <div {...stylex.props(styles.body, isFill && styles.bodyFill)}>{children}</div>;
 }
 
 // 初回同期の前の表示(見出しと本文をスケルトンにする)

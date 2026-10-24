@@ -38,6 +38,7 @@ const NARROW = "@media (max-width: 959px)";
 
 const styles = stylex.create({
   // F28: 詳細パネル(360px)を開いている間、見出しと本文の右を空ける
+  root: { flex: 1, display: "flex", flexDirection: "column" },
   panelOpen: { paddingInlineEnd: { default: "360px", [NARROW]: 0 } },
   content: { display: "flex", flexDirection: "column", flex: 1, gap: "16px" },
 });
@@ -134,6 +135,11 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
       params: { tenantSlug, assetId: id },
       search: asSearch(query),
     });
+  // リストの行のリンク。絞り込みの search を保つ(F5)
+  const detailHref = (id: string) => {
+    const params = new URLSearchParams(toMediaSearch(query)).toString();
+    return `/t/${tenantSlug}/media/${id}${params === "" ? "" : `?${params}`}`;
+  };
   const addFiles = (files: File[]) => void uploadStore.start(files);
 
   const isEmpty = rows.length === 0 && !hasMediaFilters(query) && uploads.entries.length === 0;
@@ -147,7 +153,7 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
   const clearFilters = () => changeQuery({ ...DEFAULT_MEDIA_QUERY, sort: query.sort });
 
   return (
-    <div {...stylex.props(assetId !== null && styles.panelOpen)}>
+    <div {...stylex.props(styles.root, assetId !== null && styles.panelOpen)}>
       <TenantPageHeader
         title={TERMS.media}
         breadcrumbs={[homeCrumb(tenantSlug), currentCrumb(TERMS.media)]}
@@ -161,7 +167,7 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
         }
       />
       <FileDropTarget isDisabled={!canWrite} hint={MEDIA_LABELS.dropLimit} onFiles={addFiles}>
-        <PageBody>
+        <PageBody isFill>
           {isEmpty ? (
             canWrite ? (
               <DropZone
@@ -231,7 +237,7 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
                 />
               ) : (
                 <MediaTable
-                  tenantSlug={tenantSlug}
+                  detailHref={detailHref}
                   rows={visible}
                   resolveUrl={assets.resolveUrl}
                   orphanIds={orphanIds}

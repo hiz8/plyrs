@@ -15,7 +15,7 @@ const rows = [
 
 function setup(over: Partial<MediaTableProps> = {}) {
   const props: MediaTableProps = {
-    tenantSlug: "blog",
+    detailHref: (id) => `/t/blog/media/${id}?sort=name`,
     rows,
     resolveUrl: vi.fn().mockResolvedValue("blob:x"),
     orphanIds: new Set([MEDIA_ID_B]),
@@ -32,7 +32,7 @@ it("行にサムネイル・ファイル名のリンク・代替テキスト・�
   const table = screen.getByRole("grid", { name: "メディアの一覧" });
   expect(within(table).getByRole("columnheader", { name: "サムネイル" })).toBeInTheDocument();
   const link = within(table).getByRole("link", { name: "a.png" });
-  expect(link).toHaveAttribute("href", `/t/blog/media/${MEDIA_ID_A}`);
+  expect(link).toHaveAttribute("href", `/t/blog/media/${MEDIA_ID_A}?sort=name`);
   expect(within(table).getByText("夕日の写真")).toBeInTheDocument();
   expect(within(table).getByText("代替テキストなし")).toBeInTheDocument();
   expect(within(table).getByText("画像")).toBeInTheDocument();

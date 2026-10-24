@@ -45,7 +45,9 @@ const styles = stylex.create({
   },
   column: { display: "flex", flexDirection: "column", minWidth: 0 },
   topBar: { display: { default: "none", [NARROW]: "flex" } },
-  main: { flex: 1, minWidth: 0 },
+  // F16: 空状態のドロップ領域が本文全体に広がるよう、各画面の root に高さを渡す。
+  // root の幅は stretch で block と同じ
+  main: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" },
 });
 
 export const Route = createFileRoute("/t/$tenantSlug")({

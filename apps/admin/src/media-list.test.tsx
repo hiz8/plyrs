@@ -132,16 +132,26 @@ describe("メディア(一覧)", () => {
   });
 
   it("リスト表示に切り替えると表になり、localStorage に残る", async () => {
-    await open();
+    await open("/t/blog/media?sort=name");
     await screen.findByRole("grid", { name: "メディアの一覧" });
     expect(screen.queryByRole("rowheader")).toBeNull();
     await userEvent.click(screen.getByRole("radio", { name: "リスト" }));
     const table = await screen.findByRole("grid", { name: "メディアの一覧" });
     expect(within(table).getByRole("link", { name: "one.png" })).toHaveAttribute(
       "href",
-      `/t/blog/media/${ASSET_1}`,
+      `/t/blog/media/${ASSET_1}?sort=name`,
     );
     expect(window.localStorage.getItem("plyrs.media.view")).toBe("list");
+  });
+
+  it("詳細 URL を開いたまま絞り込みを変えても pathname に assetId が残る", async () => {
+    const { router } = await open(`/t/blog/media/${ASSET_1}`);
+    await screen.findByRole("grid", { name: "メディアの一覧" });
+    fireEvent.change(screen.getByRole("combobox", { name: "種類" }), {
+      target: { value: "image" },
+    });
+    await waitFor(() => expect(router.state.location.search).toEqual({ kind: "image" }));
+    expect(router.state.location.pathname).toBe(`/t/blog/media/${ASSET_1}`);
   });
 
   it("閲覧者は追加・チェックボックス・ドロップ案内が無く、メタに閲覧のみ", async () => {
