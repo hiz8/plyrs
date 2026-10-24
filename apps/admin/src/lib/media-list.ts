@@ -135,7 +135,8 @@ function normalizeForSearch(text: string): string {
   return text.normalize("NFKC").toLocaleLowerCase("ja");
 }
 
-const nameCollator = new Intl.Collator("ja", { numeric: true, sensitivity: "base" });
+// F23(裁定で改定): 連番のファイル名が多いので数字を数として比べる自然順。大文字小文字は Collator の既定で区別する
+const nameCollator = new Intl.Collator("ja", { numeric: true });
 
 // kind / usage / q(F22: ファイル名と代替テキスト)で絞り、sort で並べる。
 // orphanIds が null(使用状況が未取得)のときは usage の絞り込みを無視する

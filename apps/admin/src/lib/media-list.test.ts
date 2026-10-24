@@ -214,6 +214,20 @@ describe("applyMediaQuery", () => {
       ids(applyMediaQuery(named, { ...DEFAULT_MEDIA_QUERY, sort: "name" }, null)),
     ).toStrictEqual([ID_C, ID_B, ID_A]);
   });
+
+  it("ファイル名順は大文字小文字の違いを Collator の既定で並べる", () => {
+    // id 降順なら ID_C(大文字)が先になるが、Collator の既定では小文字が先
+    const cased = buildMediaRows([
+      asset(ID_A, { filename: "b.png" }),
+      asset(ID_B, { filename: "B.png" }),
+      asset(ID_C, { filename: "a.png" }),
+    ]);
+    expect(
+      applyMediaQuery(cased, { ...DEFAULT_MEDIA_QUERY, sort: "name" }, null).map(
+        (row) => row.filename,
+      ),
+    ).toStrictEqual(["a.png", "b.png", "B.png"]);
+  });
 });
 
 describe("formatBytes", () => {
