@@ -45,14 +45,12 @@ function setup(
   const collection = registry.get("asset");
   if (collection === undefined) throw new Error("asset collection");
   // 実機では ack で解決する。ここでは永続化の完了だけを模す
-  const update = vi
-    .spyOn(collection, "update")
-    .mockImplementation(
-      () =>
-        ({
-          isPersisted: { promise: over.persisted ?? Promise.resolve() },
-        }) as unknown as ReturnType<typeof collection.update>,
-    );
+  const update = vi.spyOn(collection, "update").mockImplementation(
+    () =>
+      ({
+        isPersisted: { promise: over.persisted ?? Promise.resolve() },
+      }) as unknown as ReturnType<typeof collection.update>,
+  );
   const onSelect = vi.fn();
   const onClose = vi.fn();
   const assets: AssetServices = {
