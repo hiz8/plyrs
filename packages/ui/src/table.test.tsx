@@ -72,3 +72,32 @@ it("selectionMode が無ければ選択列を出さない", () => {
   );
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
 });
+
+it("isLabelHidden の見出しは名前を残し、文字は視覚的に隠す", () => {
+  render(
+    <Table aria-label="メディア">
+      <TableHeader>
+        <Column id="thumb" isLabelHidden>
+          サムネイル
+        </Column>
+        <Column id="name" isRowHeader>
+          名前
+        </Column>
+      </TableHeader>
+      <TableBody items={[{ id: "a", name: "a.png" }]}>
+        {(row) => (
+          <Row id={row.id}>
+            <Cell>img</Cell>
+            <Cell>{row.name}</Cell>
+          </Row>
+        )}
+      </TableBody>
+    </Table>,
+  );
+  expect(screen.getByRole("columnheader", { name: "サムネイル" })).toBeInTheDocument();
+  // 隠す見出しの文字は sr-only のクラスを持つ span に入る(通常の見出しの span とクラスが違う)
+  const hidden = screen.getByText("サムネイル");
+  expect(hidden.tagName).toBe("SPAN");
+  expect(hidden.className.length).toBeGreaterThan(0);
+  expect(hidden.className).not.toBe(screen.getByText("名前").className);
+});

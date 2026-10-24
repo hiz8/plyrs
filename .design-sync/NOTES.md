@@ -75,6 +75,7 @@
 - `Button`(`variant="card"`: 縦に積む選択肢のカード。幅 100%・高さ auto、選択中は `aria-pressed` で accent の面と枠。種類のカード、E33)
 - `SidePanel`(`width` / `narrowLayout="sheet"`: 幅を px で受け、狭い画面は下から出る高さ 520px の面と上端のつまみ。F1)
 - `ModalDialog`(`size="xl"`: 1040×720px、本文は flex 1 で中でスクロールを作れる。F15)
+- `Column`(`isLabelHidden`: 見出しの文字を sr-only の span で包み、アクセシブルネームだけ残す。サムネイル列用、V4-F Task 6)
 - `DropZone`(`isFill`: 本文全体に広げ、アイコンを 64px の円に入れる。F16)
 - `FileButton`(新規。FileTrigger + Button。同じファイルを続けて選べる。F39)
 - `TileGrid`(新規。RAC GridList layout="grid"、選択とアクション。F17)

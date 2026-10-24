@@ -757,6 +757,7 @@ export const MEDIA_LABELS = {
   tableLabel: "メディアの一覧",
   gridLabel: "メディアの一覧",
   columns: {
+    thumb: "サムネイル",
     name: "ファイル名",
     kind: "種類",
     size: "サイズ",

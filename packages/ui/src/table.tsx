@@ -77,6 +77,15 @@ const styles = stylex.create({
   },
   hideOnNarrow: { display: { default: null, [NARROW]: "none" } },
   checkbox: { display: "inline-flex", cursor: "pointer" },
+  // 読み上げ専用(視覚的に隠す)。列見出しの名前だけ残す(V4-F Task 6)
+  srOnly: {
+    position: "absolute",
+    width: "1px",
+    height: "1px",
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+  },
 });
 
 function SelectionCheckbox() {
@@ -133,9 +142,11 @@ export function TableHeader<T extends object>({
 export interface TableColumnProps extends Omit<ColumnProps, "className" | "style" | "children"> {
   children: string;
   hideOnNarrow?: boolean;
+  /** 見出しの文字を視覚的に隠す(アクセシブルネームには残す。サムネイル列など) */
+  isLabelHidden?: boolean;
 }
 
-export function Column({ children, hideOnNarrow, ...props }: TableColumnProps) {
+export function Column({ children, hideOnNarrow, isLabelHidden, ...props }: TableColumnProps) {
   return (
     <RacColumn
       {...props}
@@ -149,7 +160,11 @@ export function Column({ children, hideOnNarrow, ...props }: TableColumnProps) {
     >
       {({ allowsSorting, sortDirection }) => (
         <span {...stylex.props(styles.columnInner)}>
-          {children}
+          {isLabelHidden === true ? (
+            <span {...stylex.props(styles.srOnly)}>{children}</span>
+          ) : (
+            children
+          )}
           {allowsSorting && <SortIcon direction={sortDirection} />}
         </span>
       )}
