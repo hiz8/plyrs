@@ -126,6 +126,43 @@ export async function createArticleType(page: Page): Promise<void> {
   );
 }
 
+/**
+ * createArticleType の手順に、画像・ファイルのフィールド「hero」(件数は既定の 1 件)を足した版(V4-F)。
+ * 編集画面に「メディアを選択」が出るようにするための型。ダイアログの名前は add-field-dialog.tsx /
+ * field-panel.tsx の様式で、追加後に開く設定パネルの名前はフィールドの表示名になる。
+ */
+export async function createArticleTypeWithMedia(page: Page): Promise<void> {
+  await page.getByRole("complementary").getByRole("link", { name: "設定", exact: true }).click();
+  await page.getByRole("tab", { name: "コンテンツタイプ" }).click();
+  await expect(page.getByRole("tab", { name: "コンテンツタイプ" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.getByRole("button", { name: "コンテンツタイプを作成" }).first().click();
+  await page.getByRole("textbox", { name: /^表示名/ }).fill("記事");
+  await page.getByRole("textbox", { name: /^API 名/ }).fill("article");
+  for (const field of [
+    { kind: /テキスト\(1 行\)/, label: "title" },
+    { kind: /画像・ファイル/, label: "hero" },
+  ]) {
+    await page.getByRole("button", { name: "フィールドを追加" }).click();
+    const dialog = page.getByRole("dialog", { name: "フィールドを追加" });
+    await dialog.getByRole("button", { name: field.kind }).click();
+    await dialog.getByRole("button", { name: "次へ" }).click();
+    await dialog.getByRole("textbox", { name: /^表示名/ }).fill(field.label);
+    await dialog.getByRole("button", { name: "追加" }).click();
+    await page
+      .getByRole("dialog", { name: field.label })
+      .getByRole("button", { name: "適用" })
+      .click();
+  }
+  await page.getByRole("button", { name: "作成", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "コンテンツタイプ" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+}
+
 /** コンテンツタイプ一覧から article の編集画面を開いて 1 件下書き保存し、一覧へ戻る。 */
 export async function createArticleRecord(page: Page, title: string): Promise<void> {
   // 一覧の行にレコードへのリンクは無い。サイドバー(complementary)の型名のリンクから入る。

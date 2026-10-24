@@ -37,5 +37,6 @@ export default defineConfig({
     { name: "super-console", testMatch: /super-console\.spec\.ts/ },
     { name: "core-journey", testMatch: /core-journey\.spec\.ts/, dependencies: ["super-console"] },
     { name: "two-tab-sync", testMatch: /two-tab-sync\.spec\.ts/, dependencies: ["core-journey"] },
+    { name: "media", testMatch: /media\.spec\.ts/, dependencies: ["core-journey"] },
   ],
 });
