@@ -93,14 +93,22 @@ export function MediaThumb({ row, resolveUrl, size, eager = false }: MediaThumbP
   const ref = useRef<HTMLDivElement>(null);
   const isImage = row.kind === "image";
   const visible = useVisible(ref, eager);
-  const [url, setUrl] = useState<string | null>(null);
+
+  // undefined = 解決前(画像のみ)。null = 解決できなかった
+  const [resolved, setResolved] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
+    setResolved(undefined);
     if (!isImage || !visible) return;
     let cancelled = false;
-    void resolveUrl(row.id).then((next) => {
-      if (!cancelled) setUrl(next);
-    });
+    resolveUrl(row.id).then(
+      (next) => {
+        if (!cancelled) setResolved(next);
+      },
+      () => {
+        if (!cancelled) setResolved(null);
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -111,9 +119,9 @@ export function MediaThumb({ row, resolveUrl, size, eager = false }: MediaThumbP
   const small = size === "xs" || size === "sm";
   return (
     <div ref={ref} {...stylex.props(styles.frame, styles[size])}>
-      {isImage && url !== null ? (
+      {isImage && resolved === undefined ? null : isImage && resolved !== null ? (
         <img
-          src={url}
+          src={resolved}
           alt={row.alt || row.filename}
           {...stylex.props(styles.image, size === "preview" && styles.contain)}
         />

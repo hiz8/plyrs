@@ -9,31 +9,10 @@ import {
   ProgressBar,
   Spinner,
 } from "@plyrs/ui";
-import { accent, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
 import { CircleOff, Globe, RotateCw, Trash2 } from "lucide-react";
 import { BULK_LABELS, WORKFLOW_STATUS_LABELS } from "../lib/labels";
 import type { BulkKind } from "../lib/use-bulk-action";
-
-const styles = stylex.create({
-  root: {
-    display: "flex",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: space.inset,
-    padding: `${space.sm} ${space.inset}`,
-    backgroundColor: accent.surface,
-    borderWidth: stroke.default,
-    borderStyle: "solid",
-    borderColor: accent.default,
-    borderRadius: radius.control,
-    fontSize: font.body,
-  },
-  selected: { fontWeight: font.weightBold, color: accent.default },
-  note: { color: text.muted },
-  spacer: { marginInlineStart: "auto", display: "flex", alignItems: "center", gap: space.inset },
-  // 部品固有の幅(D2 L3): 進捗バーは伸ばしすぎない
-  progress: { flex: 1, minWidth: 0, maxWidth: "320px" },
-});
+import { bulkBarStyles } from "./bulk-bar-styles";
 
 export type BulkMenuAction =
   | { kind: "publish" }
@@ -78,14 +57,14 @@ export function BulkBar({
       role="region"
       aria-label={BULK_LABELS.region}
       aria-busy={progress !== null}
-      {...stylex.props(styles.root)}
+      {...stylex.props(bulkBarStyles.root)}
     >
       {progress !== null ? (
         <>
           <span aria-hidden="true">
             <Spinner label={BULK_LABELS.running[progress.kind]} />
           </span>
-          <div {...stylex.props(styles.progress)}>
+          <div {...stylex.props(bulkBarStyles.progress)}>
             <ProgressBar
               label={BULK_LABELS.running[progress.kind]}
               isLabelHidden
@@ -100,8 +79,12 @@ export function BulkBar({
         </>
       ) : (
         <>
-          <span {...stylex.props(styles.selected)}>{BULK_LABELS.selected(selectedCount)}</span>
-          {failure !== null && <span {...stylex.props(styles.note)}>{BULK_LABELS.failedNote}</span>}
+          <span {...stylex.props(bulkBarStyles.selected)}>
+            {BULK_LABELS.selected(selectedCount)}
+          </span>
+          {failure !== null && (
+            <span {...stylex.props(bulkBarStyles.note)}>{BULK_LABELS.failedNote}</span>
+          )}
           <Menu
             label={BULK_LABELS.menu}
             onAction={handleAction}
@@ -134,7 +117,7 @@ export function BulkBar({
               {BULK_LABELS.retry[failure.kind]}
             </Button>
           )}
-          <div {...stylex.props(styles.spacer)}>
+          <div {...stylex.props(bulkBarStyles.spacer)}>
             {failure === null && (
               <Button variant="link" size="sm" onPress={onSelectPage}>
                 {BULK_LABELS.selectPage(pageCount)}

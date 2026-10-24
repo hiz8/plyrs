@@ -77,3 +77,18 @@ it("画像以外は種類のアイコンと拡張子を出す", () => {
   expect(screen.getByText("CSV")).toBeInTheDocument();
   expect(resolveUrl).not.toHaveBeenCalled();
 });
+
+it("resolveUrl が reject したらアイコンと拡張子を出し、エラーを投げない", async () => {
+  Reflect.deleteProperty(window, "IntersectionObserver");
+  const resolveUrl = vi.fn().mockRejectedValue(new Error("boom"));
+  render(<MediaThumb row={image} resolveUrl={resolveUrl} size="tile" />);
+  expect(await screen.findByText("PNG")).toBeInTheDocument();
+  expect(screen.queryByRole("img")).toBeNull();
+});
+
+it("画像は解決前は空の枠で、拡張子を出さない", () => {
+  Reflect.deleteProperty(window, "IntersectionObserver");
+  render(<MediaThumb row={image} resolveUrl={() => new Promise(() => undefined)} size="tile" />);
+  expect(screen.queryByText("PNG")).toBeNull();
+  expect(screen.queryByRole("img")).toBeNull();
+});

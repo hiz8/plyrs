@@ -1,25 +1,13 @@
 import * as stylex from "@stylexjs/stylex";
 import { Button, ProgressBar } from "@plyrs/ui";
-import { accent, font, radius, space, stroke } from "@plyrs/ui/semantic.stylex";
+import { space } from "@plyrs/ui/semantic.stylex";
 import { MEDIA_LABELS } from "../../lib/labels";
+import { bulkBarStyles } from "../bulk-bar-styles";
 
-// bulk-bar.tsx と同じ地・枠・余白(M6 の上のバー)
 const styles = stylex.create({
-  root: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.sm,
-    padding: `${space.sm} ${space.inset}`,
-    backgroundColor: accent.surface,
-    borderWidth: stroke.default,
-    borderStyle: "solid",
-    borderColor: accent.default,
-    borderRadius: radius.container,
-    fontSize: font.body,
-  },
+  // 共有の root は横並び。この帯は文と進捗バーを縦に積む
+  root: { flexDirection: "column", alignItems: "stretch", gap: space.sm },
   row: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: space.sm },
-  title: { fontWeight: font.weightBold, color: accent.default },
-  spacer: { marginInlineStart: "auto" },
 });
 
 export function UploadProgressBar({
@@ -35,14 +23,14 @@ export function UploadProgressBar({
 }) {
   const { upload } = MEDIA_LABELS;
   return (
-    <div role="status" aria-live="polite" {...stylex.props(styles.root)}>
+    <div role="status" aria-live="polite" {...stylex.props(bulkBarStyles.root, styles.root)}>
       <div {...stylex.props(styles.row)}>
-        <span {...stylex.props(styles.title)}>{upload.progressTitle}</span>
+        <span {...stylex.props(bulkBarStyles.selected)}>{upload.progressTitle}</span>
         <span>
           {upload.progress(done, total)}
           {failed > 0 && ` ・ ${upload.failedCount(failed)}`}
         </span>
-        <span {...stylex.props(styles.spacer)}>
+        <span {...stylex.props(bulkBarStyles.spacer)}>
           <Button size="sm" variant="secondary" onPress={onCancel}>
             {upload.cancel}
           </Button>
