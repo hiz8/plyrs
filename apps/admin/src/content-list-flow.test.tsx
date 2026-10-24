@@ -6,6 +6,7 @@ import {
   article,
   authedRoutes,
   bootstrapped,
+  articleType,
   jsonResponse,
   renderAt,
   socketHarness,
@@ -212,5 +213,39 @@ describe("一覧（/t/$tenantSlug/content/$typeKey）", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "読み込み中" }),
     ).toBeInTheDocument();
+  });
+
+  it("型に listColumns があると追加の列が出る", async () => {
+    const typed = {
+      ...articleType,
+      fields: [...articleType.fields, { key: "subtitle", type: "text" as const, label: "副題" }],
+      listColumns: ["subtitle"],
+    };
+    const harness = socketHarness();
+    renderAt(BASE, harness, authedRoutes());
+    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
+    await bootstrapped(
+      harness.latest(),
+      [
+        article(id(1), "記事A", {
+          input: { title: "記事A", subtitle: "補足A" },
+          fieldVersions: { title: 1, subtitle: 1 },
+        }),
+      ],
+      [typed],
+    );
+    const grid = await table();
+    expect(grid.getByRole("columnheader", { name: "副題" })).toBeInTheDocument();
+    expect(grid.getByText("補足A")).toBeInTheDocument();
+  });
+
+  it("0 件のときは型の説明が空状態に出る", async () => {
+    const typed = { ...articleType, description: "ブログの記事です" };
+    const harness = socketHarness();
+    renderAt(BASE, harness, authedRoutes());
+    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
+    await bootstrapped(harness.latest(), [], [typed]);
+    expect(await screen.findByText("ブログの記事です")).toBeInTheDocument();
+    expect(screen.getByText("記事はまだありません")).toBeInTheDocument();
   });
 });

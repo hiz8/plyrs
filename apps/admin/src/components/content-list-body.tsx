@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Inbox, Search } from "lucide-react";
+import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import type { ReactNode } from "react";
 import { Button, EmptyState, Skeleton, Tabs } from "@plyrs/ui";
 import { space } from "@plyrs/ui/semantic.stylex";
@@ -30,6 +31,10 @@ export interface ContentListBodyProps {
   tenantSlug: string;
   typeKey: string;
   typeName: string;
+  /** 型の説明。空でなければ空状態の説明文に使う(K1) */
+  typeDescription?: string | undefined;
+  /** 追加列(listColumns)の定義元(K2) */
+  contentType: ContentTypeDefinition;
   query: ListQuery;
   view: ListView;
   canWrite: boolean;
@@ -52,6 +57,8 @@ export function ContentListBody({
   tenantSlug,
   typeKey,
   typeName,
+  typeDescription,
+  contentType,
   query,
   view,
   canWrite,
@@ -88,7 +95,11 @@ export function ContentListBody({
       <EmptyState
         icon={Inbox}
         title={LIST_LABELS.empty.title(typeName)}
-        description={LIST_LABELS.empty.description(typeName)}
+        description={
+          typeDescription !== undefined && typeDescription !== ""
+            ? typeDescription
+            : LIST_LABELS.empty.description(typeName)
+        }
         action={addAction}
       />
     );
@@ -152,6 +163,7 @@ export function ContentListBody({
               tenantSlug={tenantSlug}
               typeKey={typeKey}
               typeName={typeName}
+              contentType={contentType}
               rows={view.items}
               sort={{ column: query.sort, order: query.order }}
               onSortChange={(sort, order) => updateQuery({ sort, order, page: 1 })}

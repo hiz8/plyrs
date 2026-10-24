@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import type { ListRow } from "../lib/content-list";
+import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { ContentTable, type ContentTableProps } from "./content-table";
 
 const now = new Date("2026-10-20T00:00:00Z");
@@ -25,11 +26,25 @@ const row = (id: string, title: string, over: Partial<ListRow> = {}): ListRow =>
   ...over,
 });
 
+const baseType: ContentTypeDefinition = {
+  id: "018f2b6a-7a0a-7000-8000-000000000001",
+  key: "article",
+  name: "記事",
+  source: "user",
+  version: 1,
+  fields: [
+    { key: "title", type: "text", required: true },
+    { key: "subtitle", type: "text", label: "副題" },
+    { key: "views", type: "number" },
+  ],
+};
+
 function setup(over: Partial<ContentTableProps> = {}) {
   const props: ContentTableProps = {
     tenantSlug: "blog",
     typeKey: "article",
     typeName: "記事",
+    contentType: baseType,
     rows: [row("r1", "はじめの記事"), row("r2", "二つ目", { publication: "published" })],
     sort: { column: "updated", order: "desc" },
     onSortChange: vi.fn(),
@@ -79,4 +94,35 @@ it("閲覧者は選択列が無く、行の操作は「表示」だけ", () => {
   expect(screen.getAllByRole("link", { name: "表示" })).toHaveLength(2);
   expect(screen.queryByRole("link", { name: "編集" })).toBeNull();
   expect(screen.queryByRole("button", { name: "削除" })).toBeNull();
+});
+
+it("listColumns の列がタイトルの右に並び、見出しは表示名、狭い画面で隠れる", () => {
+  const r = row("r1", "はじめの記事");
+  setup({
+    contentType: { ...baseType, listColumns: ["subtitle", "views"] },
+    rows: [
+      {
+        ...r,
+        record: { ...r.record, input: { title: "はじめの記事", subtitle: "補足", views: 1234 } },
+      },
+    ],
+  });
+  const names = screen.getAllByRole("columnheader").map((h) => h.textContent ?? "");
+  expect(names.filter((t) => t !== "")).toEqual([
+    "タイトル",
+    "副題",
+    "views",
+    "公開",
+    "ステータス",
+    "更新",
+  ]);
+  const subtitle = screen.getByRole("columnheader", { name: "副題" });
+  expect(subtitle).not.toHaveAttribute("aria-sort");
+  // 狭い画面で隠す列(ステータス)と同じクラス = hideOnNarrow。タイトルとは違う
+  const status = screen.getByRole("columnheader", { name: "ステータス" });
+  expect(subtitle.className).toBe(status.className);
+  const title = screen.getByRole("columnheader", { name: /タイトル/ });
+  expect(subtitle.className).not.toBe(title.className);
+  expect(screen.getByText("補足")).toHaveAttribute("title", "補足");
+  expect(screen.getByText((1234).toLocaleString("ja-JP"))).toBeInTheDocument();
 });

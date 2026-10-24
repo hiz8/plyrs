@@ -248,6 +248,8 @@ function RecordListPage() {
       tenantSlug={tenantSlug}
       typeKey={typeKey}
       typeName={typeName}
+      typeDescription={contentType.description}
+      contentType={contentType}
       query={query}
       view={view}
       canWrite={canWrite}

@@ -291,6 +291,8 @@ export const LIST_LABELS = {
   search: "タイトルで検索",
   tableLabel: (type: string) => `${type}の一覧`,
   columns: { title: "タイトル", publication: "公開", status: "ステータス", updated: "更新" },
+  // 追加列(listColumns)のセル(K3)
+  cell: { empty: "—", yes: "はい", no: "いいえ", count: (n: number) => `${n} 件` },
   changedShort: "公開中・未反映",
   changedLong: "公開中・未反映の変更あり",
   rowActions: { edit: "編集", view: "表示", delete: "削除" },

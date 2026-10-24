@@ -12,9 +12,11 @@ import {
 } from "@plyrs/ui";
 import { accent, font, space, status } from "@plyrs/ui/semantic.stylex";
 import { CircleAlert } from "lucide-react";
+import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { Link, type Selection } from "react-aria-components";
 import { LIST_SORTS, type ListRow, type ListSort, type SortOrder } from "../lib/content-list";
 import { formatDateTime } from "../lib/datetime";
+import { listColumnsOf, rowCells, type ListColumn } from "../lib/list-cells";
 import { LIST_LABELS } from "../lib/labels";
 import { PublicationBadge, WorkflowStatusBadge } from "./publication-badge";
 
@@ -29,6 +31,14 @@ const styles = stylex.create({
     color: "inherit",
     textDecoration: "none",
   },
+  fieldCell: {
+    display: "block",
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  mono: { fontFamily: font.familyMono },
   actions: { display: "flex", alignItems: "center", gap: space.inset, fontSize: font.caption },
   edit: { color: accent.default },
   publication: { display: "inline-flex", alignItems: "center", gap: space.sm },
@@ -47,6 +57,8 @@ export interface ContentTableProps {
   typeKey: string;
   /** aria-label「{型名}の一覧」に使う型の表示名(API 名は出さない) */
   typeName: string;
+  /** 追加列(listColumns)の定義元(K2) */
+  contentType: ContentTypeDefinition;
   rows: readonly ListRow[];
   sort: { column: ListSort; order: SortOrder };
   onSortChange: (column: ListSort, order: SortOrder) => void;
@@ -64,12 +76,39 @@ export interface ContentTableProps {
   now?: Date;
 }
 
-const COLUMNS = [
-  { id: "title", sortable: true, narrow: false },
-  { id: "publication", sortable: false, narrow: false },
-  { id: "status", sortable: false, narrow: true },
-  { id: "updated", sortable: true, narrow: true },
-] as const;
+type FixedColumnId = keyof typeof LIST_LABELS.columns;
+interface TableColumn {
+  id: string;
+  sortable: boolean;
+  narrow: boolean;
+  label: string;
+  /** 型の追加列(listColumns)なら定義 */
+  field?: ListColumn;
+}
+
+const fixed = (id: FixedColumnId, sortable: boolean, narrow: boolean): TableColumn => ({
+  id,
+  sortable,
+  narrow,
+  label: LIST_LABELS.columns[id],
+});
+
+// K2: タイトル | 型の追加列(並べ替え無し・狭い画面で隠す) | 公開 | ステータス | 更新
+function columnsOf(contentType: ContentTypeDefinition): TableColumn[] {
+  return [
+    fixed("title", true, false),
+    ...listColumnsOf(contentType).map((field) => ({
+      id: `field:${field.key}`,
+      sortable: false,
+      narrow: true,
+      label: field.label,
+      field,
+    })),
+    fixed("publication", false, false),
+    fixed("status", false, true),
+    fixed("updated", true, true),
+  ];
+}
 
 function isListSort(value: unknown): value is ListSort {
   return (LIST_SORTS as readonly unknown[]).includes(value);
@@ -79,6 +118,7 @@ export function ContentTable({
   tenantSlug,
   typeKey,
   typeName,
+  contentType,
   rows,
   sort,
   onSortChange,
@@ -88,6 +128,7 @@ export function ContentTable({
   onDelete,
   now,
 }: ContentTableProps) {
+  const columns = columnsOf(contentType);
   const handleSelection = (keys: Selection) => {
     if (selection === undefined) return;
     selection.onSelectionChange(
@@ -114,7 +155,7 @@ export function ContentTable({
         }
       }}
     >
-      <TableHeader columns={COLUMNS}>
+      <TableHeader columns={columns}>
         {(c) => (
           <Column
             id={c.id}
@@ -122,7 +163,7 @@ export function ContentTable({
             allowsSorting={c.sortable}
             hideOnNarrow={c.narrow}
           >
-            {LIST_LABELS.columns[c.id]}
+            {c.label}
           </Column>
         )}
       </TableHeader>
@@ -130,7 +171,7 @@ export function ContentTable({
         {(row) => {
           const href = `/t/${tenantSlug}/content/${typeKey}/${row.record.id}`;
           return (
-            <Row id={row.record.id} columns={COLUMNS}>
+            <Row id={row.record.id} columns={columns}>
               {(c) => {
                 if (c.id === "title") {
                   return (
@@ -154,6 +195,19 @@ export function ContentTable({
                           </Link>
                         )}
                       </div>
+                    </Cell>
+                  );
+                }
+                if (c.field !== undefined) {
+                  const text = rowCells(contentType, row.record, [c.field])[0] ?? "";
+                  return (
+                    <Cell hideOnNarrow>
+                      <span
+                        title={text}
+                        {...stylex.props(styles.fieldCell, c.field.mono && styles.mono)}
+                      >
+                        {text}
+                      </span>
                     </Cell>
                   );
                 }
