@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import type { ContentTypeDefinition, FieldDefinition } from "@plyrs/metamodel";
 import { ASSET_TYPE_KEY } from "@plyrs/metamodel";
 import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
+import type { SyncRecord } from "@plyrs/sync-protocol";
 import { Button, ModalDialog } from "@plyrs/ui";
 import { bg, border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "../lib/asset-services";
@@ -10,7 +11,8 @@ import { MEDIA_PICKER_LABELS } from "../lib/labels";
 import { labelForRecord } from "../lib/record-label";
 import { parseRelationDraftKey, relationDraftKey } from "../lib/record-form-values";
 import { useRecordsOfTypes } from "../lib/use-collection";
-import { AssetThumb } from "./asset-thumb";
+import { buildMediaRows } from "../lib/media-list";
+import { MediaThumb } from "./media/media-thumb";
 
 const styles = stylex.create({
   content: { display: "flex", flexDirection: "column", gap: space.sm },
@@ -53,6 +55,18 @@ export interface AssetSelectItem {
 // アセット選択ダイアログ。関係フィールド(AssetRelationPicker)と本文画像挿入(RecordForm)が
 // 共用する。候補は同期済み asset コレクション — アップロード直後の WS 反映前でも選択できる
 // よう、アップロード成功時は filename を label にして即確定する。
+// Task 9 でピッカーごと作り直すまでのつなぎ。レコードを MediaThumb の行へ変えて小さく描く
+function RecordThumb({
+  record,
+  resolveUrl,
+}: {
+  record: SyncRecord;
+  resolveUrl: AssetServices["resolveUrl"];
+}) {
+  const row = buildMediaRows([record])[0];
+  return row === undefined ? null : <MediaThumb row={row} resolveUrl={resolveUrl} size="sm" />;
+}
+
 export function AssetSelectDialog({
   registry,
   types,
@@ -128,7 +142,7 @@ export function AssetSelectDialog({
                   {...stylex.props(styles.candidate)}
                   onClick={() => onSelect({ id: candidate.id, label })}
                 >
-                  <AssetThumb record={candidate} resolveUrl={assets.resolveUrl} />
+                  <RecordThumb record={candidate} resolveUrl={assets.resolveUrl} />
                   <span>{label}</span>
                 </button>
               );
@@ -222,7 +236,7 @@ export function AssetRelationPicker({
         const record = candidates.find((candidate) => candidate.id === ref?.id);
         return (
           <div key={key} {...stylex.props(styles.selectedRow)}>
-            {record !== undefined && <AssetThumb record={record} resolveUrl={assets.resolveUrl} />}
+            {record !== undefined && <RecordThumb record={record} resolveUrl={assets.resolveUrl} />}
             <span>
               {record === undefined ? (ref?.id.slice(0, 8) ?? key) : labelForRecord(types, record)}
             </span>

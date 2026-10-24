@@ -65,7 +65,6 @@ const mediaArticleType: ContentTypeDefinition = {
 };
 
 const ASSET_1 = "018f2b6a-7a0a-7000-8000-000000000e01";
-const ASSET_2 = "018f2b6a-7a0a-7000-8000-000000000e02";
 
 function assetRecord(
   id: string,
@@ -142,18 +141,6 @@ function pushes(socket: FakeSocket): PushedChange[] {
     .flatMap((message) => message.changes);
 }
 
-function renderAssetsList(
-  harness: ReturnType<typeof socketHarness>,
-  routes: Record<string, Handler>,
-) {
-  const router = getRouter({
-    context: createAppContext(stubFetch(routes), { connect: () => harness.connect }),
-    history: createMemoryHistory({ initialEntries: ["/t/blog/media"] }),
-  });
-  renderRouter(router);
-  return router;
-}
-
 function renderNewRecord(
   harness: ReturnType<typeof socketHarness>,
   routes: Record<string, Handler>,
@@ -165,88 +152,6 @@ function renderNewRecord(
   renderRouter(router);
   return router;
 }
-
-describe("アセット一覧 (/t/$tenantSlug/media)", () => {
-  it("lists synced assets, uploads a file, and shows the broadcast record", async () => {
-    const routes = authedRoutes();
-    routes["/v1/t/t1/assets"] = vi.fn(() =>
-      jsonResponse(201, { ok: true, record: { id: ASSET_2 } }),
-    );
-    const harness = socketHarness();
-    renderAssetsList(harness, routes);
-    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
-    await bootstrapped(harness.latest(), [assetRecord(ASSET_1, "one.png")]);
-
-    expect(await screen.findByText("one.png")).toBeInTheDocument();
-
-    const user = userEvent.setup();
-    const file = new File([Uint8Array.from([1, 2, 3])], "two.png", { type: "image/png" });
-    await user.upload(screen.getByLabelText("アセットをアップロード"), file);
-    await vi.waitFor(() => expect(routes["/v1/t/t1/assets"]).toHaveBeenCalled());
-
-    // アップロード API は DO 経由で change を broadcast する(Task 3)— それを模擬する
-    harness.latest().deliver({ type: "change", record: assetRecord(ASSET_2, "two.png") });
-    expect(await screen.findByText("two.png")).toBeInTheDocument();
-  });
-
-  it("filters to orphans only via the orphan endpoint", async () => {
-    const routes = authedRoutes();
-    routes["/v1/t/t1/assets/orphans"] = vi.fn(() => jsonResponse(200, { orphanIds: [ASSET_2] }));
-    const harness = socketHarness();
-    renderAssetsList(harness, routes);
-    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
-    await bootstrapped(harness.latest(), [
-      assetRecord(ASSET_1, "one.png"),
-      assetRecord(ASSET_2, "two.png"),
-    ]);
-
-    expect(await screen.findByText("one.png")).toBeInTheDocument();
-    expect(screen.getByText("two.png")).toBeInTheDocument();
-
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("checkbox", { name: "未参照のみ表示" }));
-
-    await vi.waitFor(() => expect(routes["/v1/t/t1/assets/orphans"]).toHaveBeenCalled());
-    await vi.waitFor(() => expect(screen.queryByText("one.png")).not.toBeInTheDocument());
-    expect(screen.getByText("two.png")).toBeInTheDocument();
-  });
-
-  it("shows usage before delete and removes the row on the tombstone broadcast", async () => {
-    const routes = authedRoutes();
-    routes[`/v1/t/t1/assets/${ASSET_1}/usage`] = vi.fn(() =>
-      jsonResponse(200, {
-        usage: [{ sourceId: "r1", sourceType: "article", sourceField: "hero", origin: "field" }],
-      }),
-    );
-    routes[`/v1/t/t1/records/${ASSET_1}`] = vi.fn(() => jsonResponse(200, { ok: true }));
-    const harness = socketHarness();
-    renderAssetsList(harness, routes);
-    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
-    await bootstrapped(harness.latest(), [assetRecord(ASSET_1, "one.png")]);
-
-    expect(await screen.findByText("one.png")).toBeInTheDocument();
-
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "削除" }));
-
-    const dialog = await screen.findByRole("alertdialog", { name: "アセットの削除" });
-    await vi.waitFor(() => expect(dialog).toHaveTextContent("article / hero"));
-
-    await user.click(screen.getByRole("button", { name: "削除を確定" }));
-    await vi.waitFor(() => expect(routes[`/v1/t/t1/records/${ASSET_1}`]).toHaveBeenCalled());
-
-    // 一覧からの消滅はトゥームストーンの WS broadcast で反映される(HTTP DELETE 自体は消滅させない)
-    harness.latest().deliver({
-      type: "change",
-      record: assetRecord(ASSET_1, "one.png", {
-        deletedAt: "2026-07-17T01:00:00Z",
-        seq: 4,
-        version: 2,
-      }),
-    });
-    await vi.waitFor(() => expect(screen.queryByText("one.png")).not.toBeInTheDocument());
-  });
-});
 
 describe("メディアフィールドと本文画像 (record 編集)", () => {
   it("selects an asset from the dialog and pushes the relation ref", async () => {

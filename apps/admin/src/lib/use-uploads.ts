@@ -158,6 +158,13 @@ export function createUploadStore(upload: Upload, initial: UploadStoreOptions = 
     },
     cancel: () => {
       controller.abort();
+      // 順番待ちのタイルには取り除くボタンが無いので、その場で消す。
+      // 中断後の uploadFiles の onChange は replaceItem が無い key を無視するので復活しない
+      const dropped = entries.filter((entry) => entry.item.status === "queued");
+      if (dropped.length === 0) return;
+      for (const entry of dropped) batch.delete(entry.key);
+      entries = entries.filter((entry) => entry.item.status !== "queued");
+      emit();
     },
     setOptions: (next) => {
       options = next;
@@ -179,4 +186,9 @@ export function uploadStoreFor(tenantId: string, upload: Upload): UploadStore {
     stores.set(tenantId, store);
   }
   return store;
+}
+
+// テスト用。store はモジュールに残るため、テストごとに別の API スタブへ向け直すときに空にする
+export function resetUploadStores(): void {
+  stores.clear();
 }

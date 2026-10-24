@@ -140,16 +140,17 @@ describe("createUploadStore", () => {
     expect(statuses(store)).toStrictEqual(["done", "done"]);
   });
 
-  it("cancel で残りは queued のまま止まり、進行中の 1 件が終わると progress が null になる", async () => {
+  it("cancel で残りの queued が消え、進行中の 1 件が終わると progress が null になる", async () => {
     const { calls, upload } = deferredUpload();
     const store = createUploadStore(upload);
     const settled = store.start([file("a.png"), file("b.png"), file("c.png")]);
     store.cancel();
     expect(store.getSnapshot().progress).not.toBeNull();
+    expect(statuses(store)).toStrictEqual(["uploading"]);
     calls[0]?.resolve("asset-a");
     await settled;
     expect(calls).toHaveLength(1);
-    expect(statuses(store)).toStrictEqual(["done", "queued", "queued"]);
+    expect(statuses(store)).toStrictEqual(["done"]);
     expect(store.getSnapshot().progress).toBeNull();
   });
 
