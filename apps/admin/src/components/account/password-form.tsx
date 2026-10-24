@@ -14,6 +14,8 @@ const styles = stylex.create({
     gridTemplateColumns: { default: "repeat(2, minmax(0, 1fr))", [NARROW]: "minmax(0, 1fr)" },
     gap: space.lg,
   },
+  // 1 列表示では 2 列目を空ける詰め物が空の行になるので消す
+  spacer: { display: { default: "block", [NARROW]: "none" } },
   footer: { display: "flex", alignItems: "center", gap: space.md },
   note: { flex: 1, fontSize: font.caption, color: text.muted },
 });
@@ -85,7 +87,7 @@ function PasswordFormInner({
           isInvalid={fieldErrors.current !== undefined}
           errorMessage={fieldErrors.current ?? ""}
         />
-        <div aria-hidden="true" />
+        <div aria-hidden="true" {...stylex.props(styles.spacer)} />
         <TextField
           type="password"
           autoComplete="new-password"

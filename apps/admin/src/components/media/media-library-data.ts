@@ -67,7 +67,7 @@ export function useAssetPublication(
   tenantSlug: string,
   assetId: string | null,
 ): MediaDetailPanelProps["publication"] {
-  const config = useQuery(configQueryOptions(api));
+  const config = useQuery({ ...configQueryOptions(api), enabled: assetId !== null });
   const publications = useQuery({
     ...publicationsQueryOptions(adminApi, tenantId, "asset"),
     enabled: assetId !== null,

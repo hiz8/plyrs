@@ -61,3 +61,13 @@ it("欄を打ち直すと、その欄の API の誤りとローカルの不一�
   await user.type(confirm(), "!");
   expect(screen.queryByText("新しいパスワードが一致しません")).not.toBeInTheDocument();
 });
+
+it("2 列目のスペーサーは 1 列表示で消せるよう、スタイルのクラスを持つ", () => {
+  const { container } = render(
+    <PasswordForm onSubmit={vi.fn()} isPending={false} fieldErrors={{}} resetKey={0} />,
+  );
+  const grid = container.querySelector("form > div");
+  const spacer = grid?.querySelector(":scope > [aria-hidden='true']");
+  expect(spacer).not.toBeNull();
+  expect(spacer?.getAttribute("class") ?? "").not.toBe("");
+});

@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { expect, it, vi } from "vitest";
 import type { TenantSync } from "../../lib/sync";
 import { TenantSyncProvider } from "../../lib/sync-context";
@@ -64,4 +65,41 @@ it("タブを選んで遷移した後、次に描かれた枠は選択中のタ�
 it("タブを選ばずに描いた枠はフォーカスを動かさない", () => {
   renderFrame({});
   expect(screen.getByRole("tab", { name: "メンバー" })).not.toHaveFocus();
+});
+
+it("StrictMode(effect の二重実行)でも、選択中のタブへ一度だけフォーカスが移る", async () => {
+  render(
+    <StrictMode>
+      <TenantSyncProvider sync={sync}>
+        <SettingsFrame tab="members" slug="blog">
+          <p>本文</p>
+        </SettingsFrame>
+      </TenantSyncProvider>
+    </StrictMode>,
+  );
+  await userEvent.setup().click(screen.getByRole("tab", { name: "一般" }));
+  cleanup();
+  render(
+    <StrictMode>
+      <TenantSyncProvider sync={sync}>
+        <SettingsFrame tab="general" slug="blog">
+          <p>本文</p>
+        </SettingsFrame>
+      </TenantSyncProvider>
+    </StrictMode>,
+  );
+  await waitFor(() => expect(screen.getByRole("tab", { name: "一般" })).toHaveFocus());
+  expect(document.activeElement).toBe(document.querySelector('[role="tab"][aria-selected="true"]'));
+  // 消費済み: 別の枠を描き直してもフォーカスを奪わない
+  cleanup();
+  render(
+    <StrictMode>
+      <TenantSyncProvider sync={sync}>
+        <SettingsFrame tab="general" slug="blog">
+          <p>本文</p>
+        </SettingsFrame>
+      </TenantSyncProvider>
+    </StrictMode>,
+  );
+  expect(screen.getByRole("tab", { name: "一般" })).not.toHaveFocus();
 });

@@ -96,6 +96,8 @@ export function MediaTable({
         {(row) => (
           <Row id={row.id} columns={COLUMNS}>
             {(c) => {
+              // 幅の狭い表示で隠す列は COLUMNS.narrow が唯一の真実
+              const hideOnNarrow = c.narrow;
               switch (c.id) {
                 case "thumb":
                   return (
@@ -121,16 +123,16 @@ export function MediaTable({
                     </Cell>
                   );
                 case "kind":
-                  return <Cell hideOnNarrow>{MEDIA_LABELS.kinds[row.kind]}</Cell>;
+                  return <Cell hideOnNarrow={hideOnNarrow}>{MEDIA_LABELS.kinds[row.kind]}</Cell>;
                 case "size":
                   return (
-                    <Cell hideOnNarrow>
+                    <Cell hideOnNarrow={hideOnNarrow}>
                       <span {...stylex.props(styles.mono)}>{formatBytes(row.size)}</span>
                     </Cell>
                   );
                 case "uploaded":
                   return (
-                    <Cell hideOnNarrow>
+                    <Cell hideOnNarrow={hideOnNarrow}>
                       {row.uploadedAt === null ? (
                         MEDIA_LABELS.usageUnknown
                       ) : (

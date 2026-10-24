@@ -848,6 +848,7 @@ export const MEDIA_PICKER_LABELS = {
   selected: "選択中",
   selectedRegion: "選択中のファイル",
   selectedCount: (n: number) => `${n} 件`,
+  altSaveFailed: (n: number) => `${n} 件の代替テキストを保存できませんでした`,
   none: "左の一覧からファイルを選んでください",
   alt: "代替テキスト",
   altHelp: "挿入する前に入れておくと、本文でもそのまま使われます",

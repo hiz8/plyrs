@@ -24,6 +24,7 @@ import {
   isMediaKindOrAll,
   applyMediaQuery,
   buildMediaRows,
+  extensionOf,
   formatBytes,
   mediaKindOf,
   type MediaKind,
@@ -127,11 +128,6 @@ interface SelectedItem {
   filename: string;
   row: MediaRow | undefined;
   provisional: Provisional | undefined;
-}
-
-function extensionOf(filename: string): string {
-  const dot = filename.lastIndexOf(".");
-  return dot === -1 ? "?" : filename.slice(dot + 1, dot + 5);
 }
 
 // 案 F 5 章(D3 M9・M10)。F30: 選んだ順・アップロード、F31: 代替テキスト、F32: 種類の既定
@@ -239,6 +235,7 @@ export function MediaPickerDialog({
   // 配信するので、サーバーの確定は待たずに挿入へ進み、失敗は非同期にトーストで知らせる
   function insert() {
     const collection = registry.get(ASSET_TYPE_KEY);
+    const persisted: Promise<unknown>[] = [];
     for (const item of selectedItems) {
       const alt = altOf(item);
       if (collection === undefined || item.row === undefined || alt === item.row.alt) continue;
@@ -249,13 +246,16 @@ export function MediaPickerDialog({
           const { alt: _previous, ...rest } = draft.input as Record<string, unknown>;
           draft.input = (alt === "" ? rest : { ...rest, alt }) as typeof draft.input;
         });
-        tx.isPersisted.promise.catch((cause: unknown) => {
-          toaster.error(errorMessage(cause, TOASTS.saveFailed));
-        });
+        persisted.push(tx.isPersisted.promise);
       } catch (cause) {
         toaster.error(errorMessage(cause, TOASTS.saveFailed));
       }
     }
+    // 失敗は何件でも 1 件のトーストにまとめる(挿入は待たない)
+    void Promise.allSettled(persisted).then((results) => {
+      const failed = results.filter((result) => result.status === "rejected").length;
+      if (failed > 0) toaster.error(MEDIA_PICKER_LABELS.altSaveFailed(failed));
+    });
     onSelect(
       selectedItems.map((item) => ({ id: item.id, label: item.filename, alt: altOf(item) })),
     );

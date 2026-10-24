@@ -5,6 +5,7 @@ import {
   DEFAULT_MEDIA_QUERY,
   MEDIA_VIEW_STORAGE_KEY,
   applyMediaQuery,
+  extensionOf,
   buildMediaRows,
   formatBytes,
   hasMediaFilters,
@@ -216,7 +217,7 @@ describe("applyMediaQuery", () => {
   });
 
   it("ファイル名順は大文字小文字の違いを Collator の既定で並べる", () => {
-    // id 降順なら ID_C(大文字)が先になるが、Collator の既定では小文字が先
+    // id 降順なら ID_B(B.png)が先になるが、Collator の既定では小文字が先
     const cased = buildMediaRows([
       asset(ID_A, { filename: "b.png" }),
       asset(ID_B, { filename: "B.png" }),
@@ -283,5 +284,13 @@ describe("usageTitles / inUseCount", () => {
   it("inUseCount は未使用に無い件数", () => {
     expect(inUseCount(["a", "b", "c"], new Set(["b"]))).toBe(2);
     expect(inUseCount([], new Set())).toBe(0);
+  });
+});
+
+describe("extensionOf", () => {
+  it("最大 4 文字を返し、無ければ ? を返す", () => {
+    expect(extensionOf("a.png")).toBe("png");
+    expect(extensionOf("a.jpeg2000")).toBe("jpeg");
+    expect(extensionOf("noext")).toBe("?");
   });
 });

@@ -1,5 +1,6 @@
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import type { ResolvedUsage } from "./media";
+import { normalizeForSearch, searchText } from "./content-list";
 import { MEDIA_LABELS } from "./labels";
 
 // 案 F 3 章: メディアライブラリの一覧の絞り込み・並べ替えと URL クエリとの相互変換。
@@ -42,13 +43,6 @@ export const DEFAULT_MEDIA_QUERY: MediaQuery = { kind: "all", usage: "all", q: "
 
 function oneOf<T extends string>(values: readonly T[], value: unknown): T | undefined {
   return (values as readonly unknown[]).includes(value) ? (value as T) : undefined;
-}
-
-// TanStack Router の search パーサは値を JSON として読むため、?q=2026 は number で届く
-// (content-list.ts の searchText と同じ規則)
-function searchText(value: unknown): string {
-  if (typeof value === "string") return value;
-  return typeof value === "number" || typeof value === "boolean" ? String(value) : "";
 }
 
 // F6: 手で書き換えられた不正な値は既定に戻す
@@ -112,7 +106,7 @@ function numberOrNull(value: unknown): number | null {
 }
 
 // 拡張子の表示(最大 4 文字、無ければ "?")
-function extensionOf(filename: string): string {
+export function extensionOf(filename: string): string {
   const dot = filename.lastIndexOf(".");
   return dot === -1 ? "?" : filename.slice(dot + 1, dot + 5);
 }
@@ -141,11 +135,6 @@ export function buildMediaRows(records: readonly SyncRecord[]): MediaRow[] {
     });
 }
 
-// 全角・半角や大文字・小文字の違いを無視して部分一致させる(content-list.ts と同じ)
-function normalizeForSearch(text: string): string {
-  return text.normalize("NFKC").toLocaleLowerCase("ja");
-}
-
 // F23(裁定で改定): 連番のファイル名が多いので数字を数として比べる自然順。大文字小文字は Collator の既定で区別する
 const nameCollator = new Intl.Collator("ja", { numeric: true });
 
@@ -166,7 +155,7 @@ export function applyMediaQuery(
         normalizeForSearch(row.alt).includes(needle)),
   );
   // 同点は id 降順(UUIDv7 = 新しいものが先)
-  const byIdDesc = (a: MediaRow, b: MediaRow) => b.id.localeCompare(a.id);
+  const byIdDesc = (a: MediaRow, b: MediaRow) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
   if (query.sort === "name") {
     return filtered.toSorted(
       (a, b) => nameCollator.compare(a.filename, b.filename) || byIdDesc(a, b),

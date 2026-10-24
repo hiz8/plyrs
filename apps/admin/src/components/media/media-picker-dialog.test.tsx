@@ -212,22 +212,25 @@ it("変えた代替テキストは挿入時に asset レコードへ書き、変
   expect(onSelect).toHaveBeenCalledWith([{ id: ASSET_1, label: "a.png", alt: "山" }]);
 });
 
-it("保存が確定しなくても挿入は進み、失敗は通知される", async () => {
+it("保存が確定しなくても挿入は進み、複数の失敗は 1 件のトーストにまとまる", async () => {
   const failed = Promise.reject(new Error("offline"));
   failed.catch(() => undefined);
-  const { onSelect } = setup({ selection: "one", persisted: failed });
+  const { onSelect } = setup({ selection: "many", persisted: failed });
   const user = userEvent.setup();
   await user.click(within(grid()).getByText("a.png"));
-  const alt = within(screen.getByRole("region", { name: "選択中のファイル" })).getByRole(
+  await user.click(within(grid()).getByText("b.png"));
+  const boxes = within(screen.getByRole("region", { name: "選択中のファイル" })).getAllByRole(
     "textbox",
     { name: "代替テキスト" },
   );
-  await user.type(alt, "山");
-  await user.click(screen.getByRole("button", { name: "このファイルを使う" }));
+  expect(boxes).toHaveLength(2);
+  for (const box of boxes) await user.type(box, "山");
+  await user.click(screen.getByRole("button", { name: /件を挿入/ }));
   expect(onSelect).toHaveBeenCalledTimes(1);
   // モーダルが開いている間、外側の通知欄はアクセシビリティツリーから外れるので hidden を許す
   const toasts = within(await screen.findByRole("region", { name: "通知", hidden: true }));
-  expect(await toasts.findByText(/保存できませんでした/)).toBeInTheDocument();
+  expect(await toasts.findByText("2 件の代替テキストを保存できませんでした")).toBeInTheDocument();
+  expect(toasts.queryAllByText(/保存できませんでした/)).toHaveLength(1);
 });
 
 it("既存の選択を外して挿入すると、フィールドの値から消える", async () => {

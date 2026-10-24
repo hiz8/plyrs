@@ -63,7 +63,7 @@ function positiveInt(value: unknown): number | undefined {
 
 // TanStack Router の既定の search パーサは値を JSON として読むため、手書きのリンクの ?q=2026 は
 // number、?q=true は boolean で届く。検索語としては文字列に戻す
-function searchText(value: unknown): string {
+export function searchText(value: unknown): string {
   if (typeof value === "string") {
     return value;
   }
@@ -173,7 +173,7 @@ function matchesTab(row: ListRow, tab: ListTab): boolean {
 }
 
 // 全角・半角や大文字・小文字の違いを無視して部分一致させる
-function normalizeForSearch(text: string): string {
+export function normalizeForSearch(text: string): string {
   return text.normalize("NFKC").toLocaleLowerCase("ja");
 }
 
