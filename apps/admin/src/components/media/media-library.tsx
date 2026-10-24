@@ -2,12 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
 import { Image as ImageIcon, Upload } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, DropZone, EmptyState, FileButton, FileDropTarget, toaster } from "@plyrs/ui";
 import { ASSET_TYPE_KEY } from "@plyrs/metamodel";
 import { createAssetServices } from "../../lib/asset-services";
 import { currentCrumb, homeCrumb } from "../../lib/breadcrumbs";
-import { MEDIA_LABELS, TERMS } from "../../lib/labels";
+import { errorMessage } from "../../lib/error-messages";
+import { MEDIA_LABELS, TERMS, TOASTS } from "../../lib/labels";
 import {
   applyMediaQuery,
   buildMediaRows,
@@ -16,18 +17,23 @@ import {
   readMediaView,
   saveMediaView,
   toMediaSearch,
+  inUseCount,
   DEFAULT_MEDIA_QUERY,
   type MediaQuery,
   type MediaView,
 } from "../../lib/media-list";
 import { uploadSummaryMessage } from "../../lib/media";
-import { orphanAssetsQueryOptions } from "../../lib/queries";
+import { orphanAssetsQueryOptions, publicationsQueryKey } from "../../lib/queries";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../lib/sync-context";
+import { bulkResultMessage, useBulkAction } from "../../lib/use-bulk-action";
 import { useCan } from "../../lib/use-can";
 import { useRecordsOfTypes } from "../../lib/use-collection";
 import { uploadStoreFor, useUploads } from "../../lib/use-uploads";
 import { PageBody, PageLoading, TenantPageHeader } from "../tenant-page-header";
+import { DeleteMediaDialog, type DeleteMediaTarget } from "./delete-media-dialog";
 import { MediaBulkBar } from "./media-bulk-bar";
+import { MediaDetailPanel } from "./media-detail-panel";
+import { useAssetPublication, useAssetUsage } from "./media-library-data";
 import { MediaGrid } from "./media-grid";
 import { MediaTable } from "./media-table";
 import { MediaToolbar } from "./media-toolbar";
@@ -57,7 +63,7 @@ export interface MediaLibraryProps {
 }
 
 export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
-  const { tenant, adminApi, queryClient } = mediaRoute.useRouteContext();
+  const { tenant, adminApi, queryClient, api } = mediaRoute.useRouteContext();
   const search = mediaRoute.useSearch();
   const navigate = useNavigate();
   const query = useMemo(() => parseMediaQuery(search), [search]);
@@ -90,6 +96,7 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
 
   const [view, setView] = useState<MediaView>(() => readMediaView());
   const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string>>(() => new Set());
+  const bulk = useBulkAction();
 
   // F34: asset 型が同期で届いてから購読する
   const hasAssetType = types.some((type) => type.key === ASSET_TYPE_KEY);
@@ -110,14 +117,28 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
 
   // 絞り込みが変わったら選択を空にする
   const queryKey = JSON.stringify(toMediaSearch(query));
+  const dismissBulk = bulk.dismiss;
   useEffect(() => {
     setSelectedKeys(new Set());
-  }, [queryKey]);
+    dismissBulk();
+  }, [queryKey, dismissBulk]);
   // 絞り込みの外に出た(削除された)ものも選択から落とす
   const selected = useMemo(() => {
     const ids = new Set(visible.map((row) => row.id));
     return new Set([...selectedKeys].filter((id) => ids.has(id)));
   }, [selectedKeys, visible]);
+
+  // F11/F12: 削除の確認の対象。1 件は開いている詳細パネルのファイル、一括は選択中
+  const [deleteTarget, setDeleteTarget] = useState<
+    { kind: "one"; id: string } | { kind: "many"; ids: string[] } | null
+  >(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  // F29: パネルを開いた要素。閉じたときにフォーカスを戻す
+  const panelReturnRef = useRef<HTMLElement | null>(null);
+
+  const usageId = deleteTarget?.kind === "one" ? deleteTarget.id : assetId;
+  const usage = useAssetUsage(adminApi, tenant.id, usageId, sync.registry, types);
+  const publicationStatus = useAssetPublication(api, adminApi, tenant.id, tenantSlug, assetId);
 
   if (!hasSynced) {
     return <PageLoading breadcrumbs={[homeCrumb(tenantSlug)]} />;
@@ -129,10 +150,19 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
     setView(next);
     saveMediaView(next);
   };
-  const open = (id: string) =>
+  const open = (id: string) => {
+    const active = document.activeElement;
+    panelReturnRef.current = active instanceof HTMLElement ? active : null;
     void navigate({
       to: "/t/$tenantSlug/media/$assetId",
       params: { tenantSlug, assetId: id },
+      search: asSearch(query),
+    });
+  };
+  const closePanel = () =>
+    void navigate({
+      to: "/t/$tenantSlug/media",
+      params: { tenantSlug },
       search: asSearch(query),
     });
   // リストの行のリンク。絞り込みの search を保つ(F5)
@@ -141,6 +171,84 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
     return `/t/${tenantSlug}/media/${id}${params === "" ? "" : `?${params}`}`;
   };
   const addFiles = (files: File[]) => void uploadStore.start(files);
+
+  // F13: 代替テキストとキャプションは同期経路で保存する(空は項目ごと落とす)
+  const saveDetail = async (id: string, input: { alt: string; caption: string }) => {
+    try {
+      const collection = sync.registry.get(ASSET_TYPE_KEY);
+      if (collection === undefined) throw new Error("asset collection unavailable");
+      const tx = collection.update(id, (draft) => {
+        const next: Record<string, unknown> = { ...draft.input };
+        delete next["alt"];
+        delete next["caption"];
+        if (input.alt !== "") next["alt"] = input.alt;
+        if (input.caption !== "") next["caption"] = input.caption;
+        // WritableDeep<SyncRecord>["input"] は SyncRecord["input"] と構造同一だが TS が同一視できないため境界 cast
+        draft.input = next as typeof draft.input;
+      });
+      await tx.isPersisted.promise;
+      toaster.success(TOASTS.saved);
+    } catch (cause) {
+      toaster.error(errorMessage(cause, TOASTS.saveFailed));
+    }
+  };
+
+  // F12: 削除後は未使用一覧と公開状態を取り直し、選択から外す
+  const afterDelete = (ids: readonly string[]) => {
+    void queryClient.invalidateQueries({
+      queryKey: orphanAssetsQueryOptions(adminApi, tenant.id).queryKey,
+    });
+    void queryClient.invalidateQueries({ queryKey: publicationsQueryKey(tenant.id) });
+    const gone = new Set(ids);
+    setSelectedKeys((keys) => new Set([...keys].filter((id) => !gone.has(id))));
+  };
+  const reportBulk = (result: Parameters<typeof bulkResultMessage>[1]) => {
+    const message = bulkResultMessage("delete", result);
+    if (message.tone === "success") toaster.success(message.title);
+    else toaster.error(message.title);
+    afterDelete(result.succeeded);
+  };
+  const deleteOne = async (id: string) => {
+    setIsDeleting(true);
+    try {
+      await adminApi.deleteRecord(tenant.id, id);
+      toaster.success(TOASTS.deleted);
+      afterDelete([id]);
+      if (id === assetId) closePanel();
+    } catch (cause) {
+      toaster.error(errorMessage(cause, TOASTS.deleteFailed));
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+  const deleteMany = (ids: string[]) => {
+    setDeleteTarget(null);
+    void bulk.run("delete", ids, (id) => adminApi.deleteRecord(tenant.id, id)).then(reportBulk);
+  };
+  const confirmDelete = () => {
+    if (deleteTarget === null) return;
+    if (deleteTarget.kind === "one") void deleteOne(deleteTarget.id);
+    else deleteMany(deleteTarget.ids);
+  };
+
+  const detailRow = assetId === null ? null : (rows.find((row) => row.id === assetId) ?? null);
+  const dialogTarget: DeleteMediaTarget | null =
+    deleteTarget === null
+      ? null
+      : deleteTarget.kind === "many"
+        ? {
+            kind: "many",
+            ids: deleteTarget.ids,
+            inUse: inUseCount(deleteTarget.ids, orphanIds ?? new Set()),
+          }
+        : detailRow === null
+          ? null
+          : {
+              kind: "one",
+              row: detailRow,
+              usage: usage.dialog,
+            };
 
   const isEmpty = rows.length === 0 && !hasMediaFilters(query) && uploads.entries.length === 0;
   const selection = canDelete
@@ -205,11 +313,25 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
                   selectedCount={selected.size}
                   totalCount={visible.length}
                   onSelectAll={() => setSelectedKeys(new Set(visible.map((row) => row.id)))}
-                  onClear={() => setSelectedKeys(new Set())}
-                  // 削除の確認と実行は Task 8 で足す
-                  onDelete={() => undefined}
-                  progress={null}
-                  failure={null}
+                  onClear={() => {
+                    setSelectedKeys(new Set());
+                    bulk.dismiss();
+                  }}
+                  onDelete={() => setDeleteTarget({ kind: "many", ids: [...selected] })}
+                  progress={
+                    bulk.progress === null
+                      ? null
+                      : {
+                          done: bulk.progress.done,
+                          total: bulk.progress.total,
+                          onCancel: bulk.cancel,
+                        }
+                  }
+                  failure={
+                    bulk.failure === null
+                      ? null
+                      : { onRetry: () => void bulk.retry()?.then(reportBulk) }
+                  }
                 />
               )}
               {visible.length === 0 && hasMediaFilters(query) ? (
@@ -248,6 +370,28 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
           )}
         </PageBody>
       </FileDropTarget>
+      <MediaDetailPanel
+        tenantSlug={tenantSlug}
+        tenantId={tenant.id}
+        row={detailRow}
+        isOpen={assetId !== null}
+        notFound={assetId !== null && detailRow === null}
+        resolveUrl={assets.resolveUrl}
+        usage={usage.panel}
+        publication={publicationStatus}
+        canWrite={canWrite}
+        canDelete={canDelete}
+        onSave={(input) => (assetId === null ? Promise.resolve() : saveDetail(assetId, input))}
+        onDelete={() => assetId !== null && setDeleteTarget({ kind: "one", id: assetId })}
+        onClose={closePanel}
+        returnFocusTo={panelReturnRef}
+      />
+      <DeleteMediaDialog
+        target={dialogTarget}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+        isPending={isDeleting}
+      />
     </div>
   );
 }
