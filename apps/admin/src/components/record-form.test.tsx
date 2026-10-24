@@ -2,7 +2,7 @@ import { ASSET_TYPE_DEFINITION, type ContentTypeDefinition } from "@plyrs/metamo
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { SyncEngine, SyncRejectedError } from "@plyrs/sync-client";
 import { CollectionRegistry } from "@plyrs/sync-client/tanstack";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -697,7 +697,7 @@ function assetServicesStub(overrides: Partial<AssetServices> = {}): AssetService
   };
 }
 
-describe("アセット関係フィールド (Phase 8 裁定: メディア UI)", () => {
+describe("メディアフィールド (Phase 8 裁定: メディア UI)", () => {
   it("renders the asset picker for allowedTypes=['asset'] fields and selects from the dialog", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn(async () => {});
@@ -713,11 +713,13 @@ describe("アセット関係フィールド (Phase 8 裁定: メディア UI)", 
         assets={assetServicesStub()}
       />,
     );
-    await user.click(screen.getByRole("button", { name: "アセットを選択" }));
+    await user.click(screen.getByRole("button", { name: "メディアを選択" }));
     const dialog = await screen.findByRole("dialog", { name: "メディアを選択" });
     expect(dialog).toHaveTextContent("hero.png");
-    await user.click(screen.getByRole("button", { name: /hero\.png/ }));
+    await user.click(within(dialog).getByText("hero.png"));
+    await user.click(within(dialog).getByRole("button", { name: "このファイルを使う" }));
     // 選択結果がフィールドに表示される
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByText("hero.png", { selector: "span" })).toBeInTheDocument();
   });
 
@@ -734,7 +736,7 @@ describe("アセット関係フィールド (Phase 8 裁定: メディア UI)", 
         onSubmit={onSubmit}
       />,
     );
-    expect(screen.queryByRole("button", { name: "アセットを選択" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "メディアを選択" })).not.toBeInTheDocument();
   });
 
   it("disables system-managed inputs when editing an asset record", () => {

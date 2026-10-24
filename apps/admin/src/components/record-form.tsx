@@ -21,7 +21,7 @@ import {
 } from "@plyrs/ui";
 import { border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "../lib/asset-services";
-import { RECORD_FORM_LABELS } from "../lib/labels";
+import { MEDIA_PICKER_LABELS, RECORD_FORM_LABELS } from "../lib/labels";
 import { labelForRecord } from "../lib/record-label";
 import {
   asRichTextValue,
@@ -34,7 +34,8 @@ import {
 } from "../lib/record-form-values";
 import { richTextPlainText } from "../lib/richtext-text";
 import { useRecordsOfTypes } from "../lib/use-collection";
-import { AssetRelationPicker, AssetSelectDialog, type AssetSelectItem } from "./asset-picker";
+import { AssetRelationPicker } from "./asset-picker";
+import { MediaPickerDialog, type PickedMedia } from "./media/media-picker-dialog";
 import { ConflictDialog } from "./conflict-dialog";
 
 // サーバー版採用でサーバー側に本文が無い場合に使う明示的な空ドキュメント。
@@ -185,7 +186,7 @@ export function RecordForm({
   const scrollToError = useRef(false);
   const lastDirty = useRef(false);
   // 本文画像挿入: ツールバーの「画像」→ ダイアログ → insert(挿入関数は state に保持)
-  const [imageInsert, setImageInsert] = useState<((item: AssetSelectItem) => void) | null>(null);
+  const [imageInsert, setImageInsert] = useState<((item: PickedMedia) => void) | null>(null);
   // §12 必須②: dirty 判定の基準。マウント時のスナップショットから始め、保存成功・
   // サーバー版採用のたびに「確定した姿」へ進める。
   const [initialDraft, setInitialDraft] = useState<DraftValues>(() =>
@@ -444,12 +445,16 @@ export function RecordForm({
         </form.Field>
       ))}
       {imageInsert !== null && assets !== undefined && (
-        <AssetSelectDialog
+        <MediaPickerDialog
           registry={registry}
           types={types}
           assets={assets}
-          onSelect={(item) => {
-            imageInsert(item);
+          fieldName={MEDIA_PICKER_LABELS.bodyField}
+          selection="one"
+          defaultKind="image"
+          onSelect={(items) => {
+            const first = items[0];
+            if (first !== undefined) imageInsert(first);
             setImageInsert(null);
           }}
           onClose={() => setImageInsert(null)}
@@ -501,7 +506,7 @@ function FieldInput({
   assets: AssetServices | undefined;
   locked: boolean;
   isReadOnly: boolean;
-  onRequestAssetImage: ((insert: (item: AssetSelectItem) => void) => void) | undefined;
+  onRequestAssetImage: ((insert: (item: PickedMedia) => void) => void) | undefined;
 }) {
   const label = field.label ?? field.key;
   const description = field.description;

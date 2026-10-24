@@ -48,7 +48,7 @@ export interface MediaGridProps {
   showDropHint: boolean;
 }
 
-function uploadTileState(
+export function uploadTileState(
   entry: UploadEntry,
   handlers: { onRetry: () => void; onRemove: () => void },
 ): UploadTileState {

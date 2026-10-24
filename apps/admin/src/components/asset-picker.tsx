@@ -1,61 +1,30 @@
 import * as stylex from "@stylexjs/stylex";
-import { useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ContentTypeDefinition, FieldDefinition } from "@plyrs/metamodel";
 import { ASSET_TYPE_KEY } from "@plyrs/metamodel";
 import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import { Button, ModalDialog } from "@plyrs/ui";
-import { bg, border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
+import { Button } from "@plyrs/ui";
+import { font, space, status, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "../lib/asset-services";
-import { MEDIA_PICKER_LABELS } from "../lib/labels";
+import { MEDIA_LABELS, MEDIA_PICKER_LABELS } from "../lib/labels";
 import { labelForRecord } from "../lib/record-label";
 import { parseRelationDraftKey, relationDraftKey } from "../lib/record-form-values";
 import { useRecordsOfTypes } from "../lib/use-collection";
 import { buildMediaRows } from "../lib/media-list";
 import { MediaThumb } from "./media/media-thumb";
+import { MediaPickerDialog, type PickedMedia } from "./media/media-picker-dialog";
 
 const styles = stylex.create({
-  content: { display: "flex", flexDirection: "column", gap: space.sm },
-  grid: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.xs,
-    maxHeight: "280px",
-    overflowY: "auto",
-  },
-  candidate: {
-    display: "flex",
-    alignItems: "center",
-    gap: space.sm,
-    padding: space.xs,
-    borderRadius: radius.control,
-    borderWidth: stroke.default,
-    borderStyle: "solid",
-    borderColor: border.default,
-    backgroundColor: bg.canvas,
-    cursor: "pointer",
-    textAlign: "left",
-    fontFamily: font.family,
-    fontSize: font.body,
-    color: text.default,
-  },
-  muted: { color: text.muted, fontSize: font.caption },
   error: { color: status.danger, fontSize: font.caption },
   fieldLabel: { fontSize: font.caption, color: text.muted },
   selected: { display: "flex", flexDirection: "column", gap: space.xs },
   selectedRow: { display: "flex", alignItems: "center", gap: space.sm },
+  filename: { fontFamily: font.familyMono, fontSize: font.caption },
   actions: { display: "flex", gap: space.sm, alignItems: "center" },
 });
 
-export interface AssetSelectItem {
-  id: string;
-  label: string;
-}
-
-// アセット選択ダイアログ。関係フィールド(AssetRelationPicker)と本文画像挿入(RecordForm)が
-// 共用する。候補は同期済み asset コレクション — アップロード直後の WS 反映前でも選択できる
-// よう、アップロード成功時は filename を label にして即確定する。
-// Task 9 でピッカーごと作り直すまでのつなぎ。レコードを MediaThumb の行へ変えて小さく描く
+// 選択中の表示用の小さなサムネイル(MediaThumb xs)
 function RecordThumb({
   record,
   resolveUrl,
@@ -64,94 +33,7 @@ function RecordThumb({
   resolveUrl: AssetServices["resolveUrl"];
 }) {
   const row = buildMediaRows([record])[0];
-  return row === undefined ? null : <MediaThumb row={row} resolveUrl={resolveUrl} size="sm" />;
-}
-
-export function AssetSelectDialog({
-  registry,
-  types,
-  assets,
-  onSelect,
-  onClose,
-}: {
-  registry: CollectionRegistry;
-  types: ContentTypeDefinition[];
-  assets: AssetServices;
-  onSelect: (item: AssetSelectItem) => void;
-  onClose: () => void;
-}) {
-  const candidates = useRecordsOfTypes(registry, [ASSET_TYPE_KEY]).toSorted((a, b) =>
-    a.id.localeCompare(b.id),
-  );
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function upload(files: FileList | null) {
-    const file = files?.[0];
-    if (file === undefined) {
-      return;
-    }
-    setError(null);
-    try {
-      const { id } = await assets.upload(file);
-      onSelect({ id, label: file.name });
-    } catch {
-      setError("アップロードに失敗しました。");
-    } finally {
-      if (fileInputRef.current !== null) {
-        fileInputRef.current.value = "";
-      }
-    }
-  }
-
-  return (
-    <ModalDialog
-      title={MEDIA_PICKER_LABELS.title}
-      isOpen
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose();
-        }
-      }}
-      footer={
-        <Button variant="secondary" onPress={onClose}>
-          閉じる
-        </Button>
-      }
-    >
-      <div {...stylex.props(styles.content)}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          aria-label="新しいアセットをアップロード"
-          onChange={(event) => void upload(event.currentTarget.files)}
-        />
-        {error !== null && <span {...stylex.props(styles.error)}>{error}</span>}
-        {candidates.length === 0 ? (
-          <p {...stylex.props(styles.muted)}>
-            アセットがまだありません。アップロードしてください。
-          </p>
-        ) : (
-          <div {...stylex.props(styles.grid)}>
-            {candidates.map((candidate) => {
-              const label = labelForRecord(types, candidate);
-              return (
-                <button
-                  key={candidate.id}
-                  type="button"
-                  {...stylex.props(styles.candidate)}
-                  onClick={() => onSelect({ id: candidate.id, label })}
-                >
-                  <RecordThumb record={candidate} resolveUrl={assets.resolveUrl} />
-                  <span>{label}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </ModalDialog>
-  );
+  return row === undefined ? null : <MediaThumb row={row} resolveUrl={resolveUrl} size="xs" />;
 }
 
 // allowedTypes がちょうど ["asset"] の関係フィールド向けの置き換え UI(Phase 8 裁定:
@@ -177,9 +59,12 @@ export function AssetRelationPicker({
   isReadOnly?: boolean | undefined;
 }) {
   const [open, setOpen] = useState(false);
-  const candidates = useRecordsOfTypes(registry, [ASSET_TYPE_KEY]).toSorted((a, b) =>
-    a.id.localeCompare(b.id),
+  // types に asset 型が無いテナントでは購読しない(MediaPickerDialog と同じ規則)
+  const assetTypeKeys = useMemo(
+    () => (types.some((type) => type.key === ASSET_TYPE_KEY) ? [ASSET_TYPE_KEY] : []),
+    [types],
   );
+  const candidates = useRecordsOfTypes(registry, assetTypeKeys);
   const many = field.config.cardinality === "many";
   const selectedKeys: string[] = many
     ? Array.isArray(value)
@@ -189,17 +74,18 @@ export function AssetRelationPicker({
       ? [value]
       : [];
 
-  function select(item: AssetSelectItem) {
-    const key = relationDraftKey({ type: ASSET_TYPE_KEY, id: item.id });
+  // F31: many は未選択の id を末尾に足し、one は置き換える。閉じるのはここ
+  function select(items: PickedMedia[]) {
+    const keys = items.map((item) => relationDraftKey({ type: ASSET_TYPE_KEY, id: item.id }));
     if (many) {
-      if (!selectedKeys.includes(key)) {
-        onChange([...selectedKeys, key]);
-      }
-    } else {
-      onChange(key);
+      onChange([...selectedKeys, ...keys.filter((key) => !selectedKeys.includes(key))]);
+    } else if (keys[0] !== undefined) {
+      onChange(keys[0]);
     }
     setOpen(false);
   }
+
+  const selectedIds = selectedKeys.flatMap((key) => parseRelationDraftKey(key)?.id ?? []);
 
   function remove(key: string) {
     if (many) {
@@ -237,25 +123,29 @@ export function AssetRelationPicker({
         return (
           <div key={key} {...stylex.props(styles.selectedRow)}>
             {record !== undefined && <RecordThumb record={record} resolveUrl={assets.resolveUrl} />}
-            <span>
+            <span {...stylex.props(styles.filename)}>
               {record === undefined ? (ref?.id.slice(0, 8) ?? key) : labelForRecord(types, record)}
             </span>
             <Button variant="secondary" onPress={() => remove(key)}>
-              解除
+              {MEDIA_LABELS.remove}
             </Button>
           </div>
         );
       })}
       <div {...stylex.props(styles.actions)}>
         <Button variant="secondary" onPress={() => setOpen(true)}>
-          アセットを選択
+          {MEDIA_PICKER_LABELS.title}
         </Button>
       </div>
       {open && (
-        <AssetSelectDialog
+        <MediaPickerDialog
           registry={registry}
           types={types}
           assets={assets}
+          fieldName={fieldName}
+          selection={many ? "many" : "one"}
+          defaultKind="all"
+          initialIds={selectedIds}
           onSelect={select}
           onClose={() => setOpen(false)}
         />
