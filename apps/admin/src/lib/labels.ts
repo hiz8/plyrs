@@ -249,6 +249,10 @@ export const DIALOGS = {
     stay: "編集を続ける",
     discard: "破棄して移動",
   },
+  // 型設計の離脱ガード(E26)。title / stay / discard は leave と共通
+  leaveType: {
+    body: "このまま移動すると、コンテンツタイプの変更は失われます。",
+  },
   conflict: {
     title: "本文が他の人の編集と重なりました",
     body: (savedAgo: string) =>

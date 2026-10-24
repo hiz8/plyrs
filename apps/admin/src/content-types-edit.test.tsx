@@ -83,13 +83,18 @@ describe("設定 › コンテンツタイプ(編集)", () => {
   });
 
   it("一覧に表示する列を足すと listColumns が PUT に入る", async () => {
-    const { puts, putBody } = setup();
+    const { puts, putBody, router } = setup();
     const user = userEvent.setup();
     await screen.findByRole("row", { name: /タイトル/ });
     await user.selectOptions(screen.getByRole("combobox", { name: "列を追加" }), "title");
     await user.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(puts()).toHaveLength(1));
     expect(putBody()).toMatchObject({ listColumns: ["title"] });
+    // 保存成功後の遷移は離脱ガードを通る(確認が出ずに一覧へ戻る)
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/t/blog/settings/content-types"),
+    );
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
   it("保存が 409 なら利用者向けの文のトーストを出して画面に留まる", async () => {

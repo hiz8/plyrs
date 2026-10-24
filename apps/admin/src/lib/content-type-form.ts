@@ -390,6 +390,11 @@ export function fieldTags(
   return result;
 }
 
+// 新規作成の離脱ガード用: 何も入力していない(emptyTypeDraft と値が等しい)か
+export function isTypeDraftEmpty(draft: TypeDraft): boolean {
+  return !isTypeDraftDirty(draft, emptyTypeDraft());
+}
+
 export function isTypeDraftDirty(a: TypeDraft, b: TypeDraft): boolean {
   return JSON.stringify(a) !== JSON.stringify(b);
 }

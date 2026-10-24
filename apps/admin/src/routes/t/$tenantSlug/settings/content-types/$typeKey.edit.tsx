@@ -67,7 +67,11 @@ function EditContentTypePage() {
       if (!saved) return;
       await queryClient.invalidateQueries({ queryKey: ["content-types", tenant.id] });
       toaster.success(labels.editor.saved);
-      await navigate({ to: "/t/$tenantSlug/settings/content-types", params: { tenantSlug } });
+      await navigate({
+        to: "/t/$tenantSlug/settings/content-types",
+        params: { tenantSlug },
+        ignoreBlocker: true,
+      });
     },
     onError: (cause) => toaster.error(errorMessage(cause, labels.editor.saveFailed)),
   });

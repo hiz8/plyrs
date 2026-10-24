@@ -31,8 +31,9 @@ function NewContentTypePage() {
   const labels = CONTENT_TYPE_LABELS;
   const canManage = useCan("type:manage");
   const { data: contentTypes } = useSuspenseQuery(contentTypesQueryOptions(adminApi, tenant.id));
-  const toList = () =>
-    navigate({ to: "/t/$tenantSlug/settings/content-types", params: { tenantSlug } });
+  // 保存成功後はまだ下書きが空でないので、ガードを通す(ignoreBlocker)
+  const toList = (options?: { ignoreBlocker: boolean }) =>
+    navigate({ to: "/t/$tenantSlug/settings/content-types", params: { tenantSlug }, ...options });
 
   // 作る権限が無い人は一覧へ戻す(読み取り専用で開く型が無いため)
   useEffect(() => {
@@ -56,7 +57,7 @@ function NewContentTypePage() {
       if (!saved) return;
       await queryClient.invalidateQueries({ queryKey: ["content-types", tenant.id] });
       toaster.success(labels.editor.created);
-      await toList();
+      await toList({ ignoreBlocker: true });
     },
     onError: (cause) => toaster.error(errorMessage(cause, labels.editor.saveFailed)),
   });

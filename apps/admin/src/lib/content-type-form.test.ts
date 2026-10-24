@@ -17,6 +17,7 @@ import {
   fieldTags,
   hasSlugField,
   isTypeDraftDirty,
+  isTypeDraftEmpty,
   kindOf,
   suggestKey,
   summaryToDefinition,
@@ -275,6 +276,16 @@ describe("下書きの操作", () => {
     expect(effectiveTitleField({ ...base, titleField: "b" })).toBe("b");
     expect(effectiveTitleField({ ...base, titleField: "slug" })).toBe("a");
     expect(effectiveTitleField({ ...base, fields: [] })).toBeNull();
+  });
+
+  it("isTypeDraftEmpty は空の下書きだけ true", () => {
+    const empty = emptyTypeDraft();
+    expect(isTypeDraftEmpty(empty)).toBe(true);
+    expect(isTypeDraftEmpty({ ...empty, name: "x" })).toBe(false);
+    expect(isTypeDraftEmpty({ ...empty, key: "x" })).toBe(false);
+    expect(isTypeDraftEmpty({ ...empty, description: "x" })).toBe(false);
+    expect(isTypeDraftEmpty({ ...empty, fields: [emptyFieldDraft("text", "a", "A")] })).toBe(false);
+    expect(isTypeDraftEmpty({ ...empty, listColumns: ["a"] })).toBe(false);
   });
 
   it("isTypeDraftDirty は構造を比べる", () => {

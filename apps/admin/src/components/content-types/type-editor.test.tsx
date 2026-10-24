@@ -6,6 +6,7 @@ import { emptyTypeDraft, toTypeDraft } from "../../lib/content-type-form";
 import {
   ADD_FIELD_LABELS,
   CONTENT_TYPE_LABELS,
+  DIALOGS,
   FIELD_KIND_LABELS,
   FIELD_PANEL_LABELS,
 } from "../../lib/labels";
@@ -13,7 +14,13 @@ import type { TenantSync } from "../../lib/sync";
 import { TenantSyncProvider } from "../../lib/sync-context";
 import { ListColumnsSelectMock } from "../../test-utils/list-columns-select-mock";
 import { summary } from "../../test-utils/type-rows";
+import { useLeaveGuard } from "../../lib/use-leave-guard";
 import { TypeEditor, type TypeEditorProps } from "./type-editor";
+
+// router の外で描くので useBlocker は使えない。既定は「止めない」で、離脱の確認だけ個別に差し替える
+vi.mock("../../lib/use-leave-guard", () => ({
+  useLeaveGuard: vi.fn(() => ({ status: "idle" })),
+}));
 
 vi.mock("./list-columns-select", () => ({ ListColumnsSelect: ListColumnsSelectMock }));
 
@@ -245,4 +252,45 @@ it("表示名の無い保存済みフィールドがあっても、他の変更�
   expect(save).toBeDisabled();
   await user.type(nameBox(), "ニュース");
   expect(save).toBeEnabled();
+});
+
+it("変更があるときに離脱しようとすると確認が出て、編集を続けるで閉じる", async () => {
+  const user = userEvent.setup();
+  const proceed = vi.fn();
+  const reset = vi.fn();
+  vi.mocked(useLeaveGuard).mockImplementation(
+    () => ({ status: "blocked", proceed, reset }) as unknown as ReturnType<typeof useLeaveGuard>,
+  );
+  setup();
+  const dialog = await screen.findByRole("alertdialog", { name: DIALOGS.leave.title });
+  expect(within(dialog).getByText(DIALOGS.leaveType.body)).toBeInTheDocument();
+  await user.click(within(dialog).getByRole("button", { name: DIALOGS.leave.stay }));
+  expect(reset).toHaveBeenCalled();
+  expect(proceed).not.toHaveBeenCalled();
+  vi.mocked(useLeaveGuard).mockImplementation(
+    () => ({ status: "idle" }) as unknown as ReturnType<typeof useLeaveGuard>,
+  );
+});
+
+const lastDirty = () => vi.mocked(useLeaveGuard).mock.calls.at(-1)?.[0];
+
+it("編集モードでは、変更すると離脱ガードの dirty が true になる", async () => {
+  const user = userEvent.setup();
+  setup();
+  expect(lastDirty()).toBe(false);
+  await user.type(nameBox(), "あ");
+  expect(lastDirty()).toBe(true);
+});
+
+it("新規では、何か入力すると dirty が true になる(空のうちは false)", async () => {
+  const user = userEvent.setup();
+  setup({ mode: "new", initial: emptyTypeDraft(), original: [], existingTypes: [] });
+  expect(lastDirty()).toBe(false);
+  await user.type(nameBox(), "あ");
+  expect(lastDirty()).toBe(true);
+});
+
+it("閲覧モードでは dirty が常に false", () => {
+  setup({ mode: "view" });
+  expect(lastDirty()).toBe(false);
 });

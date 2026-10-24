@@ -3,7 +3,7 @@ import { LayoutGrid, Plus } from "lucide-react";
 import { useRef, useState } from "react";
 import { CONTENT_TYPE_DESCRIPTION_MAX_LENGTH, type FieldDefinition } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import { Button, EmptyState, TextField } from "@plyrs/ui";
+import { Button, EmptyState, ModalDialog, TextField } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import type { ContentTypeSummary } from "../../lib/admin-api";
 import {
@@ -19,13 +19,15 @@ import {
   fieldDraftErrors,
   hasSlugField,
   isTypeDraftDirty,
+  isTypeDraftEmpty,
   keyErrorMessage,
   validateTypeKey,
   type FieldDraft,
   type TypeDraft,
 } from "../../lib/content-type-form";
 import { referenceCandidates } from "../../lib/content-types";
-import { CONTENT_TYPE_LABELS } from "../../lib/labels";
+import { CONTENT_TYPE_LABELS, DIALOGS } from "../../lib/labels";
+import { useLeaveGuard } from "../../lib/use-leave-guard";
 import { PageBody, TenantPageHeader } from "../tenant-page-header";
 import { AddFieldDialog } from "./add-field-dialog";
 import { DeleteFieldDialog } from "./delete-field-dialog";
@@ -143,6 +145,14 @@ export function TypeEditor({
     !descriptionTooLong &&
     !isPanelOpen;
   const canSubmit = isValid && (isNewType || isTypeDraftDirty(draft, initial)) && !isPending;
+
+  // 閲覧は編集できないので止めない。新規は何か入力したら、編集は保存済みと違えば未保存(E26)
+  const dirty = isReadOnly
+    ? false
+    : isNewType
+      ? !isTypeDraftEmpty(draft)
+      : isTypeDraftDirty(draft, initial);
+  const blocker = useLeaveGuard(dirty);
 
   const patch = (change: Partial<TypeDraft>) => setDraft((current) => ({ ...current, ...change }));
 
@@ -374,6 +384,28 @@ export function TypeEditor({
         }}
         onCancel={() => setDeleteTarget(null)}
       />
+      <ModalDialog
+        title={DIALOGS.leave.title}
+        isOpen={blocker.status === "blocked"}
+        onOpenChange={(open) => {
+          if (!open) blocker.reset?.();
+        }}
+        role="alertdialog"
+        isDismissable={false}
+        showCloseButton={false}
+        footer={
+          <>
+            <Button variant="dangerLink" onPress={() => blocker.proceed?.()}>
+              {DIALOGS.leave.discard}
+            </Button>
+            <Button autoFocus onPress={() => blocker.reset?.()}>
+              {DIALOGS.leave.stay}
+            </Button>
+          </>
+        }
+      >
+        <p>{DIALOGS.leaveType.body}</p>
+      </ModalDialog>
     </>
   );
 }
