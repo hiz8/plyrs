@@ -50,6 +50,7 @@ const styles = stylex.create({
   },
   hovered: { backgroundColor: bg.hover },
   selected: { color: accent.default, backgroundColor: accent.surface },
+  readOnly: { cursor: "default" },
   disabled: { opacity: 0.5, cursor: "not-allowed" },
   focusVisible: {
     outlineWidth: stroke.focus,
@@ -72,6 +73,8 @@ export interface SegmentedControlProps {
   value: string;
   onChange: (value: string) => void;
   isDisabled?: boolean;
+  /** 閲覧者向け。見た目は通常のまま(isDisabled と違い薄くしない)、選択は変わらず aria-readonly を付ける */
+  isReadOnly?: boolean;
 }
 
 export function SegmentedControl({
@@ -80,6 +83,7 @@ export function SegmentedControl({
   value,
   onChange,
   isDisabled,
+  isReadOnly,
 }: SegmentedControlProps) {
   return (
     <RadioGroup
@@ -88,6 +92,7 @@ export function SegmentedControl({
       value={value}
       onChange={onChange}
       isDisabled={isDisabled}
+      isReadOnly={isReadOnly ?? false}
       className={stylex.props(styles.group).className ?? ""}
     >
       {items.map((item) => {
@@ -100,6 +105,7 @@ export function SegmentedControl({
               styles.item,
               state.isHovered && !state.isSelected && styles.hovered,
               state.isSelected && styles.selected,
+              state.isReadOnly && styles.readOnly,
               state.isDisabled && styles.disabled,
               state.isFocusVisible && styles.focusVisible,
             ])}

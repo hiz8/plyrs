@@ -40,4 +40,25 @@ describe("SegmentedControl", () => {
     await userEvent.setup().click(screen.getByRole("radio", { name: "ダーク" }));
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it("isReadOnly は選択を変えず、aria-readonly を付ける", async () => {
+    const onChange = vi.fn();
+    render(
+      <SegmentedControl
+        label="テーマ"
+        items={items}
+        value="light"
+        onChange={onChange}
+        isReadOnly
+      />,
+    );
+    expect(screen.getByRole("radiogroup", { name: "テーマ" })).toHaveAttribute(
+      "aria-readonly",
+      "true",
+    );
+    expect(screen.getByRole("radio", { name: "ダーク" })).not.toBeDisabled();
+    await userEvent.setup().click(screen.getByRole("radio", { name: "ダーク" }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("radio", { name: "ライト" })).toBeChecked();
+  });
 });

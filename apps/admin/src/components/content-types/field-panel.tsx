@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Plus, X } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   Button,
   Checkbox,
@@ -39,7 +39,6 @@ const styles = stylex.create({
     borderTopStyle: "solid",
     borderTopColor: border.default,
   },
-  setting: { display: "flex", flexDirection: "column", gap: space.xxs },
   help: {
     margin: 0,
     paddingInlineStart: space.xl,
@@ -82,15 +81,6 @@ export interface FieldPanelProps {
   onCancel: () => void;
   /** 確認は呼び出し側 */
   onDelete: () => void;
-}
-
-function Setting({ help, children }: { help?: string; children: ReactNode }) {
-  return (
-    <div {...stylex.props(styles.setting)}>
-      {children}
-      {help !== undefined && <p {...stylex.props(styles.help)}>{help}</p>}
-    </div>
-  );
 }
 
 // 行ごとの表示名と値のエラー(fieldDraftErrors と同じ判定を、行の下に出すために行別に求める)
@@ -199,26 +189,24 @@ export function FieldPanel({
   };
 
   const indexedCheckbox = (
-    <Setting help={P.indexedHelp}>
-      <Checkbox
-        isSelected={local.indexed}
-        onChange={(indexed) => patch({ indexed })}
-        isReadOnly={isReadOnly}
-      >
-        {P.indexed}
-      </Checkbox>
-    </Setting>
+    <Checkbox
+      isSelected={local.indexed}
+      onChange={(indexed) => patch({ indexed })}
+      isReadOnly={isReadOnly}
+      description={P.indexedHelp}
+    >
+      {P.indexed}
+    </Checkbox>
   );
   const uniqueCheckbox = (
-    <Setting help={P.uniqueHelp}>
-      <Checkbox
-        isSelected={local.unique}
-        onChange={(unique) => patch({ unique })}
-        isReadOnly={isReadOnly}
-      >
-        {P.unique}
-      </Checkbox>
-    </Setting>
+    <Checkbox
+      isSelected={local.unique}
+      onChange={(unique) => patch({ unique })}
+      isReadOnly={isReadOnly}
+      description={P.uniqueHelp}
+    >
+      {P.unique}
+    </Checkbox>
   );
   const maxLengthField = (
     <TextField
@@ -240,7 +228,7 @@ export function FieldPanel({
       ]}
       value={local.cardinality}
       onChange={(value) => patch({ cardinality: value === "many" ? "many" : "one" })}
-      isDisabled={isReadOnly}
+      isReadOnly={isReadOnly}
     />
   );
 
@@ -336,16 +324,15 @@ export function FieldPanel({
 
         {kind === "text" && (
           <>
-            <Setting help={isTitleImplicit ? P.titleFieldImplicitHelp : P.titleFieldHelp}>
-              <Checkbox
-                isSelected={isTitleImplicit || titleOn}
-                onChange={setTitleOn}
-                isReadOnly={isReadOnly}
-                isDisabled={isTitleImplicit}
-              >
-                {P.titleField}
-              </Checkbox>
-            </Setting>
+            <Checkbox
+              isSelected={isTitleImplicit || titleOn}
+              onChange={setTitleOn}
+              isReadOnly={isReadOnly}
+              isDisabled={isTitleImplicit}
+              description={isTitleImplicit ? P.titleFieldImplicitHelp : P.titleFieldHelp}
+            >
+              {P.titleField}
+            </Checkbox>
             {maxLengthField}
             {indexedCheckbox}
             {uniqueCheckbox}
@@ -353,11 +340,9 @@ export function FieldPanel({
         )}
         {kind === "slug" && (
           <>
-            <Setting help={P.uniqueSlugHelp}>
-              <Checkbox isSelected isDisabled onChange={() => {}}>
-                {P.unique}
-              </Checkbox>
-            </Setting>
+            <Checkbox isSelected isDisabled onChange={() => {}} description={P.uniqueSlugHelp}>
+              {P.unique}
+            </Checkbox>
             {indexedCheckbox}
             {maxLengthField}
           </>
@@ -463,15 +448,14 @@ export function FieldPanel({
               {...(submitted && typesMissing ? { errorMessage: P.allowedTypesRequired } : {})}
             />
             {cardinality}
-            <Setting help={P.orderedHelp}>
-              <Checkbox
-                isSelected={local.ordered}
-                onChange={(ordered) => patch({ ordered })}
-                isReadOnly={isReadOnly}
-              >
-                {P.ordered}
-              </Checkbox>
-            </Setting>
+            <Checkbox
+              isSelected={local.ordered}
+              onChange={(ordered) => patch({ ordered })}
+              isReadOnly={isReadOnly}
+              description={P.orderedHelp}
+            >
+              {P.ordered}
+            </Checkbox>
           </>
         )}
       </div>

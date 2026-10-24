@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Check, Minus } from "lucide-react";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Checkbox as RacCheckbox, type CheckboxRenderProps } from "react-aria-components";
 import { stylexRenderProps } from "./compose";
 import {
@@ -48,6 +48,15 @@ const styles = stylex.create({
     borderStyle: "solid",
     borderColor: border.hover,
     borderRadius: radius.small,
+  },
+  withDescription: { display: "flex", flexDirection: "column", gap: space.xxs },
+  description: {
+    margin: 0,
+    // 箱の幅 + gap より少し右へ寄せ、文の頭に揃える
+    paddingInlineStart: space.xl,
+    fontFamily: font.family,
+    fontSize: font.caption,
+    color: text.muted,
   },
   boxHovered: { borderColor: text.muted },
   boxFilled: { backgroundColor: accent.default, borderColor: accent.default },
@@ -103,6 +112,8 @@ export interface CheckboxProps {
   isInvalid?: boolean;
   /** 閲覧者向け。箱はそのまま、押しても変わらない(RAC が aria-readonly を付ける) */
   isReadOnly?: boolean;
+  /** 箱の文の下に出す補足(font.caption / text.muted)。aria-describedby で入力に結ぶ。ラベルの外に置くので、補足の文字を押しても切り替わらない */
+  description?: string;
 }
 
 export function Checkbox({
@@ -113,8 +124,10 @@ export function Checkbox({
   isIndeterminate,
   isInvalid,
   isReadOnly,
+  description,
 }: CheckboxProps) {
-  return (
+  const descId = useId();
+  const box = (
     <RacCheckbox
       isSelected={isSelected}
       onChange={onChange}
@@ -122,6 +135,7 @@ export function Checkbox({
       isIndeterminate={isIndeterminate ?? false}
       isInvalid={isInvalid ?? false}
       isReadOnly={isReadOnly ?? false}
+      {...(description !== undefined ? { "aria-describedby": descId } : {})}
       className={stylexRenderProps<CheckboxRenderProps>((state) => [
         styles.root,
         state.isDisabled && styles.rootDisabled,
@@ -135,5 +149,14 @@ export function Checkbox({
         </>
       )}
     </RacCheckbox>
+  );
+  if (description === undefined) return box;
+  return (
+    <div {...stylex.props(styles.withDescription)}>
+      {box}
+      <p id={descId} {...stylex.props(styles.description)}>
+        {description}
+      </p>
+    </div>
   );
 }

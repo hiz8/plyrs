@@ -82,3 +82,8 @@
 - `UploadTile`(新規。仮タイルの 5 状態。F9・F10)
 - `FileDropTarget`(新規。画面全体のドロップと暗幕。F35。静的には暗幕を描けない)
 - 再同期は V4-F の最後にまとめて行う
+
+## 持ち越し(2026-10-24)で変えた部品
+- `Checkbox`(`description?: string`: 箱の文の下に font.caption / text.muted の補足。ラベルの外に置き、`aria-describedby` で入力に結ぶ。K5)
+- `SegmentedControl`(`isReadOnly?: boolean`: RAC RadioGroup の isReadOnly。見た目は通常のまま `cursor: default`、選択は変わらず `aria-readonly`。isDisabled と区別。K5)
+- 再同期は後回しのまま

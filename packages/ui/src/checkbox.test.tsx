@@ -27,6 +27,29 @@ describe("Checkbox", () => {
   });
 });
 
+describe("Checkbox description", () => {
+  it("description は aria-describedby で結ばれる", () => {
+    render(
+      <Checkbox isSelected={false} onChange={() => {}} description="検索を速くします">
+        索引
+      </Checkbox>,
+    );
+    const box = screen.getByRole("checkbox", { name: "索引" });
+    const describedBy = box.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(document.getElementById(describedBy ?? "")).toHaveTextContent("検索を速くします");
+  });
+
+  it("description が無ければ aria-describedby を付けない", () => {
+    render(
+      <Checkbox isSelected={false} onChange={() => {}}>
+        索引
+      </Checkbox>,
+    );
+    expect(screen.getByRole("checkbox", { name: "索引" })).not.toHaveAttribute("aria-describedby");
+  });
+});
+
 describe("CheckboxGroup", () => {
   const options = [
     { value: "tech", label: "Tech" },

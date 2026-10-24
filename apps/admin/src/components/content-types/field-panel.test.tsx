@@ -220,3 +220,29 @@ it("選択肢の表示名が空のままでは適用できない", async () => {
   expect(onApply).not.toHaveBeenCalled();
   expect(screen.getByText(P.optionLabelEmpty)).toBeInTheDocument();
 });
+
+const describedBy = (box: HTMLElement) =>
+  document.getElementById(box.getAttribute("aria-describedby") ?? "");
+
+it("索引・一意・タイトルの補足は Checkbox の description で読まれる", () => {
+  setup(saved("text", "title", "タイトル"));
+  expect(describedBy(screen.getByRole("checkbox", { name: P.indexed }))).toHaveTextContent(
+    P.indexedHelp,
+  );
+  expect(describedBy(screen.getByRole("checkbox", { name: P.unique }))).toHaveTextContent(
+    P.uniqueHelp,
+  );
+  expect(describedBy(screen.getByRole("checkbox", { name: P.titleField }))).toHaveTextContent(
+    P.titleFieldHelp,
+  );
+});
+
+it("読み取り専用の 1 件 / 複数は disabled ではなく readonly", () => {
+  setup(saved("reference", "author", "著者"), { isReadOnly: true });
+  expect(screen.getByRole("radiogroup", { name: P.cardinality })).toHaveAttribute(
+    "aria-readonly",
+    "true",
+  );
+  expect(screen.getByRole("radio", { name: P.one })).not.toBeDisabled();
+  expect(screen.getByRole("radio", { name: P.many })).not.toBeDisabled();
+});
