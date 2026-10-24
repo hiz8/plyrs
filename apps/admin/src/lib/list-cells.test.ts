@@ -15,6 +15,7 @@ const fields: FieldDefinition[] = [
   { key: "title", type: "text", required: true },
   { key: "subtitle", type: "text", label: "副題" },
   { key: "code", type: "text" },
+  { key: "slug", type: "text", label: "URL", config: { unique: true } },
   { key: "views", type: "number" },
   { key: "featured", type: "boolean", label: "注目" },
   { key: "starts_at", type: "datetime", label: "開始" },
@@ -56,12 +57,19 @@ const record = (input: Record<string, unknown>): SyncRecord => ({
 describe("list-cells", () => {
   it("listColumnsOf は listColumns の順で label を付け、型に無い key を落とし、4 件目以降を切る", () => {
     const cols = listColumnsOf(type(["subtitle", "nope", "code", "views", "featured"]));
-    expect(cols).toEqual([
+    expect(cols.map(({ key, label, mono }) => ({ key, label, mono }))).toEqual([
       { key: "subtitle", label: "副題", mono: false },
       { key: "code", label: "code", mono: false },
       { key: "views", label: "views", mono: false },
     ]);
     expect(listColumnsOf({ ...type([]), listColumns: undefined })).toEqual([]);
+  });
+
+  it("listColumnsOf は slug(key が slug で unique の text)だけ mono にする", () => {
+    expect(listColumnsOf(type(["slug", "subtitle"])).map((c) => [c.key, c.mono])).toEqual([
+      ["slug", true],
+      ["subtitle", false],
+    ]);
   });
 
   it("cellText は種類ごとに整える(text / number / boolean / datetime / select 単一・複数 / relation 件数 / richtext・json は —)", () => {

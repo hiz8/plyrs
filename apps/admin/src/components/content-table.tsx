@@ -12,6 +12,7 @@ import {
 } from "@plyrs/ui";
 import { accent, font, space, status } from "@plyrs/ui/semantic.stylex";
 import { CircleAlert } from "lucide-react";
+import { useMemo } from "react";
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { Link, type Selection } from "react-aria-components";
 import { LIST_SORTS, type ListRow, type ListSort, type SortOrder } from "../lib/content-list";
@@ -86,6 +87,9 @@ interface TableColumn {
   field?: ListColumn;
 }
 
+const fieldColumnsOf = (columns: readonly TableColumn[]): ListColumn[] =>
+  columns.flatMap((c) => (c.field === undefined ? [] : [c.field]));
+
 const fixed = (id: FixedColumnId, sortable: boolean, narrow: boolean): TableColumn => ({
   id,
   sortable,
@@ -128,7 +132,8 @@ export function ContentTable({
   onDelete,
   now,
 }: ContentTableProps) {
-  const columns = columnsOf(contentType);
+  const columns = useMemo(() => columnsOf(contentType), [contentType]);
+  const fieldColumns = useMemo(() => fieldColumnsOf(columns), [columns]);
   const handleSelection = (keys: Selection) => {
     if (selection === undefined) return;
     selection.onSelectionChange(
@@ -169,6 +174,13 @@ export function ContentTable({
       </TableHeader>
       <TableBody items={rows.map((r) => ({ ...r, id: r.record.id }))}>
         {(row) => {
+          // 行につき 1 回だけ整形し、セルは key で引く
+          const cells = new Map(
+            rowCells(contentType, row.record, fieldColumns).map((text, i) => [
+              fieldColumns[i]?.key ?? "",
+              text,
+            ]),
+          );
           const href = `/t/${tenantSlug}/content/${typeKey}/${row.record.id}`;
           return (
             <Row id={row.record.id} columns={columns}>
@@ -199,7 +211,7 @@ export function ContentTable({
                   );
                 }
                 if (c.field !== undefined) {
-                  const text = rowCells(contentType, row.record, [c.field])[0] ?? "";
+                  const text = cells.get(c.field.key) ?? "";
                   return (
                     <Cell hideOnNarrow>
                       <span

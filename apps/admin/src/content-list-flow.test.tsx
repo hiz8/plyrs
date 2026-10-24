@@ -248,4 +248,13 @@ describe("一覧（/t/$tenantSlug/content/$typeKey）", () => {
     expect(await screen.findByText("ブログの記事です")).toBeInTheDocument();
     expect(screen.getByText("記事はまだありません")).toBeInTheDocument();
   });
+
+  it("型の説明が空文字なら従来の空状態の文を出す", async () => {
+    const typed = { ...articleType, description: "" };
+    const harness = socketHarness();
+    renderAt(BASE, harness, authedRoutes());
+    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
+    await bootstrapped(harness.latest(), [], [typed]);
+    expect(await screen.findByText(/追加した記事はここに一覧で表示/)).toBeInTheDocument();
+  });
 });

@@ -36,6 +36,7 @@ const baseType: ContentTypeDefinition = {
     { key: "title", type: "text", required: true },
     { key: "subtitle", type: "text", label: "副題" },
     { key: "views", type: "number" },
+    { key: "slug", type: "text", label: "URL", config: { unique: true } },
   ],
 };
 
@@ -125,4 +126,15 @@ it("listColumns の列がタイトルの右に並び、見出しは表示名、�
   expect(subtitle.className).not.toBe(title.className);
   expect(screen.getByText("補足")).toHaveAttribute("title", "補足");
   expect(screen.getByText((1234).toLocaleString("ja-JP"))).toBeInTheDocument();
+});
+
+it("slug の追加列は等幅のクラスが付く", () => {
+  const r = row("r1", "はじめの記事");
+  setup({
+    contentType: { ...baseType, listColumns: ["slug", "subtitle"] },
+    rows: [
+      { ...r, record: { ...r.record, input: { title: "t", slug: "hello", subtitle: "補足" } } },
+    ],
+  });
+  expect(screen.getByText("hello").className).not.toBe(screen.getByText("補足").className);
 });
