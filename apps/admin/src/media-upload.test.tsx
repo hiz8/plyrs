@@ -71,15 +71,21 @@ describe("メディア(アップロード)", () => {
     const harness = await open(mediaRoutes({ "/v1/t/t1/assets": handler }));
     vi.useFakeTimers({ shouldAdvanceTime: true });
 
-    chooseFiles([png("a.png"), png("b.png")]);
+    chooseFiles([png("a.png", 2048), png("b.png")]);
     await waitFor(() => expect(handler).toHaveBeenCalledTimes(1));
     expect(
-      within(screen.getByRole("group", { name: "a.png" })).getAllByText("送信しています…").length,
-    ).toBeGreaterThan(0);
+      within(screen.getByRole("group", { name: "a.png" })).getByRole("progressbar", {
+        name: "送信しています…",
+      }),
+    ).toBeInTheDocument();
     expect(
       within(screen.getByRole("group", { name: "b.png" })).getByText("順番待ち"),
     ).toBeInTheDocument();
     expect(progressBar()).toHaveTextContent("0 / 2 件が完了");
+    // ファイルごとの進捗(F9)。送信の途中(50%)がタイルに出る
+    expect(
+      within(screen.getByRole("group", { name: "a.png" })).getByText("50% ・ 1.0 KB / 2.0 KB"),
+    ).toBeInTheDocument();
 
     await act(async () => {
       pending[0]?.(jsonResponse(201, { ok: true, record: { id: ASSET_2 } }));

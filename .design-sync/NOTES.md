@@ -86,4 +86,5 @@
 ## 持ち越し(2026-10-24)で変えた部品
 - `Checkbox`(`description?: string`: 箱の文の下に font.caption / text.muted の補足。ラベルの外に置き、`aria-describedby` で入力に結ぶ。K5)
 - `SegmentedControl`(`isReadOnly?: boolean`: RAC RadioGroup の isReadOnly。見た目は通常のまま `cursor: default`、選択は変わらず `aria-readonly`。isDisabled と区別。K5)
+- `UploadTile`(`uploading` に `progress?: number`(0〜1)と `detail?: string`: 進捗があれば `ProgressBar isLabelHidden`(aria-label は「送信しています…」)+ font.caption の detail(「64% ・ 1.2 / 1.9 MB」)、無ければ従来の Spinner。D3 M6・F9・K6)
 - 再同期は後回しのまま

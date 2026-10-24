@@ -3,6 +3,24 @@ import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { UploadTile } from "./upload-tile";
 
+it("進捗があれば progressbar と「64% ・ 1.2 / 1.9 MB」を出し、無ければ Spinner のまま", () => {
+  const { rerender } = render(
+    <UploadTile
+      name="a.png"
+      state={{ kind: "uploading", progress: 0.64, detail: "64% ・ 1.2 / 1.9 MB" }}
+    />,
+  );
+  expect(screen.getByRole("progressbar", { name: "送信しています…" })).toHaveAttribute(
+    "aria-valuenow",
+    "64",
+  );
+  expect(screen.getByText("64% ・ 1.2 / 1.9 MB")).toBeInTheDocument();
+
+  rerender(<UploadTile name="a.png" state={{ kind: "uploading" }} />);
+  expect(screen.queryByRole("progressbar")).toBeNull();
+  expect(screen.getByText("送信しています…", { selector: "[aria-live]" })).toBeInTheDocument();
+});
+
 it("5 つの状態を描き、再試行と取り除くがコールバックを呼ぶ", async () => {
   const onRetry = vi.fn();
   const onRemove = vi.fn();

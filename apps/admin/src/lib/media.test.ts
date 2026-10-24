@@ -74,6 +74,30 @@ describe("uploadFiles", () => {
     }
   });
 
+  it("upload の onProgress を uploading の item に写して onChange へ流す", async () => {
+    const snapshots: string[] = [];
+    await uploadFiles(
+      [fileOf("a.png")],
+      async (_file, { onProgress }) => {
+        onProgress?.({ loaded: 1, total: 4 });
+        return { id: "id-a" };
+      },
+      {
+        onChange: (items) =>
+          snapshots.push(
+            items
+              .map((item) =>
+                item.status === "uploading" && item.progress !== undefined
+                  ? `${item.status}:${item.progress.loaded}/${item.progress.total}`
+                  : item.status,
+              )
+              .join(","),
+          ),
+      },
+    );
+    expect(snapshots).toStrictEqual(["queued", "uploading", "uploading:1/4", "done"]);
+  });
+
   it("leaves the rest queued once aborted", async () => {
     const controller = new AbortController();
     const summary = await uploadFiles(

@@ -786,6 +786,9 @@ export const MEDIA_LABELS = {
     failed: "アップロードできませんでした",
     progressTitle: "アップロードしています…",
     progress: (done: number, total: number) => `${done} / ${total} 件が完了`,
+    // タイルごとの進捗(D3 M6)。全体の「n / m 件が完了」とは別
+    progressDetail: (percent: number, loaded: string, total: string) =>
+      `${percent}% ・ ${loaded} / ${total}`,
     failedCount: (n: number) => `${n} 件は送れませんでした`,
     cancel: BULK_LABELS.cancel,
   },

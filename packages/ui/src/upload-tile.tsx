@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { ICON_SIZE } from "./icon";
-import { Spinner } from "./progress";
+import { ProgressBar, Spinner } from "./progress";
 import { accent, bg, border, font, radius, space, status, stroke, text } from "./semantic.stylex";
 
 // F9・F10(D3 M6・M10)。TileGrid のタイルと同じ寸法・角丸・名前
@@ -68,7 +68,8 @@ const styles = stylex.create({
 
 export type UploadTileState =
   | { kind: "queued" }
-  | { kind: "uploading" }
+  /** progress は 0〜1。あれば進捗バー + detail(「64% ・ 1.2 / 1.9 MB」)、無ければ回転アイコン */
+  | { kind: "uploading"; progress?: number; detail?: string }
   | { kind: "failed"; message: string; onRetry: () => void }
   /** 送る前に弾いた(20 MB 超えなど)。detail は「24.8 MB」 */
   | { kind: "rejected"; message: string; detail?: string; onRemove: () => void }
@@ -104,12 +105,26 @@ export function UploadTile({ name, state, size = "md", thumb }: UploadTileProps)
         {state.kind === "uploading" && (
           <>
             {/* 文字は見える側(aria-live)だけを読み上げ対象にする */}
-            <span aria-hidden="true">
-              <Spinner label={UPLOADING_LABEL} />
-            </span>
-            <span aria-live="polite" {...stylex.props(styles.srOnly)}>
-              {UPLOADING_LABEL}
-            </span>
+            {state.progress === undefined ? (
+              <>
+                <span aria-hidden="true">
+                  <Spinner label={UPLOADING_LABEL} />
+                </span>
+                <span aria-live="polite" {...stylex.props(styles.srOnly)}>
+                  {UPLOADING_LABEL}
+                </span>
+              </>
+            ) : (
+              <>
+                <ProgressBar
+                  label={UPLOADING_LABEL}
+                  value={Math.round(state.progress * 100)}
+                  maxValue={100}
+                  isLabelHidden
+                />
+                {state.detail !== undefined && <span>{state.detail}</span>}
+              </>
+            )}
           </>
         )}
         {isError && (

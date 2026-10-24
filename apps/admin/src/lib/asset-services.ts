@@ -1,4 +1,4 @@
-import type { AdminApi } from "./admin-api";
+import type { AdminApi, UploadOptions } from "./admin-api";
 
 // アセットのプレビューは認証付き /v1 経路でしか取れない(<img src> は Authorization ヘッダを
 // 付けられない)ため、blob を fetch して objectURL に変換する。record-form / asset 一覧 /
@@ -6,7 +6,7 @@ import type { AdminApi } from "./admin-api";
 // objectURL は revoke しない(SPA のテナントセッション寿命でのリークは有限と判断。
 // テナント切替でサービスごと作り直される)。
 export interface AssetServices {
-  upload: (file: File) => Promise<{ id: string }>;
+  upload: (file: File, options?: UploadOptions) => Promise<{ id: string }>;
   resolveUrl: (assetId: string) => Promise<string | null>;
 }
 
@@ -18,7 +18,7 @@ export function createAssetServices(
 ): AssetServices {
   const urls = new Map<string, Promise<string | null>>();
   return {
-    upload: (file) => adminApi.uploadAsset(tenantId, file),
+    upload: (file, options) => adminApi.uploadAsset(tenantId, file, options),
     resolveUrl: (assetId) => {
       const cached = urls.get(assetId);
       if (cached !== undefined) {

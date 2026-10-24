@@ -1,7 +1,8 @@
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "./api-client";
-import { createAdminApi } from "./admin-api";
+import { createFakeXhr } from "../test-utils/fake-xhr";
+import { createAdminApi, type UploadProgress } from "./admin-api";
 import { createTokenManager } from "./token-manager";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -221,20 +222,73 @@ describe("deleteContentType (案 E 5.4)", () => {
 });
 
 describe("asset endpoints (Phase 8)", () => {
-  it("uploadAsset posts the raw file with filename query and content-type", async () => {
-    const calls: { url: string; init: RequestInit | undefined }[] = [];
-    const fetchImpl: typeof fetch = async (input, init) => {
-      calls.push({ url: String(input), init });
-      return jsonResponse(201, { ok: true, record: { id: "asset-1" } });
-    };
-    const api = createAdminApi(manager(), fetchImpl);
-    const file = new File([Uint8Array.from([1, 2, 3])], "hero 1.png", { type: "image/png" });
-    const result = await api.uploadAsset("t1", file);
+  it("uploadAsset は XHR で送り、進捗を onProgress に流す", async () => {
+    const handler = vi.fn((_init?: RequestInit) =>
+      jsonResponse(201, { ok: true, record: { id: "asset-1" } }),
+    );
+    const api = createAdminApi(manager(), vi.fn<typeof fetch>(), {
+      createXhr: createFakeXhr({ "/v1/t/t1/assets": handler }),
+    });
+    const file = new File([Uint8Array.from([1, 2, 3, 4])], "hero 1.png", { type: "image/png" });
+    const progress: UploadProgress[] = [];
+    const result = await api.uploadAsset("t1", file, { onProgress: (p) => progress.push(p) });
     expect(result).toEqual({ id: "asset-1" });
-    expect(calls[0]?.url).toBe("/v1/t/t1/assets?filename=hero%201.png");
-    expect(calls[0]?.init?.method).toBe("POST");
-    const headers = calls[0]?.init?.headers as Record<string, string>;
-    expect(headers["content-type"]).toBe("image/png");
+    expect(progress).toEqual([
+      { loaded: 2, total: 4 },
+      { loaded: 4, total: 4 },
+    ]);
+    const init = handler.mock.calls[0]?.[0];
+    expect(init?.method).toBe("POST");
+    expect(init?.body).toBe(file);
+    expect(init?.headers).toEqual({ authorization: "Bearer jwt-1", "content-type": "image/png" });
+  });
+
+  it("uploadAsset は 401 で 1 回だけ再発行して新しい XHR で送り直し、abort で AbortError にする", async () => {
+    const issueToken = vi
+      .fn()
+      .mockResolvedValueOnce({ token: "old", expiresIn: 900 })
+      .mockResolvedValue({ token: "new", expiresIn: 900 });
+    const tokens = createTokenManager({ issueToken, now: () => 0 });
+    const handler = vi
+      .fn<(init?: RequestInit) => Response>()
+      .mockReturnValueOnce(jsonResponse(401, { error: "unauthorized" }))
+      .mockReturnValue(jsonResponse(201, { ok: true, record: { id: "asset-1" } }));
+    const routes = { "/v1/t/t1/assets": handler };
+    const createXhr = vi.fn(createFakeXhr(routes));
+    const api = createAdminApi(tokens, vi.fn<typeof fetch>(), { createXhr });
+    const file = new File([Uint8Array.from([1, 2])], "a.png", { type: "image/png" });
+
+    expect(await api.uploadAsset("t1", file)).toEqual({ id: "asset-1" });
+    expect(createXhr).toHaveBeenCalledTimes(2);
+    expect(issueToken).toHaveBeenCalledTimes(2);
+    const sent = handler.mock.calls.map((call) => call[0]?.headers);
+    expect(sent).toEqual([
+      expect.objectContaining({ authorization: "Bearer old" }),
+      expect.objectContaining({ authorization: "Bearer new" }),
+    ]);
+
+    // 応答が返らないあいだに signal が中止されると、XHR を止めて AbortError で終わる
+    const pending = vi.fn(() => new Promise<Response>(() => {}));
+    const abortApi = createAdminApi(manager(), vi.fn<typeof fetch>(), {
+      createXhr: createFakeXhr({ "/v1/t/t1/assets": pending }),
+    });
+    const controller = new AbortController();
+    const upload = abortApi.uploadAsset("t1", file, { signal: controller.signal });
+    await vi.waitFor(() => expect(pending).toHaveBeenCalled());
+    controller.abort();
+    await expect(upload).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("uploadAsset は 413 を ApiError(too_large) にする", async () => {
+    const api = createAdminApi(manager(), vi.fn<typeof fetch>(), {
+      createXhr: createFakeXhr({
+        "/v1/t/t1/assets": vi.fn(() => jsonResponse(413, { error: "too_large" })),
+      }),
+    });
+    const file = new File([Uint8Array.from([1])], "big.png", { type: "image/png" });
+    const error = await api.uploadAsset("t1", file).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 413, code: "too_large" });
   });
 
   it("fetchAssetBlob returns the binary body", async () => {

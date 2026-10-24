@@ -1,6 +1,6 @@
 import type { ContentTypeDefinition, FieldDefinition } from "@plyrs/metamodel";
-import { throwApiError } from "./api-client";
-import { withNetworkErrors } from "./network-error";
+import { apiErrorFromBody, throwApiError } from "./api-client";
+import { NetworkError, withNetworkErrors } from "./network-error";
 import type { Role } from "./permissions";
 import type { TokenManager } from "./token-manager";
 
@@ -64,9 +64,25 @@ export interface MemberSummary {
 
 const JSON_HEADERS = { "content-type": "application/json" } as const;
 
+// F9・K6: アップロードのファイルごとの進捗。fetch は送信の進捗を取れないので XHR で送る
+export interface UploadProgress {
+  loaded: number;
+  total: number;
+}
+
+export interface UploadOptions {
+  onProgress?: (progress: UploadProgress) => void;
+  signal?: AbortSignal;
+}
+
+function abortError(): DOMException {
+  return new DOMException("The upload was aborted.", "AbortError");
+}
+
 export function createAdminApi(
   tokens: TokenManager,
   baseFetch: typeof fetch = (...args) => fetch(...args),
+  { createXhr = () => new XMLHttpRequest() }: { createXhr?: () => XMLHttpRequest } = {},
 ) {
   const fetchImpl = withNetworkErrors(baseFetch);
   async function authedFetch(tenantId: string, path: string, init: RequestInit): Promise<Response> {
@@ -81,6 +97,49 @@ export function createAdminApi(
     }
     // マージン内でもサーバー側で失効していることがある(§11 申し送り)。1 回だけ再発行して再試行。
     return request(await tokens.getToken(tenantId, { forceRefresh: true }));
+  }
+
+  function sendUpload(
+    tenantId: string,
+    file: File,
+    token: string,
+    { onProgress, signal }: UploadOptions,
+  ): Promise<{ status: number; text: string }> {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted === true) {
+        reject(abortError());
+        return;
+      }
+      const xhr = createXhr();
+      const abort = () => xhr.abort();
+      const settle = () => signal?.removeEventListener("abort", abort);
+      xhr.open("POST", `/v1/t/${tenantId}/assets?filename=${encodeURIComponent(file.name)}`);
+      xhr.setRequestHeader("authorization", `Bearer ${token}`);
+      xhr.setRequestHeader(
+        "content-type",
+        file.type === "" ? "application/octet-stream" : file.type,
+      );
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          onProgress?.({ loaded: event.loaded, total: event.total });
+        }
+      });
+      xhr.addEventListener("load", () => {
+        settle();
+        resolve({ status: xhr.status, text: xhr.responseText });
+      });
+      // withNetworkErrors と同じ型に揃える(errorMessage が接続エラーをこの型で判定する)
+      xhr.addEventListener("error", () => {
+        settle();
+        reject(new NetworkError(new TypeError("Network request failed")));
+      });
+      xhr.addEventListener("abort", () => {
+        settle();
+        reject(abortError());
+      });
+      signal?.addEventListener("abort", abort, { once: true });
+      xhr.send(file);
+    });
   }
 
   async function requestJson<T>(
@@ -154,20 +213,21 @@ export function createAdminApi(
       } while (cursor !== null);
       return all;
     },
-    async uploadAsset(tenantId: string, file: File): Promise<{ id: string }> {
-      const response = await authedFetch(
-        tenantId,
-        `/assets?filename=${encodeURIComponent(file.name)}`,
-        {
-          method: "POST",
-          headers: { "content-type": file.type === "" ? "application/octet-stream" : file.type },
-          body: file,
-        },
-      );
-      if (!response.ok) {
-        return throwApiError(response);
+    // 401 は authedFetch と同じく 1 回だけ再発行して、新しい XHR で送り直す
+    async uploadAsset(
+      tenantId: string,
+      file: File,
+      options: UploadOptions = {},
+    ): Promise<{ id: string }> {
+      let response = await sendUpload(tenantId, file, await tokens.getToken(tenantId), options);
+      if (response.status === 401) {
+        const token = await tokens.getToken(tenantId, { forceRefresh: true });
+        response = await sendUpload(tenantId, file, token, options);
       }
-      const result = (await response.json()) as { ok: true; record: { id: string } };
+      if (response.status < 200 || response.status >= 300) {
+        throw apiErrorFromBody(response.status, response.text);
+      }
+      const result = JSON.parse(response.text) as { ok: true; record: { id: string } };
       return { id: result.record.id };
     },
     async fetchAssetBlob(tenantId: string, assetId: string): Promise<Blob> {

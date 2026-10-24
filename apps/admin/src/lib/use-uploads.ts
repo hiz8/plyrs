@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import type { UploadOptions } from "./admin-api";
 import { uploadFiles, type UploadItem, type UploadSummary } from "./media";
 
 // F10: アップロードの進行を画面(React)の外に持つ。ルートが unmount されても uploadFiles は続き、
@@ -36,7 +37,7 @@ export interface UploadStore {
 
 export const DONE_HOLD_MS = 3000;
 
-type Upload = (file: File) => Promise<{ id: string }>;
+type Upload = (file: File, options: UploadOptions) => Promise<{ id: string }>;
 
 export function createUploadStore(upload: Upload, initial: UploadStoreOptions = {}): UploadStore {
   let options = initial;

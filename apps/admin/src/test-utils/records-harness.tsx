@@ -7,6 +7,7 @@ import { vi, expect } from "vitest";
 import { createAppContext, getRouter, type RouterContext } from "../router";
 import { baseAuthedRoutes, blogTenantOf, jsonResponse, stubFetch, type Handler } from "./api-stubs";
 import { FakeSocket } from "./fake-socket";
+import { createFakeXhr } from "./fake-xhr";
 
 // records-flow / publish-box-flow など、編集・作成画面を router 経由で試すテストの共通の下地。
 // RAC の Modal を開く場面はここでは扱わない(ファイルを分ける)
@@ -113,6 +114,8 @@ export function renderAt(
 ) {
   const context = createAppContext(stubFetch(routes), {
     connect: () => harness.connect,
+    // アップロード(XHR。K6・K7)は同じ routes を引く
+    createXhr: createFakeXhr(routes),
     // 取得失敗のテストがリトライの待ちで遅くならないようにする
     queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }),
   });

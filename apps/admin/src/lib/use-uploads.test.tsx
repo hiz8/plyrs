@@ -1,10 +1,12 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { UploadOptions } from "./admin-api";
 import { MAX_UPLOAD_BYTES } from "./media";
 import { DONE_HOLD_MS, createUploadStore, uploadStoreFor, useUploads } from "./use-uploads";
 
 interface Deferred {
   file: File;
+  options: UploadOptions;
   resolve: (id: string) => void;
   reject: (cause: unknown) => void;
 }
@@ -12,9 +14,9 @@ interface Deferred {
 // upload の呼び出しごとに、手で解決する Promise を作る
 function deferredUpload() {
   const calls: Deferred[] = [];
-  const upload = (file: File) =>
+  const upload = (file: File, options: UploadOptions) =>
     new Promise<{ id: string }>((resolve, reject) => {
-      calls.push({ file, resolve: (id) => resolve({ id }), reject });
+      calls.push({ file, options, resolve: (id) => resolve({ id }), reject });
     });
   return { calls, upload };
 }
@@ -57,6 +59,26 @@ describe("createUploadStore", () => {
     await vi.advanceTimersByTimeAsync(DONE_HOLD_MS);
     expect(store.getSnapshot().entries).toHaveLength(0);
     expect(store.getSnapshot().doneIds.size).toBe(0);
+  });
+
+  it("onProgress で snapshot が新しい参照になり、entry の progress が進む", async () => {
+    const { calls, upload } = deferredUpload();
+    const store = createUploadStore(upload);
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const settled = store.start([file("a.png")]);
+    const before = store.getSnapshot();
+    listener.mockClear();
+    calls[0]?.options.onProgress?.({ loaded: 5, total: 10 });
+    const after = store.getSnapshot();
+    expect(after).not.toBe(before);
+    expect(listener).toHaveBeenCalled();
+    expect(after.entries[0]?.item).toMatchObject({
+      status: "uploading",
+      progress: { loaded: 5, total: 10 },
+    });
+    calls[0]?.resolve("asset-a");
+    await settled;
   });
 
   it("onSettled は start ごとの完了で呼ばれる", async () => {

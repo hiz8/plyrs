@@ -30,11 +30,13 @@ export class ApiError extends Error {
   }
 }
 
-export async function throwApiError(response: Response): Promise<never> {
+// 本文(JSON 文字列)から ApiError を組み立てる。fetch 版(throwApiError)と XHR 版(アップロード。
+// 案 F 3.3・K6)が同じ写しを使う
+export function apiErrorFromBody(status: number, text: string): ApiError {
   let code = "unknown_error";
   let detail: string | undefined;
   try {
-    const body = (await response.json()) as { error?: unknown; code?: unknown; message?: unknown };
+    const body = JSON.parse(text) as { error?: unknown; code?: unknown; message?: unknown };
     // /auth 系は { error }、DO 由来の結果は { ok: false, code, message } — 両対応で拾う
     if (typeof body.error === "string") {
       code = body.error;
@@ -47,7 +49,17 @@ export async function throwApiError(response: Response): Promise<never> {
   } catch {
     // 本文が JSON でない（ゲートウェイ応答等）場合は unknown_error のまま
   }
-  throw new ApiError(response.status, code, detail);
+  return new ApiError(status, code, detail);
+}
+
+export async function throwApiError(response: Response): Promise<never> {
+  let text = "";
+  try {
+    text = await response.text();
+  } catch {
+    // 本文を読めない場合は unknown_error のまま
+  }
+  throw apiErrorFromBody(response.status, text);
 }
 
 const JSON_HEADERS = { "content-type": "application/json" } as const;

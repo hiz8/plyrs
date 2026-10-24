@@ -1,6 +1,10 @@
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import type { AssetUsageEntry } from "./admin-api";
+import type {
+  AssetUsageEntry,
+  UploadOptions as AssetUploadOptions,
+  UploadProgress,
+} from "./admin-api";
 import { ApiError } from "./api-client";
 import { UPLOAD_TOO_LARGE_MESSAGE } from "./error-messages";
 import { NetworkError } from "./network-error";
@@ -39,7 +43,7 @@ export function uploadRejection(file: Pick<File, "size" | "name">): UploadReject
 
 export type UploadItem = { file: File } & (
   | { status: "queued" }
-  | { status: "uploading" }
+  | { status: "uploading"; progress?: UploadProgress }
   | { status: "done"; assetId: string }
   | { status: "failed"; reason: UploadRejection | "error"; cause?: unknown }
 );
@@ -71,7 +75,7 @@ function isFatal(cause: unknown): boolean {
 // 新しい配列で渡す(グリッドの先頭に進捗付きで仮表示するため)。
 export async function uploadFiles(
   files: readonly File[],
-  upload: (file: File) => Promise<{ id: string }>,
+  upload: (file: File, options: AssetUploadOptions) => Promise<{ id: string }>,
   { onChange, signal }: UploadOptions = {},
 ): Promise<UploadSummary> {
   let items: UploadItem[] = files.map((file) => {
@@ -94,7 +98,11 @@ export async function uploadFiles(
     }
     update(index, { file: item.file, status: "uploading" });
     try {
-      const { id } = await upload(item.file);
+      // 進捗(F9)は uploading の item に写す。signal は渡さない: キャンセルは「送信中の 1 件は
+      // 終わらせ、残りを送らない」契約(use-uploads の cancel)で、XHR を止めると失敗タイルになる
+      const { id } = await upload(item.file, {
+        onProgress: (progress) => update(index, { file: item.file, status: "uploading", progress }),
+      });
       update(index, { file: item.file, status: "done", assetId: id });
     } catch (cause) {
       update(index, { file: item.file, status: "failed", reason: "error", cause });

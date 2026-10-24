@@ -53,6 +53,20 @@ export function uploadTileState(
   handlers: { onRetry: () => void; onRemove: () => void },
 ): UploadTileState {
   const { item } = entry;
+  if (item.status === "uploading" && item.progress !== undefined && item.progress.total > 0) {
+    const { loaded, total } = item.progress;
+    const progress = loaded / total;
+    return {
+      kind: "uploading",
+      progress,
+      detail: MEDIA_LABELS.upload.progressDetail(
+        Math.round(progress * 100),
+        formatBytes(loaded),
+        formatBytes(total),
+      ),
+    };
+  }
+  if (item.status === "uploading") return { kind: "uploading" };
   if (item.status !== "failed") return { kind: item.status };
   if (item.reason === "error") {
     return {

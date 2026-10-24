@@ -19,8 +19,9 @@ describe("createAssetServices (Phase 8)", () => {
     const uploadAsset = vi.fn(async () => ({ id: "a1" }));
     const services = createAssetServices(stubAdminApi({ uploadAsset }), "t1", () => "blob:unused");
     const file = new File([Uint8Array.from([1])], "a.png", { type: "image/png" });
-    expect(await services.upload(file)).toEqual({ id: "a1" });
-    expect(uploadAsset).toHaveBeenCalledWith("t1", file);
+    const options = { onProgress: vi.fn() };
+    expect(await services.upload(file, options)).toEqual({ id: "a1" });
+    expect(uploadAsset).toHaveBeenCalledWith("t1", file, options);
   });
 
   it("memoizes resolveUrl per asset id and returns null on failure", async () => {

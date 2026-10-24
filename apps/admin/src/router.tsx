@@ -28,6 +28,8 @@ export interface AppContextOptions {
   connect?: (tenantId: string) => ConnectFn;
   /** テスト用: QueryClient を差し替える(既定はリトライありの本番設定) */
   queryClient?: QueryClient;
+  /** テスト用: アップロード(XHR。K6)の XMLHttpRequest を差し替える */
+  createXhr?: () => XMLHttpRequest;
 }
 
 function browserConnect(tenantId: string, tokens: TokenManager): ConnectFn {
@@ -49,7 +51,7 @@ export function createAppContext(
 ): RouterContext {
   const api = createApiClient(fetchImpl);
   const tokens = createTokenManager({ issueToken: api.issueToken });
-  const adminApi = createAdminApi(tokens, fetchImpl);
+  const adminApi = createAdminApi(tokens, fetchImpl, { createXhr: options?.createXhr });
   const superApi = createSuperApi(fetchImpl);
   const slots = createSlotRegistry();
   // 案 A 4 章: コアの項目はサイドバーが型定義から生成する。nav:item はモジュール独自の画面用に残す
