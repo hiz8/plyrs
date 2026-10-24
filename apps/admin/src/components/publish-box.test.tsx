@@ -6,7 +6,6 @@ import { PublishBar, PublishBox } from "./publish-box";
 
 const base: PublishBoxInput = {
   isNew: false,
-  isAsset: false,
   publication: { published: false },
   recordVersion: 3,
   dirty: false,
@@ -71,14 +70,6 @@ it("ステータスの選択は onStatusChange に値を渡す", async () => {
   await user.click(screen.getByRole("button", { name: /ステータス/ }));
   await user.click(await screen.findByRole("option", { name: "レビュー中" }));
   expect(h.onStatusChange).toHaveBeenCalledWith("in_review");
-});
-
-it("asset は「保存」と「削除」だけで公開状態とステータスを出さない", () => {
-  setup({ isAsset: true, publication: undefined, dirty: true });
-  expect(screen.getByRole("button", { name: "保存" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "削除" })).toBeTruthy();
-  expect(screen.queryByText("状態")).toBeNull();
-  expect(screen.queryByText("ステータス")).toBeNull();
 });
 
 it("PublishBar は閲覧者では何も描かず、書き込み可なら操作の領域にボタンを出す", () => {

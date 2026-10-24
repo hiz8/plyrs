@@ -3,7 +3,6 @@ import { publishBoxView, type PublishBoxInput } from "./publish-box";
 
 const base: PublishBoxInput = {
   isNew: false,
-  isAsset: false,
   publication: { published: false },
   recordVersion: 3,
   dirty: false,
@@ -45,7 +44,6 @@ describe("publishBoxView", () => {
     expect(view.secondary).toMatchObject({ kind: "save-draft", isDisabled: false });
     expect(view.notes).toEqual({ changed: false, unsaved: true });
     expect(view.showDelete).toBe(true);
-    expect(view.showStatus).toBe(true);
   });
 
   it("公開中・未反映なし・未編集は更新が無効で補助ボタンが無い", () => {
@@ -128,24 +126,6 @@ describe("publishBoxView", () => {
     expect(view.notes.changed).toBe(true);
   });
 
-  it("asset は保存だけで、ステータスを出さず、未編集なら保存が無効", () => {
-    const clean = publishBoxView({ ...base, isAsset: true, publication: undefined });
-    expect(clean.state).toEqual({ kind: "asset" });
-    expect(clean.primary).toMatchObject({ kind: "save", label: "保存", isDisabled: true });
-    expect(clean.secondary).toBeNull();
-    expect(clean.showStatus).toBe(false);
-    expect(clean.showDelete).toBe(true);
-    const dirty = publishBoxView({
-      ...base,
-      isAsset: true,
-      publication: undefined,
-      dirty: true,
-      connected: false,
-    });
-    expect(dirty.primary).toMatchObject({ kind: "save", isDisabled: false });
-    expect(dirty.offlineNote).toBeNull();
-  });
-
   it("公開状態の取得前は公開が無効で、補助は下書き保存", () => {
     const view = publishBoxView({ ...base, publication: undefined });
     expect(view.state).toEqual({ kind: "loading" });
@@ -157,14 +137,6 @@ describe("publishBoxView", () => {
     const view = publishBoxView({ ...base, dirty: true, phase: "saving" });
     expect(view.primary?.isDisabled).toBe(true);
     expect(view.secondary?.isDisabled).toBe(true);
-    const asset = publishBoxView({
-      ...base,
-      isAsset: true,
-      publication: undefined,
-      dirty: true,
-      phase: "deleting",
-    });
-    expect(asset.primary?.isDisabled).toBe(true);
   });
 
   it("公開権限が無ければ主ボタンは無く、補助の保存だけ残る", () => {

@@ -7,10 +7,9 @@ import type { SaveAndPublishPhase } from "./save-and-publish";
 
 export interface PublishBoxInput {
   isNew: boolean;
-  isAsset: boolean;
-  /** undefined = 取得前(新規・asset では常に undefined) */
+  /** undefined = 取得前(新規では常に undefined) */
   publication: PublicationState | undefined;
-  /** 公開状態の取得に失敗した(新規・asset では無視する) */
+  /** 公開状態の取得に失敗した(新規では無視する) */
   publicationError?: boolean;
   recordVersion: number;
   dirty: boolean;
@@ -21,12 +20,7 @@ export interface PublishBoxInput {
   phase: SaveAndPublishPhase | "deleting";
 }
 
-export type PublishBoxButtonKind =
-  | "publish"
-  | "update"
-  | "save-draft"
-  | "save-without-publish"
-  | "save";
+export type PublishBoxButtonKind = "publish" | "update" | "save-draft" | "save-without-publish";
 
 export interface PublishBoxButton {
   kind: PublishBoxButtonKind;
@@ -40,7 +34,6 @@ export type PublishBoxState =
   | { kind: "loading" }
   | { kind: "error" }
   | { kind: "unpublished" }
-  | { kind: "asset" }
   | { kind: "published"; publishedAt: string; changed: boolean };
 
 export interface PublishBoxView {
@@ -50,8 +43,6 @@ export interface PublishBoxView {
   notes: { changed: boolean; unsaved: boolean };
   primary: PublishBoxButton | null;
   secondary: PublishBoxButton | null;
-  /** asset では false */
-  showStatus: boolean;
   showUnpublish: boolean;
   showDelete: boolean;
   offlineNote: string | null;
@@ -67,7 +58,7 @@ function button(
 }
 
 export function publishBoxView(input: PublishBoxInput): PublishBoxView {
-  const { isNew, isAsset, publication, dirty, connected, canWrite, canPublish, phase } = input;
+  const { isNew, publication, dirty, connected, canWrite, canPublish, phase } = input;
   const idle = phase === "idle";
   const changed =
     publication?.published === true && input.recordVersion > publication.sourceVersion;
@@ -75,8 +66,7 @@ export function publishBoxView(input: PublishBoxInput): PublishBoxView {
   const showDelete = canWrite && input.canDelete && !isNew;
 
   let state: PublishBoxState;
-  if (isAsset) state = { kind: "asset" };
-  else if (isNew) state = { kind: "new" };
+  if (isNew) state = { kind: "new" };
   else if (input.publicationError === true) state = { kind: "error" };
   else if (publication === undefined) state = { kind: "loading" };
   else if (publication.published) {
@@ -93,18 +83,13 @@ export function publishBoxView(input: PublishBoxInput): PublishBoxView {
     notes,
     primary: canWrite ? primary : null,
     secondary: canWrite ? secondary : null,
-    showStatus: !isAsset,
     showUnpublish: canWrite && showUnpublish,
     showDelete,
     offlineNote:
-      canWrite && !connected && !isAsset && primary !== null
+      canWrite && !connected && primary !== null
         ? PUBLISH_BOX.offlineNote(secondary?.label ?? null)
         : null,
   });
-
-  if (isAsset) {
-    return build(button("save", PUBLISH_BOX.save, !dirty || !idle), null, false);
-  }
 
   // 公開系の主ボタンは切断中に理由つきで無効になる(補助の保存は端末に積めるので押せる)
   const reason = connected ? undefined : PUBLISH_BOX.offlineReason;

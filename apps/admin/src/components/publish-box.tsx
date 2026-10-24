@@ -193,7 +193,6 @@ function StateRow({
   onRetryPublication: (() => void) | undefined;
 }) {
   const state = view.state;
-  if (state.kind === "asset") return null;
   return (
     <div {...stylex.props(styles.row)}>
       <span {...stylex.props(styles.label)}>{PUBLISH_BOX.state}</span>
@@ -253,18 +252,16 @@ export function PublishBox({
       </h2>
       <StateRow view={view} onRetryPublication={onRetryPublication} />
       <Notes view={view} />
-      {view.showStatus && (
-        <Select
-          label={PUBLISH_BOX.status}
-          items={STATUS_ITEMS}
-          selectedValue={status}
-          onChange={(value) => {
-            if (isWorkflowStatus(value)) onStatusChange(value);
-          }}
-          isReadOnly={view.readOnly}
-          size="sm"
-        />
-      )}
+      <Select
+        label={PUBLISH_BOX.status}
+        items={STATUS_ITEMS}
+        selectedValue={status}
+        onChange={(value) => {
+          if (isWorkflowStatus(value)) onStatusChange(value);
+        }}
+        isReadOnly={view.readOnly}
+        size="sm"
+      />
       <Buttons view={view} onPrimary={onPrimary} onSecondary={onSecondary} />
       {view.offlineNote !== null && (
         <div {...stylex.props(styles.offline)}>

@@ -6,7 +6,7 @@ import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
 import { Button, ModalDialog } from "@plyrs/ui";
 import { bg, border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "../lib/asset-services";
-import { ASSET_PICKER_LABELS } from "../lib/labels";
+import { MEDIA_PICKER_LABELS } from "../lib/labels";
 import { labelForRecord } from "../lib/record-label";
 import { parseRelationDraftKey, relationDraftKey } from "../lib/record-form-values";
 import { useRecordsOfTypes } from "../lib/use-collection";
@@ -92,7 +92,7 @@ export function AssetSelectDialog({
 
   return (
     <ModalDialog
-      title={ASSET_PICKER_LABELS.selectTitle}
+      title={MEDIA_PICKER_LABELS.title}
       isOpen
       onOpenChange={(open) => {
         if (!open) {

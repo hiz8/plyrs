@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import type { Collection } from "@tanstack/db";
 import { v7 as uuidv7 } from "uuid";
-import { ASSET_TYPE_KEY, type ContentTypeDefinition, type WorkflowStatus } from "@plyrs/metamodel";
+import type { ContentTypeDefinition, WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import {
   Banner,
@@ -18,7 +18,7 @@ import {
 } from "@plyrs/ui";
 import { bg, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "../lib/asset-services";
-import { contentTypeCrumb, currentCrumb, homeCrumb, mediaCrumb } from "../lib/breadcrumbs";
+import { contentTypeCrumb, currentCrumb, homeCrumb } from "../lib/breadcrumbs";
 import { formatDateTime } from "../lib/datetime";
 import { errorMessage } from "../lib/error-messages";
 import { DIALOGS, EDITOR_LABELS, PUBLISH_BOX, TOASTS } from "../lib/labels";
@@ -123,18 +123,16 @@ export function RecordEditor({
   const [busy, setBusy] = useState<"delete" | "unpublish" | "archive" | null>(null);
 
   const isNew = record === null;
-  const isAsset = contentType.key === ASSET_TYPE_KEY;
   const typeKey = contentType.key;
 
   const publication = useQuery({
     ...publicationQueryOptions(adminApi, tenant.id, record?.id ?? ""),
-    enabled: record !== null && !isAsset,
+    enabled: record !== null,
   });
 
   const view = publishBoxView({
     isNew,
-    isAsset,
-    publication: isNew || isAsset ? undefined : publication.data,
+    publication: isNew ? undefined : publication.data,
     publicationError: publication.isLoadingError,
     recordVersion: record?.version ?? 0,
     dirty,
@@ -244,10 +242,6 @@ export function RecordEditor({
 
   async function onPrimary() {
     if (savingRef.current) return;
-    if (isAsset) {
-      await onSecondary();
-      return;
-    }
     const result = await saveAndPublish.run({
       connected,
       validate: () => formRef.current?.validate() ?? false,
@@ -338,15 +332,11 @@ export function RecordEditor({
     setDeleteOpen(false);
     // 削除は楽観的に行が消えるので、編集画面が「見つかりません」に置き換わる前に移動する
     // (削除後は編集画面が無くなるので、離脱の確認は通さない)
-    if (isAsset) {
-      await navigate({ to: "/t/$tenantSlug/media", params: { tenantSlug }, ignoreBlocker: true });
-    } else {
-      await navigate({
-        to: "/t/$tenantSlug/content/$typeKey",
-        params: { tenantSlug, typeKey },
-        ignoreBlocker: true,
-      });
-    }
+    await navigate({
+      to: "/t/$tenantSlug/content/$typeKey",
+      params: { tenantSlug, typeKey },
+      ignoreBlocker: true,
+    });
     try {
       const tx = collection.delete(id);
       await tx.isPersisted.promise;
@@ -379,7 +369,7 @@ export function RecordEditor({
       : EDITOR_LABELS.crumbView;
   const breadcrumbs = [
     homeCrumb(tenantSlug),
-    isAsset ? mediaCrumb(tenantSlug) : contentTypeCrumb(tenantSlug, contentType),
+    contentTypeCrumb(tenantSlug, contentType),
     currentCrumb(currentLabel),
   ];
   const lastUpdated =

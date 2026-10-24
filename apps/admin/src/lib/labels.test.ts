@@ -1,7 +1,15 @@
 import { WORKFLOW_STATUSES } from "@plyrs/metamodel";
 import { describe, expect, it } from "vitest";
 import { LIST_TABS } from "./content-list";
-import { BULK_LABELS, LIST_LABELS, ROLE_LABELS, WORKFLOW_STATUS_LABELS, roleLabel } from "./labels";
+import { MEDIA_KINDS } from "./media-list";
+import {
+  BULK_LABELS,
+  LIST_LABELS,
+  MEDIA_LABELS,
+  ROLE_LABELS,
+  WORKFLOW_STATUS_LABELS,
+  roleLabel,
+} from "./labels";
 import { ROLES } from "./permissions";
 
 describe("labels", () => {
@@ -34,5 +42,9 @@ describe("labels", () => {
     expect(Object.keys(BULK_LABELS.retry).toSorted()).toEqual(keys);
     expect(Object.keys(BULK_LABELS.done).toSorted()).toEqual(keys);
     expect(Object.keys(BULK_LABELS.failed).toSorted()).toEqual(keys);
+  });
+
+  it("メディアの種類の文言が MEDIA_KINDS と all を網羅する", () => {
+    expect(Object.keys(MEDIA_LABELS.kinds).toSorted()).toEqual([...MEDIA_KINDS, "all"].toSorted());
   });
 });

@@ -1,6 +1,7 @@
 import type { WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncStatus } from "@plyrs/sync-client";
 import type { FieldKind } from "./content-type-form";
+import type { MediaKind } from "./media-list";
 import type { ListTab } from "./content-list";
 import { isRole, type Role } from "./permissions";
 import type { SyncIndicatorState } from "./sync-indicator";
@@ -263,8 +264,6 @@ export const DIALOGS = {
   },
   cancel: "キャンセル",
 } as const;
-
-export const ASSET_PICKER_LABELS = { selectTitle: "メディアを選択" } as const;
 
 export const RECORD_FORM_LABELS = {
   unset: "(未設定)",
@@ -723,4 +722,151 @@ export const FIELD_PANEL_LABELS = {
       "公開 API の応答にはこの項目の値が残ったまま返りますが、絞り込み・並べ替えには使えなくなります。サイト側でこの項目を使っている場合は、先にサイト側を直してください",
     confirm: "削除する",
   },
+} as const;
+
+// 案 F 3〜7 章・F25: メディアライブラリ(一覧・詳細・削除・アップロード)の文言
+export const MEDIA_LABELS = {
+  add: "ファイルを追加",
+  select: "ファイルを選択",
+  readOnly: LIST_LABELS.readOnly,
+  kinds: {
+    all: "すべての種類",
+    image: "画像",
+    pdf: "PDF",
+    video: "動画",
+    audio: "音声",
+    other: "その他",
+  } satisfies Record<MediaKind | "all", string>,
+  kindLabel: "種類",
+  usageLabel: "使用状況",
+  usage: { all: "使用中と未使用", unused: "未使用のみ" },
+  sortLabel: "並び順",
+  sorts: { newest: "新しい順", name: "ファイル名順" },
+  search: "ファイル名・代替テキストで検索",
+  count: (n: number) => `${n} 件`,
+  unusedCount: (n: number) => `${n} 件 ・ どのコンテンツからも使われていないファイル`,
+  clearFilters: LIST_LABELS.noResults.clear,
+  viewLabel: "表示の切り替え",
+  views: { grid: "グリッド", list: "リスト" },
+  unused: "未使用",
+  inUse: "使用中",
+  usageUnknown: "—",
+  noAlt: "代替テキストなし",
+  usageFailed: "使用状況を取得できませんでした",
+  retry: LIST_LABELS.retry,
+  tableLabel: "メディアの一覧",
+  gridLabel: "メディアの一覧",
+  columns: {
+    name: "ファイル名",
+    kind: "種類",
+    size: "サイズ",
+    uploaded: "アップロード",
+    usage: "使用状況",
+  },
+  remove: "外す",
+  dropHint: "画面のどこにでもファイルをドロップしてアップロードできます(1 ファイル 20 MB まで)",
+  dropLimit: "1 ファイル 20 MB まで",
+  empty: {
+    title: "メディアはまだありません",
+    description:
+      "画像・PDF・動画をここにドロップするか、「ファイルを追加」から選んでください。アップロードしたファイルは、本文やアイキャッチから選べるようになります。1 ファイル 20 MB まで。",
+    viewerDescription: "アップロードされたファイルがここに表示されます",
+  },
+  noResults: {
+    title: "条件に一致するファイルはありません",
+    description: "別の言葉で検索するか、絞り込みを解除してください",
+  },
+  upload: {
+    queued: "順番待ち",
+    uploading: "送信しています…",
+    done: "完了",
+    retry: "再試行",
+    remove: "取り除く",
+    failed: "アップロードできませんでした",
+    progressTitle: "アップロードしています…",
+    progress: (done: number, total: number) => `${done} / ${total} 件が完了`,
+    failedCount: (n: number) => `${n} 件は送れませんでした`,
+    cancel: BULK_LABELS.cancel,
+    rejectedToast: (name: string) => `${name} はアップロードできません`,
+  },
+  detail: {
+    label: (name: string) => `詳細: ${name}`,
+    close: "閉じる",
+    kind: "種類",
+    size: "サイズ",
+    dimensions: "大きさ",
+    uploaded: "アップロード",
+    dimensionsOf: (w: number, h: number) => `${w} × ${h}`,
+    alt: "代替テキスト",
+    altHelp: "画像の内容を短く説明します。読み上げソフトや画像が表示できないときに使われます",
+    caption: "キャプション",
+    captionPlaceholder: "画像の下に表示する文",
+    captionHelp: "本文に挿入したとき、画像の下に出ます",
+    unset: "(未設定)",
+    save: "保存",
+    publication: "公開",
+    published: "公開中",
+    publishedNote: "使っているコンテンツと一緒に公開済み",
+    unpublished: "未公開",
+    unpublishedNote: "このファイルを使っているコンテンツを公開すると、一緒に公開されます",
+    publicUrl: "公開 URL",
+    copy: "コピー",
+    publicationFailed: "公開状態を取得できませんでした",
+    usage: "使用箇所",
+    usageCount: (n: number) => `${n} 件`,
+    usageEmpty: "まだ使われていません",
+    usageFailed: "使用箇所を取得できませんでした",
+    separator: " ・ ",
+    replaceHint:
+      "差し替えたいときは、新しいファイルをアップロードして、上の各コンテンツで選び直してください",
+    delete: "ファイルを削除",
+    notFound: "ファイルが見つかりません。削除された可能性があります",
+  },
+  deleteDialog: {
+    title: (name: string) => `${name} を削除しますか？`,
+    body: "ファイルは元に戻せません。",
+    checking: "使用箇所を確認しています…",
+    checkFailed: "使用箇所を確認できませんでした",
+    inUse: (n: number) => `${n} 件のコンテンツで使われています`,
+    inUseTitles: (titles: string, rest: number) =>
+      rest === 0 ? `(${titles})` : `(${titles}、ほか ${rest} 件)`,
+    consequence:
+      "。削除すると、そのコンテンツからこのファイルが表示されなくなります。公開中のページでも表示されなくなります",
+    confirm: DIALOGS.delete.confirm,
+    bulkTitle: (n: number) => `${n} 件のファイルを削除しますか？`,
+    bulkInUse: (m: number) => `そのうち ${m} 件はコンテンツで使われています`,
+  },
+  bulk: {
+    region: BULK_LABELS.region,
+    delete: "削除",
+    selectAll: (n: number) => `${n} 件すべてを選択`,
+    clear: BULK_LABELS.clear,
+    running: "削除しています…",
+    retry: BULK_LABELS.retry.delete,
+  },
+} as const;
+
+// 案 H のメディアピッカー(F25)
+export const MEDIA_PICKER_LABELS = {
+  title: "メディアを選択",
+  fieldNote: (field: string, many: boolean) =>
+    `「${field}」フィールド ・ ${many ? "複数選べます" : "1 件だけ"}`,
+  bodyField: "本文",
+  upload: "アップロード",
+  close: "閉じる",
+  gridLabel: "ファイル",
+  selected: "選択中",
+  selectedRegion: "選択中のファイル",
+  selectedCount: (n: number) => `${n} 件`,
+  none: "左の一覧からファイルを選んでください",
+  alt: "代替テキスト",
+  altHelp: "挿入する前に入れておくと、本文でもそのまま使われます",
+  altPlaceholder: "画像の内容を短く",
+  justUploaded: "たった今アップロード",
+  uploaded: "アップロード完了",
+  dropHint: "ここにファイルをドロップしてもアップロードできます",
+  cancel: DIALOGS.cancel,
+  insert: (n: number) => `${n} 件を挿入`,
+  useOne: "このファイルを使う",
+  separator: " ・ ",
 } as const;
