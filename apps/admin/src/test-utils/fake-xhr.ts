@@ -66,8 +66,16 @@ class FakeXhr extends Emitter<FakeProgressEvent | undefined> {
     }
     // 送信の途中(50%)は handler の応答を待つあいだに見えるようにし、100% と load は応答のあと
     this.progress(Math.floor(body.size / 2), body.size);
-    const response = await handler({ method: this.method, headers: this.headers, body });
-    const text = await response.text();
+    let response: Response;
+    let text: string;
+    try {
+      response = await handler({ method: this.method, headers: this.headers, body });
+      text = await response.text();
+    } catch {
+      // handler の例外はネットワークエラー扱い(テストがハングしないように)
+      if (!this.aborted) this.emit("error", undefined);
+      return;
+    }
     if (this.aborted) return;
     this.status = response.status;
     this.responseText = text;

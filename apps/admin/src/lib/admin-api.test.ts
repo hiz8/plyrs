@@ -243,7 +243,7 @@ describe("asset endpoints (Phase 8)", () => {
     expect(init?.headers).toEqual({ authorization: "Bearer jwt-1", "content-type": "image/png" });
   });
 
-  it("uploadAsset は 401 で 1 回だけ再発行して新しい XHR で送り直し、abort で AbortError にする", async () => {
+  it("uploadAsset は 401 で 1 回だけ再発行して新しい XHR で送り直す", async () => {
     const issueToken = vi
       .fn()
       .mockResolvedValueOnce({ token: "old", expiresIn: 900 })
@@ -266,8 +266,11 @@ describe("asset endpoints (Phase 8)", () => {
       expect.objectContaining({ authorization: "Bearer old" }),
       expect.objectContaining({ authorization: "Bearer new" }),
     ]);
+  });
 
-    // 応答が返らないあいだに signal が中止されると、XHR を止めて AbortError で終わる
+  it("uploadAsset は signal の中止で XHR を止め、AbortError で終わる", async () => {
+    const file = new File([Uint8Array.from([1, 2])], "a.png", { type: "image/png" });
+    // 応答が返らないあいだに signal が中止される
     const pending = vi.fn(() => new Promise<Response>(() => {}));
     const abortApi = createAdminApi(manager(), vi.fn<typeof fetch>(), {
       createXhr: createFakeXhr({ "/v1/t/t1/assets": pending }),

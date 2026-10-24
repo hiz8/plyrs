@@ -14,7 +14,8 @@ it("進捗があれば progressbar と「64% ・ 1.2 / 1.9 MB」を出し、無�
     "aria-valuenow",
     "64",
   );
-  expect(screen.getByText("64% ・ 1.2 / 1.9 MB")).toBeInTheDocument();
+  expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuetext", "64% ・ 1.2 / 1.9 MB");
+  expect(screen.getAllByText("64% ・ 1.2 / 1.9 MB")).toHaveLength(1);
 
   rerender(<UploadTile name="a.png" state={{ kind: "uploading" }} />);
   expect(screen.queryByRole("progressbar")).toBeNull();

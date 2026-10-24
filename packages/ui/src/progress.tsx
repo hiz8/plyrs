@@ -13,6 +13,7 @@ const spin = stylex.keyframes({
 const styles = stylex.create({
   root: { display: "flex", flexDirection: "column", gap: space.xs, fontFamily: font.family },
   header: { display: "flex", justifyContent: "space-between", gap: space.sm, fontSize: font.body },
+  headerSm: { fontSize: font.caption },
   headerEnd: { justifyContent: "flex-end" },
   label: { color: text.default },
   value: { color: text.muted },
@@ -57,6 +58,8 @@ export interface ProgressBarProps {
   tone?: "accent" | "success";
   /** 見た目の題を出さない(aria-label は残す)。近くに同じ文言がある場合の二重読み上げ・二重表示の回避 */
   isLabelHidden?: boolean;
+  /** sm = 値の文字を font.caption にする(タイル内の 1 行表示) */
+  size?: "md" | "sm";
 }
 
 export function ProgressBar({
@@ -66,6 +69,7 @@ export function ProgressBar({
   valueLabel,
   tone = "accent",
   isLabelHidden = false,
+  size = "md",
 }: ProgressBarProps) {
   return (
     <RacProgressBar
@@ -77,7 +81,13 @@ export function ProgressBar({
     >
       {({ percentage = 0, valueText }) => (
         <>
-          <div {...stylex.props(styles.header, isLabelHidden && styles.headerEnd)}>
+          <div
+            {...stylex.props(
+              styles.header,
+              size === "sm" && styles.headerSm,
+              isLabelHidden && styles.headerEnd,
+            )}
+          >
             {!isLabelHidden && (
               <span aria-hidden="true" {...stylex.props(styles.label)}>
                 {label}

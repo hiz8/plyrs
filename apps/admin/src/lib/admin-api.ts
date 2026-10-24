@@ -214,6 +214,8 @@ export function createAdminApi(
       return all;
     },
     // 401 は authedFetch と同じく 1 回だけ再発行して、新しい XHR で送り直す
+    // signal は中止の口だけ用意している。中止の UI は後続で、uploadFiles は F10 の契約(送信中の 1 件は
+    // 終わらせる)により渡さない
     async uploadAsset(
       tenantId: string,
       file: File,

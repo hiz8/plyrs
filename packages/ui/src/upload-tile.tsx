@@ -115,15 +115,14 @@ export function UploadTile({ name, state, size = "md", thumb }: UploadTileProps)
                 </span>
               </>
             ) : (
-              <>
-                <ProgressBar
-                  label={UPLOADING_LABEL}
-                  value={Math.round(state.progress * 100)}
-                  maxValue={100}
-                  isLabelHidden
-                />
-                {state.detail !== undefined && <span>{state.detail}</span>}
-              </>
+              <ProgressBar
+                label={UPLOADING_LABEL}
+                value={Math.round(state.progress * 100)}
+                maxValue={100}
+                valueLabel={state.detail}
+                isLabelHidden
+                size="sm"
+              />
             )}
           </>
         )}
