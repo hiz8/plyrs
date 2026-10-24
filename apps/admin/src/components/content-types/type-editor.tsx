@@ -3,7 +3,7 @@ import { LayoutGrid, Plus } from "lucide-react";
 import { useRef, useState } from "react";
 import { CONTENT_TYPE_DESCRIPTION_MAX_LENGTH, type FieldDefinition } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import { Button, EmptyState, ModalDialog, TextField } from "@plyrs/ui";
+import { Button, EmptyState, TextField } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import type { ContentTypeSummary } from "../../lib/admin-api";
 import {
@@ -28,6 +28,7 @@ import {
 import { referenceCandidates } from "../../lib/content-types";
 import { CONTENT_TYPE_LABELS, DIALOGS } from "../../lib/labels";
 import { useLeaveGuard } from "../../lib/use-leave-guard";
+import { LeaveGuardDialog } from "../leave-guard-dialog";
 import { PageBody, TenantPageHeader } from "../tenant-page-header";
 import { AddFieldDialog } from "./add-field-dialog";
 import { DeleteFieldDialog } from "./delete-field-dialog";
@@ -384,28 +385,7 @@ export function TypeEditor({
         }}
         onCancel={() => setDeleteTarget(null)}
       />
-      <ModalDialog
-        title={DIALOGS.leave.title}
-        isOpen={blocker.status === "blocked"}
-        onOpenChange={(open) => {
-          if (!open) blocker.reset?.();
-        }}
-        role="alertdialog"
-        isDismissable={false}
-        showCloseButton={false}
-        footer={
-          <>
-            <Button variant="dangerLink" onPress={() => blocker.proceed?.()}>
-              {DIALOGS.leave.discard}
-            </Button>
-            <Button autoFocus onPress={() => blocker.reset?.()}>
-              {DIALOGS.leave.stay}
-            </Button>
-          </>
-        }
-      >
-        <p>{DIALOGS.leaveType.body}</p>
-      </ModalDialog>
+      <LeaveGuardDialog blocker={blocker} body={DIALOGS.leaveType.body} />
     </>
   );
 }

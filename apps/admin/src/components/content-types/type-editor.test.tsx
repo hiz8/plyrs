@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import type { FieldDefinition } from "@plyrs/metamodel";
 import { emptyTypeDraft, toTypeDraft } from "../../lib/content-type-form";
 import {
@@ -11,16 +11,22 @@ import {
   FIELD_PANEL_LABELS,
 } from "../../lib/labels";
 import type { TenantSync } from "../../lib/sync";
+import { useLeaveGuard } from "../../lib/use-leave-guard";
 import { TenantSyncProvider } from "../../lib/sync-context";
 import { ListColumnsSelectMock } from "../../test-utils/list-columns-select-mock";
 import { summary } from "../../test-utils/type-rows";
-import { useLeaveGuard } from "../../lib/use-leave-guard";
 import { TypeEditor, type TypeEditorProps } from "./type-editor";
 
 // router の外で描くので useBlocker は使えない。既定は「止めない」で、離脱の確認だけ個別に差し替える
 vi.mock("../../lib/use-leave-guard", () => ({
   useLeaveGuard: vi.fn(() => ({ status: "idle" })),
 }));
+
+afterEach(() => {
+  vi.mocked(useLeaveGuard).mockImplementation(
+    () => ({ status: "idle" }) as unknown as ReturnType<typeof useLeaveGuard>,
+  );
+});
 
 vi.mock("./list-columns-select", () => ({ ListColumnsSelect: ListColumnsSelectMock }));
 
@@ -267,9 +273,6 @@ it("変更があるときに離脱しようとすると確認が出て、編集�
   await user.click(within(dialog).getByRole("button", { name: DIALOGS.leave.stay }));
   expect(reset).toHaveBeenCalled();
   expect(proceed).not.toHaveBeenCalled();
-  vi.mocked(useLeaveGuard).mockImplementation(
-    () => ({ status: "idle" }) as unknown as ReturnType<typeof useLeaveGuard>,
-  );
 });
 
 const lastDirty = () => vi.mocked(useLeaveGuard).mock.calls.at(-1)?.[0];

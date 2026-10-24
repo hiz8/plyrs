@@ -7,15 +7,7 @@ import type { Collection } from "@tanstack/db";
 import { v7 as uuidv7 } from "uuid";
 import type { ContentTypeDefinition, WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import {
-  Banner,
-  Button,
-  ConfirmDialog,
-  ICON_SIZE,
-  ModalDialog,
-  RelativeTime,
-  toaster,
-} from "@plyrs/ui";
+import { Banner, ConfirmDialog, ICON_SIZE, RelativeTime, toaster } from "@plyrs/ui";
 import { bg, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "../lib/asset-services";
 import { contentTypeCrumb, currentCrumb, homeCrumb } from "../lib/breadcrumbs";
@@ -29,6 +21,7 @@ import { useSaveAndPublish } from "../lib/save-and-publish";
 import { useSyncStatus, useTenantSync } from "../lib/sync-context";
 import { useCan } from "../lib/use-can";
 import { useLeaveGuard } from "../lib/use-leave-guard";
+import { LeaveGuardDialog } from "./leave-guard-dialog";
 import { PublishBar, PublishBox } from "./publish-box";
 import { RecordForm, SaveDeferredError, type RecordFormHandle } from "./record-form";
 import { PageBody, TenantPageHeader } from "./tenant-page-header";
@@ -482,28 +475,7 @@ export function RecordEditor({
           </ConfirmDialog>
         </>
       )}
-      <ModalDialog
-        title={DIALOGS.leave.title}
-        isOpen={blocker.status === "blocked"}
-        onOpenChange={(open) => {
-          if (!open) blocker.reset?.();
-        }}
-        role="alertdialog"
-        isDismissable={false}
-        showCloseButton={false}
-        footer={
-          <>
-            <Button variant="dangerLink" onPress={() => blocker.proceed?.()}>
-              {DIALOGS.leave.discard}
-            </Button>
-            <Button autoFocus onPress={() => blocker.reset?.()}>
-              {DIALOGS.leave.stay}
-            </Button>
-          </>
-        }
-      >
-        <p>{DIALOGS.leave.body}</p>
-      </ModalDialog>
+      <LeaveGuardDialog blocker={blocker} body={DIALOGS.leave.body} />
     </>
   );
 }

@@ -286,6 +286,7 @@ describe("下書きの操作", () => {
     expect(isTypeDraftEmpty({ ...empty, description: "x" })).toBe(false);
     expect(isTypeDraftEmpty({ ...empty, fields: [emptyFieldDraft("text", "a", "A")] })).toBe(false);
     expect(isTypeDraftEmpty({ ...empty, listColumns: ["a"] })).toBe(false);
+    expect(isTypeDraftEmpty({ ...empty, titleField: "x" })).toBe(false);
   });
 
   it("isTypeDraftDirty は構造を比べる", () => {
