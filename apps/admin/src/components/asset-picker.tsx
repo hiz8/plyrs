@@ -74,12 +74,18 @@ export function AssetRelationPicker({
       ? [value]
       : [];
 
-  // F31(2026-10-24 改定): many はダイアログで確定した選択の順で値を置き換える(外した id は値からも外れる)。
+  // F31(2026-10-24 改定): many はダイアログで確定した選択の順で値を置き換える(外した id は値からも外れるが、レコードの無い dangling な id は末尾に保つ)。
   // one も置き換え。閉じるのはここ
   function select(items: PickedMedia[]) {
     const keys = items.map((item) => relationDraftKey({ type: ASSET_TYPE_KEY, id: item.id }));
     if (many) {
-      onChange(keys);
+      // レコードが手元に無い id(dangling)は正常系。値から黙って落とさず末尾に保つ
+      const known = new Set(candidates.map((candidate) => candidate.id));
+      const dangling = selectedKeys.filter((key) => {
+        const id = parseRelationDraftKey(key)?.id;
+        return id !== undefined && !known.has(id);
+      });
+      onChange([...keys, ...dangling.filter((key) => !keys.includes(key))]);
     } else if (keys[0] !== undefined) {
       onChange(keys[0]);
     }

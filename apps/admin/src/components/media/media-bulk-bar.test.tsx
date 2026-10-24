@@ -44,4 +44,5 @@ it("失敗があれば「削除をもう一度試す」を出す", async () => {
   setup({ failure: { onRetry } });
   await userEvent.click(screen.getByRole("button", { name: "削除をもう一度試す" }));
   expect(onRetry).toHaveBeenCalled();
+  expect(screen.getByText("(失敗したもの)")).toBeInTheDocument();
 });

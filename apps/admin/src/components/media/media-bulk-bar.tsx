@@ -59,6 +59,9 @@ export function MediaBulkBar({
           <span {...stylex.props(bulkBarStyles.selected)}>
             {BULK_LABELS.selected(selectedCount)}
           </span>
+          {failure !== null && (
+            <span {...stylex.props(bulkBarStyles.note)}>{BULK_LABELS.failedNote}</span>
+          )}
           <Button size="sm" variant="secondary" icon={Trash2} onPress={onDelete}>
             <span {...stylex.props(styles.danger)}>{MEDIA_LABELS.bulk.delete}</span>
           </Button>

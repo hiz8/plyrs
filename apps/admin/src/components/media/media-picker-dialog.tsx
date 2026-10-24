@@ -29,6 +29,7 @@ import {
   type MediaKind,
   type MediaRow,
 } from "../../lib/media-list";
+import { useFileDropGuard } from "../../lib/use-file-drop-guard";
 import { createUploadStore, DONE_HOLD_MS, useUploads } from "../../lib/use-uploads";
 import { useRecordsOfTypes } from "../../lib/use-collection";
 import { uploadTileState } from "./media-grid";
@@ -107,7 +108,7 @@ export interface MediaPickerDialogProps {
   selection: "one" | "many";
   /** F32: 種類の絞り込みの初期値 */
   defaultKind: MediaKind | "all";
-  /** many で既に選ばれている id(選択順の先頭に置く) */
+  /** 既に選ばれている id(選択順の先頭に置く。one は先頭の 1 件) */
   initialIds?: readonly string[];
   /** 呼び出し側が閉じる */
   onSelect: (items: PickedMedia[]) => void;
@@ -145,6 +146,7 @@ export function MediaPickerDialog({
   onSelect,
   onClose,
 }: MediaPickerDialogProps) {
+  useFileDropGuard();
   const many = selection === "many";
   const typeKeys = useMemo(
     () => (types.some((type) => type.key === ASSET_TYPE_KEY) ? [ASSET_TYPE_KEY] : []),
@@ -162,7 +164,9 @@ export function MediaPickerDialog({
   );
 
   // F30: 選んだ順。many だけが番号を持つ
-  const [orderedIds, setOrderedIds] = useState<string[]>(() => (many ? [...initialIds] : []));
+  const [orderedIds, setOrderedIds] = useState<string[]>(() =>
+    many ? [...initialIds] : initialIds.slice(0, 1),
+  );
   // F31: 代替テキストの下書き(触った id だけ。無ければレコードの値)
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [provisionals, setProvisionals] = useState<Record<string, Provisional>>({});
@@ -241,7 +245,9 @@ export function MediaPickerDialog({
       try {
         const tx = collection.update(item.id, (draft) => {
           // updateRecord(record-editor.tsx)と同じ境界 cast
-          draft.input = { ...draft.input, alt } as typeof draft.input;
+          // F13 と同じく、空なら alt の key ごと落とす
+          const { alt: _previous, ...rest } = draft.input as Record<string, unknown>;
+          draft.input = (alt === "" ? rest : { ...rest, alt }) as typeof draft.input;
         });
         tx.isPersisted.promise.catch((cause: unknown) => {
           toaster.error(errorMessage(cause, TOASTS.saveFailed));

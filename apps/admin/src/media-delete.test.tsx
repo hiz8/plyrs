@@ -103,5 +103,8 @@ describe("メディアの削除", () => {
     // 未使用一覧を取り直す(F12)
     await vi.waitFor(() => expect(orphans.mock.calls.length).toBeGreaterThan(1));
     expect(within(grid).getByText("two.png")).toBeInTheDocument();
+    // 削除で閉じたとき、消えたタイルではなく一覧の入れ物にフォーカスが戻る
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+    expect(document.activeElement?.contains(grid)).toBe(true);
   });
 });

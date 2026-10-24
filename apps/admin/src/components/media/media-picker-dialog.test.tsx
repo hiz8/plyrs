@@ -18,6 +18,7 @@ vi.mock("./media-filter-select", async () => {
   return { MediaFilterSelect: mock.MediaFilterSelectMock };
 });
 
+const DANGLING = "018f2b6a-7a0f-7000-8000-000000000e0a";
 const NEW_ID = "018f2b6a-7a0f-7000-8000-000000000e09";
 
 function buildRegistry() {
@@ -39,6 +40,7 @@ function setup(
     defaultKind?: MediaKind | "all";
     upload?: AssetServices["upload"];
     persisted?: Promise<void>;
+    initialIds?: string[];
   } = {},
 ) {
   const registry = buildRegistry();
@@ -67,6 +69,7 @@ function setup(
         fieldName="hero"
         selection={over.selection ?? "many"}
         defaultKind={over.defaultKind ?? "all"}
+        initialIds={over.initialIds ?? []}
         onSelect={onSelect}
         onClose={onClose}
       />
@@ -116,6 +119,36 @@ it("1 件は置き換わり、ボタンは「このファイルを使う」で�
   await user.click(use);
   await waitFor(() => expect(onSelect).toHaveBeenCalledTimes(1));
   expect(onSelect).toHaveBeenCalledWith([{ id: ASSET_1, label: "a.png", alt: "" }]);
+});
+
+it("1 件のフィールドでは現在の値が選択済みで、ボタンも押せる", () => {
+  setup({ selection: "one", initialIds: [ASSET_2] });
+  expect(screen.getByText("選択中 1 件")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "このファイルを使う" })).toBeEnabled();
+});
+
+it("代替テキストを空にして挿入すると、alt の key を落として書く", async () => {
+  const { registry, update, onSelect } = setup({ selection: "one" });
+  act(() => {
+    registry.applyStoreChange({
+      kind: "upsert",
+      record: assetRecord(ASSET_1, "a.png", { input: { alt: "旧", caption: "題" } }),
+    });
+  });
+  const user = userEvent.setup();
+  await user.click(within(grid()).getByText("a.png"));
+  const alt = within(screen.getByRole("region", { name: "選択中のファイル" })).getByRole(
+    "textbox",
+    { name: "代替テキスト" },
+  );
+  await user.clear(alt);
+  await user.click(screen.getByRole("button", { name: "このファイルを使う" }));
+  await waitFor(() => expect(onSelect).toHaveBeenCalledTimes(1));
+  const updater: unknown = update.mock.calls[0]?.[1];
+  const draft = { input: { alt: "旧", caption: "題" } };
+  if (typeof updater !== "function") throw new Error("updater");
+  updater(draft);
+  expect(draft.input).toEqual({ caption: "題" });
 });
 
 it("種類の既定が image なら PDF が出ず、検索で絞れる", async () => {
@@ -211,6 +244,7 @@ it("既存の選択を外して挿入すると、フィールドの値から消�
       value={[
         relationDraftKey({ type: "asset", id: ASSET_1 }),
         relationDraftKey({ type: "asset", id: ASSET_2 }),
+        relationDraftKey({ type: "asset", id: DANGLING }),
       ]}
       onChange={onChange}
       error={undefined}
@@ -223,5 +257,9 @@ it("既存の選択を外して挿入すると、フィールドの値から消�
   const dialog = await screen.findByRole("dialog", { name: "メディアを選択" });
   await user.click(within(dialog).getByRole("checkbox", { name: /選択 a\.png/ }));
   await user.click(within(dialog).getByRole("button", { name: "1 件を挿入" }));
-  expect(onChange).toHaveBeenCalledWith([relationDraftKey({ type: "asset", id: ASSET_2 })]);
+  // レコードの無い(dangling な)id は黙って消さず、末尾に保つ
+  expect(onChange).toHaveBeenCalledWith([
+    relationDraftKey({ type: "asset", id: ASSET_2 }),
+    relationDraftKey({ type: "asset", id: DANGLING }),
+  ]);
 });

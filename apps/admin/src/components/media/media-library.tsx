@@ -30,6 +30,7 @@ import { bulkResultMessage, useBulkAction } from "../../lib/use-bulk-action";
 import { useCan } from "../../lib/use-can";
 import { useRecordsOfTypes } from "../../lib/use-collection";
 import { uploadStoreFor, useUploads } from "../../lib/use-uploads";
+import { useFileDropGuard } from "../../lib/use-file-drop-guard";
 import { PageBody, PageLoading, TenantPageHeader } from "../tenant-page-header";
 import { DeleteMediaDialog, type DeleteMediaTarget } from "./delete-media-dialog";
 import { MediaBulkBar } from "./media-bulk-bar";
@@ -47,6 +48,7 @@ const styles = stylex.create({
   // F28: 詳細パネル(360px)を開いている間、見出しと本文の右を空ける
   root: { flex: 1, display: "flex", flexDirection: "column" },
   panelOpen: { paddingInlineEnd: { default: "360px", [NARROW]: 0 } },
+  list: { outline: "none", display: "flex", flexDirection: "column", flex: 1 },
   content: { display: "flex", flexDirection: "column", flex: 1, gap: "16px" },
 });
 
@@ -68,6 +70,8 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
   const search = mediaRoute.useSearch();
   const navigate = useNavigate();
   const query = useMemo(() => parseMediaQuery(search), [search]);
+  // F 3.3: 受け口の外に落としたファイルをブラウザに開かせない
+  useFileDropGuard();
   const sync = useTenantSync();
   const types = useSyncTypes(sync);
   const hasSynced = useSyncHasSynced(sync);
@@ -80,7 +84,13 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
   const uploads = useUploads(uploadStore);
 
   useEffect(() => {
+    const refreshUsage = () =>
+      void queryClient.invalidateQueries({
+        queryKey: orphanAssetsQueryOptions(adminApi, tenant.id).queryKey,
+      });
     uploadStore.setOptions({
+      // 1 件ずつ完了した時点で使用状況も取り直す(表示の遅れを避ける)
+      onDone: refreshUsage,
       onSettled: (summary) => {
         // 全部取り消したときなど、何も起きていなければ知らせない
         if (summary.succeeded > 0 || summary.failed > 0) {
@@ -88,9 +98,7 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
           if (summary.failed > 0) toaster.error(message);
           else toaster.success(message);
         }
-        void queryClient.invalidateQueries({
-          queryKey: orphanAssetsQueryOptions(adminApi, tenant.id).queryKey,
-        });
+        refreshUsage();
       },
     });
   }, [uploadStore, queryClient, adminApi, tenant.id]);
@@ -136,6 +144,8 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   // F29: パネルを開いた要素。閉じたときにフォーカスを戻す
   const panelReturnRef = useRef<HTMLElement | null>(null);
+  // 削除でパネルを閉じるとき、戻り先のタイルは消えているので一覧の入れ物へ戻す
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   const usageId = deleteTarget?.kind === "one" ? deleteTarget.id : assetId;
   const usage = useAssetUsage(adminApi, tenant.id, usageId, sync.registry, types);
@@ -207,13 +217,17 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
     const gone = new Set(ids);
     setSelectedKeys((keys) => new Set([...keys].filter((id) => !gone.has(id))));
   };
+  const closeAfterDelete = () => {
+    panelReturnRef.current = listRef.current;
+    closePanel();
+  };
   const reportBulk = (result: Parameters<typeof bulkResultMessage>[1]) => {
     const message = bulkResultMessage("delete", result);
     if (message.tone === "success") toaster.success(message.title);
     else toaster.error(message.title);
     afterDelete(result.succeeded);
     // F12: 開いているパネルのファイルが消えたら閉じる
-    if (assetId !== null && result.succeeded.includes(assetId)) closePanel();
+    if (assetId !== null && result.succeeded.includes(assetId)) closeAfterDelete();
   };
   const deleteOne = async (id: string) => {
     setIsDeleting(true);
@@ -221,7 +235,7 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
       await adminApi.deleteRecord(tenant.id, id);
       toaster.success(TOASTS.deleted);
       afterDelete([id]);
-      if (id === assetId) closePanel();
+      if (id === assetId) closeAfterDelete();
     } catch (cause) {
       toaster.error(errorMessage(cause, TOASTS.deleteFailed));
     } finally {
@@ -352,27 +366,31 @@ export function MediaLibrary({ tenantSlug, assetId }: MediaLibraryProps) {
                     </Button>
                   }
                 />
-              ) : view === "grid" ? (
-                <MediaGrid
-                  rows={visible}
-                  resolveUrl={assets.resolveUrl}
-                  orphanIds={orphanIds}
-                  uploads={uploads.entries}
-                  onRetryUpload={uploadStore.retry}
-                  onRemoveUpload={uploadStore.remove}
-                  selection={selection}
-                  onOpen={open}
-                  showDropHint={canWrite}
-                />
               ) : (
-                <MediaTable
-                  onBeforeOpen={rememberReturn}
-                  detailHref={detailHref}
-                  rows={visible}
-                  resolveUrl={assets.resolveUrl}
-                  orphanIds={orphanIds}
-                  selection={selection}
-                />
+                <div ref={listRef} tabIndex={-1} {...stylex.props(styles.list)}>
+                  {view === "grid" ? (
+                    <MediaGrid
+                      rows={visible}
+                      resolveUrl={assets.resolveUrl}
+                      orphanIds={orphanIds}
+                      uploads={uploads.entries}
+                      onRetryUpload={uploadStore.retry}
+                      onRemoveUpload={uploadStore.remove}
+                      selection={selection}
+                      onOpen={open}
+                      showDropHint={canWrite}
+                    />
+                  ) : (
+                    <MediaTable
+                      onBeforeOpen={rememberReturn}
+                      detailHref={detailHref}
+                      rows={visible}
+                      resolveUrl={assets.resolveUrl}
+                      orphanIds={orphanIds}
+                      selection={selection}
+                    />
+                  )}
+                </div>
               )}
             </div>
           )}
