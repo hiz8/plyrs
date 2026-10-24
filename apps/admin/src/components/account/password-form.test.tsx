@@ -62,12 +62,18 @@ it("欄を打ち直すと、その欄の API の誤りとローカルの不一�
   expect(screen.queryByText("新しいパスワードが一致しません")).not.toBeInTheDocument();
 });
 
-it("2 列目のスペーサーは 1 列表示で消せるよう、スタイルのクラスを持つ", () => {
+it("1 列表示で隠すスペーサーの style が付く(狭い画面の非表示は preview で確認)", () => {
+  // jsdom はメディアクエリを評価できないので、display:none 自体は見られない。
+  // StyleX のクラスが spacer にだけ付いていること(他の子には付かないこと)で代える
   const { container } = render(
     <PasswordForm onSubmit={vi.fn()} isPending={false} fieldErrors={{}} resetKey={0} />,
   );
   const grid = container.querySelector("form > div");
   const spacer = grid?.querySelector(":scope > [aria-hidden='true']");
+  const other = grid?.firstElementChild;
   expect(spacer).not.toBeNull();
-  expect(spacer?.getAttribute("class") ?? "").not.toBe("");
+  expect(other).not.toBe(spacer);
+  const spacerClasses = (spacer?.getAttribute("class") ?? "").split(/\s+/).filter(Boolean);
+  const otherClasses = new Set((other?.getAttribute("class") ?? "").split(/\s+/));
+  expect(spacerClasses.some((name) => !otherClasses.has(name))).toBe(true);
 });

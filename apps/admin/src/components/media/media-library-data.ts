@@ -75,12 +75,18 @@ export function useAssetPublication(
   if (publications.isLoadingError) {
     return { status: "error", onRetry: () => void publications.refetch() };
   }
-  if (publications.data === undefined || assetId === null) return { status: "pending" };
+  if (config.isLoadingError) {
+    return { status: "error", onRetry: () => void config.refetch() };
+  }
+  // 公開オリジンが届くまでは URL を組まない(window.location.origin の仮の URL を一瞬出さない)
+  if (publications.data === undefined || config.data === undefined || assetId === null) {
+    return { status: "pending" };
+  }
   return {
     status: "ready",
     published: publications.data.some((entry) => entry.recordId === assetId),
     url: publicAssetUrl(
-      resolvePublicOrigin(config.data?.publicApiOrigin ?? "", window.location.origin),
+      resolvePublicOrigin(config.data.publicApiOrigin, window.location.origin),
       tenantSlug,
       assetId,
     ),

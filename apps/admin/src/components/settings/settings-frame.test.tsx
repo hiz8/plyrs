@@ -68,6 +68,7 @@ it("タブを選ばずに描いた枠はフォーカスを動かさない", () =
 });
 
 it("StrictMode(effect の二重実行)でも、選択中のタブへ一度だけフォーカスが移る", async () => {
+  const focus = vi.spyOn(HTMLElement.prototype, "focus");
   render(
     <StrictMode>
       <TenantSyncProvider sync={sync}>
@@ -79,6 +80,8 @@ it("StrictMode(effect の二重実行)でも、選択中のタブへ一度だけ
   );
   await userEvent.setup().click(screen.getByRole("tab", { name: "一般" }));
   cleanup();
+  // クリック自身の focus 呼び出しは数えない
+  focus.mockClear();
   render(
     <StrictMode>
       <TenantSyncProvider sync={sync}>
@@ -89,6 +92,12 @@ it("StrictMode(effect の二重実行)でも、選択中のタブへ一度だけ
     </StrictMode>,
   );
   await waitFor(() => expect(screen.getByRole("tab", { name: "一般" })).toHaveFocus());
+  // effect が 2 回走っても、選択中のタブへの focus は 1 回だけ
+  const tabFocusCalls = focus.mock.contexts.filter(
+    (el) => el instanceof HTMLElement && el.getAttribute("role") === "tab",
+  );
+  expect(tabFocusCalls).toHaveLength(1);
+  focus.mockRestore();
   expect(document.activeElement).toBe(document.querySelector('[role="tab"][aria-selected="true"]'));
   // 消費済み: 別の枠を描き直してもフォーカスを奪わない
   cleanup();
