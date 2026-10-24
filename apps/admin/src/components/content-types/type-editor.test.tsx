@@ -260,21 +260,6 @@ it("表示名の無い保存済みフィールドがあっても、他の変更�
   expect(save).toBeEnabled();
 });
 
-it("変更があるときに離脱しようとすると確認が出て、編集を続けるで閉じる", async () => {
-  const user = userEvent.setup();
-  const proceed = vi.fn();
-  const reset = vi.fn();
-  vi.mocked(useLeaveGuard).mockImplementation(
-    () => ({ status: "blocked", proceed, reset }) as unknown as ReturnType<typeof useLeaveGuard>,
-  );
-  setup();
-  const dialog = await screen.findByRole("alertdialog", { name: DIALOGS.leave.title });
-  expect(within(dialog).getByText(DIALOGS.leaveType.body)).toBeInTheDocument();
-  await user.click(within(dialog).getByRole("button", { name: DIALOGS.leave.stay }));
-  expect(reset).toHaveBeenCalled();
-  expect(proceed).not.toHaveBeenCalled();
-});
-
 const lastDirty = () => vi.mocked(useLeaveGuard).mock.calls.at(-1)?.[0];
 
 it("編集モードでは、変更すると離脱ガードの dirty が true になる", async () => {
@@ -296,4 +281,19 @@ it("新規では、何か入力すると dirty が true になる(空のうち�
 it("閲覧モードでは dirty が常に false", () => {
   setup({ mode: "view" });
   expect(lastDirty()).toBe(false);
+});
+
+it("変更があるときに離脱しようとすると確認が出て、編集を続けるで閉じる", async () => {
+  const user = userEvent.setup();
+  const proceed = vi.fn();
+  const reset = vi.fn();
+  vi.mocked(useLeaveGuard).mockImplementation(
+    () => ({ status: "blocked", proceed, reset }) as unknown as ReturnType<typeof useLeaveGuard>,
+  );
+  setup();
+  const dialog = await screen.findByRole("alertdialog", { name: DIALOGS.leave.title });
+  expect(within(dialog).getByText(DIALOGS.leaveType.body)).toBeInTheDocument();
+  await user.click(within(dialog).getByRole("button", { name: DIALOGS.leave.stay }));
+  expect(reset).toHaveBeenCalled();
+  expect(proceed).not.toHaveBeenCalled();
 });

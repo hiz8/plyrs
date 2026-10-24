@@ -79,9 +79,8 @@ WordPress の「すべて / 公開済み / 下書き / ゴミ箱」に相当す�
 - (2026-10-20、V3)ステータス列はバッジで示す: 下書き neutral / レビュー中 accent / 公開準備完了 success / アーカイブ neutral + 取り消し線(D2 L1、R16)
 - (2026-10-20、V3)行の操作のホバー表示は、StyleX が子孫セレクタを書けないため、RAC の `Row` が付ける `data-hovered` を使う小さな CSS を admin の `styles.css` に置く(`[data-row-actions]` の opacity。`:focus-within` と幅 960px 未満では常時表示)(R19)。表の中のリンク(タイトル・「編集」「表示」)は RAC の `Link` を使う(H 3 章、R23)
 - 行の高さは 44px、見出し行は 40px。選択行は `accent.surface`、ホバーは `bg.hover`。並べ替え中の列は見出しを `text.default` にして矢印を付け、並べ替え可能な列は薄い両向きの矢印を添える。幅 960px 未満ではステータス列 → 更新列の順に隠す(D2 で確定)
-- 型ごとの列の追加(例: 予約枠の開始日時、イベントの開催日)は、2026-10-24 の持ち越しで 5 章の追加列として実装する(K2)
-- (2026-10-24、持ち越し)追加の列(持ち越しの計画 Task 6 で実装): 型の `listColumns`(最大 3、型に無い key は無視)の順で、タイトル列の右・公開列の左に足す。見出しは `label ?? key`、並べ替え無し、幅 960px 未満では「ステータス → 更新」より先にすべて隠す。値は tolerant read で読み、不在・不適合は「—」(K2)
-- (2026-10-24、持ち越し)セルの整形(K3): text / slug は文字列(slug は等幅)、number は `ja-JP` の桁区切り、boolean は「はい」/「いいえ」、datetime は絶対表記、select は選ばれた表示名を「、」で結ぶ、relation は「{n} 件」(0 は「—」)、richtext / json は「—」。未知の value はそのまま出す。文言は `LIST_LABELS.cell` に置く。1 行で省略し、`title` 属性に全文を持つ
+- 型ごとの追加列(例: 予約枠の開始日時、イベントの開催日)は、2026-10-24 の持ち越しで実装した(持ち越しの計画 Task 6。K2): 型の `listColumns`(最大 3、型に無い key は無視)の順で、タイトル列の右・公開列の左に足す。見出しは `label ?? key`、並べ替え無し、幅 960px 未満では「ステータス → 更新」より先にすべて隠す。値は tolerant read で読み、不在・不適合は「—」(K2)
+- (2026-10-24、持ち越し)セルの整形(K3): text / slug は文字列(slug は等幅)、number は `ja-JP` の桁区切り、boolean は「はい」/「いいえ」、datetime は絶対表記、select は選ばれた表示名を「、」で結ぶ、relation は「{n} 件」(0 は「—」)、richtext / json は「—」。`cellText` を直接呼ぶときの未知の value はそのまま出すが、一覧のセルは tolerant read を通すため、未知の select 値など型に適合しない値は「—」になる。文言は `LIST_LABELS.cell` に置く。1 行で省略し、`title` 属性に全文を持つ
 
 ## 6. 一括操作
 

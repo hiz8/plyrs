@@ -86,6 +86,6 @@
 ## 持ち越し(2026-10-24)で変えた部品
 - `Checkbox`(`description?: string`: 箱の文の下に font.caption / text.muted の補足。ラベルの外に置き、`aria-describedby` で入力に結ぶ。K5)
 - `SegmentedControl`(`isReadOnly?: boolean`: RAC RadioGroup の isReadOnly。見た目は通常のまま `cursor: default`、選択は変わらず `aria-readonly`。isDisabled と区別。K5)
-- `UploadTile`(`uploading` に `progress?: number`(0〜1)と `detail?: string`: 進捗があれば `ProgressBar isLabelHidden size="sm"`(aria-label は「送信しています…」、valueLabel に detail「64% ・ 1.2 / 1.9 MB」を 1 行で出し aria-valuetext も同じ)、無ければ従来の Spinner。D3 M6・F9・K6)
+- `UploadTile`(`uploading` に `progress?: number`(0〜1)と `detail?: string`: 進捗があれば `ProgressBar isLabelHidden size="sm"`(aria-label は「送信しています…」、valueLabel に detail「64% ・ 1.2 MB / 1.9 MB」を 1 行で出し aria-valuetext も同じ。単位を両方の数に付けるのは D3 M6 の「1.2 / 1.9 MB」との意図した違いで、単位が混ざるときに読みやすい)、無ければ従来の Spinner。D3 M6・F9・K6)
 - `ProgressBar`(`size?: "md" | "sm"`: sm は値の文字を font.caption にする。UploadTile 用)
 - 再同期は後回しのまま

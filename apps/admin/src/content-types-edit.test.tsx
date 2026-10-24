@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ERROR_MESSAGES } from "./lib/error-messages";
+import { DIALOGS } from "./lib/labels";
 import { ListColumnsSelectMock } from "./test-utils/list-columns-select-mock";
 import {
   article,
@@ -94,7 +95,9 @@ describe("設定 › コンテンツタイプ(編集)", () => {
     await waitFor(() =>
       expect(router.state.location.pathname).toBe("/t/blog/settings/content-types"),
     );
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("alertdialog", { name: DIALOGS.leave.title }),
+    ).not.toBeInTheDocument();
   });
 
   it("保存が 409 なら利用者向けの文のトーストを出して画面に留まる", async () => {

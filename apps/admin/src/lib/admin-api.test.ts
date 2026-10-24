@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "./api-client";
 import { createFakeXhr } from "../test-utils/fake-xhr";
 import { createAdminApi, type UploadProgress } from "./admin-api";
+import { NetworkError } from "./network-error";
 import { createTokenManager } from "./token-manager";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -292,6 +293,16 @@ describe("asset endpoints (Phase 8)", () => {
     const error = await api.uploadAsset("t1", file).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 413, code: "too_large" });
+  });
+
+  it("uploadAsset は接続エラーを NetworkError にする", async () => {
+    const api = createAdminApi(manager(), vi.fn<typeof fetch>(), {
+      createXhr: createFakeXhr({
+        "/v1/t/t1/assets": vi.fn(() => Promise.reject(new Error("offline"))),
+      }),
+    });
+    const file = new File([Uint8Array.from([1])], "a.png", { type: "image/png" });
+    await expect(api.uploadAsset("t1", file)).rejects.toBeInstanceOf(NetworkError);
   });
 
   it("fetchAssetBlob returns the binary body", async () => {

@@ -215,7 +215,7 @@ export function ContentTable({
                   return (
                     <Cell hideOnNarrow>
                       <span
-                        title={text}
+                        title={text === LIST_LABELS.cell.empty ? undefined : text}
                         {...stylex.props(styles.fieldCell, c.field.mono && styles.mono)}
                       >
                         {text}

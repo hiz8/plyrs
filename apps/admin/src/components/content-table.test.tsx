@@ -138,3 +138,14 @@ it("slug の追加列は等幅のクラスが付く", () => {
   });
   expect(screen.getByText("hello").className).not.toBe(screen.getByText("補足").className);
 });
+
+it("追加列の値が無いセルは「—」を出し、title を付けない", () => {
+  const r = row("r1", "はじめの記事");
+  setup({
+    contentType: { ...baseType, listColumns: ["subtitle"] },
+    rows: [{ ...r, record: { ...r.record, input: { title: "はじめの記事" } } }],
+  });
+  const cell = screen.getAllByText("—").find((el) => el.tagName === "SPAN");
+  expect(cell).toBeDefined();
+  expect(cell).not.toHaveAttribute("title");
+});
