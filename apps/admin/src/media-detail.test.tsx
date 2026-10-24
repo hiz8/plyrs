@@ -113,6 +113,15 @@ describe("メディアの詳細パネル", () => {
     expect(screen.queryByRole("dialog", { name: "one.png" })).toBeNull();
   });
 
+  it("Esc でパネルが閉じて /media に戻り、検索条件は保たれる", async () => {
+    const { router } = await open(`/t/blog/media/${ASSET_1}?sort=name`);
+    await screen.findByRole("dialog", { name: "one.png" });
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/media"));
+    expect(router.state.location.search).toEqual({ sort: "name" });
+    expect(screen.queryByRole("dialog", { name: "one.png" })).toBeNull();
+  });
+
   it("グリッドのタイルを押すとパネルが開き、別のタイルで中身が切り替わる", async () => {
     const { router } = await open("/t/blog/media");
     const grid = await screen.findByRole("grid", { name: "メディアの一覧" });

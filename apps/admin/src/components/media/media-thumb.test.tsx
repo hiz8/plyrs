@@ -57,6 +57,19 @@ it("IntersectionObserver があれば画面に入るまで resolveUrl を呼ば�
   await waitFor(() => expect(eagerResolve).toHaveBeenCalled());
 });
 
+it("画面の外(isIntersecting false)のコールバックでは resolveUrl を呼ばない", () => {
+  const { callbacks } = stubObserver();
+  const resolveUrl = vi.fn().mockResolvedValue("blob:a");
+  render(<MediaThumb row={image} resolveUrl={resolveUrl} size="tile" />);
+  act(() => {
+    callbacks[0]?.(
+      [{ isIntersecting: false } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    );
+  });
+  expect(resolveUrl).not.toHaveBeenCalled();
+});
+
 it("画像以外は種類のアイコンと拡張子を出す", () => {
   const resolveUrl = vi.fn();
   const { rerender } = render(

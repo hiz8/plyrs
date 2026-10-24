@@ -64,3 +64,15 @@ it("ファイル名のリンクを押すと onBeforeOpen が呼ばれる(F29)", 
   fireEvent.click(screen.getByRole("link", { name: "a.png" }));
   expect(onBeforeOpen).toHaveBeenCalledOnce();
 });
+
+it("selection.isDisabled なら全てのデータ行が aria-disabled になる", () => {
+  setup({
+    selection: { selectedKeys: new Set(), onSelectionChange: vi.fn(), isDisabled: true },
+  });
+  const table = screen.getByRole("grid", { name: "メディアの一覧" });
+  const bodyRows = within(table)
+    .getAllByRole("row")
+    .filter((row) => within(row).queryAllByRole("columnheader").length === 0);
+  expect(bodyRows).toHaveLength(2);
+  for (const row of bodyRows) expect(row).toHaveAttribute("aria-disabled", "true");
+});

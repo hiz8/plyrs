@@ -80,3 +80,12 @@ it("selection があればチェックボックスで選べ、showDropHint で�
   await userEvent.click(screen.getByRole("checkbox", { name: /a\.png/ }));
   expect(onSelectionChange).toHaveBeenCalledWith(new Set([MEDIA_ID_A]));
 });
+
+it("selection.isDisabled なら全ての行が aria-disabled になる", () => {
+  setup({
+    selection: { selectedKeys: new Set(), onSelectionChange: vi.fn(), isDisabled: true },
+  });
+  const tileRows = within(screen.getByRole("grid", { name: "メディアの一覧" })).getAllByRole("row");
+  expect(tileRows).toHaveLength(2);
+  for (const row of tileRows) expect(row).toHaveAttribute("aria-disabled", "true");
+});

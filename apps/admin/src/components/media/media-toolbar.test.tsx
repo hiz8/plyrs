@@ -46,6 +46,13 @@ it("絞り込みがあれば件数の横に「絞り込みを解除」、未使�
   expect(props.onQueryChange).toHaveBeenCalledWith(DEFAULT_MEDIA_QUERY);
 });
 
+it("並び順が name のまま「絞り込みを解除」を押しても sort は維持される", async () => {
+  const query: MediaQuery = { ...DEFAULT_MEDIA_QUERY, usage: "unused", q: "a", sort: "name" };
+  const props = setup({ query, count: 3 });
+  await userEvent.click(screen.getByRole("button", { name: "絞り込みを解除" }));
+  expect(props.onQueryChange).toHaveBeenCalledWith({ ...DEFAULT_MEDIA_QUERY, sort: "name" });
+});
+
 it("絞り込みが無ければ件数だけで解除ボタンは無い", () => {
   setup();
   expect(screen.getByText("12 件")).toBeInTheDocument();

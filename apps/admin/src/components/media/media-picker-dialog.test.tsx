@@ -233,6 +233,23 @@ it("保存が確定しなくても挿入は進み、複数の失敗は 1 件の�
   expect(toasts.queryAllByText(/保存できませんでした/)).toHaveLength(1);
 });
 
+it("保存が永遠に確定しなくても onSelect は呼ばれる(挿入は待たない)", async () => {
+  const { update, onSelect } = setup({
+    selection: "one",
+    persisted: new Promise<void>(() => undefined),
+  });
+  const user = userEvent.setup();
+  await user.click(within(grid()).getByText("a.png"));
+  const alt = within(screen.getByRole("region", { name: "選択中のファイル" })).getByRole(
+    "textbox",
+    { name: "代替テキスト" },
+  );
+  await user.type(alt, "山");
+  await user.click(screen.getByRole("button", { name: "このファイルを使う" }));
+  expect(update).toHaveBeenCalledTimes(1);
+  expect(onSelect).toHaveBeenCalledWith([{ id: ASSET_1, label: "a.png", alt: "山" }]);
+});
+
 it("既存の選択を外して挿入すると、フィールドの値から消える", async () => {
   const registry = buildRegistry();
   const onChange = vi.fn();

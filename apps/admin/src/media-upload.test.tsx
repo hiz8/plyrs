@@ -114,11 +114,10 @@ describe("メディア(アップロード)", () => {
     let calls = 0;
     const handler = vi.fn(() => {
       calls += 1;
-      return calls === 2
-        ? jsonResponse(500, { error: "boom" })
-        : jsonResponse(201, { ok: true, record: { id: ASSET_2 } });
+      if (calls === 2) return jsonResponse(500, { error: "boom" });
+      return jsonResponse(201, { ok: true, record: { id: calls === 3 ? ASSET_3 : ASSET_2 } });
     });
-    await open(mediaRoutes({ "/v1/t/t1/assets": handler }));
+    const harness = await open(mediaRoutes({ "/v1/t/t1/assets": handler }));
 
     const big = png("big.png");
     Object.defineProperty(big, "size", { value: 20 * 1024 * 1024 + 1 });
@@ -133,8 +132,24 @@ describe("メディア(アップロード)", () => {
     // 送らなかった 20 MB 超は assets に届いていない
     expect(handler).toHaveBeenCalledTimes(2);
 
+    // 失敗の通知は danger tone(role="alert")で出る
+    const region = await screen.findByRole("region", { name: "通知" });
+    expect(await within(region).findByRole("alert")).toBeInTheDocument();
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     fireEvent.click(within(failedTile).getByRole("button", { name: /再試行/ }));
     await waitFor(() => expect(handler).toHaveBeenCalledTimes(3));
+
+    // 再試行が成功し、同期の change が届いて仮タイルが消えると b.png は実タイル(row)になる
+    act(() => {
+      harness.latest().deliver({ type: "change", record: assetRecord(ASSET_3, "b.png") });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DONE_HOLD_MS);
+    });
+    await waitFor(() => expect(screen.queryByRole("group", { name: "b.png" })).toBeNull());
+    const grid = screen.getByRole("grid", { name: "メディアの一覧" });
+    expect(within(grid).getByText("b.png").closest('[role="row"]')).not.toBeNull();
 
     fireEvent.click(within(bigTile).getByRole("button", { name: /取り除く/ }));
     await waitFor(() => expect(screen.queryByRole("group", { name: "big.png" })).toBeNull());

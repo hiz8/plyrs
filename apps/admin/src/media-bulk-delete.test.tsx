@@ -18,8 +18,15 @@ vi.mock("./components/media/media-filter-select", async () => {
 
 describe("メディアの一括削除", () => {
   it("2 件を選んで一括削除すると使用中の件数つきの確認を経て順に DELETE し、結果のトーストが出る", async () => {
-    const ok = vi.fn(() => jsonResponse(200, { ok: true }));
-    const fail = vi.fn(() => jsonResponse(500, { error: "boom" }));
+    const order: string[] = [];
+    const ok = vi.fn(() => {
+      order.push(ASSET_1);
+      return jsonResponse(200, { ok: true });
+    });
+    const fail = vi.fn(() => {
+      order.push(ASSET_2);
+      return jsonResponse(500, { error: "boom" });
+    });
     const harness = socketHarness();
     // 詳細パネルを開いたまま、そのファイルを含めて一括削除する(F12)
     const router = renderAt(
@@ -44,7 +51,7 @@ describe("メディアの一括削除", () => {
 
     await userEvent.click(screen.getByRole("checkbox", { name: /選択 one\.png/ }));
     const bar = screen.getByRole("region", { name: "一括操作" });
-    await userEvent.click(within(bar).getByRole("button", { name: "2 件すべてを選択" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /選択 two\.png/ }));
     fireEvent.click(within(bar).getByRole("button", { name: "削除" }));
 
     const confirm = await screen.findByRole("alertdialog", {
@@ -57,6 +64,8 @@ describe("メディアの一括削除", () => {
 
     await vi.waitFor(() => expect(ok).toHaveBeenCalledOnce());
     await vi.waitFor(() => expect(fail).toHaveBeenCalledOnce());
+    // DELETE は選択した順(one.png、two.png)に送られる
+    expect(order).toEqual([ASSET_1, ASSET_2]);
     // 成功した 1 件がパネルのファイルなので、パネルは閉じて /media に戻る
     await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog/media"));
     const toasts = within(await screen.findByRole("region", { name: "通知" }));
@@ -69,5 +78,11 @@ describe("メディアの一括削除", () => {
       expect(within(after).getByRole("button", { name: "削除をもう一度試す" })).toBeInTheDocument(),
     );
     expect(within(after).getByText("1 件を選択中")).toBeInTheDocument();
+
+    // 再試行は失敗した id だけを再送する
+    fireEvent.click(within(after).getByRole("button", { name: "削除をもう一度試す" }));
+    await vi.waitFor(() => expect(fail).toHaveBeenCalledTimes(2));
+    expect(ok).toHaveBeenCalledOnce();
+    expect(order).toEqual([ASSET_1, ASSET_2, ASSET_2]);
   });
 });

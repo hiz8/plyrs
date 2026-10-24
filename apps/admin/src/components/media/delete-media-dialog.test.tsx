@@ -37,6 +37,10 @@ describe("DeleteMediaDialog", () => {
     expect(within(dialog).getByText("2 件のコンテンツで使われています")).toBeInTheDocument();
     expect(within(dialog).getByText(/はじめの記事、二つ目/)).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "削除する" })).toBeInTheDocument();
+    // 削除の結果(コンテンツから表示されなくなる)を注記に含める
+    expect(
+      within(dialog).getByText(/削除すると、そのコンテンツからこのファイルが表示されなくなります/),
+    ).toBeInTheDocument();
   });
 });
 

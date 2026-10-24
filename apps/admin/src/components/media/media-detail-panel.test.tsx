@@ -144,6 +144,17 @@ describe("MediaDetailPanel", () => {
     expect(screen.queryByRole("button", { name: "ファイルを削除" })).toBeNull();
   });
 
+  it("閲覧者でも公開 URL のコピーと使用箇所のリンクは使える(F24)", () => {
+    copyText.mockClear();
+    setup({ canWrite: false, canDelete: false });
+    const dialog = screen.getByRole("dialog", { name: "one.jpg" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "コピー" }));
+    expect(copyText).toHaveBeenCalledWith("https://x.test/public/v1/blog/assets/a");
+    const links = within(dialog).getAllByRole("link", { name: "秋のキャンペーン" });
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute("href", "/t/blog/content/news/rec1");
+  });
+
   it("row が差し替わっても入力中の値を保ち、id が変わると取り直す", () => {
     const { props, rerender } = setup({ row: rowOf(ASSET_1, { alt: "元" }) });
     expect(altField()).toHaveValue("元");
@@ -190,5 +201,9 @@ describe("MediaDetailPanel", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "保存" })).toBeDisabled());
     expect(screen.getByRole("textbox", { name: "キャプション" })).toHaveValue("文");
     pending.resolve();
+    // 保存が終わると保存中が解けてボタンは押せる状態に戻り、入力は保たれる
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getByRole("button", { name: "保存" })).toBeEnabled());
+    expect(screen.getByRole("textbox", { name: "キャプション" })).toHaveValue("文");
   });
 });
