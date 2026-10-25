@@ -29,6 +29,9 @@
 - Badge の tone は neutral / accent / success / warning / danger のみ(info は無い)
 - Drawer は浮く部品。overrides で `cardMode: single`・`viewport: 720x480`、プレビューは `isOpen` で開く(ModalDialog と同じ)
 - Avatar は `name` と `size`(sm / md)だけの小さな部品で、カードは `column` でよい
+- SidePanel は `position: fixed`(top 0 / bottom 0)で画面の高さに従うため、撮影では本文が潰れる。プレビューでは `transform: translateZ(0)` を持つ 720×460 の枠で包んで包含ブロックにする(SidePanel.tsx)。撮影幅が 960px 未満なので `full` は全面のシート、`sheet` は下から出る面として写り、右パネル(420 / 360px)は実機でだけ見える
+- TileGrid / FileDropTarget のサムネイルは画像の代わりに種類のアイコンと拡張子のタグで描く(撮影環境に画像が無い)。FileDropTarget の暗幕はドラッグ中にしか出ないので、受け口に包まれた本文だけを示す
+- UploadTile の `state` は型定義の展開で `unknown` になるため、config の `dtsPropsFor.UploadTile` に手書きの props(5 状態の union)を置いている。upload-tile.tsx の `UploadTileState` を変えたらここも直す
 
 ## 同期中に見つけて直した部品の不具合
 - Select: 既定の SelectValue が選択中の候補の中身(check 用の 16px の空き枠)を複製し、トリガーの値が右にずれていた → `SelectValue` の children で selectedText だけを出す(packages/ui/src/select.tsx、テスト追加)
@@ -42,7 +45,7 @@
 - `MenuItem`(`detail` で右寄せの補足)
 - `Table`(選択列・セルの focusVisible。RAC がフォーカスを中のチェックボックスへ転送するため、見た目はチェックボックスの輪で担保される)
 - 新規 `Avatar` / `Drawer`
-- 再同期が必要(上の「再同期の手順」)。スタブは `.design-sync/docs/` に追加済み
+- 2026-10-25 に再同期済み(スタブは `.design-sync/docs/` に追加済み)
 
 ## V3 で変えた部品
 - `TextField` / `TextArea`(`isReadOnly`: 枠線なし・下罫線だけ・地は透明)
@@ -51,12 +54,16 @@
 - `RichTextEditor`(`isReadOnly`: 編集不可・ツールバー無し・下罫線だけ)
 - `PageHeader`(`meta`: 見出しの右・操作の左に補足)
 - `Tabs`(狭い幅でタブの並びが横スクロール)
-- 再同期が必要(上の「再同期の手順」)
+- 2026-10-25 に再同期済み
 
 ## Known render warns
-(無し。GRID_OVERFLOW は overrides で対応済み)
+- `[RENDER_THIN] Drawer: variants render identically` — Drawer のプレビューは Open の 1 本だけなので「同一」は当然(固定配置の暗幕で測定が潰れる種類の警告)。無害
+(GRID_OVERFLOW は overrides で対応済み)
 
 ## Re-sync risks
+- 固定配置(position: fixed)の部品は撮影で高さが潰れる。SidePanel は `transform: translateZ(0)` の枠で包む方式(SidePanel.tsx)。同じ作りの部品を足したら同じ包み方にする
+- `cfg.dtsPropsFor.UploadTile` は upload-tile.tsx の `UploadTileState` の写し。union を変えたら config も直す(型定義の展開が union を `unknown` に潰すため)
+- 再同期の実行はサンドボックス内で可能(ビルド・撮影・DesignSync とも)。`.ds-sync/` はスキルの base dir から毎回コピーし直す
 - packages/ui に正式なビルドが無く、同期用のビルドは `.design-sync/ui-build.vite.mjs` に依存する。packages/ui の依存や StyleX の版を上げたら、まずこのビルドが通るか確かめる
 - 撮影環境に日本語フォントが無く、採点は形・色・並びで行った。文字の詰まりや改行は実ブラウザで未確認
 - Menu・Tooltip の開いた状態は setTimeout / focus の時間に依存する。撮影が速すぎると閉じた状態で撮られうる
@@ -81,11 +88,11 @@
 - `TileGrid`(新規。RAC GridList layout="grid"、選択とアクション。F17)
 - `UploadTile`(新規。仮タイルの 5 状態。F9・F10)
 - `FileDropTarget`(新規。画面全体のドロップと暗幕。F35。静的には暗幕を描けない)
-- 再同期は V4-F の最後にまとめて行う
+- 2026-10-25 に再同期済み(V4-B・G・E・F 分をまとめて。新部品 SortableList / SidePanel / FileButton / TileGrid / UploadTile / FileDropTarget / SegmentedControl と V2 の Avatar / Drawer のプレビューを作成・採点)
 
 ## 持ち越し(2026-10-24)で変えた部品
 - `Checkbox`(`description?: string`: 箱の文の下に font.caption / text.muted の補足。ラベルの外に置き、`aria-describedby` で入力に結ぶ。K5)
 - `SegmentedControl`(`isReadOnly?: boolean`: RAC RadioGroup の isReadOnly。見た目は通常のまま `cursor: default`、選択は変わらず `aria-readonly`。isDisabled と区別。K5)
 - `UploadTile`(`uploading` に `progress?: number`(0〜1)と `detail?: string`: 進捗があれば `ProgressBar isLabelHidden size="sm"`(aria-label は「送信しています…」、valueLabel に detail「64% ・ 1.2 MB / 1.9 MB」を 1 行で出し aria-valuetext も同じ。単位を両方の数に付けるのは D3 M6 の「1.2 / 1.9 MB」との意図した違いで、単位が混ざるときに読みやすい)、無ければ従来の Spinner。D3 M6・F9・K6)
 - `ProgressBar`(`size?: "md" | "sm"`: sm は値の文字を font.caption にする。UploadTile 用)
-- 再同期は後回しのまま
+- 2026-10-25 に再同期済み(Checkbox.description と SegmentedControl.isReadOnly は既存プレビューの差し替え無しで .d.ts / prompt.md だけ更新。SidePanel のプレビューで Checkbox.description を使っている)

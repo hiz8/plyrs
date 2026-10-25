@@ -90,7 +90,34 @@
     "Select": {
       "cardMode": "single",
       "primaryStory": "Selected"
+    },
+    "Drawer": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "SidePanel": {
+      "cardMode": "single",
+      "viewport": "720x480",
+      "primaryStory": "FieldSettings"
+    },
+    "TileGrid": {
+      "cardMode": "column"
+    },
+    "SortableList": {
+      "cardMode": "column"
+    },
+    "UploadTile": {
+      "cardMode": "column"
+    },
+    "FileDropTarget": {
+      "cardMode": "column"
+    },
+    "SegmentedControl": {
+      "cardMode": "column"
     }
   },
-  "readmeHeader": ".design-sync/conventions.md"
+  "readmeHeader": ".design-sync/conventions.md",
+  "dtsPropsFor": {
+    "UploadTile": "  name: string;\n  /** 仮タイルの状態。queued → uploading(progress は 0〜1。あれば進捗バー + detail「64% ・ 1.2 MB / 1.9 MB」、無ければ回転アイコン)→ done。failed は「再試行」、rejected(送る前に弾いた)は「取り除く」 */\n  state:\n    | { kind: \"queued\" }\n    | { kind: \"uploading\"; progress?: number; detail?: string }\n    | { kind: \"failed\"; message: string; onRetry: () => void }\n    | { kind: \"rejected\"; message: string; detail?: string; onRemove: () => void }\n    | { kind: \"done\" };\n  /** md = 160px(一覧)、sm = 140px(ダイアログ) */\n  size?: \"sm\" | \"md\";\n  /** done のときの画像(無ければ bg.surface) */\n  thumb?: React.ReactNode;"
+  }
 }
