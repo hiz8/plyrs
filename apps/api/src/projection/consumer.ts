@@ -9,7 +9,7 @@ import type { ProjectionPayload } from "./payload";
 
 // 順序ガードの要（CRITICAL fix: publish_seq を使う。source_version は publish/unpublish で
 // 変化しないため順序トークンになれない — unpublish→無編集republish が同じ source_version の
-// upsert/delete を生み、Queues の配信順序非保証と組み合わさると新しい publish_seq の行を古いジョブが消しうる）:
+// upsert/delete を生み、Queues の配信順序非保証と組み合わさると新しい publish の行を古いジョブが消しうる）:
 // 1) projected_records を「自分の publish_seq が現行以上のときだけ」条件付き upsert する。
 // 2) relations / index は「upsert 後に自分の publish_seq が現に載っているときだけ」入れ替える。
 // これで古いジョブは 1) で弾かれ、2) も EXISTS が偽になるため新しい公開用 DB の行を壊せない。
@@ -172,7 +172,7 @@ export function upsertStatements(
 
 // §12.3: delete も publish_seq でガードする（unpublish 発行後に republish が先着した場合に消さない。
 // CRITICAL fix: 以前は source_version でガードしていたが、それは publish/unpublish で変化しないため
-// 同一 publish_seq を装った古い delete が新しい publish_seq の行を消せてしまっていた）
+// 同じ source_version を持つ古い delete が、新しい publish の行を消せてしまっていた）
 //
 // CRITICAL fix（レビュー指摘）: delete と同じ batch で projection_tombstones の行を立てる。これが無いと、この delete の
 // 後に届く「delete より古い publish_seq を運ぶ」書き込み（stale な公開用 DB の再構築のページ読み取りなど）が

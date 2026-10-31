@@ -12,7 +12,7 @@ import { chunk, D1_BIND_CHUNK_SIZE, placeholders } from "./sql";
 // 制御し、fields の形を変えない。未公開参照先の ID も残る（ソフト参照で included にだけ現れない）。
 
 // Phase 8 決定 4: snapshotEmbed "value" の関係はアセットの埋め込み情報のオブジェクトとして fields に
-// 現れる(ID 文字列そのものと排他 — 同じフィールドの同じ `publish_seq` 内では形が揃う)。
+// 現れる(ID 文字列そのものと排他 — 同じフィールドの同じ公開版内では形が揃う)。
 export interface PublicAssetEmbed extends AssetEmbed {
   id: string;
 }
