@@ -3,7 +3,7 @@ import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
 import { sessions, superSessions, users } from "@plyrs/db/control-plane";
 import { v7 as uuidv7 } from "uuid";
 
-// design-spec §11.2: セッションの真実源は中央 D1。トークンは 32byte 不透明値を
+// design-spec §11.2: セッションの正本は中央 D1。トークンは 32byte 不透明値を
 // base64url で配り、D1 には SHA-256 ハッシュのみ保存（D1 流出時もセッション奪取不能）。
 const SESSION_TTL_DAYS = 30;
 

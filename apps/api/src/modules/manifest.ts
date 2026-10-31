@@ -6,7 +6,7 @@ import {
 import { z } from "zod";
 import { ROLES } from "../auth/permissions";
 
-// design-spec §4.2 / G6(2026-07-18 裁定): モジュールマニフェスト = zod 検証つき純データ。
+// design-spec §4.2 / G6(2026-07-18 決定): モジュールマニフェスト = zod 検証つき純データ。
 // フック実装(コード)とはファイルを分け、マニフェストだけで「型・権限・公開 write の宣言」が
 // 完結する。version はマニフェスト全体の版(型定義再配布の冪等判定に使う)。
 export const moduleManifestSchema = z

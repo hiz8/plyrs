@@ -1,13 +1,13 @@
 import { ASSET_TYPE_KEY, type FieldDefinition } from "@plyrs/metamodel";
 import { loadAllContentTypeRows } from "./content-types";
 
-// Phase 10: 特権コンソールの健全性チェック(design-spec §7 の確定事項 / §14 のレガシー状態)。
+// Phase 10: 運営管理画面の健全性チェック(design-spec §7 の確定事項 / §14 のレガシー状態)。
 // 管理オンデマンド呼び出し前提のフルスキャン(DO 内 SQLite なので実テナント規模では許容。
 // 公開経路からは呼ばれない)。
 export interface HealthReport {
   // §7: archived かつ公開中(published_snapshots が残ったまま status だけ archived になった)一覧
   archivedPublished: { recordId: string; type: string; publishedAt: string }[];
-  // §14-1: レガシー user 型 'asset'(ensureAssetContentType がシステム型への昇格を断念した状態)
+  // §14-1: レガシー user 型 'asset'(ensureAssetContentType がシステム型への切り替えを断念した状態)
   legacyAssetType: boolean;
   // §13: 旧形式(非構造)richtext を持つ record(validate-on-write が保存不能にする)
   legacyRichtextRecords: { recordId: string; type: string; fieldKey: string }[];
@@ -46,7 +46,7 @@ function richtextFieldKeys(fields: FieldDefinition[]): string[] {
 }
 
 // §13 の構造検証(record-schema.ts の richTextEnvelopeSchema)と同じ判定: envelope が object で
-// doc.type が string なら新形式。それ以外(素の文字列・doc 欠落等)は旧形式とみなす。
+// doc.type が string なら新形式。それ以外(未処理の文字列・doc 欠落等)は旧形式とみなす。
 function isLegacyRichTextValue(value: unknown): boolean {
   if (typeof value !== "object" || value === null) {
     return true;

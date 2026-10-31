@@ -22,7 +22,7 @@ export function moduleIdFromAlarmKind(kind: string): string | null {
 // Important fix(レビュー指摘): 当初はこの関数自身が try/catch していたが、それだと呼び出し元の
 // TenantDO#runModuleAlarm の transactionSync クロージャが throw しなくなり、(1) ハンドラ途中までの
 // 部分書き込みがそのまま commit され、(2) clearAlarm も commit 済みで ctx.schedule() に到達できない
-// ため当該モジュールの alarm 再武装が永久に失われる、という regression があった。throw の隔離
+// ため当該モジュールの alarm の再設定が永久に失われる、という regression があった。throw の隔離
 // (transactionSync 全体のロールバック + 他モジュール継続)は呼び出し側の責務とし、この関数自体は
 // throw を素通しする契約にする。
 export function runModuleAlarmHandler(

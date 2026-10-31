@@ -4,11 +4,11 @@ export interface AuthContext {
   userId: string;
   role: Role;
   // テナント境界を跨いで運ばれる場合のみ存在(HTTP ゲート / WS ソケット auth 由来)。
-  // Phase 9: module_events の排出先(do_config.tenant_id)を write 経路でも刻むために使う。
+  // Phase 9: module_events の送出先(do_config.tenant_id)を write 経路でも刻むために使う。
   tenantId?: string;
 }
 
-// design-spec §11.5 第2段（型×操作）。Phase 2 申し送りにより beforeWrite パイプライン
+// design-spec §11.5 第2段（型×操作）。Phase 2 引き継ぎ事項により beforeWrite パイプライン
 // ではなく RPC 入口（no-op 判定・検証より前）で判定する — no-op 経路が
 // 「現在値を正確に当てた書き込み」の内容確認オラクルになるのを防ぐ。
 //

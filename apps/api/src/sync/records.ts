@@ -20,7 +20,7 @@ interface RawSyncRow extends Record<string, SqlStorageValue> {
 
 // 同期の record 表現は relations を統合した「writeRecord の input 形式」。
 // これにより getRecord → 編集 → writeRecord の read-modify-write で
-// optional relation が無言でクリアされる継ぎ目（Phase 2 申し送り）が消える。
+// optional relation が無言でクリアされる継ぎ目（Phase 2 引き継ぎ事項）が消える。
 export function buildSyncInput(
   data: Record<string, unknown>,
   relations: Map<string, RelationRef[]>,

@@ -4,9 +4,9 @@
 
 export const OUTBOX_SWEEP = "outbox_sweep";
 
-// コミット直後に排出できなかった分を数秒後に拾い直す（§12.3 の「コミットの事実」に依存する保証）
+// コミット直後に送出できなかった分を数秒後に拾い直す（§12.3 の「コミットの事実」に依存する保証）
 export const SWEEP_DELAY_MS = 5_000;
-// 排出しきれなかった場合の再試行間隔
+// 送出しきれなかった場合の再試行間隔
 export const SWEEP_RETRY_MS = 30_000;
 
 export function minDueAt(sql: SqlStorage): number | null {

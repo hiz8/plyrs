@@ -23,14 +23,14 @@ app.use("/v1/*", requireSaneSecret);
 app.use("/super-auth/*", requireSaneSecret);
 app.use("/super/v1/*", requireSaneSecret);
 app.route("/auth", authRoutes);
-// 裁定 9: self-serve テナント作成(旧 POST /v1/tenants)は撤去。作成は /super/v1/tenants 専用。
+// 決定 9: self-serve テナント作成(旧 POST /v1/tenants)は撤去。作成は /super/v1/tenants 専用。
 app.route("/v1/t", tenantRoutes);
 app.route("/super-auth", superAuthRoutes);
 app.route("/super/v1", superRoutes);
 // §11.7(論点W): 公開 write。publicRoutes(GET のみ)より前に置く — メソッドが違うため衝突しない。
 // POST の 404 を read 側の notFound に食わせない順序。
 app.route("/public/v1", publicWriteRoutes);
-// design-spec §12: 公開 read（認証なし・DO 非経由・投影 D1 のみ）
+// design-spec §12: 公開 read（認証なし・DO 非経由・公開用 DB（PROJECTION_DB）のみ）
 app.route("/public/v1", publicRoutes);
 app.notFound((c) => c.json({ error: "not_found" }, 404));
 

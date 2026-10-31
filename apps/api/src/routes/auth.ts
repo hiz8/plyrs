@@ -182,7 +182,7 @@ export const authRoutes = new Hono<{ Bindings: Env }>()
       return c.json({ ok: true, revokedSessions: revoked.length });
     },
   )
-  // G5: セッション cookie（D1 真実源）を提示して短命 JWT を再発行する
+  // G5: セッション cookie（D1 が正本）を提示して短命 JWT を再発行する
   .post("/token", zValidator("json", z.object({ tenantId: z.uuid() })), sessionGate, async (c) => {
     const session = c.get("session");
     const { tenantId } = c.req.valid("json");

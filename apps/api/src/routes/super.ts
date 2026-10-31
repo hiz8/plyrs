@@ -27,7 +27,7 @@ import { asHealthReport, asReprojectResult, asStringArray } from "../rpc-unwrap"
 import { TENANT_SLUG_MAX_LENGTH, TENANT_SLUG_PATTERN } from "./tenants";
 
 // Minor 掃除(§16-3): precheck の SELECT と INSERT の間で同じ slug が挿入される TOCTOU レース
-// (idx_tenants_slug の UNIQUE 違反)を素の 500 にせず 409 slug_taken へ畳むための判定。
+// (idx_tenants_slug の UNIQUE 違反)を未処理の 500 にせず 409 slug_taken へ変換するための判定。
 function isUniqueConstraintError(err: unknown): boolean {
   const cause = err instanceof Error ? err.cause : undefined;
   return cause instanceof Error && cause.message.includes("UNIQUE constraint failed");
@@ -63,7 +63,7 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       .orderBy(asc(tenants.slug));
     return c.json({ tenants: rows });
   })
-  // 裁定 9: テナント作成は super 専用。ownerEmail 指定時は既存ユーザーを owner に任命する。
+  // 決定 9: テナント作成は super 専用。ownerEmail 指定時は既存ユーザーを owner に任命する。
   .post("/tenants", zValidator("json", createTenantSchema), async (c) => {
     const { name, slug, ownerEmail } = c.req.valid("json");
     const db = drizzle(c.env.DB);
@@ -95,7 +95,7 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
     // 作成は低頻度・一意索引(idx_tenants_slug)が原子性を守ることから逐次 await に分解する
     // (ブリーフ注記どおり)。上の SELECT precheck はよくある事故を早期に弾くだけで、
     // 並行リクエストの TOCTOU までは防げない — その場合は INSERT 自体が UNIQUE 制約違反で
-    // 落ちるので、素の 500 にせず catch して 409 slug_taken に畳む。
+    // 落ちるので、未処理の 500 にせず catch して 409 slug_taken に変換する。
     try {
       await db.insert(tenants).values({ id: tenantId, slug, name, createdAt: now });
     } catch (err) {
@@ -118,7 +118,7 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
     });
     return c.json({ tenantId }, 201);
   })
-  // slug は不変(§14-3 の凍結 embed URL 問題があるため rename は name のみ)。
+  // slug は不変(§14-3 のアセットの埋め込み URL の問題があるため rename は name のみ)。
   .patch(
     "/tenants/:tenantId",
     zValidator("json", z.object({ name: z.string().trim().min(1).max(100) })),
@@ -293,7 +293,7 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       return c.json({ ok: true, deleted: keys.length });
     },
   )
-  // §12.3b: テナント単位の再投影を super が起動する。第2段認可(型×操作)は owner 相当の
+  // §12.3b: テナント単位の公開用 DB の再構築を super が起動する。第2段認可(型×操作)は owner 相当の
   // 合成 AuthContext(superAuthContext)で飛び越える(design-spec §11.6)。
   .post("/tenants/:tenantId/reproject", async (c) => {
     const tenantId = c.req.param("tenantId");

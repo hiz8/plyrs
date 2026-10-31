@@ -10,7 +10,7 @@ export type SessionGateVariables = {
 };
 
 // §11.2: 利用者のセッション cookie を要るルート(/auth/token・/auth/tenants・/auth/me・/auth/password)の共通前置き。
-// superGate と同型で、cookie → D1 照会 → blocklist の順と 401/403 の応答形をここ 1 か所に固定する。
+// superGate と同じ形で、cookie → D1 照会 → blocklist の順と 401/403 の応答形をここ 1 か所に固定する。
 export const sessionGate = createMiddleware<{
   Bindings: Env;
   Variables: SessionGateVariables;

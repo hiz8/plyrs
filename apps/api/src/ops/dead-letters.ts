@@ -1,4 +1,4 @@
-// Phase 10 裁定: DLQ は「キュー内滞留」ではなく D1 退避。ack は durable insert 完了後
+// Phase 10 決定: DLQ は「キュー内滞留」ではなく D1 退避。ack は durable insert 完了後
 // (§9 の「黙って ack しない」の意図は「ack より先に永続化する」で保存される)。
 // キュー名は環境サフィックス付き(例: plyrs-projection-preview-dlq)でも動くよう、
 // 完全一致表ではなく「-dlq を剥ぐ」規約で source を導出する(Task 15 の env 分割と対)。

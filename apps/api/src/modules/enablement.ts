@@ -39,7 +39,7 @@ interface RawModuleRegistryRow extends Record<string, SqlStorageValue> {
 // grants / typeWriteGuards が両方ともオブジェクト(null は除く)であることまで見る形状検証
 // (レビュー Minor: 値の型までは見ていなかった)。
 function hasValidPermissionsShape(value: unknown): value is StoredModulePermissions {
-  // Minor fix(レビュー指摘): typeof は配列も "object" を返すため、素の typeof/null 判定だけ
+  // Minor fix(レビュー指摘): typeof は配列も "object" を返すため、単純な typeof/null 判定だけ
   // では配列が通ってしまう(grants/typeWriteGuards が配列でも「object かつ non-null」は満たす)。
   // Array.isArray で配列を全閉する。
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -62,8 +62,8 @@ function hasValidPermissionsShape(value: unknown): value is StoredModulePermissi
 // 1 テナントの RPC(listModules/getContentType 経由の moduleWriteDenial 等)を丸ごと
 // throw させないよう保護する。
 //
-// ユーザー裁定(2026-07-18): パース失敗・想定外シェイプのフォールバックは「権限なし」への
-// fail-open ではなく、MODULE_REGISTRY(コード内静的マニフェスト = 権限の真実源)から
+// ユーザー決定(2026-07-18): パース失敗・想定外シェイプのフォールバックは「権限なし」への
+// fail-open ではなく、MODULE_REGISTRY(コード内静的マニフェスト = 権限の正本)から
 // permissionsFromManifest で再導出する。DB 行が壊れていてもガードの実効性を保つため。
 // moduleId が registry に無ければ(未知モジュール行)安全側で空 grants を返す。
 function safeParsePermissions(

@@ -5,7 +5,7 @@ import { moduleManifestSchema, type ModuleManifest } from "./manifest";
 import { bookingModule } from "./booking/module";
 
 // design-spec §9.1: ファーストパーティ・サンドボックスなし。モジュール = このレジストリに
-// 静的登録された TS オブジェクト(G6 裁定: コード内静的レジストリ)。有効化していない
+// 静的登録された TS オブジェクト(G6 決定: コード内静的レジストリ)。有効化していない
 // モジュールのフック・イベント・alarm・公開エンドポイントは一切走らない(§9.5)。
 
 export type ModuleEventName = "afterWrite" | "afterPublish";
@@ -22,7 +22,7 @@ export interface ModuleEventContext {
 }
 
 // DO 内 alarm ハンドラの文脈(§9.6)。schedule はレジストリ登録のみ
-// (物理 setAlarm は TenantDO.alarm() 末尾の minDueAt 経路が一本で担う — §9 申し送りの制約)。
+// (物理 setAlarm は TenantDO.alarm() 末尾の minDueAt 経路が一本で担う — §9 引き継ぎ事項の制約)。
 export interface ModuleAlarmContext {
   sql: SqlStorage;
   now: number; // effectiveNow(epoch ms)

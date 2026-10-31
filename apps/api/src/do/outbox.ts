@@ -17,7 +17,7 @@ interface RawOutboxRow extends Record<string, SqlStorageValue> {
 }
 
 // design-spec §12.3: publish/unpublish のコミットと同一トランザクションで積む。
-// publishSeq が投影ジョブの順序ガード本体（source_version は参考情報。CRITICAL fix 参照）。
+// publishSeq が反映ジョブの順序ガード本体（source_version は参考情報。CRITICAL fix 参照）。
 export function enqueueOutbox(
   sql: SqlStorage,
   id: string,

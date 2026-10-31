@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { memberships } from "@plyrs/db/control-plane";
 import { blockMembership, blockUser } from "./blocklist";
 
-// §7 申し送り: blockUser(KV)だけでは確立済みソケットが切れない。
+// §7 引き継ぎ事項: blockUser(KV)だけでは確立済みソケットが切れない。
 // BAN は必ず該当テナント DO の disconnectUser と併呼する。
 export async function banUserEverywhere(
   env: Env,

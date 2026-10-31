@@ -52,7 +52,7 @@ function statusFor(code: string): ContentfulStatusCode {
   // §15-4: モジュール拒否コード(`moduleId:reason`、例 booking:slot_full)は公開 write(409)と
   // 揃える。公開 write 側(public-write.ts)は ':' 含みを一律 409 として扱っており、管理 API だけ
   // 既定 400 のままだと同じ拒否理由なのに経路でステータスが割れる。
-  // Minor 掃除(§16-2)申し送り: この判定は「':' を含むか」だけを見る部分文字列チェックで、
+  // Minor 掃除(§16-2)引き継ぎ事項: この判定は「':' を含むか」だけを見る部分文字列チェックで、
   // moduleId が MODULE_REGISTRY に実在するかまでは検証しない(実際に ':' 付きコードを
   // 返すのは現状 booking モジュールのみ — module-flow.test.ts の
   // 「管理 API 経由の booking:slot_full は 409 を返す」が現行挙動を固定)。狭める効用より
@@ -65,7 +65,7 @@ const writeBodySchema = z.object({
   status: z.enum(WORKFLOW_STATUSES).optional(),
 });
 
-// Phase 8 裁定 1: Worker 経由 PUT。CMS の画像用途に十分な上限(動画等の大容量は非目標)。
+// Phase 8 決定 1: Worker 経由 PUT。CMS の画像用途に十分な上限(動画等の大容量は非目標)。
 const MAX_ASSET_SIZE_BYTES = 20 * 1024 * 1024;
 const MAX_ASSET_FILENAME_LENGTH = 256;
 const MAX_ASSET_CONTENT_TYPE_LENGTH = 256; // asset 型の content_type フィールド maxLength と一致
@@ -80,7 +80,7 @@ function stubFor(c: { env: Env; req: { param: (key: "tenantId") => string } }) {
   return c.env.TENANT_DO.get(id);
 }
 
-// Phase 9: 有効化状態の control-plane ミラー(真実源は DO)。再配布(§4.2)の宛先列挙用。
+// Phase 9: 有効化状態の control-plane ミラー(正本は DO)。再配布(§4.2)の宛先列挙用。
 // best-effort — 失敗しても DO 側は確定しており、起床時の遅延適用が安全網になる。
 async function mirrorTenantModule(
   env: Env,
@@ -178,7 +178,7 @@ export const tenantRoutes = new Hono<GateEnv>()
     }
     return c.json(result, 201);
   })
-  // Phase 8 裁定 6: リテラル "orphans" が :assetId として捕捉されないよう、
+  // Phase 8 決定 6: リテラル "orphans" が :assetId として捕捉されないよう、
   // 上記アップロードルートより前・:assetId 系ルートより前に置く。
   .get("/:tenantId/assets/orphans", async (c) => {
     const orphanIds = asOrphanIds(await stubFor(c).listAssetOrphanIds());
@@ -285,7 +285,7 @@ export const tenantRoutes = new Hono<GateEnv>()
       await stubFor(c).deleteRecord(c.req.param("recordId"), c.get("auth")),
     );
     // Phase 8: asset の削除はバイナリも片付ける(best-effort — 失敗した孤児は Phase 10 の
-    // GC 候補。同期 push 経由の削除はここを通らないため孤児が残る — 申し送りに記録済み)。
+    // GC 候補。同期 push 経由の削除はここを通らないため孤児が残る — 引き継ぎ事項に記録済み)。
     if (result.ok && result.record.type === ASSET_TYPE_KEY) {
       const r2Key = result.record.data["r2_key"];
       // 最終レビュー指摘: 他テナント接頭辞の r2_key は削除しない(ownership.ts 冒頭コメント参照)。
@@ -301,8 +301,8 @@ export const tenantRoutes = new Hono<GateEnv>()
     return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
   })
   .post("/:tenantId/records/:recordId/publish", async (c) => {
-    // Phase 8 裁定 4: 凍結 embed URL は公開パス(/public/v1/:tenantSlug/...)を指す。
-    // slug の真実源はコントロールプレーン D1(publish は低頻度なので 1 クエリを許容)。
+    // Phase 8 決定 4: アセットの埋め込み URL は公開パス(/public/v1/:tenantSlug/...)を指す。
+    // slug の正本はコントロールプレーン D1(publish は低頻度なので 1 クエリを許容)。
     const tenantId = c.req.param("tenantId");
     const slugRow = await c.env.DB.prepare("SELECT slug FROM tenants WHERE id = ?")
       .bind(tenantId)

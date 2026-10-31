@@ -97,10 +97,10 @@ export class TenantDO extends DurableObject<Env> {
   private readonly db: DrizzleSqliteDODatabase<typeof schema>;
   // DO 全体の単調 seq（G2）。single-writer なのでメモリ保持 + 起動時復元で十分
   private seq = 0;
-  // CRITICAL fix（レビュー指摘）: 投影ジョブの順序トークン専用の単調カウンタ。records.version は
+  // CRITICAL fix（レビュー指摘）: 公開用 DB の反映ジョブの順序トークン専用の単調カウンタ。records.version は
   // publish/unpublish で変化しないため順序トークンになれない（unpublish→無編集republish が同じ
   // version の upsert/delete を生み、Queues の配信順序非保証と組み合わさると事故る）。
-  // publish・unpublish（cascade 含む）は必ずこれで新しい世代番号を採る。
+  // publish・unpublish（cascade 含む）は必ずこれで新しい publish_seq を採る。
   private publishSeq = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -108,7 +108,7 @@ export class TenantDO extends DurableObject<Env> {
     this.db = drizzle(ctx.storage, { schema });
     ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
-      // Phase 8 裁定 2: システム asset 型を自動登録(冪等)。Phase 8 デプロイ以前から存在する
+      // Phase 8 決定 2: システム asset 型を自動登録(冪等)。Phase 8 デプロイ以前から存在する
       // テナントも、次に DO が起きた時点でここを通って型を得る。変更があった時だけ、
       // hibernation 復帰で生きているソケットへ型カタログを配り直す(registerContentType RPC の
       // broadcast と同じ契約 — G1: content_types は seq を消費しない別チャネル)。
@@ -130,8 +130,8 @@ export class TenantDO extends DurableObject<Env> {
       // CRITICAL fix（レビュー指摘）: do_config.publish_seq が復元の一次情報。published_snapshots
       // は unpublish で行が消え、outbox も purgeSent()（sent=1 の掃除。Task 6 のスイーパーが定期的に
       // 呼ぶ）で行が消えるため、どちらのテーブルも「これまで発行した最大値」を恒久的には保持しない
-      // ―― publish→unpublish→purge→evict→republish で番号が巻き戻り、旧世代の delete ジョブが
-      // republish 後の投影行を消す事故を再び開けてしまう。do_config は publish/unpublish と同じ
+      // ―― publish→unpublish→purge→evict→republish で番号が巻き戻り、古い publish_seq の delete ジョブが
+      // republish 後の公開用 DB の行を消す事故を再び開けてしまう。do_config は publish/unpublish と同じ
       // トランザクションで書くため、テーブル側の行が消えても残る。以下の MAX スキャンは do_config の
       // 行が無かった古い DO のための床（belt and braces）に過ぎない。
       const storedRaw = ctx.storage.sql
@@ -287,7 +287,7 @@ export class TenantDO extends DurableObject<Env> {
     return moduleCatalog().map((module) => this.moduleSummary(module.manifest.moduleId));
   }
 
-  // §4.2: Queues 再配布の着地点。冪等(同一定義は Task 3 の no-op + applied_version 一致で
+  // §4.2: Queues 再配布が届く先。冪等(同一定義は Task 3 の no-op + applied_version 一致で
   // 何もしない)。無効テナントには型を足さない。
   applyModuleManifest(
     moduleId: string,
@@ -345,7 +345,7 @@ export class TenantDO extends DurableObject<Env> {
       return { ok: false, ...moduleDenial };
     }
     const armed: Promise<void>[] = [];
-    // outbox 系 RPC(publish/unpublish/delete/push)と同じ規律: 実際に module_events が
+    // outbox 系 RPC(publish/unpublish/delete/push)と同じ方針: 実際に module_events が
     // 積まれた時だけ drain する(§14 の MINOR fix と同じアンチパターン ―
     // 「tenant unknown」ログの空撃ちと無駄な unsentModuleEvents クエリ ― を避ける)。
     let moduleEventsPending = false;
@@ -365,7 +365,7 @@ export class TenantDO extends DurableObject<Env> {
         contentType,
         { ...params, actor: auth.userId },
       );
-      // module_events の宛先(do_config.tenant_id)は write 経路でも刻む(§14 の push 教訓と同型:
+      // module_events の宛先(do_config.tenant_id)は write 経路でも刻む(§14 の push 教訓と同じ形:
       // 実際に積まれた時だけ)。auth.tenantId は HTTP ゲート由来のときのみ存在する。
       if (countUnsentModuleEvents(this.ctx.storage.sql) > 0 && auth.tenantId !== undefined) {
         moduleEventsPending = true;
@@ -387,7 +387,7 @@ export class TenantDO extends DurableObject<Env> {
     return result;
   }
 
-  // Phase 8 裁定 1: asset record の作成・システム管理フィールドの書き込みはアップロード API
+  // Phase 8 決定 1: asset record の作成・システム管理フィールドの書き込みはアップロード API
   // 専用の経路。writeRecord と同じコアを systemWrite で通す(assetGuardHook だけが免除される —
   // unique 検証や validate-on-write は同じに掛かる)。
   async createAssetRecord(params: WriteRecordInput, auth: AuthContext): Promise<WriteRecordResult> {
@@ -571,7 +571,7 @@ export class TenantDO extends DurableObject<Env> {
     return loadPublications(this.ctx.storage.sql, query);
   }
 
-  // Phase 8 裁定 6: 読み取り系は getRecord と同じく role 不問(authorize.ts 冒頭コメントの既存規律)
+  // Phase 8 決定 6: 読み取り系は getRecord と同じく role 不問(authorize.ts 冒頭コメントの既存の方針)
   listAssetOrphanIds(): string[] {
     return loadAssetOrphanIds(this.ctx.storage.sql);
   }
@@ -580,9 +580,9 @@ export class TenantDO extends DurableObject<Env> {
     return loadAssetUsage(this.ctx.storage.sql, assetId);
   }
 
-  // Phase 10: 特権コンソールの健全性チェック。管理オンデマンド呼び出し前提のフルスキャン
+  // Phase 10: 運営管理画面の健全性チェック。管理オンデマンド呼び出し前提のフルスキャン
   // (DO 内 SQLite なので実テナント規模では許容。公開経路からは呼ばれない)。読み取り系は
-  // getRecord と同じく role 不問(authorize.ts 冒頭コメントの既存規律)。
+  // getRecord と同じく role 不問(authorize.ts 冒頭コメントの既存の方針)。
   healthCheck(): HealthReport {
     return healthCheckCore(this.ctx.storage.sql);
   }
@@ -631,8 +631,8 @@ export class TenantDO extends DurableObject<Env> {
       if (inner.ok && countUnsent(this.ctx.storage.sql) > 0) {
         armed.push(this.armSweep(Date.now() + SWEEP_DELAY_MS));
       }
-      // §9.4: delete は自ら module event を積まないが、直前の操作の排出漏れを拾える経路として
-      // publish/unpublish と同型で足す(afterPublish の排出経路)。
+      // §9.4: delete は自ら module event を積まないが、直前の操作の送出漏れを拾える経路として
+      // publish/unpublish と同じ形で足す(afterPublish の送出経路)。
       if (countUnsentModuleEvents(this.ctx.storage.sql) > 0) {
         moduleEventsPending = true;
         armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
@@ -653,7 +653,7 @@ export class TenantDO extends DurableObject<Env> {
     return result;
   }
 
-  // DO は自分が idFromName のどの名前で起きたかを知らない。投影ジョブの宛先に必要なので永続化する。
+  // DO は自分が idFromName のどの名前で起きたかを知らない。反映ジョブの宛先に必要なので永続化する。
   private rememberTenant(tenantId: string): void {
     this.ctx.storage.sql.exec(
       "INSERT OR REPLACE INTO do_config (key, value) VALUES ('tenant_id', ?)",
@@ -704,7 +704,7 @@ export class TenantDO extends DurableObject<Env> {
       if (inner.ok) {
         armed.push(this.armSweep(Date.now() + SWEEP_DELAY_MS));
       }
-      // §9.4: afterPublish が積まれた時だけ module events sweep も張る(outbox と同型)。
+      // §9.4: afterPublish が積まれた時だけ module events sweep も張る(outbox と同じ形)。
       if (countUnsentModuleEvents(this.ctx.storage.sql) > 0) {
         moduleEventsPending = true;
         armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
@@ -746,8 +746,8 @@ export class TenantDO extends DurableObject<Env> {
       if (inner.ok) {
         armed.push(this.armSweep(Date.now() + SWEEP_DELAY_MS));
       }
-      // §9.4: unpublish 自体は afterPublish を積まないが、直前の排出漏れを拾える経路として
-      // publish と同型で足す。
+      // §9.4: unpublish 自体は afterPublish を積まないが、直前の送出漏れを拾える経路として
+      // publish と同じ形で足す。
       if (countUnsentModuleEvents(this.ctx.storage.sql) > 0) {
         moduleEventsPending = true;
         armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
@@ -783,7 +783,7 @@ export class TenantDO extends DurableObject<Env> {
     return row?.value ?? null;
   }
 
-  // アウトボックスの排出。正常系は publish 直後に呼ぶ。失敗しても例外を投げない
+  // アウトボックスの送出。正常系は publish 直後に呼ぶ。失敗しても例外を投げない
   // （コミットは済んでいる。拾い直すのは sweeper の仕事 = §12.3 の「コミットの事実」に依存する保証）。
   private async drainOutbox(): Promise<void> {
     const tenantId = this.tenantId();
@@ -819,7 +819,7 @@ export class TenantDO extends DurableObject<Env> {
     }
   }
 
-  // drainOutbox と同じ契約: コミット済みイベントのベストエフォート排出。失敗は sweeper が拾う。
+  // drainOutbox と同じ契約: コミット済みイベントのベストエフォート送出。失敗は sweeper が拾う。
   private async drainModuleEvents(): Promise<void> {
     const tenantId = this.tenantId();
     if (tenantId === null) {
@@ -883,15 +883,15 @@ export class TenantDO extends DurableObject<Env> {
 
   // §9.6: モジュール alarm のディスパッチ。ハンドラはトランザクション内で走り、
   // schedule はレジストリ登録のみ(物理再アームは alarm() 末尾の minDueAt 経路が担う —
-  // §9 申し送り: モジュールに ctx.storage.setAlarm を触らせない)。
+  // §9 引き継ぎ事項: モジュールに ctx.storage.setAlarm を触らせない)。
   //
   // Important fix(レビュー指摘): try/catch は transactionSync の**外側**、モジュール単位で
   // 行う。runModuleAlarmHandler(module-alarms.ts)は throw を素通しする契約なので、onAlarm が
   // throw すると transactionSync のクロージャごと throw し、clearAlarm を含む書き込みが
-  // 丸ごとロールバックされる(= 次回起床でリトライされ、alarm 再武装が失われない)。ここで
+  // 丸ごとロールバックされる(= 次回起床でリトライされ、alarm の再設定が失われない)。ここで
   // catch して console.error するだけに留め、他モジュールの alarm 実行・末尾の物理 setAlarm
   // 再アームは呼び出し元(alarm())の for ループで継続させる(ensureAssetContentType /
-  // ensureEnabledModuleTypes と同じテナント全損回避の規律)。
+  // ensureEnabledModuleTypes と同じテナント全損回避の方針)。
   private runModuleAlarm(moduleId: string, nowMs: number): void {
     const written: string[] = [];
     try {
@@ -956,7 +956,7 @@ export class TenantDO extends DurableObject<Env> {
   // drainOutbox() の await 中は DO の input gate が保持されないため、この消去は「sweep が始まった
   // 後に別の publish/unpublish/delete/push が張った新しい登録」も巻き添えで消しうる。ただし、その
   // 割り込んだ操作自身も自分の transactionSync 直後に armSweep + drainOutbox（速い経路）で自分の
-  // outbox 行を排出済みなので、実害が出るのは「その割り込んだ操作自身の drain も失敗していた」
+  // outbox 行を送出済みなので、実害が出るのは「その割り込んだ操作自身の drain も失敗していた」
   // 場合に限られる ―― そのときは次のアラームが SWEEP_DELAY_MS(5s) ではなく SWEEP_RETRY_MS(30s)
   // 後になるだけで、正しさ（§12.3: いずれ拾われる）は損なわれない。これを許容される最悪ケースとして
   // 明示的に受け入れる。
@@ -971,7 +971,7 @@ export class TenantDO extends DurableObject<Env> {
     purgeSent(this.ctx.storage.sql);
   }
 
-  // module_events 版の sweepOutbox。多重化・再アーム方針は完全に同型(§9.6)。
+  // module_events 版の sweepOutbox。多重化・再アーム方針は完全に同じ形(§9.6)。
   private async sweepModuleEvents(): Promise<void> {
     await this.drainModuleEvents();
     clearAlarm(this.ctx.storage.sql, MODULE_EVENTS_SWEEP);
@@ -982,7 +982,7 @@ export class TenantDO extends DurableObject<Env> {
     purgeSentModuleEvents(this.ctx.storage.sql);
   }
 
-  // Queues consumer が投影ペイロードを取りに来る経路（メッセージ本体にデータを載せない）
+  // Queues consumer が反映用ペイロードを取りに来る経路（メッセージ本体にデータを載せない）
   getProjectionPayload(recordId: string): ProjectionPayload | null {
     return loadProjectionPayload(this.ctx.storage.sql, recordId);
   }
@@ -994,8 +994,8 @@ export class TenantDO extends DurableObject<Env> {
     return loadPublishedPage(this.ctx.storage.sql, cursor, limit);
   }
 
-  // Finding 3（important）: 再投影の終端 sweep が使う。カタログ（projection_fields）は record の
-  // 投影 upsert への相乗りでしか更新されないため、全件 unpublish 済みの型は歩きのページ読み取りに
+  // Finding 3（important）: 公開用 DB の再構築の終端 sweep が使う。カタログ（projection_fields）は record の
+  // 公開用 DB への upsert と同時にしか更新されないため、全件 unpublish 済みの型は再構築の実行（1 回分）のページ読み取りに
   // 一度も乗らず、宣言（content_types）が生きていても sweep がカタログ行を消してしまう
   // （projection/consumer.ts の handleReprojectJob 参照）。カタログは公開レコードの有無ではなく
   // 「宣言があるか」だけに依存するべき派生物なので、record とは独立に content_types から
@@ -1007,7 +1007,7 @@ export class TenantDO extends DurableObject<Env> {
     }));
   }
 
-  // §12.3b: テナント単位の再投影を開始する（owner 限定）。epoch を刻んで最初の reproject
+  // §12.3b: テナント単位の公開用 DB の再構築を開始する（owner 限定）。epoch を刻んで最初の reproject
   // ジョブ（cursor: null）を 1 件送出するだけ — ページングと mark-and-sweep は consumer 側。
   async startReprojection(
     tenantId: string,
@@ -1021,7 +1021,7 @@ export class TenantDO extends DurableObject<Env> {
       this.rememberTenant(tenantId);
     });
     const epoch = Date.now();
-    // 再投影は outbox を経由しない（publish のような原子性要求が無く、失敗しても再実行すれば足りる）
+    // 公開用 DB の再構築は outbox を経由しない（publish のような原子性要求が無く、失敗しても再実行すれば足りる）
     await this.env.PROJECTION_QUEUE.send({ jobType: "reproject", tenantId, cursor: null, epoch });
     return { ok: true, epoch };
   }
@@ -1074,7 +1074,7 @@ export class TenantDO extends DurableObject<Env> {
     ws.send(JSON.stringify(message));
   }
 
-  // 失効したソケットへは配信しない（読み取り側にも ≤15分の失効を効かせる）。
+  // 失効したソケットへは配信しない（読み取り側にも ≤15分の失効を適用する）。
   // DO が既に起きている時にしか走らないためハイバネーションコストは変わらない。
   private isSocketLive(socket: WebSocket, nowMs: number): boolean {
     if (socket.readyState !== WebSocket.OPEN) {
@@ -1120,7 +1120,7 @@ export class TenantDO extends DurableObject<Env> {
       ws.close(CLOSE_CODES.protocolError, "no_session");
       return;
     }
-    // Phase 3 申し送り: 15分 JWT はソケット確立後に切れる。メッセージ処理の入口で検査する。
+    // Phase 3 引き継ぎ事項: 15分 JWT はソケット確立後に切れる。メッセージ処理の入口で検査する。
     if (isTokenExpired(auth, Date.now())) {
       ws.close(CLOSE_CODES.tokenExpired, "token_expired");
       return;
@@ -1142,14 +1142,14 @@ export class TenantDO extends DurableObject<Env> {
     if (parsed.type === "push") {
       let outcome: PushOutcome;
       // CRITICAL fix（レビュー指摘）: push 経路の delete は deleteRecordCore → cascadeUnpublish
-      // 経由で outbox に delete 行を積みうる（裁定 2026-07-13）。deleteRecord/publishRecord/
-      // unpublishRecord の各 RPC 経路はコミット直後に sweep を張って outbox を排出するが、
+      // 経由で outbox に delete 行を積みうる（決定 2026-07-13）。deleteRecord/publishRecord/
+      // unpublishRecord の各 RPC 経路はコミット直後に sweep を張って outbox を送出するが、
       // この経路だけそれを欠いていた ―― レジストリが空のままだと constructor の再アーム保険も
-      // 効かず、以後このテナントで publish/unpublish/HTTP delete が一度も呼ばれなければ、
+      // 機能せず、以後このテナントで publish/unpublish/HTTP delete が一度も呼ばれなければ、
       // コミット済みの unpublish が outbox に永遠に取り残される（公開停止したはずのレコードが
-      // 投影に残り続ける）。setAlarm は transactionSync に参加し、ロールバックで巻き戻る
+      // 公開用 DB に残り続ける）。setAlarm は transactionSync に参加し、ロールバックで巻き戻る
       // （実証済み）。クロージャ内では await できないので promise を掴み、トランザクションを
-      // 出てから待つ。module events(afterWrite)も同じ制約を持つため同じ armed 配列に相乗りする。
+      // 出てから待つ。module events(afterWrite)も同じ制約を持つため同じ armed 配列を共用する。
       const armed: Promise<void>[] = [];
       let outboxPending = false;
       let moduleEventsPending = false;
@@ -1210,14 +1210,14 @@ export class TenantDO extends DurableObject<Env> {
       // 呼ばれないため、型登録とレコード書き込みしかしていないテナントには do_config に
       // tenant_id が無い。drainOutbox() を毎 push 無条件に呼ぶと、そのテナントの push（同期の
       // 最も高頻度な経路）が毎回 tenant id 不明のエラーログを吐く。outbox に実際に行が積まれて
-      // sweep を張った時（outboxPending）だけ排出を試みる ―― drainOutbox 自身の
+      // sweep を張った時（outboxPending）だけ送出を試みる ―― drainOutbox 自身の
       // 「tenant unknown → ログして return」はそれでも保険として残す。
       if (outboxPending) {
-        // drainOutbox はコミット後のベストエフォート排出。ack/broadcast は既に送信済みなので、
+        // drainOutbox はコミット後のベストエフォート送出。ack/broadcast は既に送信済みなので、
         // 失敗しても例外を投げず、拾い直しは sweeper に任せる（drainOutbox 自身の契約）。
         await this.drainOutbox();
       }
-      // module events を積んだときのみ排出する(drainOutbox と同じ理由・同じベストエフォート契約)。
+      // module events を積んだときのみ送出する(drainOutbox と同じ理由・同じベストエフォート契約)。
       if (moduleEventsPending) {
         await this.drainModuleEvents();
       }
@@ -1235,7 +1235,7 @@ export class TenantDO extends DurableObject<Env> {
     return this.ctx.getWebSockets(tag).length;
   }
 
-  // Phase 3 申し送り: 確立済みソケットは BAN 後も生き続けるため、明示的に切る経路を持つ。
+  // Phase 3 引き継ぎ事項: 確立済みソケットは BAN 後も生き続けるため、明示的に切る経路を持つ。
   disconnectUser(userId: string): number {
     const sockets = this.ctx.getWebSockets(`user:${userId}`);
     for (const socket of sockets) {

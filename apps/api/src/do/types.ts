@@ -34,7 +34,7 @@ export type WriteErrorCode =
 export type WriteRecordInput = Omit<WriteRecordParams, "actor">;
 
 // Phase 9: モジュールフックの拒否コードは `${moduleId}:${reason}` の名前空間必須
-// (例 'booking:slot_full')。システム語彙(WriteErrorCode)と構造的に衝突しない。
+// (例 'booking:slot_full')。システムが定義するコード(WriteErrorCode)と構造的に衝突しない。
 // AckResult.code が string のまま保たれてきた理由の実装(ロードマップ §7)。
 export type ModuleRejectionCode = `${string}:${string}`;
 

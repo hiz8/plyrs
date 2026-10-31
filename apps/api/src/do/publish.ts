@@ -16,9 +16,9 @@ export interface PublishDeps {
   sql: SqlStorage;
   now: () => string;
   newId: () => string;
-  // CRITICAL fix（レビュー指摘）: records.version は publish/unpublish で変化しないため投影ジョブの
+  // CRITICAL fix（レビュー指摘）: records.version は publish/unpublish で変化しないため反映ジョブの
   // 順序トークンになれない（unpublish→無編集republish が同じ version の upsert/delete を生む）。
-  // publish・unpublish は必ずこれで新しい世代番号を採る。
+  // publish・unpublish は必ずこれで新しい publish_seq を採る。
   nextPublishSeq: () => number;
 }
 
@@ -54,7 +54,7 @@ function rowToSnapshot(row: RawSnapshotRow): PublishedSnapshot {
   };
 }
 
-// publish 時点の関係を凍結投影する（field 由来も body 由来も両方。§7）
+// publish 時点の関係を公開版に保存する（field 由来も body 由来も両方。§7）
 export function loadRelationRows(sql: SqlStorage, recordId: string): ProjectionRelationRow[] {
   return sql
     .exec<{
@@ -119,8 +119,8 @@ function writeSnapshot(
   return snapshot;
 }
 
-// Phase 8 裁定 4: 凍結埋め込みは publish 時点の asset record(編集の真実源)から読む。
-// dangling(不在・削除済み・型違い)は null — 素の ID 参照として投影される(ソフト参照)。
+// Phase 8 決定 4: アセットの埋め込み情報は publish 時点の asset record(編集の正本)から読む。
+// dangling(不在・削除済み・型違い)は null — 単なる ID 参照として公開用 DB へ反映される(ソフト参照)。
 function buildAssetEmbed(sql: SqlStorage, tenantSlug: string, assetId: string): AssetEmbed | null {
   const asset = loadRecord(sql, assetId);
   if (asset === null || asset.deletedAt !== null || asset.type !== ASSET_TYPE_KEY) {
@@ -160,8 +160,8 @@ export function publishRecordCore(
   }
   const relations = loadRelationRows(deps.sql, recordId);
 
-  // Phase 8 裁定 7: 参照中(field + body)の未公開 asset を同一トランザクションで一緒に
-  // publish する(公開ゲート付き配信の帰結 — 凍結 URL が publish 直後から機能するため)。
+  // Phase 8 決定 7: 参照中(field + body)の未公開 asset を同一トランザクションで一緒に
+  // publish する(公開ゲート付き配信の帰結 — 埋め込み URL が publish 直後から機能するため)。
   // asset 自身は relation / richtext フィールドを持たないため再帰は起きない。
   // unpublish はカスケードしない(他の公開 record が参照中かもしれない)。
   const assetIds = [
@@ -189,7 +189,7 @@ export function publishRecordCore(
     writeSnapshot(deps, asset, loadRelationRows(deps.sql, assetId), actor);
   }
 
-  // 裁定 4: snapshotEmbed "value" のフィールド由来行へ凍結値を埋め込む。body 由来の asset
+  // 決定 4: snapshotEmbed "value" のフィールド由来行へ publish 時点の値を埋め込む。body 由来の asset
   // 参照には埋め込まない(フィールド設定を持たない — 公開側は URL 規約
   // /public/v1/:slug/assets/:id で解決する)。
   const contentType = loadContentTypeByKey(deps.sql, record.type);
@@ -205,7 +205,7 @@ export function publishRecordCore(
       : row,
   );
   const snapshot = writeSnapshot(deps, record, frozen, actor);
-  // §9.4 ステップ5: afterPublish はコミットと同一トランザクションで積む(排出は呼び出し元)。
+  // §9.4 ステップ5: afterPublish はコミットと同一トランザクションで積む(送出は呼び出し元)。
   // unpublish には emit しない(スコープは afterWrite / afterPublish の 2 種)。
   emitModuleEvents(deps.sql, deps.newId, deps.now(), "afterPublish", record.type, recordId, actor);
   return { ok: true, snapshot };
@@ -221,9 +221,9 @@ export function unpublishRecordCore(deps: PublishDeps, recordId: string): Unpubl
     return { ok: false, code: "not_published", message: `record is not published: ${recordId}` };
   }
   deps.sql.exec("DELETE FROM published_snapshots WHERE record_id = ?", recordId);
-  // CRITICAL fix: delete ジョブには snapshot の publish_seq を使い回さず、必ず新しい世代番号を採る。
+  // CRITICAL fix: delete ジョブには snapshot の publish_seq を使い回さず、必ず新しい publish_seq を採る。
   // これにより「後から republish された upsert」は常にこの delete より新しい番号を持ち、
-  // 遅れて届いた delete が republish 後の投影行を消せなくなる（§12.3）。
+  // 遅れて届いた delete が republish 後の公開用 DB の行を消せなくなる（§12.3）。
   const publishSeq = deps.nextPublishSeq();
   enqueueOutbox(
     deps.sql,
@@ -237,7 +237,7 @@ export function unpublishRecordCore(deps: PublishDeps, recordId: string): Unpubl
   return { ok: true, recordId, sourceVersion: row.source_version };
 }
 
-// 裁定（2026-07-13）: delete は unpublish を強制する。未公開なら何もしない。
+// 決定（2026-07-13）: delete は unpublish を強制する。未公開なら何もしない。
 export function cascadeUnpublish(deps: PublishDeps, recordId: string): void {
   unpublishRecordCore(deps, recordId);
 }
@@ -250,12 +250,12 @@ export function loadProjectionPayload(sql: SqlStorage, recordId: string): Projec
     return null;
   }
   const snapshot = rowToSnapshot(row);
-  // 型定義が消えていても投影は落とさない（索引が空になるだけ）。寛容読みの姿勢と揃える。
+  // 型定義が消えていても公開用 DB への反映は落とさない（索引が空になるだけ）。tolerant read の姿勢と揃える。
   const contentType = loadContentTypeByKey(sql, snapshot.type);
   return buildProjectionPayload(contentType?.fields ?? [], snapshot);
 }
 
-// 再投影のページング（record_id 順の keyset ページネーション）
+// 公開用 DB の再構築のページング（record_id 順の keyset ページネーション）
 export function loadPublishedPage(
   sql: SqlStorage,
   cursor: string | null,
@@ -287,7 +287,7 @@ export function loadPublishedPage(
 }
 
 // Phase 6b: 管理画面の公開状態表示・archive 警告（design-spec §7）のための読み取り。
-// 公開状態の真実源 = published_snapshots 行の有無（§7）なので、record の存在は見ない。
+// 公開状態の正本 = published_snapshots 行の有無（§7）なので、record の存在は見ない。
 export type PublicationState =
   | { published: false }
   | { published: true; publishedAt: string; publishedBy: string; sourceVersion: number };
@@ -324,7 +324,7 @@ export function loadPublications(
     params.push(query.cursor);
   }
   // 条件は固定文字列の組み合わせのみ(値はすべてバインド)。`?1 IS NULL OR type = ?1` の形に
-  // 畳むと SQLite が idx_published_snapshots_type を使えずフルスキャンになるため、句ごと出し分ける
+  // まとめると SQLite が idx_published_snapshots_type を使えずフルスキャンになるため、句ごと出し分ける
   const where = conditions.length === 0 ? "" : ` WHERE ${conditions.join(" AND ")}`;
   const rows = sql
     .exec<Pick<RawSnapshotRow, "record_id" | "published_at" | "source_version">>(

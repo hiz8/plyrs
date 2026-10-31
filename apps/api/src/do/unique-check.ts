@@ -1,7 +1,7 @@
 import type { BeforeWriteHook } from "./hooks";
 
 // design-spec §5・33: unique はシステム定義 beforeWrite フックとして強制する。
-// unique を持てるのは text / number / datetime のみ（G7 と同日の裁定）。
+// unique を持てるのは text / number / datetime のみ（G7 と同日の決定）。
 export const uniqueCheckHook: BeforeWriteHook = (ctx) => {
   for (const field of ctx.contentType.fields) {
     if (field.type !== "text" && field.type !== "number" && field.type !== "datetime") {

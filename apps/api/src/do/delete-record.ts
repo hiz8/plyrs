@@ -40,7 +40,7 @@ export function deleteRecordCore(
     recordId,
   );
   deps.sql.exec("DELETE FROM relations WHERE source_id = ?", recordId);
-  // 裁定（2026-07-13）: 削除された実体が公開され続ける事故を構造的に防ぐ。
+  // 決定（2026-07-13）: 削除された実体が公開され続ける事故を構造的に防ぐ。
   // archive（ワークフロー軸）は仕様どおり強制 unpublish しない — delete だけが強制する。
   cascadeUnpublish(
     { sql: deps.sql, now: () => now, newId: deps.newId, nextPublishSeq: deps.nextPublishSeq },

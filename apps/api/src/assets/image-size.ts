@@ -8,7 +8,7 @@ export interface ImageSize {
 }
 
 function u16be(bytes: Uint8Array, offset: number): number {
-  // 呼び出し元が境界チェック済み。noUncheckedIndexedAccess のため ?? 0 で畳む
+  // 呼び出し元が境界チェック済み。noUncheckedIndexedAccess のため ?? 0 にまとめる
   return ((bytes[offset] ?? 0) << 8) | (bytes[offset + 1] ?? 0);
 }
 

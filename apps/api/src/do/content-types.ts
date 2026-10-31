@@ -76,9 +76,9 @@ export function loadContentTypeByKey(sql: SqlStorage, key: string): ContentTypeR
   return row === undefined ? null : rowToContentTypeRow(row);
 }
 
-// Finding 3（important）: 再投影の終端 sweep がカタログ（projection_fields）を content_types から
+// Finding 3（important）: 公開用 DB の再構築の終端 sweep がカタログ（projection_fields）を content_types から
 // 作り直せるように、全 content_types 行をロードする。getProjectionPayload / getPublishedPage
-// （do/publish.ts）と同じ「DO の SQLite を読むだけの素朴な関数」という様式に合わせる。
+// （do/publish.ts）と同じ「DO の SQLite を読むだけの素朴な関数」という書き方に合わせる。
 export function loadAllContentTypeRows(sql: SqlStorage): ContentTypeRow[] {
   return sql
     .exec<RawContentTypeRow>("SELECT * FROM content_types ORDER BY key ASC")

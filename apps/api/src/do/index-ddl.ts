@@ -5,7 +5,7 @@ export interface IndexedColumn {
   columnType: "TEXT" | "NUMERIC" | "INTEGER";
 }
 
-// 単一値フィールドのみ昇格。multiple select は行分割が必要なため対象外（design-spec §12.2 の
+// 単一値フィールドのみ専用カラムへ切り出す。multiple select は行分割が必要なため対象外（design-spec §12.2 の
 // projection_index が公開側で担う）。json / richtext / relation はそもそも indexed を持てない。
 export function indexedColumns(fields: FieldDefinition[]): IndexedColumn[] {
   const out: IndexedColumn[] = [];

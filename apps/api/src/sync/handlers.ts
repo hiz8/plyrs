@@ -63,7 +63,7 @@ export interface PushOutcome {
   broadcasts: ServerMessage[];
 }
 
-// 第2段認可は RPC 入口と同じく「先頭」で判定する（Phase 2 申し送りの内容確認オラクル対策）。
+// 第2段認可は RPC 入口と同じく「先頭」で判定する（Phase 2 引き継ぎ事項の内容確認オラクル対策）。
 export function handlePush(
   deps: PushDeps,
   changes: ClientChange[],
@@ -114,7 +114,7 @@ export function handlePush(
       // 信用できない。write は writeRecordCore 内の prev.type !== contentType.key 検査で
       // 詐称が閉じるが、delete（deleteRecordCore）には対がなく recordId だけで tombstone する。
       // 実 record を引き、その実型に対してモジュール write ガードを再判定する
-      // (apps/api/src/tenant-do.ts の HTTP deleteRecord の既存ガードと同型)。
+      // (apps/api/src/tenant-do.ts の HTTP deleteRecord の既存ガードと同じ形)。
       const target = loadRecord(deps.sql, change.recordId);
       if (target !== null) {
         const actualType = loadContentTypeByKey(deps.sql, target.type);

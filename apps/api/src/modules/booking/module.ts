@@ -59,7 +59,7 @@ const beforeWrite: BeforeWriteHook = (ctx) => {
 };
 
 // §9.3 非同期副作用: 確認メール送信の代替(面4 の外部送信は非目標)。at-least-once の再配達は
-// booking.notification の unique(reservation_id) が unique_violation で畳む = 冪等。
+// booking.notification の unique(reservation_id) が unique_violation で 1 件にまとめる = 冪等。
 async function handleAfterWrite(ctx: ModuleEventContext): Promise<void> {
   const result = await ctx.writeRecord(BOOKING_NOTIFICATION_KEY, {
     recordId: ctx.newId(),

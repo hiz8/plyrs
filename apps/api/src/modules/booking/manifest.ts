@@ -115,7 +115,7 @@ const contentTypes: ContentTypeDefinition[] = [
     pluginId: BOOKING_MODULE_ID,
     version: 1,
     fields: [
-      // afterWrite の at-least-once 配送を冪等に畳む鍵(unique 制約 → 二重配送は unique_violation)
+      // afterWrite の at-least-once 配送を冪等にまとめる鍵(unique 制約 → 二重配送は unique_violation)
       {
         key: "reservation_id",
         type: "text",

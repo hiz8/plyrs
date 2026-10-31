@@ -5,11 +5,11 @@
 interface EnvBindings {
   TENANT_DO: DurableObjectNamespace<import("./src/tenant-do").TenantDO>;
   DB: D1Database;
-  // design-spec §12.2: 共有投影 D1（publish 派生の公開読み取りモデル）
+  // design-spec §12.2: 公開用 DB（PROJECTION_DB。publish 派生の公開読み取りモデル）
   PROJECTION_DB: D1Database;
-  // design-spec §12.3: アウトボックス排出先。DO からも Worker からも送る
+  // design-spec §12.3: アウトボックス送出先。DO からも Worker からも送る
   PROJECTION_QUEUE: Queue<import("./src/projection/jobs").ProjectionJob>;
-  // Phase 9 §9.4: モジュールイベント(afterWrite/afterPublish)の排出先。DO からのみ送る
+  // Phase 9 §9.4: モジュールイベント(afterWrite/afterPublish)の送出先。DO からのみ送る
   MODULES_QUEUE: Queue<import("./src/modules/events").ModuleQueueJob>;
   BLOCKLIST: KVNamespace;
   // Phase 5b (G3): 公開 read の tenantSlug→tenantId 解決キャッシュ（公開経路は DO を起こさない）

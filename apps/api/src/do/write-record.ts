@@ -137,7 +137,7 @@ export function writeRecordCore(
   const statusChanged = prev !== null && nextStatus !== prev.status;
   // computeChangeSet は現行定義の relation フィールドしか見ないため、型定義から外れた
   // フィールドの残存 relation は changedFields に現れない。それを見逃すと「無変更」判定のまま
-  // 早期returnし、下の再投影（blanket delete）に到達できず relations が残留し続ける。
+  // 早期returnし、下の relations 行の作り直し（blanket delete）に到達できず relations が残留し続ける。
   const currentRelationFieldKeys = new Set(change.relationWrites.map((write) => write.fieldKey));
   const staleRelationFieldRemoved = Array.from(prevRelations.entries()).some(
     ([key, refs]) => refs.length > 0 && !currentRelationFieldKeys.has(key),
@@ -247,7 +247,7 @@ export function writeRecordCore(
     });
   }
 
-  // §9.4 ステップ5: afterWrite はコミットと同一トランザクションで積む(排出は呼び出し元)。
+  // §9.4 ステップ5: afterWrite はコミットと同一トランザクションで積む(送出は呼び出し元)。
   if (deps.newEventId !== undefined) {
     emitModuleEvents(
       deps.sql,

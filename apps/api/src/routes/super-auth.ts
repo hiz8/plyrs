@@ -83,7 +83,7 @@ export const superAuthRoutes = new Hono<SuperAuthEnv>()
     return c.json({ adminId, totpSecret: secret, otpauthUri: otpauthUri(normalized, secret) }, 201);
   })
   // 単段ログイン(パスワード + TOTP を 1 リクエスト。中間状態セッションを持たない)。
-  // 失敗理由は区別せず invalid_credentials に畳む(列挙耐性)。
+  // 失敗理由は区別せず invalid_credentials にまとめる(列挙耐性)。
   .post("/login", zValidator("json", loginSchema), async (c) => {
     const decision = await checkAuthRateLimit(c.env, c.req.header("cf-connecting-ip"));
     if (decision !== "ok") {
