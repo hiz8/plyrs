@@ -147,7 +147,7 @@ describe("fieldDefinitionSchema", () => {
   });
 });
 
-describe('relation snapshotEmbed "value" (Phase 8 決定 4: asset 限定の固定の値)', () => {
+describe('relation snapshotEmbed "value" (Phase 8 決定 4: asset 限定の固定値)', () => {
   it('accepts "value" when allowedTypes is exactly ["asset"]', () => {
     const parsed = fieldDefinitionSchema.safeParse(
       relationFieldInput({ allowedTypes: ["asset"], cardinality: "many", snapshotEmbed: "value" }),

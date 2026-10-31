@@ -17,7 +17,7 @@ const indexableConfig = {
 } as const;
 
 // 案 E 2.1: label は入力フォームのラベルと一覧の列見出し(未指定なら key を表示)、
-// description は入力欄の下の補足。どちらも表示用で、検証・公開用 DB・公開 API には影響しない。
+// description は入力欄の下の補足。どちらも表示用で、検証・公開用 DB への反映・公開 API には影響しない。
 export const FIELD_LABEL_MAX_LENGTH = 100;
 export const FIELD_DESCRIPTION_MAX_LENGTH = 500;
 
@@ -102,7 +102,7 @@ export const relationFieldSchema = z
     }),
   })
   .superRefine((field, ctx) => {
-    // Phase 8 決定 4: "value" は asset 限定の固定の値。埋め込むのは実質不変値のみという
+    // Phase 8 決定 4: "value" は asset 限定の固定値。埋め込むのは実質不変値のみという
     // L1 方針(design-spec §7)を、宣言の時点で型レベルに固定する。
     if (
       field.config.snapshotEmbed === "value" &&

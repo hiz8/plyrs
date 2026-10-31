@@ -1,4 +1,4 @@
-// design-spec §11.2: 権限剥奪・BAN の即時失効はブロックリスト照会で有効にする。
+// design-spec §11.2: 権限剥奪・BAN の即時失効はブロックリスト照会で実現する。
 // 更新は失効イベント時のみ（稀）、読みは毎リクエスト（KV はエッジで安価）。
 function keyFor(userId: string): string {
   return `blocked:user:${userId}`;

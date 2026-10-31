@@ -995,7 +995,7 @@ export class TenantDO extends DurableObject<Env> {
   }
 
   // Finding 3（important）: 公開用 DB の再構築の終端 sweep が使う。カタログ（projection_fields）は record の
-  // 公開用 DB への upsert と同時にしか更新されないため、全件 unpublish 済みの型は再構築の実行（1 回分）のページ読み取りに
+  // 公開用 DB への upsert と同時にしか更新されないため、全件 unpublish 済みの型はその回の再構築のページ読み取りに
   // 一度も乗らず、宣言（content_types）が生きていても sweep がカタログ行を消してしまう
   // （projection/consumer.ts の handleReprojectJob 参照）。カタログは公開レコードの有無ではなく
   // 「宣言があるか」だけに依存するべき派生物なので、record とは独立に content_types から

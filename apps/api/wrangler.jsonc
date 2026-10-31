@@ -94,7 +94,7 @@
   "triggers": { "crons": ["17 3 * * *"] },
   // Task 15: preview/production 環境分割。main/compatibility_date/migrations はトップレベルから
   // 継承されるが、binding 系(d1/kv/r2/queues/unsafe/triggers/durable_objects)は wrangler の
-  // 仕様上 env ごとに全定義が必要(継承されない)。`--env` なしの `wrangler deploy`(--env なし)は禁止 —
+  // 仕様上 env ごとに全定義が必要(継承されない)。`--env` なしの `wrangler deploy` は禁止 —
   // トップレベルは dev/vitest 用のダミー ID のまま(docs/deploy.md §0 参照)。
   "env": {
     "preview": {

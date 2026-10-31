@@ -1,6 +1,6 @@
 import type { FieldDefinition } from "@plyrs/metamodel";
 
-// Phase 8 決定 4: snapshotEmbed "value" のアセットの埋め込み情報(asset 限定の固定の種類)。
+// Phase 8 決定 4: snapshotEmbed "value" のアセットの埋め込み情報(asset 限定の固定値)。
 // publish 時点の asset record から取り込んで保存し、以後 asset 側の変更には追従しない
 // (L1: 埋め込むのは実質不変値のみ / L2: 古くなったら記事を再 publish — design-spec §7)。
 export interface AssetEmbed {
@@ -36,7 +36,7 @@ export interface ProjectionIndexRow {
 export const CATALOG_KINDS = ["text", "num", "bool", "date", "relation"] as const;
 export type CatalogKind = (typeof CATALOG_KINDS)[number];
 
-// Phase 5c housekeeping: projection_fields の kind は将来指定できる値が増えうる（record upsert と同時に更新する
+// Phase 5c housekeeping: projection_fields の kind は将来指定できる値が増えうる（record upsert と同時に行う
 // LWW 更新のため、旧コードが新 kind の行を読む窓がある）。未知 kind の行は
 // 「宣言されていない」扱いで skip する保険（loadCatalog が使う）。
 export function isCatalogKind(value: string): value is CatalogKind {

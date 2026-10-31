@@ -131,7 +131,7 @@ function SuperDlqPage() {
           aria-label="失敗したジョブの破棄"
           {...stylex.props(superStyles.dialog)}
         >
-          <h2 {...stylex.props(superStyles.dialogTitle)}>この失敗したジョブを破棄しますか?</h2>
+          <h2 {...stylex.props(superStyles.dialogTitle)}>失敗したジョブを破棄しますか?</h2>
           {discardError !== null ? (
             <p role="alert" {...stylex.props(superStyles.banner)}>
               {discardError}

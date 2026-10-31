@@ -34,7 +34,7 @@ describe("resolveTenantId (design-spec §12.7 / G3)", () => {
     const slug = freshSlug();
     expect(await resolveTenantId(env, slug)).toBeNull();
     await seedTenant(crypto.randomUUID(), slug);
-    // 負キャッシュが効いている（未知 slug 連打でコントロールプレーン D1 を叩かせない）
+    // 負キャッシュが機能している（未知 slug 連打でコントロールプレーン D1 を叩かせない）
     expect(await resolveTenantId(env, slug)).toBeNull();
   });
 

@@ -147,7 +147,7 @@ Durable Object 内で、record から relations の行を作り直す処理は�
 | 公開用 DB の行 | テーブル `projected_records`、`projected_relations` |
 | 墓標 | テーブル `projection_tombstones` |
 | 公開用 DB への反映 | キュー `PROJECTION_QUEUE`、実装 `apps/api/src/projection/`(`consumer.ts`、`jobs.ts`、`payload.ts`) |
-| 公開用 DB の再構築 | ジョブ `jobType: "reproject"`、Durable Object のメソッド `startReprojection`、API `/super/v1/tenants/:tenantId/reproject`、監査アクション `reproject.start` |
+| 公開用 DB の再構築 | ジョブ `jobType: "reproject"`、Durable Object のメソッド `startReprojection`、API `/v1/t/:tenantId/reproject`(テナントのオーナー)と `/super/v1/tenants/:tenantId/reproject`(super 管理者)、監査アクション `reproject.start` |
 | 公開版 | テーブル `published_snapshots` |
 | 順序の基準 | 列 `publish_seq` |
 | 運営管理画面 | API `/super/v1/*`、`/super-auth/*` |

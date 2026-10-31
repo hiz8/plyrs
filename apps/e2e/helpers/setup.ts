@@ -97,7 +97,7 @@ export async function loginAsUser(page: Page, email: string, password: string): 
   await page.waitForURL(/\/t\/[^/]+(\/|$)/);
 }
 
-/** ログイン直後のサイトでサイドバーの「設定」から入り、タブ「コンテンツタイプ」を開いて article 型(title text field)を作る。設定はまず「一般」を最初に開く(V4-G、決定 G4)ためタブを押す。 */
+/** ログイン直後のサイトでサイドバーの「設定」から入り、タブ「コンテンツタイプ」を開いて article 型(title text field)を作る。設定は最初に「一般」を開く(V4-G、決定 G4)ためタブを押す。 */
 export async function createArticleType(page: Page): Promise<void> {
   // パンくずにも「設定」リンクがあるため、サイドバー(<aside> = complementary)に限定する。
   await page.getByRole("complementary").getByRole("link", { name: "設定", exact: true }).click();

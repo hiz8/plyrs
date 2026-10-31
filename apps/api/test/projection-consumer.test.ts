@@ -293,7 +293,7 @@ describe("publish generation ordering — CRITICAL fix (レビュー指摘)", ()
   });
 
   // records.version は publish/unpublish で変化しない。unpublish → 無編集で republish すると
-  // 同じ source_version の upsert/delete が publish_seq の異なる 2 件がアウトボックスに積まれ、Queues は配信順序を
+  // 同じ source_version を持つ upsert/delete が、publish_seq の異なる 2 件としてアウトボックスに積まれ、Queues は配信順序を
   // 保証しないため、遅れて届いた古い delete が現に公開中の republish 後の行を消してしまいうる
   // （旧 source_version ガードに対しては FAIL することを修正前に確認済み — レポート参照）。
   it("survives a stale unpublish-delete that arrives after a same-source-version republish", async () => {

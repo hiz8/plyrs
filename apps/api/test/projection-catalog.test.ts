@@ -153,8 +153,8 @@ describe("projection field catalog (Phase 5b)", () => {
     expect((await catalogRows(tenantId, "article")).length).toBe(4);
 
     // カタログ行の projected_at をわざと古くする ―― 実運用では「この型のレコードが unpublish
-    // されて以降、誰も publish/unpublish していない期間」に相当する（catalog は record payload の書き込み
-    // （upsertStatements）と同時にしか更新されないため、この間 projected_at は unpublish 直前のまま進まない）。
+    // されて以降、誰も publish/unpublish していない期間」に相当する（catalog は upsertStatements の record payload 書き込みと
+    // 同時にしか更新されないため、この間 projected_at は unpublish 直前のまま進まない）。
     // このテストは同期的に進むため、何もしなければ projected_at と reproject の epoch がほぼ
     // 同時刻になり、SWEEP_SKEW_MARGIN_MS の甘さに守られてバグが再現しない（偽陰性）。
     await env.PROJECTION_DB.prepare(

@@ -32,7 +32,7 @@ export const REPROJECT_PAGE_SIZE = 50;
 
 // レビュー指摘（重大）: epoch は DO のアイソレートで刻んだ Date.now()、projected_at は
 // キュー consumer のアイソレートで刻んだ Date.now() ―― 別アイソレートの別時計であり、
-// 単純に比較してよい関係にない（公開用 DB の再構築の実行の終わりの sweep がまさにこの比較をしている）。公開用 DB の再構築の
+// 単純に比較してよい関係にない（公開用 DB の再構築を終える sweep がまさにこの比較をしている）。公開用 DB の再構築の
 // 開始直後に publish された行が、わずかに遅れた consumer の時計で epoch より前の
 // projected_at を持ってしまうと、再構築のページ読み取りに載らなかったその行を sweep が誤って消してしまう。
 // consumer.ts の handleReprojectJob 冒頭コメント参照。

@@ -109,7 +109,7 @@ describe("createTenantSync（ロードマップ §8 配線契約 5 点）", () =
     expect(sync.registry.get("article")?.status).toBe("loading");
     socket.deliver({ type: "sync", records: [record()], serverSeq: 3, complete: true });
     await vi.waitFor(() => expect(sync.getStatus()).toBe("ready"));
-    // sync 完了後: onReady → markReady が効いて loading を抜ける
+    // sync 完了後: onReady → markReady が呼ばれて loading を抜ける
     expect(sync.registry.get("article")?.status).not.toBe("loading");
   });
 

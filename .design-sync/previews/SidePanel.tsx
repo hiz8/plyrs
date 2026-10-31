@@ -3,7 +3,7 @@ import { Button, Checkbox, Select, SidePanel, TextField } from "@plyrs/ui";
 // SidePanel は position: fixed(top 0 / bottom 0)で画面の高さに従う。撮影では高さが測れないため、
 // transform を持つ枠を包含ブロックにして 720×460 の画面を作る。
 // 撮影幅が 960px 未満なので、narrowLayout の既定(full)は全面のシート、sheet は下から出る面として写る。
-// 幅 420px / 360px の右パネルは実機(960px 以上)でだけ見える
+// 幅 420px / 360px の右パネルは実際の画面(960px 以上)でだけ見える
 const screen = {
   position: "relative",
   width: 720,

@@ -44,7 +44,7 @@ export const projectionTombstones = sqliteTable(
     tenantId: text("tenant_id").notNull(),
     recordId: text("record_id").notNull(),
     publishSeq: integer("publish_seq").notNull(),
-    tombstonedAt: integer("tombstoned_at").notNull(), // epoch ms。公開用 DB の再構築の sweep の GC 基準
+    tombstonedAt: integer("tombstoned_at").notNull(), // epoch ms。公開用 DB の再構築で sweep するときの GC 基準
   },
   (table) => [primaryKey({ columns: [table.tenantId, table.recordId] })],
 );

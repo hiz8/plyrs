@@ -251,8 +251,8 @@ async function handleReprojectJob(env: Env, job: ReprojectJob, nowMs: number): P
     return;
   }
   // Finding 3（important）: sweep の前に DO から content_types 由来のカタログを取り直して
-  // upsert する。カタログは record payload と同時に更新する経路（upsertStatements）でしか更新されないため、
-  // 全件 unpublish 済みの型（公開レコード 0 件）は公開用 DB の再構築の実行のページ読み取りに一度も乗らない ――
+  // upsert する。カタログは record payload の書き込み（upsertStatements）と同時にしか更新されないため、
+  // 全件 unpublish 済みの型（公開レコード 0 件）は公開用 DB の再構築のページ読み取りに一度も乗らない ――
   // 宣言（content_types）はまだ生きているのに、この後の sweep（projected_at < epoch - margin）
   // だけがカタログ行を「触られなかった残骸」として削除してしまうと、以後そのテナントのフィルタ/
   // include 検証が「索引宣言なし」の 400 に化ける（upsertStatements 内のコメント参照: 400/空結果
@@ -337,9 +337,9 @@ async function handleReprojectJob(env: Env, job: ReprojectJob, nowMs: number): P
   // unpublish(seq2, projection_tombstones の行が立って配信済み) → republish(seq3, その行は消えて公開用 DB の行は生きている) の後に
   // seq2 の delete ジョブが再配信されると、deleteStatements の INSERT ... ON CONFLICT DO UPDATE は
   // 無条件なので、現に公開中（seq3）のレコードに対して古い publish_seq（seq2）の projection_tombstones の行が孤児として
-  // 再び立つことがある。これは無害である: projection_tombstones の行が弾くのは「自分より新しい publish_seq を運ぶ
-  // 書き込み」だけ（upsertStatements の `publish_seq > ?8` ガード）なので、この孤児の projection_tombstones 行が
-  // 弾けるのは seq2 以下の書き込みに限られ、それは定義上すでに stale であり seq3 以降の
+  // 再び立つことがある。これは無害である: projection_tombstones の行が弾くのは「自分より古い publish_seq を運ぶ
+  // 書き込み」だけ（upsertStatements の `publish_seq > ?8` ガード = 行の publish_seq が書き込みのものより大きいときに弾く）なので、
+  // この孤児の projection_tombstones 行が弾けるのは seq2 より古い書き込みに限られ、それは定義上すでに stale であり seq3 以降の
   // 正当な書き込みを妨げたり行を復活させたりはできない。かつ主キーが (tenant_id, record_id)
   // なので、1 レコードにつき最大 1 行にしか増えない。
   // したがって projection_tombstones の行数は「操作回数」ではなく「レコード数」に有界であり、定期的な
