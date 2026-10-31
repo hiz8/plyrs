@@ -125,7 +125,7 @@ export function createApiClient(baseFetch: typeof fetch = (...args) => fetch(...
       return tenants;
     },
     // createTenant（POST /v1/tenants）は Task 13 で撤去: self-serve 作成廃止(決定 9)により
-    // 対応ルートが api Worker 側から消えている。作成は 運営管理画面専用(super-api.ts)。
+    // 対応ルートが api Worker 側から消えている。作成は運営管理画面専用(super-api.ts)。
     issueToken(tenantId: string): Promise<{ token: string; expiresIn: number }> {
       return requestJson("/auth/token", {
         method: "POST",
