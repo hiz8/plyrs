@@ -116,9 +116,9 @@ describe("projection field catalog (Phase 5b)", () => {
   });
 
   // Finding 3（important）: 公開レコードが 0 件になった型（全件 unpublish 済み）は公開用 DB の再構築の
-  // ページ読み取りに一度も乗らないため、カタログ更新は record payload と同時の更新
-  // （upsertStatements）でしか起きない。宣言（content_types）はまだ生きているのに、終端 sweep
-  // （projected_at < epoch - margin）だけがカタログ行を「触られなかった残骸」として掃いてしまうと、
+  // ページ読み取りに一度も乗らないため、カタログは record payload の書き込み
+  // （upsertStatements）と同時にしか更新されない。宣言（content_types）はまだ生きているのに、終端 sweep
+  // （projected_at < epoch - margin）だけがカタログ行を「触られなかった残骸」として削除してしまうと、
   // 以後このテナントのフィルタ/include 検証が「索引宣言なし」の 400 に化ける。
   // RED-first: 現行実装（sweep の前に DO からカタログを取り直さない）ではこのテストは落ちる。
   it("survives the terminal sweep for a type whose only record was unpublished (Finding 3)", async () => {
@@ -153,8 +153,8 @@ describe("projection field catalog (Phase 5b)", () => {
     expect((await catalogRows(tenantId, "article")).length).toBe(4);
 
     // カタログ行の projected_at をわざと古くする ―― 実運用では「この型のレコードが unpublish
-    // されて以降、誰も publish/unpublish していない期間」に相当する（catalog は record payload
-    // と同時にしか更新されないため、この間 projected_at は unpublish 直前のまま進まない）。
+    // されて以降、誰も publish/unpublish していない期間」に相当する（catalog は record payload の書き込み
+    // （upsertStatements）と同時にしか更新されないため、この間 projected_at は unpublish 直前のまま進まない）。
     // このテストは同期的に進むため、何もしなければ projected_at と reproject の epoch がほぼ
     // 同時刻になり、SWEEP_SKEW_MARGIN_MS の甘さに守られてバグが再現しない（偽陰性）。
     await env.PROJECTION_DB.prepare(

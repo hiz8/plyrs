@@ -183,7 +183,7 @@ describe("runModuleAlarmHandler(レジストリ注入シーム) (§15 冒頭掃�
 });
 
 describe("TenantDO#runModuleAlarm のロールバック隔離 (§15 Important fix)", () => {
-  it("[統合] onAlarm 途中の throw で書き込み・alarm 再設定解除がロールバックされ、他 kind の処理は継続する", async () => {
+  it("[統合] onAlarm 途中の throw で書き込み・alarm の再設定の解除がロールバックされ、他 kind の処理は継続する", async () => {
     const tenantId = "t-alarm-rollback";
     const owner: AuthContext = { userId: "u-owner", role: "owner", tenantId };
     const tenant = stub("mod-alarm-rollback");
