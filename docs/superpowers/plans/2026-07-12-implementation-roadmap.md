@@ -5,6 +5,8 @@
 > superpowers:writing-plans 形式の詳細計画（TDD・完全なコード付き）を
 > `docs/superpowers/plans/` に1ファイルずつ作成する。
 > Phase 1 の詳細計画は作成済み: `2026-07-12-phase1-foundation-and-metamodel.md`
+>
+> 用語について: このファイルと過去の計画書は実施時点の用語のまま残す。新旧の対応は `docs/glossary.md` を参照。
 
 ---
 

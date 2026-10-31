@@ -9,6 +9,7 @@ plyrs は Cloudflare 上のマルチテナント CMS/BaaS(kintone 的に「型�
 - `docs/design-spec.md` — 設計仕様(章番号 `§N`・論点記号・決定ログ)
 - `docs/tech-selection.md` — 技術選定とバージョン方針
 - `docs/deploy.md` — preview / production デプロイ手順、super 管理者 bootstrap
+- `docs/glossary.md` — 用語集。新しい文章(ドキュメント・コメント・画面の文言・コミットメッセージ)は用語集に従う。旧語は過去の計画書にだけ残るので、用語集の対応表で引く
 - `docs/superpowers/plans/2026-07-12-implementation-roadmap.md` — フェーズ計画の索引(各フェーズの申し送り・未裁定事項)。フェーズ別詳細計画は同ディレクトリ
 
 ドキュメント・コメント・コミットメッセージは日本語。
