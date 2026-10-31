@@ -11,7 +11,7 @@
 | ------------------------------- | -------------------------------- | ------------- |
 | ホスト・実行層                  | Cloudflare Workers               | 第3章         |
 | テナントデータ                  | Durable Objects (SQLite backend) | 第2・3・6章   |
-| コントロールプレーン / 公開投影 | D1                               | 第3・11・12章 |
+| コントロールプレーン / 公開用 DB| D1                               | 第3・11・12章 |
 | 非同期搬送                      | Cloudflare Queues                | 第9・12章     |
 | バイナリ                        | R2                               | 第3・5章      |
 | キャッシュ・ブロックリスト      | Cache API / KV                   | 第3・11・12章 |
@@ -78,10 +78,10 @@
 ### 1.5 テスト: Vitest + React Testing Library — 採用(+ 追加1点)
 
 - **現状**: Vitest は VoidZero 製で Vite ネイティブ。oxc 系ツールチェーンと同じ開発元で相性・継続性ともに良い。
-- **追加選定: `@cloudflare/vitest-plugin`**(Cloudflare 公式。1.0.0 で `@cloudflare/vitest-pool-workers` から改名)。Vitest のテストを **workerd ランタイム上で実行**でき、DO・D1・Queues・R2 をローカルでバインドしてテストできる。本プロジェクトのコア(DO 内の書き込み経路・フック・アウトボックス・投影 consumer)は Workers ランタイム依存が強く、Node 上のユニットテストだけでは検証できないため必須。
+- **追加選定: `@cloudflare/vitest-plugin`**(Cloudflare 公式。1.0.0 で `@cloudflare/vitest-pool-workers` から改名)。Vitest のテストを **workerd ランタイム上で実行**でき、DO・D1・Queues・R2 をローカルでバインドしてテストできる。本プロジェクトのコア(DO 内の書き込み経路・フック・アウトボックス・公開用 DB への反映 consumer)は Workers ランタイム依存が強く、Node 上のユニットテストだけでは検証できないため必須。
 - **テスト構成**:
   - **ユニット(Node)**: メタモデルのバリデーション、Zod スキーマ生成、AST → relations 抽出、競合判定ロジック等の純関数。
-  - **統合(vitest-plugin)**: DO 書き込み経路(beforeWrite → commit → outbox)、publish → 投影 consumer、認可2段、alarm 多重化。
+  - **統合(vitest-plugin)**: DO 書き込み経路(beforeWrite → commit → outbox)、publish → 反映 consumer、認可2段、alarm 多重化。
   - **コンポーネント(RTL + jsdom/happy-dom)**: 管理画面 UI。
   - **E2E(Playwright)**: 導入は後回し可。同期(WebSocket)を含むクリティカルパスのみ薄く。
 - **リスクと注意**: vitest-plugin が要求する Vitest のバージョンレンジに引きずられることがある。Vitest のメジャーアップは vitest-plugin の対応を確認してから(2026-10 時点で vitest-plugin 1.3.6 は `vitest ^4.1.0` のみ対応、Vitest 5 は未対応)。
@@ -112,7 +112,7 @@
     admin/        # TanStack Start(管理画面)
     api/          # Hono(公開配信 API・公開 write・Webhook 受け口)
     sync/         # DO 定義(テナント DO)+ 同期プロトコル実装 ※デプロイ単位は api と統合も可
-    consumers/    # Queues consumer(投影・副作用フック)
+    consumers/    # Queues consumer(公開用 DB への反映・副作用フック)
   packages/
     metamodel/    # content_types の型・Zod スキーマ生成・バリデーション(純関数)
     sync-protocol/# 同期メッセージ型・field_versions 競合判定(クライアント/DO 共用)
@@ -137,7 +137,7 @@
 
 - **採用**: Hono(公開配信 API・公開 write エンドポイント・DO 内部の fetch ルーティング)。
 - **根拠**:
-  - Workers ファーストで最軽量級。公開 read パスは「投影 D1 + キャッシュだけを叩く最速経路」(仕様第12章)であるべきで、フレームワークのオーバーヘッド最小化がそのまま効く。
+  - Workers ファーストで最軽量級。公開 read パスは「公開用 DB + キャッシュだけを叩く最速経路」(仕様第12章)であるべきで、フレームワークのオーバーヘッド最小化がそのまま効果的である。
   - **Hono RPC**(`hono/client`)により、管理画面からの非同期 API(publish / unpublish / モジュール有効化等、WebSocket 同期に乗らない操作)を型安全に呼べる。
   - DO クラス内のルーティング(同期 WS のアップグレード、公開 write の受理)にもそのまま使える。
 - **役割分担の明確化**: TanStack Start の server functions は**管理画面固有の glue**(セッション確立・初期データ)に限定し、ドメイン API はすべて Hono 側に置く。公開 API はヘッドレス契約(仕様第0章)なので、管理画面フレームワークから独立させる。
@@ -147,8 +147,8 @@
 
 - **採用**: Drizzle ORM。DO には `drizzle-orm/durable-sqlite` ドライバ、D1 には D1 ドライバ。マイグレーションは drizzle-kit で生成し、DO は**コンストラクタで `blockConcurrencyWhile` + migrator による JIT 適用**(確立済みパターン)。
 - **根拠**:
-  - Durable Objects SQLite と D1 の**両方を公式サポート**する唯一の主要 ORM。DO(コンテンツ中核+運用テーブル)と D1(コントロールプレーン・投影3テーブル)を同じスキーマ定義言語・同じ型推論で書ける。
-  - SQL-like で抽象が薄く、generated column・expression index・`batch()`(投影 consumer の原子性、仕様第12.3章)等、仕様が要求する SQLite の生機能に手が届く。
+  - Durable Objects SQLite と D1 の**両方を公式サポート**する唯一の主要 ORM。DO(コンテンツ中核+運用テーブル)と D1(コントロールプレーン・公開用 DB の3テーブル)を同じスキーマ定義言語・同じ型推論で書ける。
+  - SQL-like で抽象が薄く、generated column・expression index・`batch()`(反映 consumer の原子性、仕様第12.3章)等、仕様が要求する SQLite の生機能に手が届く。
   - drizzle-zod で Zod との接続も既製。
 - **注意**:
   - **メタモデル部分は Drizzle の型推論の外**にある(`records.data` は JSON)。Drizzle が守るのは物理テーブルの形まで。`data` 内の型安全は 2.6 の動的 Zod が担う、という二層を混同しない。
@@ -160,18 +160,18 @@
 - **根拠**:
   - **メタモデル → 実行時スキーマ生成**(仕様第4章、tanstack-db の typed collection をレジストリから実行時生成)に対し、Zod はスキーマを値として合成するのが自然で、フィールド型パレット(第5章)の各型を Zod スキーマ片にマップする実装が素直。
   - Standard Schema 準拠のため、TanStack Form・tanstack-db・Hono のバリデータミドルウェア・drizzle-zod と**単一のスキーマ定義で接続**できる。
-  - validate-on-write(第4.2章)・寛容 read(unknown フィールド保持 = `passthrough`/`loose`)の両方を表現できる。
+  - validate-on-write(第4.2章)・tolerant read(unknown フィールド保持 = `passthrough`/`loose`)の両方を表現できる。
 - **代替案**: Valibot(バンドル最小。`zod/mini` で不足した場合の乗り換え先。Standard Schema 準拠なので接続層は書き直し不要)。
 
 ### 2.7 リッチテキストエディタ: Tiptap v3(ProseMirror)
 
 - **採用**: Tiptap v3。ドキュメントは ProseMirror JSON(= 仕様第5章の「構造化 JSON AST」)として `records.data` に格納。
 - **根拠**:
-  - **ProseMirror の strict なドキュメントスキーマ**が、仕様の中核要求と一対一で対応する: (a) スキーマ外のノードは存在できない → validate-on-write と整合、(b) リンク・埋め込みメディアをカスタムノード(mark/node)として第一級で定義 → 保存時に AST を走査して `relations (origin='body')` へ投影(第6章)する実装が決定的に書ける。
+  - **ProseMirror の strict なドキュメントスキーマ**が、仕様の中核要求と一対一で対応する: (a) スキーマ外のノードは存在できない → validate-on-write と整合、(b) リンク・埋め込みメディアをカスタムノード(mark/node)として第一級で定義 → 保存時に AST を走査して `relations (origin='body')` へ書き出す(第6章)実装が決定的に書ける。
   - ヘッドレス(UI 非依存)なので react-aria-components + StyleX のツールバー・UI と衝突しない。
   - CMS 用途の実績・拡張エコシステム(mention、placeholder、カスタム embed)が最も厚い。
   - 将来オプションの「本文限定の協調編集」(仕様第10章)にも y-prosemirror という確立経路がある(採用は保留のまま)。
-- **AST 永続化の規約**: エディタの JSON をそのまま真実源にするが、**スキーマバージョンを AST ルートに刻む**(`{"schemaVersion": 1, "doc": {...}}`)。エディタ拡張の追加=スキーマ進化であり、寛容 read(第4.2章)の対象として扱う。
+- **AST 永続化の規約**: エディタの JSON をそのまま正本にするが、**スキーマバージョンを AST ルートに刻む**(`{"schemaVersion": 1, "doc": {...}}`)。エディタ拡張の追加=スキーマ進化であり、tolerant read(第4.2章)の対象として扱う。
 - **代替案(不採用理由明記)**:
   - **Lexical**(Meta): StyleX と同じ開発元で思想は近いが、2026年時点でも 0.x であり、リリースごとに非互換変更・deprecated 削除が続いている。**AST を年単位で永続化する本用途では、ドキュメントフォーマットの安定性を最優先**し ProseMirror 系を採る。
   - Plate / BlockNote: ProseMirror ではなく Slate 系/Tiptap ラッパー。抽象が厚く、AST の完全な制御という要求に合わない。
@@ -188,7 +188,7 @@
   - **JWT 署名・検証**: `jose`(Workers 完全対応のデファクト)。仕様第11.2章の短命 JWT(15分)発行と Worker 入口での署名検証。
   - **セッション・ユーザー・membership**: 中央 D1 に Drizzle で自作(仕様が構造を完全に規定済み)。
   - **パスワード**: 初期は **WebCrypto PBKDF2**(Workers ネイティブ、外部依存ゼロ)。将来 **passkey(WebAuthn)** を第一認証に格上げする余地を残す。特権テナント(第11.6章)は当初から passkey または TOTP を必須化。
-- **根拠**: 仕様第11章は「中央 D1 真実源 + 短命 JWT + KV ブロックリスト + 2段認可」という**具体的な独自構造を既に確定**している。Better Auth 等の認証フレームワークはそれ自身のスキーマ・セッションモデルを持ち込むため、この設計に合わせて歪めるより、プリミティブ(jose + WebCrypto)の上に薄く自作する方が総コストが低い。「自分専用の理想 CMS」原則(第9.1章)とも整合。
+- **根拠**: 仕様第11章は「中央 D1 正本 + 短命 JWT + KV ブロックリスト + 2段認可」という**具体的な独自構造を既に確定**している。Better Auth 等の認証フレームワークはそれ自身のスキーマ・セッションモデルを持ち込むため、この設計に合わせて歪めるより、プリミティブ(jose + WebCrypto)の上に薄く自作する方が総コストが低い。「自分専用の理想 CMS」原則(第9.1章)とも整合。
 - **代替案**: Better Auth(D1/Drizzle 対応あり。もし OAuth プロバイダ連携を多数持ちたくなったら、認証**入口だけ**を委ね、セッション・認可は仕様どおり自作構造に落とす形で部分採用を検討)。
 
 ### 2.10 ID 生成: uuid(UUIDv7)
@@ -205,7 +205,7 @@
 ### 2.11 WebSocket 同期: DO Hibernation API 直接使用(ラッパー不採用)
 
 - **採用**: サーバー側は **WebSocket Hibernation API を素で使う**(`acceptWebSocket` / `webSocketMessage`)。クライアント側の再接続・バックオフは `partysocket`(単体利用可能な再接続 WebSocket クライアント)を採用。
-- **根拠**: 仕様第3章がハイバネーションを課金構造の生命線と規定しており、抽象レイヤー(PartyServer 等)を挟むとハイバネーション挙動の制御・検証が間接化する。同期プロトコル(第10章: field_versions・競合裁定)は完全に独自なので、ラッパーの提供する部屋・ブロードキャスト抽象に得るものが少ない。クライアント側だけは再接続処理が定型なので既製を使う。
+- **根拠**: 仕様第3章がハイバネーションを課金構造の生命線と規定しており、抽象レイヤー(PartyServer 等)を挟むとハイバネーション挙動の制御・検証が間接化する。同期プロトコル(第10章: field_versions・競合判定)は完全に独自なので、ラッパーの提供する部屋・ブロードキャスト抽象に得るものが少ない。クライアント側だけは再接続処理が定型なので既製を使う。
 - **メッセージ形式**: JSON(初期)。プロファイリングで問題が出たら CBOR 等を検討(現段階では複雑さを買わない)。
 
 ### 2.12 濫用防止(公開 write): Cloudflare Turnstile + Workers Rate Limiting
@@ -263,7 +263,7 @@ pnpm の `overrides` と renovate(または手動)で管理。RC/beta を2つ(St
   - 手元での `pnpm add` / `pnpm update` も 7 日以内の版を選ばない(例: 最新が当日公開の版でも、7 日前までに公開された版が入る)。公開直後の版がどうしても必要なときは、`pnpm-workspace.yaml` の `minimumReleaseAgeExclude` に対象を明示して追加する。
   - 脆弱性修正の PR は待機・スケジュールの対象外。Renovate は脆弱性修正の更新に限り、`minimumReleaseAgeExclude` へ対象の版を自動で追記する(GitHub の Dependabot alerts を有効にしておく必要がある)。
 - **Cloudflare トークンに触れる依存も特別扱いしない**: `deploy.yml` はトークンを wrangler を実行するステップ(D1 migrations・api デプロイ・admin デプロイ)の env にだけ渡しており(実施済み、`docs/deploy.md` §0)、`pnpm install` と admin ビルドで動く依存は実行中にトークンを読めない。ただし、トークンのないステップで動いたコードは `node_modules` の改ざんや `$GITHUB_PATH` への追記で後続ステップを乗っ取れるため、トークンに触れる可能性はジョブで動くすべての依存(推移的依存を含む)に残る。`wrangler` / `@cloudflare/*` / vite プラグインだけを名前で手動マージにしても守れる範囲は限られ、差分の目視で悪意のあるコードを見抜くことも現実的ではない。一方で wrangler と workers-types はほぼ毎日更新されるため、手動にすると更新が滞る。対策は Renovate と pnpm による 7 日待機(推移的依存を含む)、ステップ単位のトークン分離(実行中に環境変数を読み取って送信する、汎用的な乗っ取りパッケージに有効)、Environment secret を `main` からのデプロイに限定すること、production の必須レビューで受け持つ。
-- **自動マージ後の安全網**: CI で拾えない実機差異(SPA シェル配信など)は、main push で走る preview デプロイで検知する。production は従来どおり手動 + 必須レビュー。
+- **自動マージ後の安全網**: CI で拾えない実環境での差異(SPA シェル配信など)は、main push で走る preview デプロイで検知する。production は従来どおり手動 + 必須レビュー。
 - `engines` の Node 要件と `.node-version` のメジャー(24)は方針として手動で上げる(Renovate は `.node-version` を次メジャー到達時のみ提案する)。
 
 ---

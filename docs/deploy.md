@@ -2,7 +2,7 @@
 
 ## 0. 前提と警告
 
-- **素の `wrangler deploy`(`--env` なし)は禁止**。`apps/api/wrangler.jsonc` / `apps/admin/wrangler.jsonc` のトップレベルブロックは dev/vitest 用(`@cloudflare/vitest-plugin` が `configPath` で読む)であり、`database_id` や KV `id` はすべてダミー値。必ず `--env preview` か `--env production` を付けてデプロイする。
+- **`--env` なしの `wrangler deploy` は禁止**。`apps/api/wrangler.jsonc` / `apps/admin/wrangler.jsonc` のトップレベルブロックは dev/vitest 用(`@cloudflare/vitest-plugin` が `configPath` で読む)であり、`database_id` や KV `id` はすべてダミー値。必ず `--env preview` か `--env production` を付けてデプロイする。
 - GitHub Secrets: `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` は **`preview` / `production` の各 Environment secret として設定し、リポジトリレベルには置かない**。`deploy.yml` のジョブは `environment:` を指定しているので Environment secret が解決される。トークンは環境ごとに別々に発行し、失効・ローテーションを個別に行えるようにする(ただし同一 Cloudflare アカウント内では Workers / D1 の編集権限がアカウント単位のため、preview 用トークンでも production のリソースを操作できる。完全に隔離するには preview 用に別アカウントが必要)。
 - `deploy.yml` は `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` を **wrangler を実行するステップ(D1 migrations・api デプロイ・admin デプロイ)の env にだけ**渡し、`pnpm install` と admin ビルドには渡さない。依存パッケージ(推移的依存を含む)のコードの大半はこの 2 ステップで動くため、トークンが見える範囲を wrangler とその依存に絞れる。admin ビルド(`CLOUDFLARE_ENV=<env> vite build`)は wrangler.jsonc の env 解決をローカルで行うだけで Cloudflare API を呼ばないため、トークンなしで成功する。この分離で防げるのは、実行中に環境変数を読み取って送信するタイプの攻撃(乗っ取られたパッケージの多くはこれ)に限られる。同じジョブ内のステップは同じランナー・同じファイルシステムを共有するため、トークンのないステップで動いたコードが後続ステップを乗っ取る経路が残り、このワークフローを狙った攻撃は防げない。
   - **`node_modules` の改ざん**: admin ビルド(vite と全プラグイン)で動くコードが `node_modules` 内の wrangler を書き換えれば、次のステップで改ざん後の wrangler がトークン付きで実行される。

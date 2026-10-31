@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 概要
 
-plyrs は Cloudflare 上のマルチテナント CMS/BaaS(kintone 的に「型をデータとして定義する」メタモデル + ヘッドレス公開配信)。設計判断の真実源は以下で、コード中のコメントは `§12.3` `論点W` `裁定 10` `Phase 9` のようにこれらを参照する:
+plyrs は Cloudflare 上のマルチテナント CMS/BaaS(kintone 的に「型をデータとして定義する」メタモデル + ヘッドレス公開配信)。設計判断の正本は以下で、コード中のコメントは `§12.3` `論点W` `決定 10` `Phase 9` のようにこれらを参照する:
 
 - `docs/design-spec.md` — 設計仕様(章番号 `§N`・論点記号・決定ログ)
 - `docs/tech-selection.md` — 技術選定とバージョン方針
 - `docs/deploy.md` — preview / production デプロイ手順、super 管理者 bootstrap
 - `docs/glossary.md` — 用語集。新しい文章(ドキュメント・コメント・画面の文言・コミットメッセージ)は用語集に従う。旧語は過去の計画書にだけ残るので、用語集の対応表で引く
-- `docs/superpowers/plans/2026-07-12-implementation-roadmap.md` — フェーズ計画の索引(各フェーズの申し送り・未裁定事項)。フェーズ別詳細計画は同ディレクトリ
+- `docs/superpowers/plans/2026-07-12-implementation-roadmap.md` — フェーズ計画の索引(各フェーズの引き継ぎ事項・未決定事項)。フェーズ別詳細計画は同ディレクトリ
 
 ドキュメント・コメント・コミットメッセージは日本語。
 
@@ -42,7 +42,7 @@ pnpm --filter @plyrs/admin build     # routeTree.gen.ts の再生成もこれで
 ```bash
 pnpm --filter @plyrs/db generate             # テナント DO-SQLite(drizzle/、DO 起動時に自動適用)
 pnpm --filter @plyrs/db generate:d1          # コントロールプレーン D1(drizzle-d1/)
-pnpm --filter @plyrs/db generate:projection  # 公開投影 D1(drizzle-projection/)
+pnpm --filter @plyrs/db generate:projection  # 公開用 DB(drizzle-projection/)
 ```
 
 ## アーキテクチャ
@@ -55,36 +55,36 @@ pnpm --filter @plyrs/db generate:projection  # 公開投影 D1(drizzle-projectio
 - `packages/metamodel` — フィールド型パレット・content type 定義・Zod スキーマ生成・tolerant read(純関数、クライアントと DO で共用)
 - `packages/sync-protocol` — 同期メッセージ型とフィールド単位の競合解決(`resolve.ts`)
 - `packages/sync-client` — 同期エンジン(outbox / store / transport)と TanStack DB 連携(`./tanstack`)
-- `packages/db` — Drizzle スキーマ 3 系統: `schema.ts`(DO 内)/ `control-plane.ts`(D1)/ `projection.ts`(投影 D1)
+- `packages/db` — Drizzle スキーマ 3 系統: `schema.ts`(DO 内)/ `control-plane.ts`(D1)/ `projection.ts`(公開用 DB)
 - `packages/ui` — react-aria-components + StyleX のコンポーネント、Tiptap リッチテキストエディタ
 
 ### データの置き場(物理分離が背骨)
 
 - **テナント = 1 Durable Object (SQLite)**。DO 境界がテナント境界なので DO 内テーブルに `tenant_id` 列は無い。中核は `content_types`(型定義をデータとして持つ)/ `records`(全コンテンツ、`data` は JSON)/ `relations`(関係、片側のみ格納・ソフト参照)。DO が各テナントの single-writer
 - **コントロールプレーン D1**(`DB`): テナント・ユーザー・メンバーシップ・セッション・super 管理者。認可はリクエスト入口(Worker)で DO を開かずに判定する
-- **投影 D1**(`PROJECTION_DB`): 全テナント共有、`tenant_id` 付きの公開読み取りモデル。再構築可能な派生物
+- **公開用 DB**(`PROJECTION_DB`): 全テナント共有、`tenant_id` 付きの公開読み取りモデル。再構築可能な派生物
 - R2 `ASSETS`(キー `${tenantId}/${assetId}`、バイナリ不変)、KV `BLOCKLIST` / `TENANT_SLUGS`
 
 ### 非対称二経路(design-spec §8)
 
-- **書き込み経路**: 管理画面 → sync-client → `/v1/t/:tenantId/sync` の WebSocket(**Hibernation API 必須**、素の `accept()` 禁止)→ DO。書き込みは `do/write-record.ts` に集約され、validate-on-write → beforeWrite フック(一意性 `unique-check`・asset 防御・モジュールフック)→ 差分 → outbox 記録
-- **公開 read 経路**: `/public/v1/:tenantSlug/...` は**DO を起こさない**。投影 D1 とキャッシュのみを読む(`src/public/`)。publish 時に DO の outbox → `PROJECTION_QUEUE` → consumer(`projection/consumer.ts`)が冪等に投影する
+- **書き込み経路**: 管理画面 → sync-client → `/v1/t/:tenantId/sync` の WebSocket(**Hibernation API 必須**、Hibernation API を使わない `accept()` は禁止)→ DO。書き込みは `do/write-record.ts` に集約され、validate-on-write → beforeWrite フック(一意性 `unique-check`・asset 防御・モジュールフック)→ 差分 → outbox 記録
+- **公開 read 経路**: `/public/v1/:tenantSlug/...` は**DO を起こさない**。公開用 DB とキャッシュのみを読む(`src/public/`)。publish 時に DO の outbox → `PROJECTION_QUEUE` → consumer(`projection/consumer.ts`)が冪等に公開用 DB へ反映する
 - 例外: モジュールの公開 write(`routes/public-write.ts`)は Turnstile + Rate Limiting を DO 到達前の Worker 層で検証する(コスト DoS 対策)
 - Queues consumer は `index.ts` の単一 `queue()` がキュー名で振り分ける。`-dlq` は D1 へ退避し `/super/v1/dead-letters` から運用する
 
 ### その他の重要な前提
 
 - **ID はクライアント生成の UUIDv7**。関係はソフト参照で dangling を正常系として扱う
-- 型定義変更で既存 records を一括変換しない(tolerant read + validate-on-write の遅延適合)
+- 型定義変更で既存 records を一括変換しない(tolerant read + validate-on-write の遅延マイグレーション)
 - プラグイン(モジュール)の型キーはモジュール ID で名前空間化(例 `booking.slot`)。モジュールは `apps/api/src/modules/` に manifest + registry で静的登録
 - 同期の競合解決: 別フィールドはマージ、同一スカラーは LWW、同一リッチテキストは検知して手動解決
 - DO の RPC 戻り値は Cloudflare の型が union を潰すため、`src/rpc-unwrap.ts` の `asXxx()` で実型へ戻す。**`@ts-expect-error` による抑止は禁止**
-- admin は `src/start.ts` で `defaultSsr: false`。Workers には SPA の 404→シェル リライト層が無いため `server.ts` が `/_shell` を自前配信する(dev では prerender が無く SSR にフォールバックするので、dev/E2E が緑でも実機で壊れうる)
+- admin は `src/start.ts` で `defaultSsr: false`。Workers には SPA の 404→シェル リライト層が無いため `server.ts` が `/_shell` を自前配信する(dev では prerender が無く SSR にフォールバックするので、dev/E2E のテストが通っても実環境で壊れうる)
 
 ## テスト
 
 - api のテストは `@cloudflare/vitest-plugin`(workerd 上で実行。旧名 `@cloudflare/vitest-pool-workers`)。`vitest.config.ts` が D1 マイグレーションをバインディングとして注入し、`test/apply-migrations.ts` で適用する。DO は `env.TENANT_DO.get(env.TENANT_DO.idFromName(<一意な名前>))` でテストごとに分離する
-- `cloudflare:test` の `fetchMock` は pool-workers 0.18 で削除済み(後継の vitest-plugin でも無し)。外部 fetch のモックは `vi.spyOn(globalThis, "fetch")`(`test/public-write.test.ts` が様式)
+- `cloudflare:test` の `fetchMock` は pool-workers 0.18 で削除済み(後継の vitest-plugin でも無し)。外部 fetch のモックは `vi.spyOn(globalThis, "fetch")`(`test/public-write.test.ts` が手本)
 - admin / ui は jsdom + Testing Library
 
 ## ローカル開発・デプロイの注意
