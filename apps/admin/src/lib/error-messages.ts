@@ -51,7 +51,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   // サイト(super の作成画面)
   slug_taken: "このサイトの識別子は既に使われています",
   unknown_owner: "指定したメールアドレスのユーザーが見つかりません",
-  // メンバー管理(案 G 4 章、裁定 G14)
+  // メンバー管理(案 G 4 章、決定 G14)
   last_owner:
     "最後の管理者のため、ロールの変更と削除はできません。先に別のメンバーを管理者にしてください",
   already_member: "このメールアドレスは既にメンバーです",
@@ -84,7 +84,7 @@ export function errorMessage(cause: unknown, fallback: string): string {
   if (code !== undefined && Object.hasOwn(ERROR_MESSAGES, code)) {
     return ERROR_MESSAGES[code] ?? fallback;
   }
-  // 素の TypeError は見ない(ハンドラ内のバグまで接続エラーに見せないため。network-error.ts)
+  // NetworkError に包まれていない TypeError は見ない(ハンドラ内のバグまで接続エラーに見せないため。network-error.ts)
   if (cause instanceof NetworkError) {
     return NETWORK_ERROR_MESSAGE;
   }

@@ -21,7 +21,7 @@ const styles = stylex.create({
 });
 
 // TanStack Router の errorComponent 契約: 捕捉した error を props で受ける。
-// blocked 403 や 5xx が Router 既定の素の表示に落ちないための最終防衛線（6a Minor）。
+// blocked 403 や 5xx が Router 既定の標準表示に落ちないための最終防衛線（6a Minor）。
 export function ErrorScreen({ error }: { error: unknown }) {
   const detail =
     error instanceof ApiError || error instanceof SuperApiError

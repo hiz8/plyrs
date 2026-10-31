@@ -143,7 +143,7 @@ export function TileGrid<T extends TileItem>({
         selectionBehavior={selectionMode === "multiple" ? "toggle" : "replace"}
         {...(selectedKeys === undefined ? {} : { selectedKeys: new Set<string>(selectedKeys) })}
         {...(disabledKeys === undefined ? {} : { disabledKeys: new Set<string>(disabledKeys) })}
-        // 選択が無いときだけ action、選択中はクリックで切り替え(RAC の既定を許容、V4-F Task 4 の裁定)
+        // 選択が無いときだけ action、選択中はクリックで切り替え(RAC の既定を許容、V4-F Task 4 の決定)
         {...(onAction === undefined ? {} : { onAction: (key) => onAction(String(key)) })}
         onSelectionChange={(selection: Selection) => {
           onSelectionChange?.(

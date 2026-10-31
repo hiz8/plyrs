@@ -11,7 +11,7 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-// super-tenants.test.tsx と同じ様式: 同一パスに複数メソッドがぶら下がるため
+// super-tenants.test.tsx と同じ書き方: 同一パスに複数メソッドがぶら下がるため
 // `${method} ${path}` キーで振り分け、完全な URL も渡してクエリ文字列を検証可能にする。
 // 戻り値を Response | Promise<Response> にしているのは isPending disable テストが
 // 応答タイミングを手動制御する deferred な Response を返す必要があるため。

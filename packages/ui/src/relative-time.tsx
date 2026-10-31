@@ -13,7 +13,7 @@ const styles = stylex.create({
     textUnderlineOffset: "3px",
     borderRadius: radius.small,
     cursor: "default",
-    // 素の <time> のため RAC の isFocusVisible が無い。:focus-visible で同じリングを出す
+    // 標準の <time> のため RAC の isFocusVisible が無い。:focus-visible で同じリングを出す
     outlineStyle: { default: "none", ":focus-visible": "solid" },
     outlineWidth: stroke.focus,
     outlineColor: focus.ring,

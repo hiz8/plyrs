@@ -45,7 +45,7 @@ const styles = stylex.create({
 
 export interface FileDropTargetProps {
   onFiles: (files: File[]) => void;
-  /** true: ドロップを受けず暗幕も出さない(素の入れ物) */
+  /** true: ドロップを受けず暗幕も出さない(装飾のない入れ物) */
   isDisabled?: boolean;
   /** 暗幕の 2 行目の固定部分(「1 ファイル 20 MB まで」)。件数は部品が前に付ける */
   hint: string;

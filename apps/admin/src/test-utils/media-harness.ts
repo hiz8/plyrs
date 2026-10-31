@@ -2,7 +2,7 @@ import type { SyncRecord } from "@plyrs/sync-protocol";
 import { vi } from "vitest";
 import { jsonResponse, authedRoutes, type Handler } from "./records-harness";
 
-// メディア画面の router テスト共通の下地(asset-flow.test.tsx のレコードの様式)
+// メディア画面の router テスト共通の下地(asset-flow.test.tsx のレコードの書き方)
 
 export const ASSET_1 = "018f2b6a-7a0a-7000-8000-000000000e01";
 export const ASSET_2 = "018f2b6a-7a0b-7000-8000-000000000e02";

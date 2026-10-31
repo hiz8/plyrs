@@ -86,7 +86,7 @@ export interface StatusSummary {
 }
 
 // rows は更新順なので、byType の並びは order(homeTypes の結果)の順へ戻す。
-// (裁定 B1。order は必須で、渡し忘れを型エラーにする)
+// (決定 B1。order は必須で、渡し忘れを型エラーにする)
 function summarize(rows: readonly HomeRecord[], order: readonly HomeType[]): StatusSummary {
   const counts = new Map<string, TypeCount>();
   for (const row of rows) {

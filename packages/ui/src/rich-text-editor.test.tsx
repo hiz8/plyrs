@@ -221,7 +221,7 @@ describe("RichTextEditor mention", () => {
   });
 });
 
-describe("画像挿入 (Phase 8 裁定 5)", () => {
+describe("画像挿入 (Phase 8 決定 5)", () => {
   it("always registers the assetImage node so docs containing it open safely", async () => {
     let captured: Editor | null = null;
     render(

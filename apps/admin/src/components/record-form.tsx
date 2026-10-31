@@ -302,7 +302,7 @@ export function RecordForm({
         return;
       }
       // draft は自分の版のまま。他者の変更は既に store に確定しているため、再送信の
-      // baseFieldVersions は最新へ進み、今度はクリーンな上書き(手動裁定の LWW)として通る。
+      // baseFieldVersions は最新へ進み、今度はクリーンな上書き(手動判定の LWW)として通る。
       await onSubmit(converted.input);
       setInitialDraft(value);
     }
@@ -418,7 +418,7 @@ export function RecordForm({
         // 動的キー: DraftValues は Record<string, unknown> のため form.Field の
         // DeepKeys<DraftValues> は string 全域に解決される。field.key は
         // ContentTypeDefinition から得た string なのでそのまま代入できる
-        // (境界 cast 不要 — rpc-unwrap 様式の cast はここでは発生しない)。
+        // (境界 cast 不要 — rpc-unwrap と同じ書き方の cast はここでは発生しない)。
         <form.Field key={field.key} name={field.key}>
           {(api) => (
             <FieldInput
@@ -634,7 +634,7 @@ function FieldInput({
         </WithDescription>
       );
     case "relation":
-      // Phase 8 裁定: メディアフィールド = allowedTypes ["asset"] の関係フィールド。
+      // Phase 8 決定: メディアフィールド = allowedTypes ["asset"] の関係フィールド。
       // assets(アップロード経路)が配線されているときだけ専用 UI に切り替える。
       if (
         assets !== undefined &&

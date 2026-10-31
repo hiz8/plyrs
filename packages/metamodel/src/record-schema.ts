@@ -23,9 +23,9 @@ export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
 );
 
 // tech-selection 2.7: AST ルートに schemaVersion を刻む。
-// 裁定 6(2026-07-17): doc は「語彙非依存の構造検証」— ノード型名の語彙(heading 等)は
+// 決定 6(2026-07-17): doc は「ノード型名に依存しない構造検証」— ノード型名(heading 等)は
 // 検証しない(エディタ拡張 = スキーマ進化を metamodel の変更なしに受け入れる。§4.2 の
-// 寛容 read と同じ思想)が、ツリー構造(type: string を持つノードの再帰)だけは強制し、
+// tolerant read と同じ思想)が、ツリー構造(type: string を持つノードの再帰)だけは強制し、
 // DO 側の relations 抽出(body-relations.ts)が壊れた形の doc を受け取らないことを保証する。
 export interface RichTextMark {
   type: string;
@@ -40,7 +40,7 @@ export interface RichTextNode {
   text?: string | undefined;
 }
 
-// looseObject: ProseMirror が将来 JSON 表現にキーを足しても破棄も拒否もしない(遅延適合)
+// looseObject: ProseMirror が将来 JSON 表現にキーを足しても破棄も拒否もしない(遅延マイグレーション)
 const richTextMarkSchema: z.ZodType<RichTextMark> = z.looseObject({
   type: z.string().min(1),
   attrs: z.record(z.string(), jsonValueSchema).optional(),
@@ -112,7 +112,7 @@ export function buildFieldValueSchema(field: FieldDefinition): z.ZodType<unknown
 }
 
 // validate-on-write の実体。looseObject により型定義に無いキーは検証せず素通しで保持する
-// （design-spec §4.2 の遅延適合: 旧型定義時代のフィールドを破棄も拒否もしない）。
+// （design-spec §4.2 の遅延マイグレーション: 旧型定義時代のフィールドを破棄も拒否もしない）。
 export function buildRecordInputSchema(contentType: ContentTypeDefinition) {
   const shape: Record<string, z.ZodType<unknown>> = {};
   for (const field of contentType.fields) {

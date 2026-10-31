@@ -5,7 +5,7 @@ export type SyncResolution =
   | { kind: "apply"; input: Record<string, unknown> }
   | { kind: "conflict"; conflicts: FieldConflict[] };
 
-// design-spec §10.3: single-writer の DO がフィールド単位で裁定する。
+// design-spec §10.3: single-writer の DO がフィールド単位で判定する。
 // 別フィールドの変更は両立（マージ）、同一スカラーは LWW（後勝ち）、
 // 同一リッチテキスト（AST）は検知して手動解決（§10.4）。
 export function resolveSyncWrite(
@@ -26,7 +26,7 @@ export function resolveSyncWrite(
     if (baseVersion === currentVersion) {
       continue;
     }
-    // 未知フィールド（クライアントの型定義が古い等）は LWW 側に倒す — 寛容 read と同じ思想
+    // 未知フィールド（クライアントの型定義が古い等）は LWW 側に倒す — tolerant read と同じ思想
     if (fieldTypes.get(fieldKey) === "richtext") {
       conflicts.push({ fieldKey, baseVersion, currentVersion });
     }

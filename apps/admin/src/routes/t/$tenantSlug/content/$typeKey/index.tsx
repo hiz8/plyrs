@@ -85,7 +85,7 @@ function RecordListPage() {
     enabled: hasSynced,
   });
 
-  // 裁定 R18: 絞り込み・並べ替え・ページが変わったら選択を解除する
+  // 決定 R18: 絞り込み・並べ替え・ページが変わったら選択を解除する
   const queryKey = JSON.stringify(toListSearch(query));
   useEffect(() => {
     setSelected(new Set());
@@ -107,7 +107,7 @@ function RecordListPage() {
   );
   const view = useMemo(() => applyListQuery(listRows, query), [listRows, query]);
 
-  // §12 必須①(2026-07-17 裁定): ゲートは初回同期の完了までに限る。以降の切断・再同期は
+  // §12 必須①(2026-07-17 決定): ゲートは初回同期の完了までに限る。以降の切断・再同期は
   // バナー表示のみでフォーム(未保存入力)を維持する。
   if (!hasSynced) {
     return <PageLoading breadcrumbs={[homeCrumb(tenantSlug)]} />;

@@ -46,7 +46,7 @@ function setup(
   const registry = buildRegistry();
   const collection = registry.get("asset");
   if (collection === undefined) throw new Error("asset collection");
-  // 実機では ack で解決する。ここでは永続化の完了だけを模す
+  // 実環境では ack で解決する。ここでは永続化の完了だけを模す
   const update = vi.spyOn(collection, "update").mockImplementation(
     () =>
       ({

@@ -12,7 +12,7 @@ function makeEditor(resolver?: AssetUrlResolver) {
   });
 }
 
-describe("assetImage node (Phase 8 裁定 5)", () => {
+describe("assetImage node (Phase 8 決定 5)", () => {
   it("inserts a block node with the mention-shaped attrs", () => {
     const editor = makeEditor();
     editor

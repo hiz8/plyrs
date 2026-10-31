@@ -10,7 +10,7 @@ const styles = stylex.create({
   text: { margin: 0, fontSize: font.body, color: text.default },
 });
 
-// E17: フィールドの削除確認。値はデータ上に残る(遅延適合)ので、公開 API への影響を注記する
+// E17: フィールドの削除確認。値はデータ上に残る(遅延マイグレーション)ので、公開 API への影響を注記する
 export function DeleteFieldDialog({
   target,
   onConfirm,

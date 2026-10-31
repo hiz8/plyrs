@@ -36,7 +36,7 @@ function RecordThumb({
   return row === undefined ? null : <MediaThumb row={row} resolveUrl={resolveUrl} size="xs" />;
 }
 
-// allowedTypes がちょうど ["asset"] の関係フィールド向けの置き換え UI(Phase 8 裁定:
+// allowedTypes がちょうど ["asset"] の関係フィールド向けの置き換え UI(Phase 8 決定:
 // メディアフィールドは独立型ではなく asset への関係フィールド — design-spec §5 論点E)。
 export function AssetRelationPicker({
   field,

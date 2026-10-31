@@ -26,7 +26,7 @@ export const MAX_CHANGES_PER_PUSH = 100;
 export const KEEPALIVE_PING = "ping";
 export const KEEPALIVE_PONG = "pong";
 
-// ack の失敗コード語彙（クライアントの分岐実装用。モジュール拡張のため型は string のまま）
+// ack の失敗コードの一覧（クライアントの分岐実装用。モジュール拡張のため型は string のまま）
 export const ACK_ERROR_CODES = [
   "forbidden",
   "unknown_type",

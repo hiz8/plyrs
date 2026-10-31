@@ -25,7 +25,7 @@ import {
 } from "../../../lib/sync-context";
 import { syncIndicatorState } from "../../../lib/sync-indicator";
 
-// a-navigation.md 3.4: 960px 未満でサイドバーをドロワーに畳み、上部バーを出す
+// a-navigation.md 3.4: 960px 未満でサイドバーをドロワーへ切り替え、上部バーを出す
 const NARROW = "@media (max-width: 959px)";
 
 const styles = stylex.create({
@@ -51,7 +51,7 @@ const styles = stylex.create({
 });
 
 export const Route = createFileRoute("/t/$tenantSlug")({
-  // 認証ガード（2026-07-16 裁定 #3）: テナント一覧から slug を解決する。未認証は /login、
+  // 認証ガード（2026-07-16 決定 #3）: テナント一覧から slug を解決する。未認証は /login、
   // 非所属 slug は /tenants へ（存在有無は応答から区別できない — 一覧に無い、が全て）。
   beforeLoad: async ({ context, params, location }) => {
     // 案 A 6 章: 旧 URL はクエリ・ハッシュごと新しい URL へ転送する。router が beforeLoad の
@@ -83,7 +83,7 @@ export const Route = createFileRoute("/t/$tenantSlug")({
 function ShellLayout() {
   const { tenant, slots, api, adminApi, tokens, queryClient, sync } = Route.useRouteContext();
   const navigate = useNavigate();
-  // 裁定 4: 接続はテナントレイアウトの寿命に一致させる。テナント切替は
+  // 決定 4: 接続はテナントレイアウトの寿命に一致させる。テナント切替は
   // tenant.id が変わる = useMemo が作り直し、effect cleanup が旧接続を stop する。
   const tenantSync = useMemo(() => sync(tenant.id), [sync, tenant.id]);
   const syncStatus = useSyncStatus(tenantSync);
@@ -115,7 +115,7 @@ function ShellLayout() {
   }, [pathname]);
 
   // 広い幅(サイドバーが常設になる 960px 以上)へ広がったら、開いたままのドロワーを閉じる。
-  // レイアウトの切替自体は CSS だけで行い、matchMedia はこの後始末にだけ使う(裁定 11)
+  // レイアウトの切替自体は CSS だけで行い、matchMedia はこの後始末にだけ使う(決定 11)
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
     const query = window.matchMedia("(min-width: 960px)");

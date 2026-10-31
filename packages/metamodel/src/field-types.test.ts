@@ -147,7 +147,7 @@ describe("fieldDefinitionSchema", () => {
   });
 });
 
-describe('relation snapshotEmbed "value" (Phase 8 裁定 4: asset 限定の固定語彙)', () => {
+describe('relation snapshotEmbed "value" (Phase 8 決定 4: asset 限定の固定の値)', () => {
   it('accepts "value" when allowedTypes is exactly ["asset"]', () => {
     const parsed = fieldDefinitionSchema.safeParse(
       relationFieldInput({ allowedTypes: ["asset"], cardinality: "many", snapshotEmbed: "value" }),
@@ -155,7 +155,7 @@ describe('relation snapshotEmbed "value" (Phase 8 裁定 4: asset 限定の固�
     expect(parsed.success).toBe(true);
   });
 
-  it('rejects "value" for non-asset or mixed allowedTypes (L1 規律を型レベルで保証)', () => {
+  it('rejects "value" for non-asset or mixed allowedTypes (L1 方針を型レベルで保証)', () => {
     expect(
       fieldDefinitionSchema.safeParse(
         relationFieldInput({

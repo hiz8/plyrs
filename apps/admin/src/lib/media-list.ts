@@ -135,7 +135,7 @@ export function buildMediaRows(records: readonly SyncRecord[]): MediaRow[] {
     });
 }
 
-// F23(裁定で改定): 連番のファイル名が多いので数字を数として比べる自然順。大文字小文字は Collator の既定で区別する
+// F23(決定で改定): 連番のファイル名が多いので数字を数として比べる自然順。大文字小文字は Collator の既定で区別する
 const nameCollator = new Intl.Collator("ja", { numeric: true });
 
 // kind / usage / q(F22: ファイル名と代替テキスト)で絞り、sort で並べる。
@@ -189,7 +189,7 @@ function defaultStorage(): Storage | undefined {
   }
 }
 
-// theme.ts と同じ様式: ストレージが使えなくても画面は既定で動く
+// theme.ts と同じ書き方: ストレージが使えなくても画面は既定で動く
 export function readMediaView(storage = defaultStorage()): MediaView {
   try {
     return storage?.getItem(MEDIA_VIEW_STORAGE_KEY) === "list" ? "list" : "grid";

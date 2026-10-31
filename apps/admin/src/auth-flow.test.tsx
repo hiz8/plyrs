@@ -177,7 +177,7 @@ function findTurnstileScript(): HTMLScriptElement | null {
 }
 
 // window.turnstile を stub していない状態でロード失敗を再現する(実 script 注入が必要なため)。
-// このファイルは静的 import のみで vi.resetModules が効かず、lib/turnstile.ts の
+// このファイルは静的 import のみで vi.resetModules で状態を戻せず、lib/turnstile.ts の
 // loadPromise はファイル内で共有される。以降の describe(window.turnstile を stub する)を
 // 汚染しないよう、残った script は failure させて loadPromise を null に戻しておく。
 describe("Turnstile ロード失敗", () => {

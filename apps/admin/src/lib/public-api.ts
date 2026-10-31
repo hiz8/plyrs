@@ -1,4 +1,4 @@
-// 公開 API の URL の組み立て(案 G 3 章、裁定 G1・G8)
+// 公開 API の URL の組み立て(案 G 3 章、決定 G1・G8)
 function trimTrailingSlash(origin: string): string {
   return origin.replace(/\/+$/, "");
 }

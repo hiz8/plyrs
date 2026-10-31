@@ -25,7 +25,7 @@ const styles = stylex.create({
 
 export interface TooltipProps {
   content: ReactNode;
-  /** RAC のフォーカスできる要素(Button など)。素の要素は Focusable で包む(relative-time.tsx) */
+  /** RAC のフォーカスできる要素(Button など)。標準の DOM 要素は Focusable で包む(relative-time.tsx) */
   children: ReactElement;
   placement?: "top" | "bottom" | "start" | "end";
   delay?: number;

@@ -34,7 +34,7 @@ const styles = stylex.create({
 });
 
 export const Route = createFileRoute("/login")({
-  // §6: siteKey は公開情報。defaultSsr: false なのでこの loader はクライアント専用(super-login.tsx と同型)。
+  // §6: siteKey は公開情報。defaultSsr: false なのでこの loader はクライアント専用(super-login.tsx と同じ形)。
   loader: async ({ context }) => {
     return context.queryClient.fetchQuery({
       queryKey: ["turnstile-config"],

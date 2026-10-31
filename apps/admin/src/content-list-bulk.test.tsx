@@ -13,7 +13,7 @@ import {
   type Handler,
 } from "./test-utils/records-harness";
 
-// 一括操作の配線だけを試すので、メニュー(RAC のポップオーバー)は素のボタンに差し替える
+// 一括操作の配線だけを試すので、メニュー(RAC のポップオーバー)は標準のボタンに差し替える
 vi.mock("./components/bulk-bar", () => ({
   BulkBar: (props: BulkBarProps) => (
     <div role="region" aria-label="一括操作">

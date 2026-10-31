@@ -13,7 +13,7 @@ function jsonResponse(status: number, body: unknown): Response {
 
 type Handler = Mock<(init?: RequestInit) => Response>;
 
-// パス → ハンドラの素朴なスタブ。未定義パスへの fetch は即テスト失敗にする(auth-flow.test.tsx と同様式)。
+// パス → ハンドラの素朴なスタブ。未定義パスへの fetch は即テスト失敗にする(auth-flow.test.tsx と同じ書き方)。
 function stubFetch(routes: Record<string, Handler>): typeof fetch {
   return async (input, init) => {
     const path =

@@ -10,7 +10,7 @@ export default createServerEntry({
   async fetch(request) {
     const route = resolveServerRoute(request, { devProxyPublic: env.DEV_PROXY_PUBLIC === "1" });
     if (route === "config") {
-      // 案 G 3 章、裁定 G1: デプロイ単位で固定の値を画面へ渡す
+      // 案 G 3 章、決定 G1: デプロイ単位で固定の値を画面へ渡す
       return Response.json(
         { publicApiOrigin: env.PUBLIC_API_ORIGIN ?? "" },
         { headers: { "cache-control": "no-store" } },

@@ -34,7 +34,7 @@ export type DraftsState =
   | { kind: "error"; message: string; onRetry: () => void }
   | { kind: "ready"; drafts: HomeRecord[]; summary: StatusSummary };
 
-// b-home.md 2.2: 自分が最後に編集した下書き。全件は一覧へ(裁定 B11)
+// b-home.md 2.2: 自分が最後に編集した下書き。全件は一覧へ(決定 B11)
 export function DraftsCard({ slug, state }: { slug: string; state: DraftsState }) {
   return (
     <HomeCard title={HOME_LABELS.drafts.title} note={HOME_LABELS.drafts.note}>

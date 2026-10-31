@@ -44,7 +44,7 @@ function browserConnect(tenantId: string, tokens: TokenManager): ConnectFn {
 }
 
 // 既定はグローバル fetch を束縛したラッパー(ブラウザで detached fetch を呼ぶと
-// Illegal invocation になるため、素の `fetch` を既定値にしない)。テストはスタブを渡す。
+// Illegal invocation になるため、束縛していない `fetch` を既定値にしない)。テストはスタブを渡す。
 export function createAppContext(
   fetchImpl: typeof fetch = (...args) => fetch(...args),
   options?: AppContextOptions,

@@ -2,7 +2,7 @@ import type { SyncRecord } from "@plyrs/sync-protocol";
 import { MODULE_LABELS } from "./labels";
 import type { NavType } from "./navigation";
 
-// モジュール画面の純関数(案 G 5 章、裁定 G3・G15)
+// モジュール画面の純関数(案 G 5 章、決定 G3・G15)
 export interface TypeCount {
   key: string;
   name: string;

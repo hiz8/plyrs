@@ -202,7 +202,7 @@ describe("splitRecordInput", () => {
   });
 });
 
-describe("richTextEnvelopeSchema (Phase 7: 語彙非依存の構造検証)", () => {
+describe("richTextEnvelopeSchema (Phase 7: ノード型名に依存しない構造検証)", () => {
   const validDoc = {
     type: "doc",
     content: [

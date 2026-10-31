@@ -95,7 +95,7 @@ export function createAdminApi(
     if (response.status !== 401) {
       return response;
     }
-    // マージン内でもサーバー側で失効していることがある(§11 申し送り)。1 回だけ再発行して再試行。
+    // マージン内でもサーバー側で失効していることがある(§11 引き継ぎ事項)。1 回だけ再発行して再試行。
     return request(await tokens.getToken(tenantId, { forceRefresh: true }));
   }
 

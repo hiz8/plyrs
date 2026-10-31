@@ -32,7 +32,7 @@ function RecordEditorPage() {
   const collection = sync.registry.get(typeKey);
   const rows = useCollectionRows(collection);
 
-  // §12 必須①(2026-07-17 裁定): ゲートは初回同期の完了までに限る。以降の切断・再同期は
+  // §12 必須①(2026-07-17 決定): ゲートは初回同期の完了までに限る。以降の切断・再同期は
   // バナー表示のみでフォーム(未保存入力)を維持する。
   if (!hasSynced) {
     return <PageLoading breadcrumbs={[homeCrumb(tenantSlug)]} />;

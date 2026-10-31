@@ -110,7 +110,7 @@ describe("extractBodyRelations", () => {
   });
 });
 
-describe("assetImage ノードの抽出 (Phase 8 裁定 5)", () => {
+describe("assetImage ノードの抽出 (Phase 8 決定 5)", () => {
   const contentTypeWithBody: ContentTypeDefinition = {
     id: "018f2b6a-7a0a-7000-8000-0000000000aa",
     key: "article",

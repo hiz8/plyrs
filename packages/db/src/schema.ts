@@ -65,20 +65,20 @@ export const relations = sqliteTable(
   ],
 );
 
-// design-spec §7: 公開状態の真実源は published_snapshots 行の存在。records 側に公開フラグを持たない。
+// design-spec §7: 公開状態の正本は published_snapshots 行の存在。records 側に公開フラグを持たない。
 export const publishedSnapshots = sqliteTable(
   "published_snapshots",
   {
     recordId: text("record_id").primaryKey(), // records.id と 1 対 1
     type: text("type").notNull(),
     data: text("data").notNull(), // publish 時点の data のコピー（JSON）
-    relations: text("relations").notNull(), // publish 時点の関係の凍結投影（JSON）
+    relations: text("relations").notNull(), // publish 時点の関係を公開版に保存したもの（JSON）
     publishedAt: text("published_at").notNull(),
     publishedBy: text("published_by").notNull(),
     sourceVersion: integer("source_version").notNull(), // どの records.version を publish したか（参考情報。順序トークンではない）
     // CRITICAL fix（レビュー指摘）: records.version は publish/unpublish で変化しないため順序トークンに
     // なれない（unpublish→無編集republish が同じ version の upsert/delete を生む）。DO 全体で単調な
-    // 世代カウンタを別途持ち、投影の順序ガードはこちらを使う。
+    // publish_seq のカウンタを別途持ち、公開用 DB の順序ガードはこちらを使う。
     publishSeq: integer("publish_seq").notNull().default(0),
   },
   // 案 D 9 章: 型ごとの公開状態一覧(WHERE type = ? AND record_id > ? ORDER BY record_id)を
@@ -86,7 +86,7 @@ export const publishedSnapshots = sqliteTable(
   (table) => [index("idx_published_snapshots_type").on(table.type, table.recordId)],
 );
 
-// design-spec §12.3: アウトボックス。DO コミットと投影 D1 書き込みの dual-write を分離する。
+// design-spec §12.3: アウトボックス。DO コミットと公開用 DB 書き込みの dual-write を分離する。
 export const outbox = sqliteTable(
   "outbox",
   {
@@ -94,7 +94,7 @@ export const outbox = sqliteTable(
     jobType: text("job_type").notNull(), // 'upsert' | 'delete'
     recordId: text("record_id").notNull(),
     sourceVersion: integer("source_version").notNull(), // 参考情報。順序トークンではない（上記参照）
-    publishSeq: integer("publish_seq").notNull().default(0), // 投影ジョブの順序ガード本体
+    publishSeq: integer("publish_seq").notNull().default(0), // 反映ジョブの順序ガード本体
     enqueuedAt: text("enqueued_at").notNull(),
     sent: integer("sent").notNull().default(0), // 送出済みフラグ（0 | 1）
   },
@@ -108,7 +108,7 @@ export const alarmRegistry = sqliteTable("alarm_registry", {
   dueAt: integer("due_at").notNull(), // epoch ms
 });
 
-// DO 自身は idFromName の元になった tenantId を知らない。投影ジョブの宛先に必要なので永続化する。
+// DO 自身は idFromName の元になった tenantId を知らない。反映ジョブの宛先に必要なので永続化する。
 export const doConfig = sqliteTable("do_config", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
@@ -126,7 +126,7 @@ export const moduleRegistry = sqliteTable("module_registry", {
 });
 
 // design-spec §9.3 / §9.4 ステップ5: afterWrite / afterPublish イベントの outbox。
-// コミットと同一トランザクションで積み、Queues(plyrs-modules)へ排出する(§12.3 と同型)。
+// コミットと同一トランザクションで積み、Queues(plyrs-modules)へ送出する(§12.3 と同じ形)。
 export const moduleEvents = sqliteTable(
   "module_events",
   {

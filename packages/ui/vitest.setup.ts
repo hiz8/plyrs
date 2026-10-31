@@ -9,7 +9,7 @@ afterEach(() => {
 // --- ProseMirror(Tiptap)の jsdom シム ---
 // jsdom は Range の測定 API・scrollIntoView・elementFromPoint を実装しない。ProseMirror の
 // EditorView はマウント時・選択更新時にこれらを呼ぶため、ゼロ矩形/no-op の最小実装を与える。
-// 座標に依存する検証はできない — エディタのテストはコマンド駆動でドキュメント状態を見る様式
+// 座標に依存する検証はできない — エディタのテストはコマンド駆動でドキュメント状態を見る書き方
 // (src/rich-text-editor.test.tsx)にすること。
 const zeroRect: DOMRect = {
   x: 0,

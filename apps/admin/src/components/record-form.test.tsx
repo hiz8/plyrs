@@ -463,7 +463,7 @@ function conflictForm(
 
 const THEIRS_META = { fieldVersions: { title: 1, body: 2 }, version: 2, seq: 3 };
 
-describe("RecordForm 本文競合(裁定 3 / R10)", () => {
+describe("RecordForm 本文競合(決定 3 / R10)", () => {
   it("「あとで決める」を選ぶと save は SaveDeferredError を投げ、下書きは残る", async () => {
     const onSubmit = vi.fn<(input: Record<string, unknown>) => Promise<void>>(async () => {
       throw conflictError();
@@ -697,7 +697,7 @@ function assetServicesStub(overrides: Partial<AssetServices> = {}): AssetService
   };
 }
 
-describe("メディアフィールド (Phase 8 裁定: メディア UI)", () => {
+describe("メディアフィールド (Phase 8 決定: メディア UI)", () => {
   it("renders the asset picker for allowedTypes=['asset'] fields and selects from the dialog", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn(async () => {});

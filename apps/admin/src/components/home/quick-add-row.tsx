@@ -25,7 +25,7 @@ const styles = stylex.create({
   },
 });
 
-// 裁定 B20: 型ごとの secondary ボタン。利用者の型 → モジュールの型の境目に区切り線
+// 決定 B20: 型ごとの secondary ボタン。利用者の型 → モジュールの型の境目に区切り線
 export function QuickAddRow({
   types,
   onAdd,

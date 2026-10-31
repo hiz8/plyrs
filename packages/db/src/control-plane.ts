@@ -8,7 +8,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 // design-spec §2: コントロールプレーン（ID・認可）。テナントデータ本体（DO）の外側の中央 D1。
-// 「テナントのデータを開いてよいか」を、そのデータを開かずに判定するための真実源。
+// 「テナントのデータを開いてよいか」を、そのデータを開かずに判定するための正本。
 
 export const tenants = sqliteTable(
   "tenants",
@@ -38,7 +38,7 @@ export const memberships = sqliteTable(
   {
     userId: text("user_id").notNull(),
     tenantId: text("tenant_id").notNull(),
-    role: text("role").notNull(), // 'owner' | 'editor' | 'viewer'（apps/api 側 permissions.ts が真実源）
+    role: text("role").notNull(), // 'owner' | 'editor' | 'viewer'（apps/api 側 permissions.ts が正本）
     createdAt: text("created_at").notNull(),
   },
   (table) => [
@@ -47,7 +47,7 @@ export const memberships = sqliteTable(
   ],
 );
 
-// design-spec §11.2: セッションの真実源は中央 D1。トークンは平文を保存せずハッシュのみ。
+// design-spec §11.2: セッションの正本は中央 D1。トークンは平文を保存せずハッシュのみ。
 export const sessions = sqliteTable(
   "sessions",
   {
@@ -64,7 +64,7 @@ export const sessions = sqliteTable(
   ],
 );
 
-// Phase 9: モジュール有効化の control-plane ミラー。真実源は各テナント DO の module_registry
+// Phase 9: モジュール有効化の control-plane ミラー。正本は各テナント DO の module_registry
 // で、この表は型定義再配布(§4.2 の Queues 配信)が「どのテナントに配るか」を DO を起こさずに
 // 列挙するための派生。enable/disable の HTTP ルートが best-effort で書く(失敗しても DO 側の
 // 起床時遅延適用が安全網)。
@@ -119,7 +119,7 @@ export const auditLogs = sqliteTable(
   {
     id: text("id").primaryKey(),
     actorId: text("actor_id").notNull(),
-    action: text("action").notNull(), // 'tenant.create' | 'user.ban' | ... (apps/api 側 audit.ts が語彙の真実源)
+    action: text("action").notNull(), // 'tenant.create' | 'user.ban' | ... (apps/api 側 audit.ts が action の値の正本)
     targetType: text("target_type").notNull(),
     targetId: text("target_id").notNull(),
     detail: text("detail").notNull(), // JSON
@@ -131,7 +131,7 @@ export const auditLogs = sqliteTable(
   ],
 );
 
-// Phase 10 裁定: DLQ は「キュー内滞留」ではなく D1 へ退避(ack は durable insert 後)。
+// Phase 10 決定: DLQ は「キュー内滞留」ではなく D1 へ退避(ack は durable insert 後)。
 // id は Queues の message.id(再配達の冪等キー)。queue は元キュー名(-dlq を剥いだもの)。
 export const deadLetters = sqliteTable(
   "dead_letters",

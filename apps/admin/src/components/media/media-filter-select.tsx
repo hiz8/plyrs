@@ -1,6 +1,6 @@
 import { Select } from "@plyrs/ui";
 
-// テストで素の <select> に差し替えるため 1 ファイルに分けている(test-utils/media-filter-select-mock.tsx)
+// テストで標準の <select> に差し替えるため 1 ファイルに分けている(test-utils/media-filter-select-mock.tsx)
 export function MediaFilterSelect({
   label,
   items,

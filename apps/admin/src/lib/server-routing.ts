@@ -16,7 +16,7 @@ export function resolveServerRoute(
   if (isApiPath(pathname)) {
     return "api";
   }
-  // 裁定 10(2026-07-18): E2E がコアジャーニーを検証するための dev 限定転送を維持。
+  // 決定 10(2026-07-18): E2E がコアジャーニーを検証するための dev 限定転送を維持。
   if (opts.devProxyPublic && (pathname === "/public/v1" || pathname.startsWith("/public/v1/"))) {
     return "api";
   }

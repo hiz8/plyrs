@@ -188,7 +188,7 @@ export function RecordEditor({
   async function updateRecord(id: string, input: Record<string, unknown>) {
     const tx = collection.update(id, (draft) => {
       // WritableDeep<SyncRecord>["input"] は SyncRecord["input"] と構造同一だが
-      // WritableDeep の再帰展開で TS が同一視できないため境界 cast(rpc-unwrap 様式)。
+      // WritableDeep の再帰展開で TS が同一視できないため境界 cast(rpc-unwrap と同じ書き方)。
       draft.input = input as typeof draft.input;
     });
     await tx.isPersisted.promise;

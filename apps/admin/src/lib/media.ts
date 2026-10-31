@@ -12,7 +12,7 @@ import { labelForRecord } from "./record-label";
 
 // 案 F 3.3・4 章: メディアライブラリの補助処理(アップロードの順次送信と、使用箇所の表示名の解決)。
 
-// apps/api の routes/tenant.ts の MAX_ASSET_SIZE_BYTES(Phase 8 裁定 1)と
+// apps/api の routes/tenant.ts の MAX_ASSET_SIZE_BYTES(Phase 8 決定 1)と
 // MAX_ASSET_FILENAME_LENGTH と同じ値。サーバーも 413 / 400 で弾くが、送り切ってから断られない
 // よう、送る前に確かめる
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;

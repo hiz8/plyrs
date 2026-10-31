@@ -7,7 +7,7 @@ import {
   ASSET_TYPE_KEY,
 } from "./asset-type";
 
-describe("ASSET_TYPE_DEFINITION (Phase 8 裁定 2)", () => {
+describe("ASSET_TYPE_DEFINITION (Phase 8 決定 2)", () => {
   it("is a valid system content type definition", () => {
     const parsed = contentTypeDefinitionSchema.safeParse(ASSET_TYPE_DEFINITION);
     expect(parsed.success).toBe(true);

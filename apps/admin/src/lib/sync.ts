@@ -14,7 +14,7 @@ export interface TenantSync {
   getStatus(): SyncStatus;
   getTypes(): ContentTypeDefinition[];
   /** 初回同期(最初の ready)が完了したか。以降は切断中も true のまま(§12 必須①)。
-      インスタンスの寿命はテナントレイアウトのマウントと一致する(裁定 4)。 */
+      インスタンスの寿命はテナントレイアウトのマウントと一致する(決定 4)。 */
   getHasSynced(): boolean;
   /** status / contentTypes の変化で発火(useSyncExternalStore 用) */
   subscribe(listener: () => void): () => void;

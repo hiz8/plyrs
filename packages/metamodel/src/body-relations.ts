@@ -9,7 +9,7 @@ export const RECORD_MENTION_NODE_TYPE = "recordMention";
 
 // 本文中の画像埋め込みノードの型名。packages/ui の ASSET_IMAGE_NODE_NAME と一致すること
 // (apps/admin/src/lib/mention-contract.test.ts が両者の一致を固定する)。attrs は mention と
-// 同型 {recordType, recordId, label} — 抽出経路を 1 本に保つための Phase 8 裁定 5。
+// 同じ形 {recordType, recordId, label} — 抽出経路を 1 本に保つための Phase 8 決定 5。
 export const ASSET_IMAGE_NODE_TYPE = "assetImage";
 
 const BODY_REFERENCE_NODE_TYPES: readonly string[] = [
@@ -18,7 +18,7 @@ const BODY_REFERENCE_NODE_TYPES: readonly string[] = [
 ];
 
 // mention ノードの attrs 契約: { recordType, recordId, label }。label は挿入時点の表示名の
-// スナップショット(エディタ表示専用 — relations には投影しない。真実源は参照先 record)。
+// スナップショット(エディタ表示専用 — relations には保存しない。正本は参照先 record)。
 const mentionAttrsSchema = z.looseObject({
   recordType: z.string().min(1),
   recordId: uuidSchema,
@@ -47,7 +47,7 @@ function collectMentionRefs(node: RichTextNode, refs: RelationRef[], seen: Set<s
 }
 
 // design-spec §6「本文中リンクの一元化」: data(relation 分離後)の richtext フィールドを
-// 走査し、record 参照ノードを relations(origin='body')への書き込みへ写す純関数。
+// たどり、record 参照ノードを relations(origin='body')への書き込みへ写す純関数。
 // 防御的に読む: エンベロープ不成立・attrs 不正のフィールド/ノードは黙って読み飛ばす
 // (古い形の data が残るのは常態 — design-spec §4.2)。同一参照の重複は文書内の初出のみ残す。
 // 参照先の存在は保証しない(ソフト参照 — dangling は正常系)。

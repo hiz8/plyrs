@@ -50,7 +50,7 @@ export interface ConflictChoice {
   theirs: string;
 }
 
-// design-spec §10.4 / 裁定 3(2026-07-17): 本文競合は自動マージせず手動で解決する。R10 でモーダルにした。
+// design-spec §10.4 / 決定 3(2026-07-17): 本文競合は自動マージせず手動で解決する。R10 でモーダルにした。
 // conflict ack にサーバー現在値は入らない(ロードマップ §7)ため、突き合わせ相手は手元
 // store の最新 record — サーバーは他者の change を ack より先に配信するので一致する。
 export function ConflictDialog({

@@ -144,7 +144,7 @@ function pushes(socket: FakeSocket): PushedChange[] {
 }
 
 // 編集操作は 見出し1 トグル(ツールバー経由 = 実ユーザーと同一コードパス)で行う。
-// jsdom は contenteditable へのタイピングを再現できないため(ui 側のテスト様式と同じ判断)。
+// jsdom は contenteditable へのタイピングを再現できないため(ui 側のテストの書き方と同じ判断)。
 async function toggleHeadingAndSave(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole("textbox", { name: "body" });
   await user.click(screen.getByRole("button", { name: "見出し1" }));
@@ -263,7 +263,7 @@ async function conflictSetup(harness: ReturnType<typeof socketHarness>) {
   return { user, change };
 }
 
-describe("本文競合の手動解決(裁定 3)", () => {
+describe("本文競合の手動解決(決定 3)", () => {
   it("adopting the server version resets the editor without a second push", async () => {
     const harness = socketHarness();
     const { user } = await conflictSetup(harness);

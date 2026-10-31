@@ -95,7 +95,7 @@ function TenantDetailPage() {
 
   const memberRows = members.data?.members ?? [];
 
-  // 走査系(health / orphan)はボタン起動の useMutation にする — useQuery の自動 refetch に
+  // 調査系(health / orphan)はボタン起動の useMutation にする — useQuery の自動 refetch に
   // 乗せると DO をフルスキャンで無駄に起こしてしまう(design-spec: DO はオンデマンド呼び出し前提)。
   const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);

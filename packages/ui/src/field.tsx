@@ -13,7 +13,7 @@ const styles = stylex.create({
     gap: space.sm,
     fontFamily: font.family,
   },
-  // 2026-10-18 裁定: ラベルは 14px / 500
+  // 2026-10-18 決定: ラベルは 14px / 500
   labelRow: {
     display: "inline-flex",
     alignItems: "center",

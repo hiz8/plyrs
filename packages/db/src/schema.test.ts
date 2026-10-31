@@ -37,7 +37,7 @@ describe("@plyrs/db schema", () => {
   });
 
   // CRITICAL fix（レビュー指摘）: records.version（source_version）は publish/unpublish で変化
-  // しないため投影ジョブの順序トークンになれない。DO 発行の単調な publish 世代番号を別カラムで持つ。
+  // しないため反映ジョブの順序トークンになれない。DO 発行の単調な publish_seq を別カラムで持つ。
   it("gives published_snapshots and outbox a monotonic publish generation, separate from source_version", () => {
     expect(publishedSnapshots.publishSeq).toBeDefined();
     expect(outbox.publishSeq).toBeDefined();

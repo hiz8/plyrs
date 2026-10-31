@@ -57,7 +57,7 @@ function RootShell({ children }: Readonly<{ children: ReactNode }>) {
         {/* dev では StyleX の CSS がバンドルに入らず、unplugin の dev エンドポイントから取る
             (@stylexjs/unplugin README "Dev HTML injection")。build の prerender には入れない。
             head() の links に置くと React 19 が stylesheet の読み込み完了まで描画を保留し、
-            jsdom のテストが止まるので、precedence の無い素の link としてシェルに置く */}
+            jsdom のテストが止まるので、precedence の無い標準の link としてシェルに置く */}
         {import.meta.env.DEV ? <link rel="stylesheet" href="/virtual:stylex.css" /> : null}
       </head>
       <body {...stylex.props(styles.body)}>

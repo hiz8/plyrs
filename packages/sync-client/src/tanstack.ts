@@ -49,7 +49,7 @@ function toChange(
       baseFieldVersions[key] = version;
     }
   }
-  // §7: status は到着順の LWW で裁定される。変えていない status を毎回送ると、
+  // §7: status は到着順の LWW で判定される。変えていない status を毎回送ると、
   // 手元が古いスナップショットのまま編集しただけで他ユーザーの publish 等を
   // 静かに巻き戻してしまう。実際に変わったときだけ含める。
   const statusChanged = previous === undefined || previous.status !== record.status;

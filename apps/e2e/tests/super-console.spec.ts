@@ -5,7 +5,7 @@ import { totpCode } from "../helpers/totp";
 // このプロセス全体で bootstrap を成立させる唯一の spec(2 回目の bootstrap 呼び出しは
 // 403 already_bootstrapped)。playwright.config.ts の projects/dependencies で必ず
 // 最初に実行される。ラベル・ロール名は apps/admin/src/super-login.test.tsx /
-// super-tenants.test.tsx / super-ops.test.tsx を真実源にしている。
+// super-tenants.test.tsx / super-ops.test.tsx を正本にしている。
 test("bootstrap, totp login, tenant CRUD and audit log", async ({ page }) => {
   await page.goto("/super-login");
   await expect(page.getByRole("heading", { name: "初期セットアップ" })).toBeVisible();

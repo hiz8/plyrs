@@ -1,6 +1,6 @@
 import { withNetworkErrors } from "./network-error";
 
-// 運営コンソール(/super-auth・/super/v1)への薄い JSON ラッパー。admin-api.ts と違い
+// 運営管理画面の API(/super-auth・/super/v1)への薄い JSON ラッパー。admin-api.ts と違い
 // トークン管理はしない — cookie 認証(SameSite=Strict の super セッション cookie)なので
 // Authorization ヘッダは付けず、fetch 側の credentials: "include" だけで完結する。
 export class SuperApiError extends Error {
@@ -19,7 +19,7 @@ export interface SuperApi {
   delete<T>(path: string, body?: unknown): Promise<T>;
 }
 
-// 既定値はグローバル fetch を束縛したラッパー。素の `fetch` を既定値にすると、ブラウザで
+// 既定値はグローバル fetch を束縛したラッパー。束縛していない `fetch` を既定値にすると、ブラウザで
 // detached call（this 喪失）となり Illegal invocation を投げる(admin-api.ts / api-client.ts と同様)。
 export function createSuperApi(baseFetch: typeof fetch = (...args) => fetch(...args)): SuperApi {
   const fetchImpl = withNetworkErrors(baseFetch);

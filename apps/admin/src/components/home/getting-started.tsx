@@ -71,7 +71,7 @@ const styles = stylex.create({
   notice: { width: "100%", maxWidth: MAX_WIDTH },
 });
 
-// 型が 0 件のときの管理者向け案内(裁定 B4)
+// 型が 0 件のときの管理者向け案内(決定 B4)
 export function GettingStarted({
   siteName,
   onCreateType,

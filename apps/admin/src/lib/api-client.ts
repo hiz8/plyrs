@@ -1,6 +1,6 @@
 import { withNetworkErrors } from "./network-error";
 
-// 管理画面 → api Worker の HTTP 契約（すべて same-origin 相対パス。2026-07-16 裁定 #1）。
+// 管理画面 → api Worker の HTTP 契約（すべて same-origin 相対パス。2026-07-16 決定 #1）。
 // fetch は注入可能（テストはスタブを渡す）。セッション cookie は same-origin fetch の既定で送られる。
 export interface TenantSummary {
   id: string;
@@ -64,7 +64,7 @@ export async function throwApiError(response: Response): Promise<never> {
 
 const JSON_HEADERS = { "content-type": "application/json" } as const;
 
-// 既定値はグローバル fetch を束縛したラッパー。素の `fetch` を既定値にすると、ブラウザで
+// 既定値はグローバル fetch を束縛したラッパー。束縛していない `fetch` を既定値にすると、ブラウザで
 // detached call（this 喪失）となり Illegal invocation を投げる。
 export function createApiClient(baseFetch: typeof fetch = (...args) => fetch(...args)) {
   const fetchImpl = withNetworkErrors(baseFetch);
@@ -124,8 +124,8 @@ export function createApiClient(baseFetch: typeof fetch = (...args) => fetch(...
       const { tenants } = await requestJson<{ tenants: TenantSummary[] }>("/auth/tenants");
       return tenants;
     },
-    // createTenant（POST /v1/tenants）は Task 13 で撤去: self-serve 作成廃止(裁定 9)により
-    // 対応ルートが api Worker 側から消えている。作成は super コンソール専用(super-api.ts)。
+    // createTenant（POST /v1/tenants）は Task 13 で撤去: self-serve 作成廃止(決定 9)により
+    // 対応ルートが api Worker 側から消えている。作成は 運営管理画面専用(super-api.ts)。
     issueToken(tenantId: string): Promise<{ token: string; expiresIn: number }> {
       return requestJson("/auth/token", {
         method: "POST",

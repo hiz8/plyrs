@@ -16,7 +16,7 @@ import {
   text,
 } from "./semantic.stylex";
 
-// 案 G 6.2 / 裁定 G2: 3 択のテーマ切り替え用。外枠 pill の中に内側のボタン pill を並べ、
+// 案 G 6.2 / 決定 G2: 3 択のテーマ切り替え用。外枠 pill の中に内側のボタン pill を並べ、
 // 選択中は accent.surface / accent.default で示す。
 const styles = stylex.create({
   group: {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTokenManager } from "./token-manager";
 
-describe("token manager (2026-07-16 裁定: メモリのみ + 先回りリフレッシュ)", () => {
+describe("token manager (2026-07-16 決定: メモリのみ + 先回りリフレッシュ)", () => {
   it("caches a token while it is outside the refresh margin", async () => {
     let now = 1_000_000;
     const issueToken = vi.fn().mockResolvedValue({ token: "t1", expiresIn: 900 });
@@ -12,7 +12,7 @@ describe("token manager (2026-07-16 裁定: メモリのみ + 先回りリフレ
     expect(issueToken).toHaveBeenCalledTimes(1);
   });
 
-  it("refreshes proactively inside the 60s margin (Phase 4b 申し送り: exp 前の先回り)", async () => {
+  it("refreshes proactively inside the 60s margin (Phase 4b 引き継ぎ事項: exp 前の先回り)", async () => {
     let now = 0;
     const issueToken = vi
       .fn()

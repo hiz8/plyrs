@@ -11,7 +11,7 @@ vi.mock("./components/media/media-filter-select", async () => {
   return { MediaFilterSelect: mock.MediaFilterSelectMock };
 });
 
-// Phase 8 裁定: メディアフィールド(hero)は allowedTypes ["asset"] の関係フィールド。
+// Phase 8 決定: メディアフィールド(hero)は allowedTypes ["asset"] の関係フィールド。
 const mediaArticleType: ContentTypeDefinition = {
   id: "018f2b6a-7a0a-7000-8000-000000000d01",
   key: "article",

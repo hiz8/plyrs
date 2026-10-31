@@ -12,7 +12,7 @@ describe("stylexRenderProps (StyleX コンパイルのカナリア兼、状態�
     // vitest.config の @stylexjs/unplugin が transform していれば create は throw しない。
     // ここが「stylex.create should never be called at runtime」等で落ちる場合、テスト
     // パイプラインで StyleX が未コンパイル — 作業を止めてコントローラへ報告すること
-    // （フォールバック導入はコントローラの裁定事項）。
+    // （フォールバック導入はコントローラの決定事項）。
     const className = stylex.props(styles.base).className ?? "";
     expect(className.length).toBeGreaterThan(0);
   });

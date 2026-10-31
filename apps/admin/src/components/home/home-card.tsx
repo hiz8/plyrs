@@ -154,7 +154,7 @@ export function HomeCard({
   );
 }
 
-// href があれば行全体が RAC Link(裁定 B10)。無ければ div(中に個別のリンクを置く行)
+// href があれば行全体が RAC Link(決定 B10)。無ければ div(中に個別のリンクを置く行)
 export function CardRow({
   href,
   children,
@@ -202,7 +202,7 @@ export function RowTitleLink({ href, children }: { href: string; children: React
   );
 }
 
-// 裁定 B8: 空のカードは上罫線の下に中央寄せで案内する
+// 決定 B8: 空のカードは上罫線の下に中央寄せで案内する
 export function CardEmpty({
   icon: Icon,
   text: message,
@@ -251,7 +251,7 @@ function InlineLink({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
-// 裁定 B1: 「お知らせ 2 ・ ブログ 1」。各項目がその型の一覧へのリンク
+// 決定 B1: 「お知らせ 2 ・ ブログ 1」。各項目がその型の一覧へのリンク
 export function TypeLinks({
   items,
   hrefOf,
@@ -277,7 +277,7 @@ export function TypeLinks({
   );
 }
 
-// 裁定 B1: 型が 1 つなら label がそのままリンク、複数なら label は文字にして型ごとのリンクを添える
+// 決定 B1: 型が 1 つなら label がそのままリンク、複数なら label は文字にして型ごとのリンクを添える
 export function SummaryLink({
   summary,
   hrefOf,

@@ -11,7 +11,7 @@ export interface RichTextMentionItem {
   id: string;
   /** content type key */
   type: string;
-  /** 表示名(挿入時点のスナップショット。真実源は relations 側 — design-spec §5) */
+  /** 表示名(挿入時点のスナップショット。正本は relations 側 — design-spec §5) */
   label: string;
 }
 

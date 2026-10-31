@@ -1,9 +1,9 @@
 import type { ComponentType } from "react";
 
-// design-spec §9.9（論点P）: 管理画面コアが定義する拡張スロットの語彙。2026-07-16 裁定の
+// design-spec §9.9（論点P）: 管理画面コアが定義する拡張スロットの種類。2026-07-16 決定の
 // 最小初版 = nav:item のみ実配線し、record-editor:* は Phase 6b で実配線済み。
-// home:widget は管理画面 UX 再構築(案 B 2.5)で追加した語彙で、ホームの画面(V4)が描画する。
-// 語彙を増やすときは SlotContributions にキーを足す（登録機構は不変）。
+// home:widget は管理画面 UX 再構築(案 B 2.5)で追加したスロットで、ホームの画面(V4)が描画する。
+// スロットを増やすときは SlotContributions にキーを足す（登録機構は不変）。
 
 interface SlotContributionBase {
   /** スロット内で一意。モジュール名前空間を推奨（例: "core.content-types", "booking.calendar"） */

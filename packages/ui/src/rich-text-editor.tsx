@@ -196,13 +196,13 @@ export interface RichTextEditorProps {
   /**
    * プログラマティック制御・テスト用の口。jsdom は contenteditable へのタイピングを再現
    * できないため、テストはここで捕まえた editor へのコマンド駆動で行う(コマンドはキー入力と
-   * 同じ transaction dispatch を通る — 6b の隠しネイティブ select と同型の判断)。
+   * 同じ transaction dispatch を通る — 6b の隠しネイティブ select と同じ形の判断)。
    */
   onEditorReady?: ((editor: Editor) => void) | undefined;
   /**
    * ツールバーの「画像」ボタン。押されると insert コールバックを渡して呼ばれる —
    * 呼び出し側(admin)がアセット選択 UI を開き、確定時に insert({id, label}) を呼ぶ。
-   * 省略時はボタン非表示(ノード自体は常に登録される — 語彙進化の制約)。
+   * 省略時はボタン非表示(ノード自体は常に登録される — ノードの種類を増やせるようにする制約)。
    */
   onRequestAssetImage?:
     | ((insert: (item: { id: string; label: string }) => void) => void)

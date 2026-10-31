@@ -297,7 +297,7 @@ export class SyncEngine {
 
   private flush(): void {
     // 現在のソケットで ack 待ちのものは送らない。ここでフィルタしないと push() のたびに
-    // outbox 全体を送り直し、サーバー側で毎回再裁定（余計な seq/version 進行とブロード
+    // outbox 全体を送り直し、サーバー側で毎回再判定（余計な seq/version 進行とブロード
     // キャスト）が起きる。
     const pending = this.outbox.pending().filter((change) => !this.inFlight.has(change.changeId));
     if (pending.length === 0 || this.socket === null || this.socket.readyState !== SOCKET_OPEN) {

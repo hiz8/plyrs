@@ -142,7 +142,7 @@ describe("fromDraftValues", () => {
     expect("hero" in result.input).toBe(false);
   });
 
-  it("preserves unknown keys and richtext from the base input (遅延適合 §4.2)", () => {
+  it("preserves unknown keys and richtext from the base input (遅延マイグレーション §4.2)", () => {
     const base = {
       legacy_field: "keep me",
       body: { schemaVersion: 1, doc: { type: "doc" } },

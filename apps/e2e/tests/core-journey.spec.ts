@@ -29,8 +29,8 @@ test("signup to published public API", async ({ page }) => {
   await openRecordEditor(page, title);
   await publishRecord(page);
 
-  // 公開 API(dev 限定転送): 投影は結果整合なのでポーリングし、実際に記事が現れることまで見る
-  // (このエンドポイントは未公開でも空配列で 200 を返すため、ステータスだけでは投影完了を
+  // 公開 API(dev 限定転送): 公開用 DB への反映は結果整合なのでポーリングし、実際に記事が現れることまで見る
+  // (このエンドポイントは未公開でも空配列で 200 を返すため、ステータスだけでは反映完了を
   // 検証できない — items に対象記事が現れることを条件にする)。
   await expect
     .poll(

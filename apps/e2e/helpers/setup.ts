@@ -93,11 +93,11 @@ export async function loginAsUser(page: Page, email: string, password: string): 
   await page.getByLabel("メールアドレス").fill(email);
   await page.getByLabel("パスワード").fill(password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  // 所属 1 件ならサイト選択を飛ばしてホームに着地する(型の有無で転送しない)。URL だけを待つ。
+  // 所属 1 件ならサイト選択を飛ばしてホームへ遷移する(型の有無で転送しない)。URL だけを待つ。
   await page.waitForURL(/\/t\/[^/]+(\/|$)/);
 }
 
-/** ログイン直後のサイトでサイドバーの「設定」から入り、タブ「コンテンツタイプ」を開いて article 型(title text field)を作る。設定はまず「一般」に着地する(V4-G、裁定 G4)ためタブを押す。 */
+/** ログイン直後のサイトでサイドバーの「設定」から入り、タブ「コンテンツタイプ」を開いて article 型(title text field)を作る。設定はまず「一般」を最初に開く(V4-G、決定 G4)ためタブを押す。 */
 export async function createArticleType(page: Page): Promise<void> {
   // パンくずにも「設定」リンクがあるため、サイドバー(<aside> = complementary)に限定する。
   await page.getByRole("complementary").getByRole("link", { name: "設定", exact: true }).click();
@@ -129,7 +129,7 @@ export async function createArticleType(page: Page): Promise<void> {
 /**
  * createArticleType の手順に、画像・ファイルのフィールド「hero」(件数は既定の 1 件)を足した版(V4-F)。
  * 編集画面に「メディアを選択」が出るようにするための型。ダイアログの名前は add-field-dialog.tsx /
- * field-panel.tsx の様式で、追加後に開く設定パネルの名前はフィールドの表示名になる。
+ * field-panel.tsx の書き方で、追加後に開く設定パネルの名前はフィールドの表示名になる。
  */
 export async function createArticleTypeWithMedia(page: Page): Promise<void> {
   await page.getByRole("complementary").getByRole("link", { name: "設定", exact: true }).click();

@@ -1,4 +1,4 @@
-// vi.mock("./media-filter-select", ...) の差し替え先。RAC のセレクトは jsdom で扱いにくいので素の select にする
+// vi.mock("./media-filter-select", ...) の差し替え先。RAC のセレクトは jsdom で扱いにくいので標準の select にする
 export function MediaFilterSelectMock(props: {
   label: string;
   items: { value: string; label: string }[];

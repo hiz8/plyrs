@@ -7,7 +7,7 @@ export interface TolerantReadResult {
   invalidKeys: string[];
 }
 
-// design-spec §4.2 寛容 read: records が最新の型定義に適合している保証はない前提で読む。
+// design-spec §4.2 tolerant read: records が最新の型定義に適合している保証はない前提で読む。
 // 欠損・不適合は不在扱い（破棄はしない — raw は呼び出し元が保持）、未知キーは報告のみ。
 export function tolerantReadData(
   contentType: ContentTypeDefinition,

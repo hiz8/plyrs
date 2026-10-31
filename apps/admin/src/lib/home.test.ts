@@ -204,7 +204,7 @@ describe("home", () => {
     expect(summary.total).toBe(0);
   });
 
-  it("homeRecords と recentUpdates は archived も含む(裁定 B9)", () => {
+  it("homeRecords と recentUpdates は archived も含む(決定 B9)", () => {
     const rows = homeRecords([rec("z", "article", { status: "archived" })], ht, titleOf);
     expect(rows).toHaveLength(1);
     expect(recentUpdates(rows).map((r) => r.record.id)).toStrictEqual(["z"]);

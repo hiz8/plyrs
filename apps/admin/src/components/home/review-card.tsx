@@ -59,7 +59,7 @@ function ReviewRow({
   hrefOf: (type: HomeType) => string;
 }) {
   const [only, ...rest] = summary.byType;
-  // 裁定 B1: 型が 1 つなら行が一覧へのリンク、複数なら行はリンクにせず内訳リンクを添える
+  // 決定 B1: 型が 1 つなら行が一覧へのリンク、複数なら行はリンクにせず内訳リンクを添える
   const href = only !== undefined && rest.length === 0 ? hrefOf(only.type) : undefined;
   return (
     <div>

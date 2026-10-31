@@ -22,7 +22,7 @@ export function meQueryOptions(api: ApiClient) {
   });
 }
 
-// デプロイ単位で固定(案 G 3 章、裁定 G1)
+// デプロイ単位で固定(案 G 3 章、決定 G1)
 export function configQueryOptions(api: ApiClient) {
   return queryOptions({
     queryKey: ["config"],
@@ -96,7 +96,7 @@ export function modulesQueryOptions(adminApi: AdminApi, tenantId: string) {
     queryFn: () => adminApi.listModules(tenantId),
     // トグル直後の状態を確実に映す(設定ページは低頻度アクセスなのでキャッシュ不要)
     staleTime: 0,
-    // 取得の失敗で最大 7 秒ほどホームがスケルトンのままにならないよう 1 回だけ(V4-B の申し送り)
+    // 取得の失敗で最大 7 秒ほどホームがスケルトンのままにならないよう 1 回だけ(V4-B の引き継ぎ事項)
     retry: 1,
   });
 }

@@ -61,7 +61,7 @@ function HomePage() {
   const sync = useTenantSync();
   const types = useSyncTypes(sync);
   const hasSynced = useSyncHasSynced(sync);
-  // 裁定 B7: 自分の情報の失敗は下書きの枠だけに閉じ込める
+  // 決定 B7: 自分の情報の失敗は下書きの枠だけに閉じ込める
   const me = useQuery(meQueryOptions(api));
   const modules = useQuery(modulesQueryOptions(adminApi, tenant.id));
   const publications = useQuery({
@@ -88,11 +88,11 @@ function HomePage() {
     [publications.data],
   );
 
-  // 裁定 B13: 型の一覧は同期とモジュール一覧の両方が落ち着くまで確定しない
+  // 決定 B13: 型の一覧は同期とモジュール一覧の両方が落ち着くまで確定しない
   // (モジュール一覧の失敗は isPending を抜けるので、ホームは利用者の型だけで描かれる)
   const typesSettled = hasSynced && !modules.isPending;
 
-  // 裁定 B6: 見出しの右はメールとロール。閲覧者は「閲覧のみ」
+  // 決定 B6: 見出しの右はメールとロール。閲覧者は「閲覧のみ」
   const email = me.data?.email;
   const meta = canWrite ? (
     email === undefined ? (
@@ -137,8 +137,8 @@ function HomePage() {
 
   let content;
   if (!typesSettled) {
-    // 裁定 B12: 見出しは残し、中身だけスケルトンにする
-    // 閲覧者は確定後と同じく新規追加・下書きを出さない(裁定 B20)
+    // 決定 B12: 見出しは残し、中身だけスケルトンにする
+    // 閲覧者は確定後と同じく新規追加・下書きを出さない(決定 B20)
     const loadingReview = (
       <ReviewCard
         slug={tenantSlug}
@@ -187,7 +187,7 @@ function HomePage() {
       <NoTypesNotice />
     );
   } else {
-    // 裁定 B20: 新規追加と下書きは書き込める人だけ。閲覧者は確認待ちと最近の更新を並べる
+    // 決定 B20: 新規追加と下書きは書き込める人だけ。閲覧者は確認待ちと最近の更新を並べる
     const review = (
       <ReviewCard
         slug={tenantSlug}

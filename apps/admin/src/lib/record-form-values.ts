@@ -10,8 +10,8 @@ import {
 //   multiple-select / many-relation は string[]、one-relation は合成キー string、
 //   richtext は AST エンベロープそのもの(Phase 7 でエディタが編集する)。
 // - 空 draft は「キーを省略」に写す（空文字列を書き込まない）。
-// - baseInput の未知キーは保持(遅延適合 = design-spec §4.2)。
-// - initialDraft を与えると dirty キーのみ書き戻す(§12 必須② — 2026-07-17 裁定)。
+// - baseInput の未知キーは保持(遅延マイグレーション = design-spec §4.2)。
+// - initialDraft を与えると dirty キーのみ書き戻す(§12 必須② — 2026-07-17 決定)。
 export type DraftValues = Record<string, unknown>;
 
 // type key(snake_case)にも UUID にも現れない Unit Separator(U+001F)を区切りに使う
@@ -137,7 +137,7 @@ export function fromDraftValues(
   contentType: ContentTypeDefinition,
   draft: DraftValues,
   baseInput: Record<string, unknown>,
-  // §12 必須②(2026-07-17 裁定): 編集モードではマウント時(または直近保存時)の draft を
+  // §12 必須②(2026-07-17 決定): 編集モードではマウント時(または直近保存時)の draft を
   // 基準に「ユーザーが実際に変えたキーだけ」を書き戻す。untouched キーは baseInput
   // (最新 record.input)の値がそのまま残り、他編集者の変更を巻き戻さない。
   // undefined(新規作成)は従来どおり全フィールドを書く。

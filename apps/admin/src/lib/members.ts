@@ -2,7 +2,7 @@ import type { MemberSummary } from "./admin-api";
 import { MEMBER_LABELS } from "./labels";
 import { isRole, type Role } from "./permissions";
 
-// メンバー管理の純関数(案 G 4 章、裁定 G11〜G13・G26・G30)
+// メンバー管理の純関数(案 G 4 章、決定 G11〜G13・G26・G30)
 export const ROLE_RANK: Record<Role, number> = { viewer: 0, editor: 1, owner: 2 };
 
 // 両方が既知のロールで rank が下がるときだけ true。未知のロールは判断できないので false
