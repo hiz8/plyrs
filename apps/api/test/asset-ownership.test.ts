@@ -13,7 +13,7 @@ import { fakeLimiter } from "./rate-limit-helper";
 //
 // この状態は公開 API からは再現できない: DO 構築(blockConcurrencyWhile 内)は必ず
 // ensureAssetContentType を先に走らせ、既存の key='asset' 行が無ければ system 型を
-// 即座に確保してしまう。既存テストの様式(content-types.test.ts / smoke.test.ts の
+// 即座に確保してしまう。既存テストの書き方(content-types.test.ts / smoke.test.ts の
 // runInDurableObject + 直接 SQL)にならい、構築済み DO の content_types 行を直接
 // 書き換えて legacy 状態を模擬したうえで、以降は通常の HTTP 経路だけを叩く。
 const RUN_ID = crypto.randomUUID().slice(0, 8);
@@ -32,7 +32,7 @@ function json(body: unknown, headers: Record<string, string> = {}): RequestInit 
 }
 
 // §6: AUTH_LIMITER は本物の Miniflare シミュレート ratelimit(--no-isolate で全ファイル共有)。
-// signup を叩く setupTenant はこの env を使う(素の env だと他テストの呼び出し数次第で 429 が混入する)。
+// signup を叩く setupTenant はこの env を使う(既定の env だと他テストの呼び出し数次第で 429 が混入する)。
 const authEnv: Env = { ...env, AUTH_LIMITER: fakeLimiter(true) };
 
 async function setupTenant(): Promise<{

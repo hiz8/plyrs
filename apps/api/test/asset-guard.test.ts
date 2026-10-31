@@ -23,7 +23,7 @@ function assetInput(overrides: Record<string, unknown> = {}): Record<string, unk
   };
 }
 
-describe("asset の改変防御 (Phase 8 裁定 2: assetGuardHook)", () => {
+describe("asset の改変防御 (Phase 8 決定 2: assetGuardHook)", () => {
   it("createAssetRecord (system write) creates an asset record", async () => {
     const tenant = stub("asset-guard-create");
     const id = uuidv7();

@@ -146,7 +146,7 @@ describe("public list (§12.4 / §12.5)", () => {
       )
       .map((item) => item.id);
     expect(got).toStrictEqual(expected);
-    // 裁定（2026-07-14 controller amendment）: 一覧 items にも単体と同じく関係フィールドを
+    // 決定（2026-07-14 controller amendment）: 一覧 items にも単体と同じく関係フィールドを
     // ID 配列として常時マージする（include の有無に関わらず）。ページ全体で 1 回チャンク内取得。
     const byId = new Map(body.items.map((item) => [item.id, item.fields]));
     expect(byId.get(postId(0))?.["authors"]).toStrictEqual([authorA]);

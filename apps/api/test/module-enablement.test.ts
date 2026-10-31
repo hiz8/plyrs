@@ -37,7 +37,7 @@ function socketAuth(role: "owner" | "editor", tenantId: string) {
   };
 }
 
-// booking-module.test.ts の setupSlot 様式: resource / slot(capacity 1) を owner が用意し、
+// booking-module.test.ts の setupSlot の書き方: resource / slot(capacity 1) を owner が用意し、
 // 続けて booking.reservation(owner 限定の guard 型)を 1 件作る。
 async function setupReservation(
   tenant: ReturnType<typeof stub>,
@@ -204,7 +204,7 @@ describe("push 経由 delete のモジュール write ガード (Critical fix)",
   // delete(deleteRecordCore)は recordId だけで tombstone するため対がなかった。editor が
   // typeKey を editor が書ける非ガード型(booking.resource)へ詐称し、recordId には owner 限定の
   // booking.reservation を指す delete change を push すると、ガードを迂回して削除できてしまう
-  // 穴を固定する。
+  // 不具合を固定する。
   it("editor が typeKey を非ガード型に詐称した delete push は forbidden で拒否され record は残る", async () => {
     const tenantId = "t-mod-del-1";
     const tenant = stub("mod-push-delete-1");

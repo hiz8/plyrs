@@ -23,10 +23,10 @@ import { TURNSTILE_VERIFY_URL } from "../src/modules/turnstile";
 import { asModuleSummaries, asRecordSnapshot, asWriteResult } from "../src/rpc-unwrap";
 import { insertTenantWithOwner } from "./create-tenant";
 
-// Task 11(module-routes.test.ts)+ publish.test.ts の bootstrapTenant 様式・
-// Task 12(public-write.test.ts)の mockSiteverify / fakeLimiter / reservationBody 様式・
+// Task 11(module-routes.test.ts)+ publish.test.ts の bootstrapTenant の書き方・
+// Task 12(public-write.test.ts)の mockSiteverify / fakeLimiter / reservationBody の書き方・
 // public-helpers.ts の deliverJobs(plyrs-projection)をキュー名だけ plyrs-modules に
-// 差し替えた版・booking-module.test.ts の alarm 失効様式を 1 本のシナリオへ組み立てる。
+// 差し替えた版・booking-module.test.ts の alarm 失効の書き方を 1 本のシナリオへ組み立てる。
 const RUN_ID = crypto.randomUUID().slice(0, 8);
 let n = 0;
 function unique(prefix: string): string {
@@ -84,7 +84,7 @@ function reservationBody(slotId: string, turnstileToken = "tok"): RequestInit {
   };
 }
 
-// module-routes.test.ts の setupTenant 様式。公開 write のテナント解決には slug が要るため
+// module-routes.test.ts の setupTenant の書き方。公開 write のテナント解決には slug が要るため
 // (resolveTenantId は tenants.slug → id)、/v1/tenants に渡した slug をここで併せて返す。
 async function setupTenant(): Promise<{
   tenantId: string;
@@ -106,7 +106,7 @@ async function setupTenant(): Promise<{
   return { tenantId, tenantSlug, ownerToken };
 }
 
-// public-helpers.ts の deliverJobs と同型: 実ブローカは自動 consume しないため、
+// public-helpers.ts の deliverJobs と同じ形: 実ブローカは自動 consume しないため、
 // createMessageBatch + worker.queue で plyrs-modules キューへ手動配達する。
 async function deliverModuleJobs(jobs: ModuleQueueJob[]): Promise<void> {
   const batch = createMessageBatch<ModuleQueueJob>(
@@ -144,7 +144,7 @@ afterEach(async () => {
 
 describe("モジュールシステム 一気通貫 (Phase 9)", () => {
   it("enable → 公開予約 → 通知 → 満席 → 失効 → 再予約が一巡する", async () => {
-    // 1. HTTP で booking を enable(Task 11 の様式)
+    // 1. HTTP で booking を enable(Task 11 の書き方)
     const { tenantId, tenantSlug, ownerToken } = await setupTenant();
     cleanupTenantId = tenantId;
     cleanupOwnerToken = ownerToken;
@@ -232,7 +232,7 @@ describe("モジュールシステム 一気通貫 (Phase 9)", () => {
     expect(((await second.json()) as { code: string }).code).toBe("booking:slot_full");
 
     // 6. runInDurableObject で updated_at / due_at を過去へ倒し runDurableObjectAlarm → cancelled
-    // (booking-module.test.ts の様式: 物理 setAlarm は未来にしておく。workerd は過去日時の
+    // (booking-module.test.ts の書き方: 物理 setAlarm は未来にしておく。workerd は過去日時の
     //  setAlarm を即時に自動発火させ、runDurableObjectAlarm を呼ぶ前に消費してしまうため)
     await runInDurableObject(tenant, async (_instance, state) => {
       const past = new Date(Date.now() - BOOKING_PENDING_TTL_MS - 60_000).toISOString();
@@ -278,8 +278,8 @@ describe("§15 冒頭掃除(実害系 3 件)", () => {
   });
 
   it("壊れた permissions 行は MODULE_REGISTRY から再導出され、editor の owner 限定型書き込みは forbidden のまま", async () => {
-    // ユーザー裁定(2026-07-18): 壊れた permissions 行のフォールバックは fail-open(空 grants)ではなく、
-    // コード内静的マニフェスト(MODULE_REGISTRY)を真実源として再導出する。ガードの実効性が
+    // ユーザーの決定(2026-07-18): 壊れた permissions 行のフォールバックは fail-open(空 grants)ではなく、
+    // コード内静的マニフェスト(MODULE_REGISTRY)を正本として再導出する。ガードの実効性が
     // 保たれていることを、editor が owner 限定型(booking.reservation)へ書けないことで固定する。
     const tenantId = crypto.randomUUID();
     const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));

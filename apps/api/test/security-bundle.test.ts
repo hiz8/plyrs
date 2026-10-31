@@ -146,7 +146,7 @@ describe("§6 security bundle", () => {
     // このファイルは --no-isolate の共有ストレージ(apps/api/test/apply-migrations.ts 参照)で
     // 実行される。同一ファイルの他の it が本物の signup/login で作った無関係な live session が
     // sessions 表に残っているため、ここで挿入した id だけに絞って検証する(gate.test.ts の
-    // unique() 様式と同じ「共有ストレージ汚染を避ける」意図)。
+    // unique() の書き方と同じ「共有ストレージ汚染を避ける」意図)。
     const sessionIds = ["s-live", "s-expired", "s-revoked"];
     const superSessionIds = ["ss-live", "ss-expired"];
     expect(

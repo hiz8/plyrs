@@ -110,12 +110,12 @@ describe("publish → outbox → queue → projection D1 (wiring)", () => {
 
   // CRITICAL fix（レビュー指摘）: 同期ソケットの push 経路で届く delete は deleteRecordCore →
   // cascadeUnpublish で outbox に delete 行を積むが、HTTP RPC の deleteRecord/publishRecord/
-  // unpublishRecord と違ってこの経路だけ sweep を張らず outbox を排出していなかった。
-  // レジストリが空のままだと constructor の再アーム保険も効かず、以後このテナントで
-  // publish/unpublish/HTTP delete が一度も呼ばれなければ outbox 行は永久に排出されない
-  // ―― 公開停止されたはずのレコードが投影に残り続ける。ここでは他のテストと同じ実 miniflare
+  // unpublishRecord と違ってこの経路だけ sweep を張らず outbox を送出していなかった。
+  // レジストリが空のままだと constructor の再設定の保険も機能せず、以後このテナントで
+  // publish/unpublish/HTTP delete が一度も呼ばれなければ outbox 行は永久に送出されない
+  // ―― 公開停止されたはずのレコードが公開用 DB に残り続ける。ここでは他のテストと同じ実 miniflare
   // キューブローカ（worker.queue() を呼ばない）経由で、WebSocket push の delete が実際に
-  // 投影行を消すところまでポーリングで確認する。
+  // 公開用 DB の行を消すところまでポーリングで確認する。
   it("cascades the unpublish into the projection when the record is deleted over the sync push path", async () => {
     const tenantId = crypto.randomUUID();
     const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));

@@ -10,7 +10,7 @@ function stub(name: string) {
   return env.TENANT_DO.get(env.TENANT_DO.idFromName(name));
 }
 
-describe("システム asset 型の自動登録 (Phase 8 裁定 2)", () => {
+describe("システム asset 型の自動登録 (Phase 8 決定 2)", () => {
   it("registers the asset type on DO construction", async () => {
     const tenant = stub("asset-type-auto");
     const row = asContentTypeRow(await tenant.getContentType(ASSET_TYPE_KEY));
@@ -71,7 +71,7 @@ describe("ensureAssetContentType の skip 分岐 (Phase 8 以前から key='asse
   // content_types 行を直接書き換えて模擬する。Phase 8 では ensureAssetContentType を実引数で
   // 直接呼んでいたが、それでは「constructor の blockConcurrencyWhile が本当にこの分岐を通り、
   // throw せず起動が成立する」ことを担保しない。evictDurableObject + ping で実コンストラクタを
-  // 再走行させる(sweeper.test.ts の再起動再現と同じ様式)。
+  // 再走行させる(sweeper.test.ts の再起動再現と同じ書き方)。
   it("既存のユーザー型を上書きせず、DO は throw せずに再起動できる", async () => {
     const tenant = stub("asset-type-skip-legacy");
     await tenant.ping(); // 先に system 型の自動登録を完了させる

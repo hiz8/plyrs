@@ -8,10 +8,10 @@ import { fakeLimiter } from "./rate-limit-helper";
 import { BOOKING_MANIFEST } from "../src/modules/booking/manifest";
 
 // §6: AUTH_LIMITER は本物の Miniflare シミュレート ratelimit(--no-isolate で全ファイル共有)。
-// signup を叩く setupTenant はこの env を使う(素の env だと他テストの呼び出し数次第で 429 が混入する)。
+// signup を叩く setupTenant はこの env を使う(既定の env だと他テストの呼び出し数次第で 429 が混入する)。
 const authEnv: Env = { ...env, AUTH_LIMITER: fakeLimiter(true) };
 
-// gate.test.ts の bootstrapTenant / grantMembership 様式(共有ストレージ対策のランダム接頭辞込み)
+// gate.test.ts の bootstrapTenant / grantMembership の書き方(共有ストレージ対策のランダム接頭辞込み)
 const RUN_ID = crypto.randomUUID().slice(0, 8);
 let n = 0;
 function unique(prefix: string): string {

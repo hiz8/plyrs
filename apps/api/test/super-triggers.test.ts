@@ -10,7 +10,7 @@ import { resetSuperAdmins, superEnv, superLogin } from "./super-login";
 import { BOOKING_MANIFEST } from "../src/modules/booking/manifest";
 
 // Queue の配送は非同期（miniflare のブローカ経由）。フラッシュ API は無いのでポーリングする
-// (dead-letters.test.ts / projection-e2e.test.ts と同じ様式)。
+// (dead-letters.test.ts / projection-e2e.test.ts と同じ書き方)。
 async function waitFor<T>(read: () => Promise<T | null>, timeoutMs = 5_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -40,7 +40,7 @@ async function auditActions(): Promise<string[]> {
 }
 
 // tenant_modules を direct insert したテストは afterEach で必ず戻す(module-flow.test.ts と
-// 同じ規律 — 共有 D1 の再配布 fanout テストは特にリークに脆い。Phase 9 §15 の既知事項)。
+// 同じ方針 — 共有 D1 の再配布 fanout テストは特にリークに脆い。Phase 9 §15 の既知事項)。
 let cleanupTenantModule: { tenantId: string; moduleId: string } | undefined;
 
 afterEach(async () => {
@@ -70,8 +70,8 @@ describe("super operational triggers", () => {
     );
     expect(published.ok).toBe(true);
 
-    // publish の自然な排出（outbox → queue → projection、実ブローカ経由）を待ち、
-    // 投影が一度出来上がった状態からスタートする。
+    // publish の自然な送出（outbox → queue → projection、実ブローカ経由）を待ち、
+    // 公開用 DB に一度反映された状態からスタートする。
     await waitFor(() =>
       env.PROJECTION_DB.prepare(
         "SELECT record_id FROM projected_records WHERE tenant_id = ? AND record_id = ?",
@@ -80,7 +80,7 @@ describe("super operational triggers", () => {
         .first<{ record_id: string }>(),
     );
 
-    // 投影行の消失（手動介入・障害等）を再現する。super の reproject トリガーで復元できることを確認する。
+    // 公開用 DB の行の消失（手動介入・障害等）を再現する。super の reproject トリガーで復元できることを確認する。
     await env.PROJECTION_DB.prepare(
       "DELETE FROM projected_records WHERE tenant_id = ? AND record_id = ?",
     )
@@ -105,7 +105,7 @@ describe("super operational triggers", () => {
     expect(typeof body.epoch).toBe("number");
 
     // 実 miniflare ブローカ経由で reproject ジョブが projection consumer へ届き、
-    // 投影が復元されるまでポーリングで観測する(dead-letters.test.ts と同じ様式)。
+    // 公開用 DB の行が復元されるまでポーリングで観測する(dead-letters.test.ts と同じ書き方)。
     await waitFor(() =>
       env.PROJECTION_DB.prepare(
         "SELECT record_id FROM projected_records WHERE tenant_id = ? AND record_id = ?",
@@ -124,7 +124,7 @@ describe("super operational triggers", () => {
     const stub = e.TENANT_DO.get(e.TENANT_DO.idFromName(tenantId));
 
     // DO 側は有効化済みだが型が古い(applied_version=0)状態を作る
-    // (module-redistribute.test.ts の markStale と同じ様式)。redistribute のファンアウトが
+    // (module-redistribute.test.ts の markStale と同じ書き方)。redistribute のファンアウトが
     // 実際に applied_version を進めることを観測できるようにするため。
     await stub.enableModule(tenantId, "booking", auth("owner1"));
     await runInDurableObject(stub, async (_instance, state) => {
@@ -134,7 +134,7 @@ describe("super operational triggers", () => {
     });
 
     // control-plane 側の D1 ミラー(tenant_modules)へ enabled=1 の行を direct insert する
-    // (afterEach で必ず戻す — 規律)。
+    // (afterEach で必ず戻す — 方針)。
     cleanupTenantModule = { tenantId, moduleId: "booking" };
     await drizzle(env.DB)
       .insert(tenantModules)
@@ -166,7 +166,7 @@ describe("super operational triggers", () => {
     expect(await response.json()).toEqual({ ok: true });
 
     // 実 miniflare ブローカ経由で module_redistribute → module_sync が各テナント DO へ届き、
-    // applied version が進むまでポーリングする(module-redistribute.test.ts の観測様式)。
+    // applied version が進むまでポーリングする(module-redistribute.test.ts の観測の書き方)。
     await waitFor(async () => {
       const summaries = asModuleSummaries(await stub.listModules());
       const bookingSummary = summaries.find((m) => m.moduleId === "booking");

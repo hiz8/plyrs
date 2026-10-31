@@ -7,11 +7,11 @@ import { insertTenantWithOwner } from "./create-tenant";
 import { fakeLimiter } from "./rate-limit-helper";
 
 // §6: AUTH_LIMITER は本物の Miniflare シミュレート ratelimit(--no-isolate で全ファイル共有)。
-// signup を叩く setupTenant はこの env を使う(素の env だと他テストの呼び出し数次第で 429 が混入する)。
+// signup を叩く setupTenant はこの env を使う(既定の env だと他テストの呼び出し数次第で 429 が混入する)。
 const authEnv: Env = { ...env, AUTH_LIMITER: fakeLimiter(true) };
 
 // 共有ストレージ（--no-isolate）ではファイル間でも衝突しないよう、実行ごとのランダム接頭辞を混ぜる
-// (既存 HTTP e2e テストの様式: content-types-list.test.ts / publish.test.ts の bootstrapTenant に合わせる)
+// (既存 HTTP e2e テストの書き方: content-types-list.test.ts / publish.test.ts の bootstrapTenant に合わせる)
 const RUN_ID = crypto.randomUUID().slice(0, 8);
 let n = 0;
 function unique(prefix: string): string {
@@ -54,7 +54,7 @@ const PNG_HEADER = Uint8Array.from([
   0x00, 0x00, 0x03, 0x20, 0x00, 0x00, 0x02, 0x58, 0x08, 0x06, 0x00, 0x00, 0x00,
 ]);
 
-describe("アセットのアップロードとプレビュー (Phase 8 裁定 1, 3)", () => {
+describe("アセットのアップロードとプレビュー (Phase 8 決定 1, 3)", () => {
   it("uploads a binary, creates the asset record, and stores the R2 object", async () => {
     const { tenantId, headers } = await setupTenant();
     const response = await app.request(

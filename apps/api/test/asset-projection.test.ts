@@ -8,11 +8,11 @@ import { insertTenantWithOwner } from "./create-tenant";
 import { fakeLimiter } from "./rate-limit-helper";
 
 // §6: AUTH_LIMITER は本物の Miniflare シミュレート ratelimit(--no-isolate で全ファイル共有)。
-// signup を叩く setupTenant はこの env を使う(素の env だと他テストの呼び出し数次第で 429 が混入する)。
+// signup を叩く setupTenant はこの env を使う(既定の env だと他テストの呼び出し数次第で 429 が混入する)。
 const authEnv: Env = { ...env, AUTH_LIMITER: fakeLimiter(true) };
 
 // 共有ストレージ（--no-isolate）ではファイル間でも衝突しないよう、実行ごとのランダム接頭辞を混ぜる
-// (既存 HTTP e2e テストの様式: asset-upload.test.ts / content-types-list.test.ts の
+// (既存 HTTP e2e テストの書き方: asset-upload.test.ts / content-types-list.test.ts の
 // setupTenant/bootstrapTenant に合わせる)
 const RUN_ID = crypto.randomUUID().slice(0, 8);
 let n = 0;
@@ -31,7 +31,7 @@ function json(body: unknown, headers: Record<string, string> = {}): RequestInit 
 
 // 公開 API のテナント解決は KV/コントロールプレーン D1 を引くため、実 HTTP ブートストラップで
 // 作られた実 slug が必要(§12.7)。publish も同じテナントの HTTP ルートを通すことで、
-// 凍結 embed URL(/public/v1/:slug/...)が実際の slug と一致する(routes/tenant.ts の
+// アセットの埋め込み URL(/public/v1/:slug/...)が実際の slug と一致する(routes/tenant.ts の
 // POST /:tenantId/records/:recordId/publish がコントロールプレーン D1 から slug を引く)。
 async function setupTenant(): Promise<{
   tenantId: string;
@@ -61,7 +61,7 @@ const PNG_HEADER = Uint8Array.from([
 
 // 型 id は HTTP 経由の登録でも contentTypeDefinitionSchema が要求する(uuid 必須)。
 // 実 UUID である必要はなく、テナントごとに独立した DO なので固定値の使い回しで問題ない
-// (publish.test.ts の mediaArticleType と同じ様式)。
+// (publish.test.ts の mediaArticleType と同じ書き方)。
 function mediaArticleType(): Record<string, unknown> {
   return {
     id: "018f2b6a-7a0a-7000-8000-00000000c001",
@@ -99,7 +99,7 @@ function plainArticleType(): Record<string, unknown> {
   };
 }
 
-// アセットをアップロードし、alt / width / height が凍結対象として揃った状態にして返す
+// アセットをアップロードし、alt / width / height が埋め込み情報として揃った状態にして返す
 // (アップロード API は alt を受け付けないため、ユーザー編集可フィールドとして
 // 汎用の書き込みルートで追記する — asset-guard.test.ts が検証済みの規約)。
 async function uploadAssetWithAlt(
@@ -158,7 +158,7 @@ async function projectRecord(tenantId: string, recordId: string): Promise<void> 
   );
 }
 
-describe("embed の投影と公開 API (Phase 8 裁定 4)", () => {
+describe("embed の公開用 DB への反映と公開 API (Phase 8 決定 4)", () => {
   it("projects the frozen embed and serves it inline on the public API", async () => {
     const { tenantId, tenantSlug, headers } = await setupTenant();
 
@@ -197,7 +197,7 @@ describe("embed の投影と公開 API (Phase 8 裁定 4)", () => {
     expect(published.status).toBe(200);
 
     // カスケードで asset も同じトランザクションで publish 済み(Task 6)。両方の
-    // upsert ジョブを投影 D1 へ反映する。
+    // upsert ジョブを公開用 DB へ反映する。
     await projectRecord(tenantId, assetId);
     await projectRecord(tenantId, articleId);
 

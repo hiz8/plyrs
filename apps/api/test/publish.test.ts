@@ -21,14 +21,14 @@ import {
 const TENANT = "tenant-publish";
 
 // §6: AUTH_LIMITER は本物の Miniflare シミュレート ratelimit(--no-isolate で全ファイル共有)。
-// signup を叩く bootstrapTenant はこの env を使う(素の env だと他テストの呼び出し数次第で 429 が混入する)。
+// signup を叩く bootstrapTenant はこの env を使う(既定の env だと他テストの呼び出し数次第で 429 が混入する)。
 const authEnv: Env = { ...env, AUTH_LIMITER: fakeLimiter(true) };
 
 function freshStub() {
   return env.TENANT_DO.get(env.TENANT_DO.idFromName(crypto.randomUUID()));
 }
 
-// Phase 8 の追加テスト（asset-guard.test.ts / asset-type.test.ts の様式に合わせる）:
+// Phase 8 の追加テスト（asset-guard.test.ts / asset-type.test.ts の書き方に合わせる）:
 // 名前付きの DO を立て、任意の tenantSlug を publishRecord に渡して埋め込み URL を検証する。
 const OWNER: AuthContext = { userId: "u-owner", role: "owner" };
 
@@ -67,7 +67,7 @@ describe("publish / unpublish (design-spec §7)", () => {
       publishedBy: "owner1",
       sourceVersion: 1,
     });
-    // relations は publish 時点の凍結投影（design-spec §7）
+    // relations は publish 時点で公開版に保存したもの（design-spec §7）
     expect(result.snapshot.relations).toContainEqual(
       expect.objectContaining({ sourceField: "authors", targetType: "author", ordinal: 0 }),
     );
@@ -136,7 +136,7 @@ describe("publish / unpublish (design-spec §7)", () => {
     expect(deleted).toMatchObject({ ok: false, code: "record_deleted" });
   });
 
-  it("cascades unpublish when a published record is deleted (裁定 2026-07-13)", async () => {
+  it("cascades unpublish when a published record is deleted (決定 2026-07-13)", async () => {
     await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1"));
     const deleted = asDeleteResult(await stub.deleteRecord(uuid(100), auth("owner1")));
     expect(deleted.ok).toBe(true);
@@ -189,8 +189,8 @@ describe("outbox rows (design-spec §12.3)", () => {
     expect(written.ok).toBe(true);
   });
 
-  // Task 6: DO は publish のコミット直後に producer としてアウトボックスを排出する。
-  // 行自体は sweeper の purgeSent() が掃くまで残るが、sent は 1 になっている。
+  // Task 6: DO は publish のコミット直後に producer としてアウトボックスを送出する。
+  // 行自体は sweeper の purgeSent() が削除するまで残るが、sent は 1 になっている。
   it("queues exactly one upsert row on publish and the producer drains it immediately", async () => {
     const published = asPublishResult(
       await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1")),
@@ -225,7 +225,7 @@ describe("outbox rows (design-spec §12.3)", () => {
         )
         .toArray();
       // publish が積んだ upsert 行 + unpublish が積んだ delete 行の 2 件が残る
-      // （producer が両方とも即時排出するので sent = 1。行自体は sweeper の purgeSent() 待ち）
+      // （producer が両方とも即時送出するので sent = 1。行自体は sweeper の purgeSent() 待ち）
       expect(rows).toHaveLength(2);
       expect(rows[0]).toMatchObject({ job_type: "upsert", sent: 1 });
       expect(rows[1]).toMatchObject({
@@ -288,7 +288,7 @@ describe("outbox rows (design-spec §12.3)", () => {
   // CRITICAL fix（レビュー指摘・再現済み）: published_snapshots と outbox の MAX に頼る復元は、
   // 両方の行が消えた後では床にすらならない。unpublish で snapshot 行は消え、purgeSent()
   // （Task 6 のスイーパーが sent=1 の outbox 行を定期的に掃除する経路）で outbox 行も消えたら、
-  // 起動時 MAX スキャンは両方とも 0 を返し番号が巻き戻る。do_config に永続化した値だけがこの穴を塞ぐ。
+  // 起動時 MAX スキャンは両方とも 0 を返し番号が巻き戻る。do_config に永続化した値だけがこの漏れを塞ぐ。
   it("does not let publish_seq rewind after unpublish, an outbox purge, and eviction", async () => {
     const published = asPublishResult(
       await stub.publishRecord(TENANT, TENANT, uuid(100), auth("owner1")),
@@ -299,7 +299,7 @@ describe("outbox rows (design-spec §12.3)", () => {
     );
     expect(unpublished.ok).toBe(true);
 
-    // purge する前に、これまで発行済みの世代番号の上限を記録しておく（upsert(1) + delete(2)）。
+    // purge する前に、これまで発行済みの publish_seq の上限を記録しておく（upsert(1) + delete(2)）。
     const maxIssuedBeforePurge = await runInDurableObject(stub, async (_instance, state) => {
       return state.storage.sql
         .exec<{ max_seq: number | null }>("SELECT MAX(publish_seq) AS max_seq FROM outbox")
@@ -460,7 +460,7 @@ describe("publish routes", () => {
   });
 });
 
-describe("publish のアセット統合 (Phase 8 裁定 4, 7)", () => {
+describe("publish のアセット統合 (Phase 8 決定 4, 7)", () => {
   const mediaArticleType = {
     id: "018f2b6a-7a0a-7000-8000-00000000c001",
     key: "media_article",
@@ -524,8 +524,8 @@ describe("publish のアセット統合 (Phase 8 裁定 4, 7)", () => {
     expect(result.ok).toBe(true);
     const assetPublication = asPublicationState(await tenant.getPublication(assetId));
     expect(assetPublication.published).toBe(true);
-    // outbox には記事と asset の 2 ジョブが積まれている(排出済みなら pendingOutbox は 0 でも
-    // よい — 投影ペイロードが両方取れることを確認する)
+    // outbox には記事と asset の 2 ジョブが積まれている(送出済みなら pendingOutbox は 0 でも
+    // よい — 反映用ペイロードが両方取れることを確認する)
     expect(asProjectionPayload(await tenant.getProjectionPayload(assetId))).not.toBeNull();
     expect(asProjectionPayload(await tenant.getProjectionPayload(articleId))).not.toBeNull();
   });

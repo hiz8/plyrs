@@ -8,7 +8,7 @@ import { fakeLimiter } from "./rate-limit-helper";
 import { asPublicationsPage } from "./rpc-unwrap";
 
 // §6: AUTH_LIMITER は本物の Miniflare シミュレート ratelimit(--no-isolate で全ファイル共有)。
-// signup を叩く bootstrapTenant はこの env を使う(素の env だと他テストの呼び出し数次第で 429 が混入する)。
+// signup を叩く bootstrapTenant はこの env を使う(既定の env だと他テストの呼び出し数次第で 429 が混入する)。
 const authEnv: Env = { ...env, AUTH_LIMITER: fakeLimiter(true) };
 
 // 共有ストレージ（--no-isolate）ではファイル間でも衝突しないよう、実行ごとのランダム接頭辞を混ぜる
@@ -135,7 +135,7 @@ describe("GET /v1/t/:tenantId/content-types (Phase 6a)", () => {
     const { contentTypes } = (await res.json()) as {
       contentTypes: { key: string; name: string; version: number }[];
     };
-    // Phase 8 裁定 2: asset はシステム型として全テナントに自動登録される(key 昇順で article の次)
+    // Phase 8 決定 2: asset はシステム型として全テナントに自動登録される(key 昇順で article の次)
     expect(contentTypes.map((t) => t.key)).toStrictEqual(["article", "asset"]);
     expect(contentTypes[0]?.version).toBe(1);
   });
@@ -151,7 +151,7 @@ describe("GET /v1/t/:tenantId/content-types (Phase 6a)", () => {
     const { contentTypes } = (await res.json()) as {
       contentTypes: { key: string; source: string }[];
     };
-    // Phase 8 裁定 2: 新規テナントも DO 構築時にシステム asset 型が自動登録される
+    // Phase 8 決定 2: 新規テナントも DO 構築時にシステム asset 型が自動登録される
     expect(contentTypes.map((t) => t.key)).toStrictEqual(["asset"]);
     expect(contentTypes[0]?.source).toBe("system");
   });

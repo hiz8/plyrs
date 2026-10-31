@@ -52,7 +52,7 @@ describe("canonicalCacheUrl", () => {
   });
 });
 
-describe("withEdgeCache (裁定 2026-07-14: Cache API + 短 TTL・パージなし)", () => {
+describe("withEdgeCache (決定 2026-07-14: Cache API + 短 TTL・パージなし)", () => {
   it("serves the second call from cache without invoking produce", async () => {
     const url = canonicalCacheUrl(crypto.randomUUID(), "records/post/id/r1", {});
     let calls = 0;

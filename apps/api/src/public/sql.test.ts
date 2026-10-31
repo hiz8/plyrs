@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { ListQuery } from "./query";
 import { buildListQuery, chunk, placeholders, type ListRow } from "./sql";
 
-// このテスト専用の合成テナント。投影は派生ストアなので直接播種してよい
+// このテスト専用の合成テナント。公開用 DB は派生ストアなので直接播種してよい
 // （consumer 経由の播種は Task 10 以降の統合テストが担う）。
 const tenantId = crypto.randomUUID();
 
@@ -81,7 +81,7 @@ describe("buildListQuery (実 D1 で実行)", () => {
 
   it("pages with a keyset cursor over ties", async () => {
     const query = { ...defaults(), limit: 1 };
-    // p4 と p3 は同時刻。p4 の後のカーソルで p3 が返る（タイブレークが効く）
+    // p4 と p3 は同時刻。p4 の後のカーソルで p3 が返る（タイブレークが機能する）
     const afterP4 = { ...query, cursor: { k: "2026-07-03T00:00:00.000Z", id: "p4" } };
     expect(await run(afterP4)).toStrictEqual(["p3", "p2"].slice(0, 2)); // limit+1 で 2 行返る
   });

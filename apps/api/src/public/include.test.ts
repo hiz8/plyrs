@@ -50,7 +50,7 @@ beforeAll(async () => {
   await seedRelation("post1", "embedded", "author2", "body"); // body 由来は展開しない
 });
 
-describe("toPublicRecord (裁定 2026-07-14: 内部値非公開・fields 入れ子)", () => {
+describe("toPublicRecord (決定 2026-07-14: 内部値非公開・fields 入れ子)", () => {
   it("maps the row into the public shape without internal values", () => {
     const record = toPublicRecord({
       record_id: "r1",

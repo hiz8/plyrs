@@ -26,7 +26,7 @@ function cookieOf(res: Response): string {
 
 // このファイルは共有 D1(--no-isolate)の super_admins に行を作る。放置すると後続タスクの
 // /super-auth/status 前提(bootstrapped: false 等)や super_admins を使うテストを汚染するため、
-// describe 末尾で bootstrap した行と紐づく super_sessions を掃除する(tenant_modules と同じ規律)。
+// describe 末尾で bootstrap した行と紐づく super_sessions を掃除する(tenant_modules と同じ方針)。
 let createdAdminId: string | undefined;
 
 afterAll(async () => {
@@ -43,7 +43,7 @@ describe("super auth", () => {
   // 確認する(既存の「二回目 bootstrap 403」テストは逐次呼び出しのため、早期 SELECT チェック
   // だけで通ってしまい、単文化を SELECT+INSERT の 2 文実装へ「整理」する回帰を検知できない)。
   // このテストは super_admins が空であることが前提のため、下の lifecycle テストより先に置き、
-  // 勝者の行を自前で後始末して空の状態へ戻す(afterAll の掃除規律と同じ)。
+  // 勝者の行を自前で後始末して空の状態へ戻す(afterAll の掃除の方針と同じ)。
   it("allows only one of two concurrent bootstraps with different emails", async () => {
     const e = testEnv();
     const credsA = { email: "RaceA@Example.com", password: "race-a-password-123" };

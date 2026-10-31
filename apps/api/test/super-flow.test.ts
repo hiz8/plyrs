@@ -7,9 +7,9 @@ import { app } from "../src/index";
 import { articleType, validArticleInput } from "./fixtures";
 import { resetSuperAdmins, superEnv, superLogin } from "./super-login";
 
-// super-tenants.test.ts / super-users.test.ts / super-triggers.test.ts の super HTTP 様式
+// super-tenants.test.ts / super-users.test.ts / super-triggers.test.ts の super HTTP の書き方
 // (superLogin + superEnv + cookie リクエスト)と、gate.test.ts / content-types-list.test.ts の
-// owner HTTP 様式(signup → /auth/token → 型登録 → record 書き込み → publish)を、
+// owner HTTP の書き方(signup → /auth/token → 型登録 → record 書き込み → publish)を、
 // module-flow.test.ts と同じ「1 本のシナリオで面を縦断する」形に組み立てる。
 // DO RPC を直叩きせず、すべて実 HTTP 経路(app.request)を通す ―― 特権運用の縦断確認が目的のため。
 
@@ -28,7 +28,7 @@ function json(body: unknown, headers: Record<string, string> = {}): RequestInit 
   };
 }
 
-// super-tenants.test.ts / super-users.test.ts と同じ super cookie リクエスト様式。
+// super-tenants.test.ts / super-users.test.ts と同じ super cookie リクエストの書き方。
 function superReq(method: string, path: string, cookie: string, body?: unknown): Request {
   return new Request(`https://api.test${path}`, {
     method,
@@ -38,7 +38,7 @@ function superReq(method: string, path: string, cookie: string, body?: unknown):
 }
 
 // Queue の配送は非同期(miniflare のブローカ経由)。super-triggers.test.ts / dead-letters.test.ts
-// と同じポーリング様式。
+// と同じポーリングの書き方。
 async function waitFor<T>(read: () => Promise<T | null>, timeoutMs = 5_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -72,7 +72,7 @@ afterEach(async () => {
 });
 
 describe("特権テナント運用 一気通貫 (Phase 10)", () => {
-  it("bootstrap → super テナント作成 → owner の公開 → 健全性 → 再投影 → BAN → 削除が一巡する", async () => {
+  it("bootstrap → super テナント作成 → owner の公開 → 健全性 → 公開用 DB の再構築 → BAN → 削除が一巡する", async () => {
     // 1. bootstrap → super login(super cookie 取得)
     const { cookie: superCookie, adminId } = await superLogin();
     const e = superEnv();
@@ -108,7 +108,7 @@ describe("特権テナント運用 一気通貫 (Phase 10)", () => {
       .where(and(eq(memberships.tenantId, tenantId), eq(memberships.userId, ownerId)));
     expect(ownerMembership).toEqual([{ role: "owner" }]);
 
-    // 3. owner が型 + record 作成 → publish → 投影着地をポーリング
+    // 3. owner が型 + record 作成 → publish → 公開用 DB への反映をポーリング
     const issued = await app.request("/auth/token", json({ tenantId }, { cookie: ownerCookie }), e);
     expect(issued.status).toBe(200);
     const { token: ownerToken } = (await issued.json()) as { token: string };
@@ -183,7 +183,7 @@ describe("特権テナント運用 一気通貫 (Phase 10)", () => {
       expect.objectContaining({ recordId, type: "article" }),
     );
 
-    // 6. super: 投影 D1 の行を直接 DELETE(乖離)→ POST reproject → 投影復元をポーリング
+    // 6. super: 公開用 DB の行を直接 DELETE(乖離)→ POST reproject → 公開用 DB の復元をポーリング
     await env.PROJECTION_DB.prepare(
       "DELETE FROM projected_records WHERE tenant_id = ? AND record_id = ?",
     )
@@ -222,7 +222,7 @@ describe("特権テナント運用 一気通貫 (Phase 10)", () => {
     expect(blockedToken.status).toBe(403);
     expect(await blockedToken.json()).toEqual({ error: "blocked" });
 
-    // 8. super: DELETE tenants/:id → 公開 API(tenant-resolver 経由)404 / 投影・R2・control-plane が空
+    // 8. super: DELETE tenants/:id → 公開 API(tenant-resolver 経由)404 / 公開用 DB・R2・control-plane が空
     const deleteRes = await app.request(
       superReq("DELETE", `/super/v1/tenants/${tenantId}`, superCookie),
       undefined,

@@ -10,7 +10,7 @@ export function fakeLimiter(succeeds: boolean): RateLimit {
 export const superEnv = (): Env => ({ ...env, AUTH_LIMITER: fakeLimiter(true) }) as Env;
 
 // bootstrap → login して super cookie を返す。呼び出し側は afterEach で resetSuperAdmins() を呼ぶこと
-// (共有 D1 のリーク対策 — tenant_modules と同じ規律)。
+// (共有 D1 のリーク対策 — tenant_modules と同じ方針)。
 export async function superLogin(): Promise<{ cookie: string; adminId: string }> {
   const e = superEnv();
   const creds = { email: `root+${crypto.randomUUID()}@x.com`, password: "super-password-123" };

@@ -159,7 +159,7 @@ describe("仮予約の失効 alarm (§9.6 / §9.8)", () => {
         moduleAlarmKind("booking"),
       );
       // 物理アラームは未来にしておく: workerd は過去日時の setAlarm を実際にほぼ即時に自動発火
-      // させ、runDurableObjectAlarm を呼ぶ前に消費されてしまう(Task 8 で確立した様式に追従)。
+      // させ、runDurableObjectAlarm を呼ぶ前に消費されてしまう(Task 8 で確立した書き方に追従)。
       // due 判定はレジストリの due_at(過去)を effectiveNow/dueKinds が見るため、論理的な失効
       // 条件はブリーフどおり変えていない。
       await state.storage.setAlarm(Date.now() + 60_000);

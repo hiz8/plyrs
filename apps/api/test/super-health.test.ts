@@ -37,7 +37,7 @@ describe("tenant health check", () => {
     );
     expect(published.ok).toBe(true);
 
-    // status を archived へ(公開は publish 時点の凍結スナップショットなので影響を受けない — §7)
+    // status を archived へ(公開は publish 時点のスナップショットなので影響を受けない — §7)
     const archived = asWriteResult(
       await stub.writeRecord(
         "article",
@@ -47,7 +47,7 @@ describe("tenant health check", () => {
     );
     expect(archived.ok).toBe(true);
 
-    // asset-ownership.test.ts と同じ様式: system 型として自動登録済みの 'asset' 行を
+    // asset-ownership.test.ts と同じ書き方: system 型として自動登録済みの 'asset' 行を
     // 無関係な user 型の行へ直接差し替える(Phase 8 以前からのテナントを模擬)。
     // さらに article record の richtext フィールド(body)を旧形式(非構造の生文字列)へ直接書き換える。
     await runInDurableObject(stub, async (_instance, state) => {
@@ -98,7 +98,7 @@ describe("orphan R2 asset detection", () => {
     const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
 
     // 参照済み asset: アップロード経路と同じ規約(r2_key = `${tenantId}/${assetId}`)で
-    // createAssetRecord RPC + ASSETS.put を直接叩く(routes/tenant.ts の POST /assets と同型)。
+    // createAssetRecord RPC + ASSETS.put を直接叩く(routes/tenant.ts の POST /assets と同じ形)。
     const assetId = uuidv7();
     const referencedKey = `${tenantId}/${assetId}`;
     await env.ASSETS.put(referencedKey, Uint8Array.from([1, 2, 3]));

@@ -30,7 +30,7 @@ describe("outbox sweeper on the alarm registry (design-spec §9.6 / §12.3)", ()
   it("arms an alarm in the same transaction as the outbox row", async () => {
     await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1"));
     await runInDurableObject(stub, async (_instance, state) => {
-      // 正常系で排出済みでも、レジストリの掃除は sweeper の仕事なのでアラームは張られたまま
+      // 正常系で送出済みでも、レジストリの掃除は sweeper の仕事なのでアラームは張られたまま
       expect(await state.storage.getAlarm()).not.toBeNull();
     });
   });

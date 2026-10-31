@@ -12,7 +12,7 @@ import { asRecordSnapshot } from "../src/rpc-unwrap";
 // (vi.spyOn(globalThis, "fetch"))で siteverify だけを差し替える。テストの意図(Turnstile
 // 成功/失敗・呼ばれる/呼ばれない)は変えていない。
 
-// gate.test.ts の unique 様式: 共有ストレージ(--no-isolate)では DO 名(= tenantId)が
+// gate.test.ts の unique の書き方: 共有ストレージ(--no-isolate)では DO 名(= tenantId)が
 // 衝突すると capacity 1 の枠を it 間で食い合う。テナントごとに DO を分けるため it ごとに
 // TENANT_ID/SLUG を分ける。
 const RUN_ID = crypto.randomUUID().slice(0, 8);
@@ -154,7 +154,7 @@ describe("公開 write (design-spec §11.7 = 論点W)", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it("満席の枠は booking:slot_full の 409(第2段のフックが公開経路にも効く)", async () => {
+  it("満席の枠は booking:slot_full の 409(第2段のフックが公開経路にも有効)", async () => {
     const tenantId = unique("t-pubwrite");
     const tenantSlug = unique("pubwrite");
     await seedTenantAndSlot(tenantId, tenantSlug);

@@ -5,7 +5,7 @@ import { tenants } from "@plyrs/db/control-plane";
 import { app } from "../src/index";
 
 // Phase 5c housekeeping: cache.match をクエリ検証（カタログ読み込み含む）より前段に移した。
-// ウォームキャッシュのヒット時には投影 D1 に一切触れないことを、PROJECTION_DB を
+// ウォームキャッシュのヒット時には公開用 DB に一切触れないことを、PROJECTION_DB を
 // 「触ったら throw する」バインディングに差し替えた env で実証する（キャッシュキーは全
 // パラメータを含むため、ヒット = 同一パラメータで過去に 200 を返した、であり検証省略は安全）。
 

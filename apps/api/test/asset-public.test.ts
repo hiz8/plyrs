@@ -8,11 +8,11 @@ import { insertTenantWithOwner } from "./create-tenant";
 import { fakeLimiter } from "./rate-limit-helper";
 
 // §6: AUTH_LIMITER は本物の Miniflare シミュレート ratelimit(--no-isolate で全ファイル共有)。
-// signup を叩く setupTenant はこの env を使う(素の env だと他テストの呼び出し数次第で 429 が混入する)。
+// signup を叩く setupTenant はこの env を使う(既定の env だと他テストの呼び出し数次第で 429 が混入する)。
 const authEnv: Env = { ...env, AUTH_LIMITER: fakeLimiter(true) };
 
 // 共有ストレージ（--no-isolate）ではファイル間でも衝突しないよう、実行ごとのランダム接頭辞を混ぜる
-// (既存 HTTP e2e テストの様式: asset-projection.test.ts の setupTenant に合わせる)
+// (既存 HTTP e2e テストの書き方: asset-projection.test.ts の setupTenant に合わせる)
 const RUN_ID = crypto.randomUUID().slice(0, 8);
 let n = 0;
 function unique(prefix: string): string {
@@ -71,8 +71,8 @@ async function uploadAsset(
   return { assetId: record.id };
 }
 
-// HTTP publish → DO から投影ペイロードを取得 → handleProjectionJob で投影 D1 へ upsert
-// (asset-projection.test.ts の projectRecord と同じ様式)。
+// HTTP publish → DO から反映用ペイロードを取得 → handleProjectionJob で公開用 DB へ upsert
+// (asset-projection.test.ts の projectRecord と同じ書き方)。
 async function publishAndProject(
   tenantId: string,
   tenantSlug: string,
@@ -104,11 +104,11 @@ async function publishAndProject(
   );
 }
 
-describe("公開アセット配信 (Phase 8 裁定 3: DO 非経由・公開ゲート付き)", () => {
+describe("公開アセット配信 (Phase 8 決定 3: DO 非経由・公開ゲート付き)", () => {
   it("serves the binary for a published asset with hardening headers", async () => {
     const { tenantId, tenantSlug, headers } = await setupTenant();
     const { assetId } = await uploadAsset(tenantId, headers, "hero.png");
-    // asset を直接 publish → 投影ジョブを処理
+    // asset を直接 publish → 反映ジョブを処理
     await publishAndProject(tenantId, tenantSlug, headers, assetId);
 
     const response = await app.request(`/public/v1/${tenantSlug}/assets/${assetId}`, {}, env);
@@ -140,11 +140,11 @@ describe("公開アセット配信 (Phase 8 裁定 3: DO 非経由・公開ゲ�
   });
 
   // 最終レビュー指摘(important): r2_key のテナント所有権ガード。projected_records は
-  // 投影パイプライン(handleProjectionJob)経由でしか書けないはずだが、投影ゲートは
-  // 「行があるか」だけを見るため、data.r2_key の中身までは検証しない ―― ここでは投影 D1 に
+  // 反映パイプライン(handleProjectionJob)経由でしか書けないはずだが、公開用 DB の行を見るゲートは
+  // 「行があるか」だけを見るため、data.r2_key の中身までは検証しない ―― ここでは公開用 DB に
   // 直接、他テナント接頭辞の r2_key を持つ行を播種して(このテナントの実バイナリが実在しない
   // ケースと違い、実際に foreign バイナリが R2 に存在する状況を再現する)、ownership.ts の
-  // ガードが確実に効くことを確認する。
+  // ガードが確実に機能することを確認する。
   it("404s when the projected r2_key does not belong to this tenant (ownership guard)", async () => {
     const { tenantId, tenantSlug } = await setupTenant();
     const assetId = uuidv7();

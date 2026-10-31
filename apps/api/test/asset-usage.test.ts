@@ -8,7 +8,7 @@ import { insertTenantWithOwner } from "./create-tenant";
 import { fakeLimiter } from "./rate-limit-helper";
 
 // §6: AUTH_LIMITER は本物の Miniflare シミュレート ratelimit(--no-isolate で全ファイル共有)。
-// signup を叩く setupTenant はこの env を使う(素の env だと他テストの呼び出し数次第で 429 が混入する)。
+// signup を叩く setupTenant はこの env を使う(既定の env だと他テストの呼び出し数次第で 429 が混入する)。
 const authEnv: Env = { ...env, AUTH_LIMITER: fakeLimiter(true) };
 
 const OWNER: AuthContext = { userId: "u-owner", role: "owner" };
@@ -48,7 +48,7 @@ async function createAsset(tenant: ReturnType<typeof stub>): Promise<string> {
 }
 
 // 共有ストレージ（--no-isolate）ではファイル間でも衝突しないよう、実行ごとのランダム接頭辞を混ぜる
-// (既存 HTTP e2e テストの様式: asset-upload.test.ts の setupTenant に合わせる)
+// (既存 HTTP e2e テストの書き方: asset-upload.test.ts の setupTenant に合わせる)
 const RUN_ID = crypto.randomUUID().slice(0, 8);
 let n = 0;
 function unique(prefix: string): string {
@@ -87,7 +87,7 @@ const PNG_HEADER = Uint8Array.from([
   0x00, 0x00, 0x03, 0x20, 0x00, 0x00, 0x02, 0x58, 0x08, 0x06, 0x00, 0x00, 0x00,
 ]);
 
-describe("orphan 検出と使用箇所 (Phase 8 裁定 6 / design-spec §6)", () => {
+describe("orphan 検出と使用箇所 (Phase 8 決定 6 / design-spec §6)", () => {
   it("lists only assets with no inbound relations as orphans", async () => {
     const tenant = stub("asset-usage-orphans");
     asRegisterResult(await tenant.registerContentType(galleryType, OWNER));

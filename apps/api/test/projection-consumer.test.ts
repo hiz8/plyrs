@@ -77,7 +77,7 @@ interface OutboxRow extends Record<string, SqlStorageValue> {
 }
 
 // CRITICAL fix: 実際に DO が発行した publish_seq / source_version をテストが手組みせず読み出す。
-// 世代番号の割り当ては DO のコンストラクタ復元込みの内部状態に依存するため、ハードコードした
+// publish_seq の割り当ては DO のコンストラクタ復元込みの内部状態に依存するため、ハードコードした
 // 番号は容易に嘘の前提になる（そしてこのバグ自体がまさにその手の思い込みで見逃されていた）。
 async function lastOutboxRow(stub: DurableObjectStub<TenantDO>): Promise<OutboxRow> {
   return runInDurableObject(stub, async (_instance, state) => {
@@ -293,7 +293,7 @@ describe("publish generation ordering — CRITICAL fix (レビュー指摘)", ()
   });
 
   // records.version は publish/unpublish で変化しない。unpublish → 無編集で republish すると
-  // 同じ source_version の upsert/delete が 2 世代分アウトボックスに積まれ、Queues は配信順序を
+  // 同じ source_version の upsert/delete が publish_seq の異なる 2 件がアウトボックスに積まれ、Queues は配信順序を
   // 保証しないため、遅れて届いた古い delete が現に公開中の republish 後の行を消してしまいうる
   // （旧 source_version ガードに対しては FAIL することを修正前に確認済み — レポート参照）。
   it("survives a stale unpublish-delete that arrives after a same-source-version republish", async () => {
@@ -309,7 +309,7 @@ describe("publish generation ordering — CRITICAL fix (レビュー指摘)", ()
     ]);
     expect(await projected(tenantId, recordId)).not.toBeNull();
 
-    // unpublish → delete が積まれる。source_version は変わらないが、世代番号は新しく採られる。
+    // unpublish → delete が積まれる。source_version は変わらないが、publish_seq は新しく採られる。
     const unpublished = asUnpublishResult(
       await stub.unpublishRecord(tenantId, recordId, auth("owner1")),
     );
@@ -318,7 +318,7 @@ describe("publish generation ordering — CRITICAL fix (レビュー指摘)", ()
     expect(staleDelete.source_version).toBe(v1.source_version);
     expect(staleDelete.publish_seq).toBeGreaterThan(v1.publish_seq);
 
-    // 編集せずに republish → records.version（source_version）は変わらないが世代番号はさらに進む
+    // 編集せずに republish → records.version（source_version）は変わらないが publish_seq はさらに進む
     const republished = asPublishResult(
       await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
     );
@@ -343,7 +343,7 @@ describe("publish generation ordering — CRITICAL fix (レビュー指摘)", ()
     expect(await projected(tenantId, recordId)).not.toBeNull();
 
     // ...そして unpublish 時点の delete が遅れて届く。source_version は republish 後の行と同じだが、
-    // 世代番号（publish_seq）は古い。
+    // publish_seq は古い。
     await deliver([
       {
         jobType: "delete",
@@ -360,14 +360,14 @@ describe("publish generation ordering — CRITICAL fix (レビュー指摘)", ()
 });
 
 describe("upsertStatements — direct-call staleness guard (handleProjectionJob 越しでは検証できない)", () => {
-  // handleProjectionJob は常に DO から「生きた」ペイロードを取り直すため、古い世代のペイロードを
+  // handleProjectionJob は常に DO から「生きた」ペイロードを取り直すため、古い publish_seq のペイロードを
   // 人為的に作って渡すことができない。ガードの本体（source_version/relations/index の張替え条件）を
   // 直接検証するには upsertStatements() を単体で呼ぶしかない。
   it("leaves a newer generation's data, relations, and index rows untouched when given a stale payload", async () => {
     const liveTenantId = crypto.randomUUID();
     const liveRecordId = uuid(300);
 
-    // 現行世代（publish_seq = 9）を直接 D1 に仕込む
+    // 現行の行（publish_seq = 9）を直接 D1 に仕込む
     await env.PROJECTION_DB.batch([
       env.PROJECTION_DB.prepare(
         `INSERT INTO projected_records
@@ -396,7 +396,7 @@ describe("upsertStatements — direct-call staleness guard (handleProjectionJob 
       ).bind(liveTenantId, "article", "slug", "current-slug", null, null, liveRecordId),
     ]);
 
-    // 古い世代（publish_seq = 3）のペイロードを手組みし、直接 upsertStatements() へ渡す
+    // 古い publish_seq（= 3）のペイロードを手組みし、直接 upsertStatements() へ渡す
     const stalePayload: ProjectionPayload = {
       recordId: liveRecordId,
       type: "article",
@@ -467,10 +467,10 @@ describe("projected_at refresh on redelivery — pins the >= guard (not >)", () 
     expect(published.ok).toBe(true);
   });
 
-  // 同一世代（同じ publish_seq）の再配信は at-least-once の下で普通に起こる。ガードが > だと
-  // 2 回目の配信が弾かれ projected_at が最初の配信時刻のまま古くなる。Task 7 の再投影
+  // 同じ publish_seq の再配信は at-least-once の下で普通に起こる。ガードが > だと
+  // 2 回目の配信が弾かれ projected_at が最初の配信時刻のまま古くなる。Task 7 の公開用 DB の再構築
   // mark-and-sweep は projected_at >= epoch を生存判定に使うため、それは生きている行を
-  // 誤って掃く事故になる。>= であることをここで直接固定する。
+  // 誤って削除する事故になる。>= であることをここで直接固定する。
   it("bumps projected_at when the same publish generation is redelivered", async () => {
     const v1 = await lastOutboxRow(stub);
     const job: ProjectionJob = {
@@ -493,10 +493,10 @@ describe("projected_at refresh on redelivery — pins the >= guard (not >)", () 
 
 // CRITICAL fix（レビュー指摘、probe で再現済み）: upsertStatements() の projected_records 書き込みは
 // ON CONFLICT の UPDATE 枝だけを publish_seq でガードしており、行が既に消えている（unpublish 済み）
-// ときは無条件 INSERT になる。再投影がページを読んだ「後」に unpublish の delete ジョブが先着すると、
-// 古い publish_seq を運ぶ再投影の書き込みが平文 INSERT として着地し、消えたはずのレコードを
+// ときは無条件 INSERT になる。公開用 DB の再構築がページを読んだ「後」に unpublish の delete ジョブが先着すると、
+// 古い publish_seq を運ぶ再構築の書き込みが平文 INSERT として適用され、消えたはずのレコードを
 // 復活させてしまう。relations/index の EXISTS ガードは書き込み後の状態を見るため、この復活した行が
-// 存在する限り一緒に張り替わってしまう（防波堤にならない）。
+// 存在する限り一緒に入れ替わってしまう（防御策にならない）。
 describe("resurrection race — a stale write must not undo a delete (CRITICAL fix)", () => {
   it("[race a] blocks a stale upsertStatements() call after the delete already landed (incremental path)", async () => {
     const tenantId = crypto.randomUUID();
@@ -512,14 +512,14 @@ describe("resurrection race — a stale write must not undo a delete (CRITICAL f
     );
     expect(published.ok).toBe(true);
 
-    // 「再投影がページを読んだ」瞬間を模す: この時点ではまだ公開中（publish_seq 1）。
+    // 「再構築がページを読んだ」瞬間を模す: この時点ではまだ公開中（publish_seq 1）。
     // stalePayload はこの後 unpublish が起きたことを知らない。
     const stalePayload = asProjectionPayload(await stub.getProjectionPayload(recordId));
     if (stalePayload === null) {
       throw new Error("test setup invariant: record must be projectable right after publish");
     }
 
-    // ここで編集者が unpublish する。delete ジョブが（再投影の書き込みより）先に届く。
+    // ここで編集者が unpublish する。delete ジョブが（再構築の書き込みより）先に届く。
     const unpublished = asUnpublishResult(
       await stub.unpublishRecord(tenantId, recordId, auth("owner1")),
     );
@@ -536,7 +536,7 @@ describe("resurrection race — a stale write must not undo a delete (CRITICAL f
     ]);
     expect(await projected(tenantId, recordId)).toBeNull();
 
-    // 遅れて届いた再投影由来の（stale な）書き込みを、consumer が実際に使う関数で直接再生する。
+    // 遅れて届いた再構築由来の（stale な）書き込みを、consumer が実際に使う関数で直接再生する。
     await env.PROJECTION_DB.batch(
       upsertStatements(env.PROJECTION_DB, tenantId, stalePayload, Date.now()),
     );
@@ -608,7 +608,7 @@ describe("resurrection race — a stale write must not undo a delete (CRITICAL f
     expect(await projected(tenantId, liveRecordId)).toBeNull();
     expect(await countRows("projected_relations", tenantId, liveRecordId)).toBe(0);
     expect(await countRows("projection_index", tenantId, liveRecordId)).toBe(0);
-    // レースに無関係だったもう片方は普通に投影される
+    // レースに無関係だったもう片方は普通に公開用 DB へ反映される
     expect(await projected(tenantId, otherRecordId)).not.toBeNull();
   });
 
@@ -637,7 +637,7 @@ describe("resurrection race — a stale write must not undo a delete (CRITICAL f
     ]);
     expect(await projected(tenantId, recordId)).not.toBeNull();
 
-    // unpublish → delete ジョブ（墓標が立つ）
+    // unpublish → delete ジョブ（projection_tombstones に行が立つ）
     const unpublished = asUnpublishResult(
       await stub.unpublishRecord(tenantId, recordId, auth("owner1")),
     );
@@ -655,7 +655,7 @@ describe("resurrection race — a stale write must not undo a delete (CRITICAL f
     expect(await projected(tenantId, recordId)).toBeNull();
     expect(await countRows("projection_tombstones", tenantId, recordId)).toBe(1);
 
-    // republish（世代番号は unpublish より真に大きい）→ upsert ジョブ
+    // republish（publish_seq は unpublish より真に大きい）→ upsert ジョブ
     const republished = asPublishResult(
       await stub.publishRecord(tenantId, tenantId, recordId, auth("owner1")),
     );
@@ -678,11 +678,11 @@ describe("resurrection race — a stale write must not undo a delete (CRITICAL f
 });
 
 // Task 7（レビュー指摘、probe で決定的に再現済み）: TenantDO.startReprojection にロックが無いため、
-// オーナーが「再構築」を連打するだけで独立した epoch を持つ 2 つの歩きが同時に走りうる。歩き終わりの
-// sweep が「epoch より前の墓標」を GC していると、後発の歩きの sweep が「先発の、まだ着地していない
-// 歩き」が依存している墓標を消してしまう。すると先発の歩きが遅れて発行する stale な書き込みが
+// オーナーが「再構築」を連打するだけで独立した epoch を持つ 2 つの再構築の実行が同時に走りうる。実行の終わりの
+// sweep が「epoch より前の projection_tombstones の行」を GC していると、後から始まった実行の sweep が「先に始まった、まだ書き込みが届いていない
+// 実行」が依存している projection_tombstones の行を消してしまう。すると先に始まった実行が遅れて発行する stale な書き込みが
 // 無防備になり、消えたはずのレコードを平文 INSERT で復活させる（しかも projected_at はどちらの
-// epoch より新しくなるため、以後どちらの歩きの sweep にも掃かれない）。
+// epoch より新しくなるため、以後どちらの実行の sweep にも削除されない）。
 describe("overlapping reprojection walks cannot resurrect a record (Task 7 fix)", () => {
   it("a stale upsertStatements() call from an earlier, still in-flight walk stays blocked after a later, unrelated walk's terminal sweep runs", async () => {
     const tenantId = crypto.randomUUID();
@@ -710,14 +710,14 @@ describe("overlapping reprojection walks cannot resurrect a record (Task 7 fix)"
     ]);
     expect(await projected(tenantId, recordId)).not.toBeNull();
 
-    // 「先発の歩き」がこのレコードのページを読んだ瞬間を模す。この時点ではまだ公開中
+    // 「先に始まった実行」がこのレコードのページを読んだ瞬間を模す。この時点ではまだ公開中
     // （unpublish はこの後起きる）。stalePayload はそれを知らないまま止め置かれる。
     const stalePayload = asProjectionPayload(await stub.getProjectionPayload(recordId));
     if (stalePayload === null) {
       throw new Error("test setup invariant: record must be projectable right after publish");
     }
 
-    // 編集者が unpublish → delete ジョブが墓標を立てる
+    // 編集者が unpublish → delete ジョブが projection_tombstones の行を立てる
     const unpublished = asUnpublishResult(
       await stub.unpublishRecord(tenantId, recordId, auth("owner1")),
     );
@@ -744,9 +744,9 @@ describe("overlapping reprojection walks cannot resurrect a record (Task 7 fix)"
       throw new Error("test setup invariant: the delete job must plant a tombstone");
     }
 
-    // 「後発の、無関係な歩き」が別の epoch で独立に走る。この時点でこのテナントに公開中のレコードは
+    // 「後から始まった、無関係な実行」が別の epoch で独立に走る。この時点でこのテナントに公開中のレコードは
     // 0 件なので、1 回の handleProjectionJob 呼び出しで終端 sweep まで完了する（空ページ即 sweep）。
-    // epoch は上の墓標より確実に後の値にする（旧コードの GC 条件 tombstoned_at < epoch を確実に
+    // epoch は上の projection_tombstones の行より確実に後の値にする（旧コードの GC 条件 tombstoned_at < epoch を確実に
     // 踏ませて、バグを再現できるようにするため）。
     await handleProjectionJob(
       env,
@@ -754,10 +754,10 @@ describe("overlapping reprojection walks cannot resurrect a record (Task 7 fix)"
       tombstoneRow.tombstoned_at + 2_000,
     );
 
-    // 先発の歩きがまだ依存している墓標は、後発の歩きの終端 sweep を生き延びなければならない
+    // 先に始まった実行がまだ依存している projection_tombstones の行は、後から始まった実行の終端 sweep を生き延びなければならない
     expect(await countRows("projection_tombstones", tenantId, recordId)).toBe(1);
 
-    // 先発の歩きの遅延した stale write（unpublish 前の publish_seq を運ぶ）が今ごろ届く。
+    // 先に始まった実行の遅延した stale write（unpublish 前の publish_seq を運ぶ）が今ごろ届く。
     // handleReprojectJob のページ読み取りループが実際に呼ぶのと同じ upsertStatements() を直接叩く。
     await env.PROJECTION_DB.batch(
       upsertStatements(env.PROJECTION_DB, tenantId, stalePayload, Date.now()),
@@ -770,9 +770,9 @@ describe("overlapping reprojection walks cannot resurrect a record (Task 7 fix)"
   });
 });
 
-// projection D1 は全テナント共有なので、墓標の NOT EXISTS ガードは必ず tenant_id で絞る
+// 公開用 DB(PROJECTION_DB)は全テナント共有なので、projection_tombstones の NOT EXISTS ガードは必ず tenant_id で絞る
 // 必要がある。これまでこの絞り込みが壊れても検出できていたのは reproject.test.ts の
-// 100件2ページ自己連鎖テストで record_id がたまたま衝突したときの、原因の分かりにくい
+// 100件2ページの、次のジョブを自分で送るテストで record_id がたまたま衝突したときの、原因の分かりにくい
 // 件数不一致だけだった。ここに狙い撃ちのテストを置く。
 describe("tombstone guard scoping — tenant_id must gate the NOT EXISTS subquery", () => {
   it("does not let tenant A's tombstone block tenant B's upsert of the same record id", async () => {
@@ -802,8 +802,8 @@ describe("tombstone guard scoping — tenant_id must gate the NOT EXISTS subquer
     );
     expect(publishedB.ok).toBe(true);
 
-    // テナント A だけ unpublish し、その delete ジョブを実配信して墓標を立てる
-    // （publish_seq=1 → unpublish で publish_seq=2 の墓標）
+    // テナント A だけ unpublish し、その delete ジョブを実配信して projection_tombstones の行を立てる
+    // （publish_seq=1 → unpublish で publish_seq=2 の行）
     const unpublishedA = asUnpublishResult(
       await stubA.unpublishRecord(tenantA, recordId, auth("owner1")),
     );
@@ -822,7 +822,7 @@ describe("tombstone guard scoping — tenant_id must gate the NOT EXISTS subquer
     expect(await countRows("projection_tombstones", tenantA, recordId)).toBe(1);
 
     // テナント B は公開したまま無関係。その upsert ジョブ（publish_seq=1）を配信する。
-    // tenant_id が NOT EXISTS から抜けていると、テナント A の墓標（publish_seq=2 > 1）が
+    // tenant_id が NOT EXISTS から抜けていると、テナント A の projection_tombstones の行（publish_seq=2 > 1）が
     // 誤ってこの書き込みを弾く。
     const upsertRowB = await lastOutboxRow(stubB);
     await deliver([
@@ -835,7 +835,7 @@ describe("tombstone guard scoping — tenant_id must gate the NOT EXISTS subquer
       },
     ]);
 
-    // 同じ record_id を持つだけの無関係なテナント A の墓標が、テナント B の正当な書き込みを
+    // 同じ record_id を持つだけの無関係なテナント A の projection_tombstones の行が、テナント B の正当な書き込みを
     // 弾いてはならない
     expect(await projected(tenantB, recordId)).not.toBeNull();
     // テナント A 側は unpublish 済みのまま

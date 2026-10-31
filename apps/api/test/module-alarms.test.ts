@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 // runModuleAlarmHandler へ直接注入するための最小フェイクマニフェスト(schema 検証は通さない
-// テスト fixture — module-redistribute.test.ts の ASSET_COLLISION_MANIFEST と同じ様式)。
+// テスト fixture — module-redistribute.test.ts の ASSET_COLLISION_MANIFEST と同じ書き方)。
 function fakeManifest(moduleId: string): ModuleManifest {
   return {
     moduleId,
@@ -131,7 +131,7 @@ describe("runModuleAlarmHandler(レジストリ注入シーム) (§15 冒頭掃�
   // Important fix(レビュー指摘): 当初 runModuleAlarmHandler 自身が try/catch していたが、
   // それだと呼び出し元の transactionSync クロージャが throw しなくなり、ハンドラ途中までの
   // 部分書き込みが commit され、かつ clearAlarm も commit 済みで schedule() に届かない
-  // (= そのモジュールの alarm 再武装が永久に失われる)regression があった。
+  // (= そのモジュールの alarm 再設定が永久に失われる)regression があった。
   // 隔離(ロールバック + 他モジュール継続)の責務は呼び出し側(TenantDO#runModuleAlarm、
   // 下の統合テスト)に置き、この関数自体は throw を素通しする契約にする。
   it("module があれば onAlarm をそのまま呼ぶ(throw も透過する)", async () => {
@@ -183,7 +183,7 @@ describe("runModuleAlarmHandler(レジストリ注入シーム) (§15 冒頭掃�
 });
 
 describe("TenantDO#runModuleAlarm のロールバック隔離 (§15 Important fix)", () => {
-  it("[統合] onAlarm 途中の throw で書き込み・alarm 再武装解除がロールバックされ、他 kind の処理は継続する", async () => {
+  it("[統合] onAlarm 途中の throw で書き込み・alarm 再設定解除がロールバックされ、他 kind の処理は継続する", async () => {
     const tenantId = "t-alarm-rollback";
     const owner: AuthContext = { userId: "u-owner", role: "owner", tenantId };
     const tenant = stub("mod-alarm-rollback");
@@ -223,7 +223,7 @@ describe("TenantDO#runModuleAlarm のロールバック隔離 (§15 Important fi
 
     // booking の実 onAlarm を「まず 1 件 write してから throw する」実装に差し替える。
     // (1) その write が transactionSync 全体のロールバックで巻き戻ること、
-    // (2) clearAlarm も巻き戻り、module:booking の alarm 登録(再武装)が失われないこと、
+    // (2) clearAlarm も巻き戻り、module:booking の alarm 登録(再設定)が失われないこと、
     // を、synthetic ctx ではなく実際の alarm() 経路(runDurableObjectAlarm)で検証する。
     let onAlarmCalled = false;
     vi.spyOn(bookingModule, "onAlarm").mockImplementation((ctx: ModuleAlarmContext) => {
@@ -267,7 +267,7 @@ describe("TenantDO#runModuleAlarm のロールバック隔離 (§15 Important fi
         .one();
       expect((JSON.parse(row.data) as { state: string }).state).toBe("pending");
 
-      // clearAlarm もロールバックされ、booking の alarm 登録(再武装)は失われていない
+      // clearAlarm もロールバックされ、booking の alarm 登録(再設定)は失われていない
       const bookingKind = state.storage.sql
         .exec<{ kind: string }>(
           "SELECT kind FROM alarm_registry WHERE kind = ?",

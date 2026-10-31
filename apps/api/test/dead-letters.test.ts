@@ -23,7 +23,7 @@ afterEach(async () => {
 });
 
 // Queue の配送は非同期（miniflare のブローカ経由）。フラッシュ API は無いのでポーリングする
-// (projection-e2e.test.ts と同じ様式)。
+// (projection-e2e.test.ts と同じ書き方)。
 async function waitFor<T>(read: () => Promise<T | null>, timeoutMs = 5_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -91,8 +91,8 @@ describe("dead letter park & replay", () => {
     );
     expect(published.ok).toBe(true);
 
-    // publish の自然な排出（outbox → queue → projection、実ブローカ経由）を待ち、
-    // 投影が一度出来上がった状態からスタートする。
+    // publish の自然な送出（outbox → queue → projection、実ブローカ経由）を待ち、
+    // 公開用 DB に一度反映された状態からスタートする。
     await waitFor(() =>
       env.PROJECTION_DB.prepare(
         "SELECT record_id FROM projected_records WHERE tenant_id = ? AND record_id = ?",
@@ -101,7 +101,7 @@ describe("dead letter park & replay", () => {
         .first<{ record_id: string }>(),
     );
 
-    // 投影行の消失（手動介入・障害等）を再現する。reproject リプレイで復元できることを確認する。
+    // 公開用 DB の行の消失（手動介入・障害等）を再現する。reproject リプレイで復元できることを確認する。
     await env.PROJECTION_DB.prepare(
       "DELETE FROM projected_records WHERE tenant_id = ? AND record_id = ?",
     )
@@ -148,7 +148,7 @@ describe("dead letter park & replay", () => {
     expect(await replayed.json()).toEqual({ ok: true });
 
     // replay は実キューへ送出するだけ。実 miniflare ブローカ経由で projection consumer が走り、
-    // 投影行が復元されるまでポーリングで観測する(projection-e2e.test.ts と同じ様式)。
+    // 公開用 DB の行が復元されるまでポーリングで観測する(projection-e2e.test.ts と同じ書き方)。
     await waitFor(() =>
       env.PROJECTION_DB.prepare(
         "SELECT record_id FROM projected_records WHERE tenant_id = ? AND record_id = ?",

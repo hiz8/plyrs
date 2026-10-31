@@ -48,7 +48,7 @@ describe("sync bootstrap", () => {
 
     expect(welcome).toMatchObject({ type: "welcome", protocolVersion: 1 });
     if (welcome.type === "welcome") {
-      // Phase 8 裁定 2: システム asset 型が key 昇順で article の次に自動登録される
+      // Phase 8 決定 2: システム asset 型が key 昇順で article の次に自動登録される
       expect(welcome.contentTypes.map((type) => type.key)).toEqual(["article", "asset"]);
       expect(welcome.serverSeq).toBeGreaterThan(0);
     }
@@ -57,7 +57,7 @@ describe("sync bootstrap", () => {
     const records = recordsOf(sync);
     expect(records).toHaveLength(1);
     expect(records[0]?.id).toBe(uuid(80));
-    // relations が input に統合されている（Phase 2 申し送りの継ぎ目の解消）
+    // relations が input に統合されている（Phase 2 引き継ぎ事項の継ぎ目の解消）
     expect(records[0]?.input["authors"]).toEqual(validArticleInput()["authors"]);
     expect(records[0]?.input["hero"]).toEqual(validArticleInput()["hero"]);
     expect(records[0]?.input["title"]).toBe("こんにちは");

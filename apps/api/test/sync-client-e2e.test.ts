@@ -128,7 +128,7 @@ describe("sync client against the real DO", () => {
     await vi.waitFor(() => expect(first.status).toBe("ready"), { timeout: 5000 });
     await first.push(change(uuid(64)));
     // checkpoint はサーバーの `sync` complete を受けてのみ前進する契約（roadmap §7:
-    // Phase 4a 完了時の申し送り）。push の ack 単体では前進しないため、この push を
+    // Phase 4a 完了時の引き継ぎ事項）。push の ack 単体では前進しないため、この push を
     // checkpoint に反映させるには一度張り直して新しい hello ラウンドトリップを経由する。
     await first.stop();
     await first.start();

@@ -41,7 +41,7 @@ describe("public edge cache (§12.6: Cache API + 短 TTL・パージなし)", ()
     const first = await app.request(path, {}, env);
     expect(first.status).toBe(200);
     const firstBody = await first.text();
-    // 投影を直接書き換える（派生ストアなのでテスト操作として正当）
+    // 公開用 DB を直接書き換える（派生ストアなのでテスト操作として正当）
     await env.PROJECTION_DB.prepare(
       'UPDATE projected_records SET data = \'{"title":"改変後"}\' WHERE tenant_id = ?1 AND record_id = ?2',
     )

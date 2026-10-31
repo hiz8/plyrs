@@ -29,7 +29,7 @@ export async function deliverJobs(jobs: ProjectionJob[]): Promise<void> {
   await getQueueResult(batch, ctx);
 }
 
-// write + publish して、投影 upsert ジョブに必要な世代情報を返す
+// write + publish して、公開用 DB への upsert ジョブに必要な publish_seq などの情報を返す
 export async function writeAndPublish(
   stub: DurableObjectStub<TenantDO>,
   tenantId: string,

@@ -202,7 +202,7 @@ describe("sync push", () => {
     watcher.socket.close(1000, "done");
   });
 
-  it("cascades unpublish when a published record is deleted over the sync socket (裁定 2026-07-13)", async () => {
+  it("cascades unpublish when a published record is deleted over the sync socket (決定 2026-07-13)", async () => {
     const recordId = uuid(650);
     const written = asWriteResult(
       await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("admin")),
@@ -229,8 +229,8 @@ describe("sync push", () => {
 
     expect(asProjectionPayload(await stub.getProjectionPayload(recordId))).toBeNull();
     // CRITICAL fix（レビュー指摘）: push 経路の delete も他の RPC 経路と同じく sweep を張って
-    // outbox を排出しなければならない。「sent = 0 のまま残る」を正としていた旧アサーションは
-    // バグ（排出されない）を固定してしまっていた ―― 実際に送出済み（sent = 1）で、未送出が
+    // outbox を送出しなければならない。「sent = 0 のまま残る」を正としていた旧アサーションは
+    // バグ（送出されない）を固定してしまっていた ―― 実際に送出済み（sent = 1）で、未送出が
     // 0 件であることを固定する。
     expect(await stub.pendingOutbox()).toBe(0);
     await runInDurableObject(stub, async (_instance, state) => {
@@ -259,7 +259,7 @@ describe("sync push", () => {
     // publish 自身の drain で outbox は既に空。ただし正常系でもレジストリの掃除は sweeper の
     // 仕事なので、この時点ではまだ publish が張った登録が残っている（他のテストと同じ前提）。
     // ここを空にしておかないと、後で見る registry の行が push 由来なのか publish の残骸なのか
-    // 区別できず、armSweep を呼ばなくても偶然パスしてしまう（Finding A と同じ穴）。
+    // 区別できず、armSweep を呼ばなくても偶然パスしてしまう（Finding A と同じ漏れ）。
     expect(await stub.pendingOutbox()).toBe(0);
     expect(await runDurableObjectAlarm(stub)).toBe(true);
     await runInDurableObject(stub, async (_instance, state) => {
@@ -291,7 +291,7 @@ describe("sync push", () => {
     // (a) 送出に失敗した outbox 行は未送出のまま残る
     expect(await stub.pendingOutbox()).toBe(1);
     // (b) push 経路の armSweep が張った登録が生き残っている
-    //     （これが無いと constructor の再アーム保険も見つけるものがなく、行が永遠に取り残される）
+    //     （これが無いと constructor の再設定の保険も見つけるものがなく、行が永遠に取り残される）
     await runInDurableObject(stub, async (_instance, state) => {
       const registry = state.storage.sql
         .exec<{ kind: string }>("SELECT kind FROM alarm_registry WHERE kind = ?", OUTBOX_SWEEP)

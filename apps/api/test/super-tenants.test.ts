@@ -49,7 +49,7 @@ describe("super tenant CRUD", () => {
       undefined,
       superEnv(),
     );
-    expect(res.status).toBe(404); // 裁定 9: super 専用化
+    expect(res.status).toBe(404); // 決定 9: super 専用化
   });
 
   it("creates, lists, renames a tenant and assigns an owner by email", async () => {
@@ -118,9 +118,9 @@ describe("super tenant CRUD", () => {
     expect(actions).toEqual(expect.arrayContaining(["tenant.create", "tenant.rename"]));
   });
 
-  // Minor 掃除(§16-3): precheck の SELECT 通過後に UNIQUE 制約違反が起きても素の 500 に
+  // Minor 掃除(§16-3): precheck の SELECT 通過後に UNIQUE 制約違反が起きても未処理の 500 に
   // ならず 409 slug_taken を返すことを、同一 slug への並行作成(TOCTOU)で検証する
-  // (super-auth.test.ts の「並行 bootstrap は片方だけ成立」と同じ真の並行発火の様式 —
+  // (super-auth.test.ts の「並行 bootstrap は片方だけ成立」と同じ真の並行発火の書き方 —
   // 逐次「直接 insert してから作成」では precheck の SELECT だけで 409 になり、
   // catch(SqliteError) の経路を通らない)。
   it("returns 409 slug_taken instead of 500 when two creates race on the same slug", async () => {
@@ -153,7 +153,7 @@ describe("super tenant CRUD", () => {
       e,
     );
     const { tenantId } = (await created.json()) as { tenantId: string };
-    // 消される対象を作っておく: KV キャッシュ / R2 オブジェクト / 投影行
+    // 消される対象を作っておく: KV キャッシュ / R2 オブジェクト / 公開用 DB の行
     await env.TENANT_SLUGS.put(`tenant-slug:sup-del`, JSON.stringify({ id: tenantId }));
     await env.ASSETS.put(`${tenantId}/some-asset`, "bytes");
     // packages/db/src/projection.ts の実カラム(status / published_by は存在しない)に合わせる

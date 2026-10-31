@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { decodeCursor, encodeCursor } from "./cursor";
 
-describe("keyset cursor codec (裁定 2026-07-14: 無署名 base64url)", () => {
+describe("keyset cursor codec (決定 2026-07-14: 無署名 base64url)", () => {
   it("round-trips string, number, and unicode sort keys", () => {
     const cases = [
       { k: "2026-07-14T00:00:00.000Z", id: "018f2b6a-7a0a-7000-8000-000000000001" },

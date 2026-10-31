@@ -21,7 +21,7 @@ function unique(prefix: string): string {
 
 // §6: AUTH_LIMITER は実体が本物の Miniflare シミュレート ratelimit(limit=10/period=60)。
 // --no-isolate のテストランでは全ファイルが同じバケットを共有するため、signup/login を
-// 何度も叩くこのファイルは常にこの env を使う(素の env だと他テストの呼び出し数次第で 429 が混入する)。
+// 何度も叩くこのファイルは常にこの env を使う(既定の env だと他テストの呼び出し数次第で 429 が混入する)。
 const testEnv: Env = { ...env, AUTH_LIMITER: fakeLimiter(true) };
 
 function json(body: unknown, cookie?: string): RequestInit {
@@ -124,7 +124,7 @@ describe("auth routes", () => {
     expect(denied.status).toBe(401);
   });
 
-  // 裁定 9: self-serve テナント作成(POST /v1/tenants)は撤去され、常に 404 を返す
+  // 決定 9: self-serve テナント作成(POST /v1/tenants)は撤去され、常に 404 を返す
   // (super-tenants.test.ts の「self-serve tenant creation is gone」で検証済み)。
 
   it("issues a 15-minute tenant JWT to members only (G5)", async () => {

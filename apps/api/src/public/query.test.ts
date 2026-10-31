@@ -32,7 +32,7 @@ function manyFieldCatalog(): Catalog {
   return map;
 }
 
-describe("parseListQuery (§12.4 の語彙)", () => {
+describe("parseListQuery (§12.4 で指定できる値)", () => {
   it("defaults to -published_at (system column), limit 20, no filters", () => {
     const parsed = parseListQuery({}, emptyCatalog());
     if (!parsed.ok) throw new Error(parsed.error);
@@ -170,7 +170,7 @@ describe("parseListQuery (§12.4 の語彙)", () => {
 // Finding 1（critical）: フィルタ値の総数が D1 の 1 クエリのバインド上限（100）を突破しうる。
 // buildListQuery の最悪形は 6 固定バインド（tenant/type 2 + カーソル 2 + limit 1 + 索引ソート
 // フィールド 1）+ フィルタごとの定数 3（scalar フィルタが relation より重い）× MAX_FILTERS(8) +
-// フィルタ値の総数。旧語彙（MAX_FILTERS=8 × MAX_FILTER_VALUES=20/filter、総数無制限）だと
+// フィルタ値の総数。旧上限（MAX_FILTERS=8 × MAX_FILTER_VALUES=20/filter、総数無制限）だと
 // 8 filters × 20 values = 160 が素通りし、6 + 24 + 160 = 190 バインドで D1 の上限を超える。
 describe("parseListQuery: MAX_TOTAL_FILTER_VALUES（D1 バインド予算、Finding 1）", () => {
   it("rejects when the total filter value count exceeds the D1 bind budget (60)", () => {
@@ -198,7 +198,7 @@ describe("parseListQuery: MAX_TOTAL_FILTER_VALUES（D1 バインド予算、Find
 
 describe("buildListQuery: D1 バインド予算（Finding 1）", () => {
   it("keeps the bind count within D1's 100/query cap for the worst allowed query", () => {
-    // 語彙が許す最大形: フィルタ 8 個（MAX_FILTERS）× 値の総数 60（MAX_TOTAL_FILTER_VALUES）＋
+    // 指定できる値の範囲での最大形: フィルタ 8 個（MAX_FILTERS）× 値の総数 60（MAX_TOTAL_FILTER_VALUES）＋
     // 索引ソート（+1 バインド）＋ カーソル（+2 バインド）。
     const params: Record<string, string[]> = {
       sort: ["-sortfield"],
