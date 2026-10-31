@@ -74,19 +74,19 @@ function SuperDlqPage() {
 
   return (
     <>
-      <h1 {...stylex.props(superStyles.title)}>DLQ</h1>
+      <h1 {...stylex.props(superStyles.title)}>失敗したジョブ</h1>
       {dlq.isError ? (
         <p role="alert" {...stylex.props(superStyles.banner)}>
-          デッドレター一覧を取得できませんでした
+          失敗したジョブの一覧を取得できませんでした
         </p>
       ) : null}
       {dlq.isPending ? (
         <p {...stylex.props(superStyles.muted)}>{LOADING_LABEL}</p>
       ) : rows.length === 0 ? (
-        <p {...stylex.props(superStyles.muted)}>デッドレターはありません</p>
+        <p {...stylex.props(superStyles.muted)}>失敗したジョブはありません</p>
       ) : (
         <table {...stylex.props(superStyles.table)}>
-          <caption {...stylex.props(superStyles.caption)}>デッドレターの一覧</caption>
+          <caption {...stylex.props(superStyles.caption)}>失敗したジョブの一覧</caption>
           <thead>
             <tr>
               <th {...stylex.props(superStyles.cell)}>キュー</th>
@@ -128,10 +128,10 @@ function SuperDlqPage() {
       {discardTarget !== null && (
         <div
           role="alertdialog"
-          aria-label="デッドレターの破棄"
+          aria-label="失敗したジョブの破棄"
           {...stylex.props(superStyles.dialog)}
         >
-          <h2 {...stylex.props(superStyles.dialogTitle)}>このデッドレターを破棄しますか?</h2>
+          <h2 {...stylex.props(superStyles.dialogTitle)}>この失敗したジョブを破棄しますか?</h2>
           {discardError !== null ? (
             <p role="alert" {...stylex.props(superStyles.banner)}>
               {discardError}

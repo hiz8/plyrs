@@ -28,7 +28,7 @@ record を publish した瞬間の姿を、Durable Object 内の `published_snap
 
 ### 公開用 DB の再構築
 
-あるテナントの公開用 DB の行を、公開版から作り直す運用。反映ジョブの取りこぼしや不整合を直すために、オーナーが開始する。
+あるテナントの公開用 DB の行を、公開版から作り直す運用。反映ジョブの取りこぼしや不整合を直すために開始する。テナントのオーナーが API から、または super 管理者が運営管理画面から開始できる(権限は `projection:rebuild`)。
 
 流れは次のとおり。
 
@@ -63,7 +63,7 @@ Durable Object 内で、record から relations の行を作り直す処理は�
 | 引き継ぎ事項 | あるフェーズの作業から次へ渡す、残課題と注意点 |
 | 画面の「失敗したジョブ」 | 運営管理画面で、キューの処理に失敗して退避されたジョブを一覧する項目 |
 | 画面の「レコードのないファイル」 | 運営管理画面で、どの record からも参照されていないアセットを一覧する項目 |
-| 画面の「検索」 | 運営管理画面で、テナントの状態や、どの record からも参照されていないアセットを調べる操作 |
+| 画面の「検索」 | 運営管理画面のテナント詳細で、どの record からも参照されていないアセットを調べる操作(「レコードのないファイルを検索」)。旧称は「走査」 |
 | 画面の「メンバーから外す」 | テナントのメンバーの権限を取り消す操作 |
 
 ## 2. 旧語との対応
@@ -121,7 +121,7 @@ Durable Object 内で、record から relations の行を作り直す処理は�
 | 効く、効かない | 有効、機能する | 文脈で「～に効果的」「～にうまく機能する」なども使う |
 | デッドレター(画面) | 失敗したジョブ | 画面の文言の話。`dead_letters` と DLQ は残す |
 | 孤児アセット(画面) | レコードのないファイル | 画面の文言の話。内部の「孤児」は一般的な語なので残す |
-| 走査(画面) | 検索 | 画面の文言の話 |
+| 走査(画面) | 検索 | 画面の文言の話。「レコードのないファイルを検索」のボタンを指す |
 | 剥奪(画面) | メンバーから外す | 画面の文言の話 |
 
 ### 2.3 変えない語
@@ -147,7 +147,7 @@ Durable Object 内で、record から relations の行を作り直す処理は�
 | 公開用 DB の行 | テーブル `projected_records`、`projected_relations` |
 | 墓標 | テーブル `projection_tombstones` |
 | 公開用 DB への反映 | キュー `PROJECTION_QUEUE`、実装 `apps/api/src/projection/`(`consumer.ts`、`jobs.ts`、`payload.ts`) |
-| 公開用 DB の再構築 | ジョブ `jobType: "reproject"`、DO メソッド `startReprojection`、API `/super/v1/tenants/:tenantId/reproject`、監査アクション `reproject.start` |
+| 公開用 DB の再構築 | ジョブ `jobType: "reproject"`、Durable Object のメソッド `startReprojection`、API `/super/v1/tenants/:tenantId/reproject`、監査アクション `reproject.start` |
 | 公開版 | テーブル `published_snapshots` |
 | 順序の基準 | 列 `publish_seq` |
 | 運営管理画面 | API `/super/v1/*`、`/super-auth/*` |

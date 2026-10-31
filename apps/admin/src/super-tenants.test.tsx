@@ -237,8 +237,8 @@ describe("super tenant management", () => {
     if (bobRow === null) {
       throw new Error("row not found");
     }
-    await user.click(within(bobRow).getByRole("button", { name: "剥奪" }));
-    await user.click(screen.getByRole("button", { name: "剥奪を確定" }));
+    await user.click(within(bobRow).getByRole("button", { name: "メンバーから外す" }));
+    await user.click(screen.getByRole("button", { name: "外すことを確定" }));
 
     expect(revokeMember).toHaveBeenCalledTimes(1);
   });

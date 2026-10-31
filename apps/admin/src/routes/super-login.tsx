@@ -128,7 +128,7 @@ function SuperLoginPage() {
         }}
       >
         <h1 {...stylex.props(styles.title)}>
-          {mode === "bootstrap" ? "初期セットアップ" : "運営コンソールへログイン"}
+          {mode === "bootstrap" ? "初期セットアップ" : "運営管理画面へログイン"}
         </h1>
         {totpInfo !== null && (
           <div {...stylex.props(styles.totpInfo)}>

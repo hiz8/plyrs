@@ -64,7 +64,7 @@ describe("super login", () => {
 
     expect(await screen.findByText("JBSWY3DPEHPK3PXP")).toBeInTheDocument();
     expect(screen.getByText(OTPAUTH_URI)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "運営コンソールへログイン" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "運営管理画面へログイン" })).toBeInTheDocument();
     expect(screen.getByLabelText("認証コード")).toBeInTheDocument();
     expect(bootstrap).toHaveBeenCalledTimes(1);
     const bootstrapInit = bootstrap.mock.calls[0]?.[0];
@@ -87,7 +87,7 @@ describe("super login", () => {
     });
 
     expect(
-      await screen.findByRole("heading", { name: "運営コンソールへログイン" }),
+      await screen.findByRole("heading", { name: "運営管理画面へログイン" }),
     ).toBeInTheDocument();
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("メールアドレス"), "admin@example.com");
@@ -97,7 +97,10 @@ describe("super login", () => {
 
     expect(await screen.findByRole("link", { name: "テナント" })).toHaveAttribute("href", "/super");
     expect(screen.getByRole("link", { name: "ユーザー" })).toHaveAttribute("href", "/super/users");
-    expect(screen.getByRole("link", { name: "DLQ" })).toHaveAttribute("href", "/super/dlq");
+    expect(screen.getByRole("link", { name: "失敗したジョブ" })).toHaveAttribute(
+      "href",
+      "/super/dlq",
+    );
     expect(screen.getByRole("link", { name: "監査ログ" })).toHaveAttribute("href", "/super/audit");
     expect(screen.getByRole("link", { name: "モジュール" })).toHaveAttribute(
       "href",
@@ -120,7 +123,7 @@ describe("super login", () => {
     renderAt("/super", { "/super-auth/status": status, "/super-auth/me": me });
 
     expect(
-      await screen.findByRole("heading", { name: "運営コンソールへログイン" }),
+      await screen.findByRole("heading", { name: "運営管理画面へログイン" }),
     ).toBeInTheDocument();
   });
 
@@ -134,7 +137,7 @@ describe("super login", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("エラーが発生しました");
     expect(screen.getByRole("alert")).toHaveTextContent("500: server_error");
     expect(
-      screen.queryByRole("heading", { name: "運営コンソールへログイン" }),
+      screen.queryByRole("heading", { name: "運営管理画面へログイン" }),
     ).not.toBeInTheDocument();
   });
 
@@ -168,7 +171,7 @@ describe("super login", () => {
     await user.click(screen.getByRole("button", { name: "ログアウト" }));
 
     expect(
-      await screen.findByRole("heading", { name: "運営コンソールへログイン" }),
+      await screen.findByRole("heading", { name: "運営管理画面へログイン" }),
     ).toBeInTheDocument();
     expect(logout).toHaveBeenCalledTimes(1);
     expect(context.queryClient.getQueryData(["super", "tenants"])).toBeUndefined();

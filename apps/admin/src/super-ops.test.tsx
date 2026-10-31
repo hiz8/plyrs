@@ -120,7 +120,7 @@ describe("super operations pages", () => {
 
     expect(await screen.findByText("Blog")).toBeInTheDocument();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "孤児アセットを走査" }));
+    await user.click(screen.getByRole("button", { name: "レコードのないファイルを検索" }));
 
     expect(await screen.findByText("t1/orphan-1")).toBeInTheDocument();
     expect(screen.getByText("t1/orphan-2")).toBeInTheDocument();
@@ -128,7 +128,7 @@ describe("super operations pages", () => {
     await user.click(screen.getByRole("button", { name: "選択を削除" }));
 
     expect(
-      await screen.findByRole("alertdialog", { name: "孤児アセットの削除" }),
+      await screen.findByRole("alertdialog", { name: "レコードのないファイルの削除" }),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "削除を確定" }));
 
@@ -153,13 +153,13 @@ describe("super operations pages", () => {
 
     expect(await screen.findByText("Blog")).toBeInTheDocument();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "再投影を開始" }));
+    await user.click(screen.getByRole("button", { name: "再構築を開始" }));
 
-    expect(await screen.findByRole("alertdialog", { name: "再投影の確認" })).toBeInTheDocument();
+    expect(await screen.findByRole("alertdialog", { name: "再構築の確認" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "開始を確定" }));
 
     expect(reproject).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText("再投影を開始しました(epoch: 4)")).toBeInTheDocument();
+    expect(await screen.findByText("再構築を開始しました(epoch: 4)")).toBeInTheDocument();
   });
 
   it("lists dead letters and replays one", async () => {
@@ -199,7 +199,7 @@ describe("super operations pages", () => {
 
     await user.click(within(row).getByRole("button", { name: "破棄" }));
     expect(
-      await screen.findByRole("alertdialog", { name: "デッドレターの破棄" }),
+      await screen.findByRole("alertdialog", { name: "失敗したジョブの破棄" }),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "破棄を確定" }));
     expect(discard).toHaveBeenCalledTimes(1);

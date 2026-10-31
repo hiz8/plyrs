@@ -89,7 +89,7 @@ function TenantDetailPage() {
       await revokeMutation.mutateAsync(revokeTarget.userId);
       setRevokeTarget(null);
     } catch {
-      setRevokeError("剥奪に失敗しました");
+      setRevokeError("外せませんでした");
     }
   }
 
@@ -127,7 +127,7 @@ function TenantDetailPage() {
       setOrphans(rows);
       setSelectedKeys(new Set());
     } catch {
-      setOrphanError("孤児アセットの走査に失敗しました");
+      setOrphanError("レコードのないファイルの検索に失敗しました");
     }
   }
 
@@ -181,7 +181,7 @@ function TenantDetailPage() {
       setReprojectEpoch(result.epoch);
       setReprojectConfirm(false);
     } catch {
-      setReprojectError("再投影を開始できませんでした");
+      setReprojectError("再構築を開始できませんでした");
     }
   }
 
@@ -220,7 +220,7 @@ function TenantDetailPage() {
                   <td {...stylex.props(superStyles.cell)}>{member.createdAt}</td>
                   <td {...stylex.props(superStyles.cell)}>
                     <Button variant="secondary" onPress={() => startRevoke(member)}>
-                      剥奪
+                      メンバーから外す
                     </Button>
                   </td>
                 </tr>
@@ -229,7 +229,11 @@ function TenantDetailPage() {
           </table>
         )}
         {revokeTarget !== null && (
-          <div role="alertdialog" aria-label="メンバーの剥奪" {...stylex.props(superStyles.dialog)}>
+          <div
+            role="alertdialog"
+            aria-label="メンバーから外す"
+            {...stylex.props(superStyles.dialog)}
+          >
             <h3 {...stylex.props(superStyles.dialogTitle)}>
               {revokeTarget.email} をこのテナントから外しますか?
             </h3>
@@ -240,7 +244,7 @@ function TenantDetailPage() {
             ) : null}
             <span {...stylex.props(superStyles.actions)}>
               <Button variant="secondary" onPress={() => void confirmRevoke()}>
-                剥奪を確定
+                外すことを確定
               </Button>
               <Button variant="secondary" onPress={() => setRevokeTarget(null)}>
                 キャンセル
@@ -333,13 +337,13 @@ function TenantDetailPage() {
         </div>
 
         <div {...stylex.props(styles.opBlock)}>
-          <h3 {...stylex.props(styles.opTitle)}>孤児アセット</h3>
+          <h3 {...stylex.props(styles.opTitle)}>レコードのないファイル</h3>
           <Button
             variant="secondary"
             isDisabled={orphanScanMutation.isPending}
             onPress={() => void scanOrphans()}
           >
-            孤児アセットを走査
+            レコードのないファイルを検索
           </Button>
           {orphanError !== null ? (
             <p role="alert" {...stylex.props(superStyles.banner)}>
@@ -348,11 +352,13 @@ function TenantDetailPage() {
           ) : null}
           {orphans !== null &&
             (orphans.length === 0 ? (
-              <p {...stylex.props(superStyles.muted)}>孤児アセットはありません</p>
+              <p {...stylex.props(superStyles.muted)}>レコードのないファイルはありません</p>
             ) : (
               <>
                 <table {...stylex.props(superStyles.table)}>
-                  <caption {...stylex.props(superStyles.caption)}>孤児アセットの一覧</caption>
+                  <caption {...stylex.props(superStyles.caption)}>
+                    レコードのないファイルの一覧
+                  </caption>
                   <thead>
                     <tr>
                       <th {...stylex.props(superStyles.cell)}>キー</th>
@@ -387,7 +393,7 @@ function TenantDetailPage() {
           {orphanDeleteConfirm && (
             <div
               role="alertdialog"
-              aria-label="孤児アセットの削除"
+              aria-label="レコードのないファイルの削除"
               {...stylex.props(superStyles.dialog)}
             >
               <h3 {...stylex.props(superStyles.dialogTitle)}>
@@ -415,16 +421,18 @@ function TenantDetailPage() {
         </div>
 
         <div {...stylex.props(styles.opBlock)}>
-          <h3 {...stylex.props(styles.opTitle)}>再投影</h3>
+          <h3 {...stylex.props(styles.opTitle)}>公開用 DB の再構築</h3>
           <Button variant="secondary" onPress={() => setReprojectConfirm(true)}>
-            再投影を開始
+            再構築を開始
           </Button>
           {reprojectEpoch !== null ? (
-            <p {...stylex.props(styles.notice)}>再投影を開始しました(epoch: {reprojectEpoch})</p>
+            <p {...stylex.props(styles.notice)}>再構築を開始しました(epoch: {reprojectEpoch})</p>
           ) : null}
           {reprojectConfirm && (
-            <div role="alertdialog" aria-label="再投影の確認" {...stylex.props(superStyles.dialog)}>
-              <h3 {...stylex.props(superStyles.dialogTitle)}>このテナントを再投影しますか?</h3>
+            <div role="alertdialog" aria-label="再構築の確認" {...stylex.props(superStyles.dialog)}>
+              <h3 {...stylex.props(superStyles.dialogTitle)}>
+                このテナントの公開用 DB を再構築しますか?
+              </h3>
               {reprojectError !== null ? (
                 <p role="alert" {...stylex.props(superStyles.banner)}>
                   {reprojectError}

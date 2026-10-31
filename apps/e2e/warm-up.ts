@@ -37,7 +37,7 @@ export default async function warmUp(): Promise<void> {
     await page.goto(`${BASE_URL}/super-login`);
     // bootstrap の前後どちらの見出しでもよい(ここでは何も操作しない)
     await page
-      .getByRole("heading", { name: /初期セットアップ|運営コンソールへログイン/ })
+      .getByRole("heading", { name: /初期セットアップ|運営管理画面へログイン/ })
       .waitFor({ timeout: RENDER_TIMEOUT_MS });
   } finally {
     await browser.close();

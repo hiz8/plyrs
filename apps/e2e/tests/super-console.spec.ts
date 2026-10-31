@@ -19,7 +19,7 @@ test("bootstrap, totp login, tenant CRUD and audit log", async ({ page }) => {
   expect(secret.length).toBeGreaterThan(0);
   persistSuperAdminSecret(secret);
 
-  await expect(page.getByRole("heading", { name: "運営コンソールへログイン" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "運営管理画面へログイン" })).toBeVisible();
   await page.getByLabel("認証コード").fill(totpCode(secret));
   await page.getByRole("button", { name: "ログイン" }).click();
   await expect(page).toHaveURL(/\/super$/);

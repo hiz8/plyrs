@@ -52,7 +52,7 @@ interface SuperMe {
 const NAV_ITEMS = [
   { to: "/super", label: "テナント" },
   { to: "/super/users", label: "ユーザー" },
-  { to: "/super/dlq", label: "DLQ" },
+  { to: "/super/dlq", label: "失敗したジョブ" },
   { to: "/super/audit", label: "監査ログ" },
   { to: "/super/modules", label: "モジュール" },
 ] as const;
@@ -90,7 +90,7 @@ function SuperShellLayout() {
   return (
     <div {...stylex.props(styles.shell)}>
       <nav {...stylex.props(styles.sidebar)} aria-label="メインナビゲーション">
-        <span {...stylex.props(styles.brand)}>plyrs 運営コンソール</span>
+        <span {...stylex.props(styles.brand)}>plyrs 運営管理画面</span>
         {NAV_ITEMS.map((item) => (
           <Link key={item.to} to={item.to} {...stylex.props(styles.navLink)}>
             {item.label}
