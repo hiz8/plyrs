@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Catalog } from "./catalog";
 import { decodeCursor } from "./cursor";
 
-// §12.4 のクエリ語彙（裁定 2026-07-14: filter[] ブラケット記法）。
+// §12.4 のクエリで指定できる値（決定 2026-07-14: filter[] ブラケット記法）。
 // - filter[field]=v は同一キー繰り返しで any-of、異なるフィールド間で AND。
 // - フィルタ/ソートは索引宣言済みフィールド（カタログに載っているもの）に限る。
 // - ソートは単一値フィールドのみ（複数値は行分割で順序が未定義 → 400）。
@@ -58,7 +58,7 @@ const MAX_INCLUDE_FIELDS = 5;
 // 最悪形は全フィルタが scalar のとき: 6 + 3 * MAX_FILTERS(8) + 総数 = 30 + 総数。
 // D1 の 1 クエリのバインド上限は 100 なので、60 を上限にすれば 30 + 60 = 90 に収まり、
 // 実装の細部が多少ずれても耐える 10 バインドの安全マージンを残せる（本番のみ 500 化する
-// 事故を防ぐのが目的で、ローカル SQLite は上限が緩くテストが緑のままだった）。
+// 事故を防ぐのが目的で、ローカル SQLite は上限が緩くテストが通るままだった）。
 const MAX_TOTAL_FILTER_VALUES = 60;
 
 const FILTER_KEY_PATTERN = /^filter\[([a-z][a-z0-9_]*)\]$/u;

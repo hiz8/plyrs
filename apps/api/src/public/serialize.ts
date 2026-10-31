@@ -1,4 +1,4 @@
-// 裁定（2026-07-14）: 内部値（source_version / publish_seq / projected_at）は公開しない。
+// 決定（2026-07-14）: 内部値（source_version / publish_seq / projected_at）は公開しない。
 // ユーザー定義フィールドは fields に入れ子（システム項目との名前衝突を構造で回避）。
 export interface PublicRecord {
   id: string;

@@ -75,7 +75,7 @@ export const publicWriteRoutes = new Hono<{ Bindings: Env }>()
     );
     if (!result.ok) {
       // モジュール名前空間コード(例 booking:slot_full)は業務上の競合 = 409。
-      // システム語彙は管理 API と同じ対応(forbidden 403 / validation 400)に落とす。
+      // システムが定義するコードは管理 API と同じ対応(forbidden 403 / validation 400)に落とす。
       const status = result.code.includes(":") ? 409 : result.code === "forbidden" ? 403 : 400;
       return c.json({ ok: false, code: result.code, message: result.message }, status);
     }

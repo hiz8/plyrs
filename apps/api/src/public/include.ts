@@ -2,17 +2,17 @@ import type { AssetEmbed } from "../projection/payload";
 import { toPublicRecord, type ProjectedRecordRow, type PublicRecord } from "./serialize";
 import { chunk, D1_BIND_CHUNK_SIZE, placeholders } from "./sql";
 
-// §12.5: 公開経路の関係解決は projected_relations に対してのみ行う。参照先が投影に無ければ
+// §12.5: 公開経路の関係解決は projected_relations に対してのみ行う。参照先が公開用 DB に無ければ
 // （未公開 / 取り下げ済み）その参照は黙って不在になる（ソフト参照。エラーにしない）。
 // 展開は field 由来のみ（body 由来のリンクはレコード本文の関心。Phase 7）。
 
 // design-spec §6: 関係は data に入らない（write-record.test.ts で確定済みの不変条件）ので
-// toPublicRecord() が返す fields には関係フィールドの値が一切現れない。裁定（2026-07-14 #3）:
+// toPublicRecord() が返す fields には関係フィールドの値が一切現れない。決定（2026-07-14 #3）:
 // 既定でも関係フィールドは ID 配列として fields に現れる — include は included[] の同梱だけを
 // 制御し、fields の形を変えない。未公開参照先の ID も残る（ソフト参照で included にだけ現れない）。
 
-// Phase 8 裁定 4: snapshotEmbed "value" の関係は凍結埋め込みオブジェクトとして fields に
-// 現れる(素の ID 文字列と排他 — 同じフィールドの同じ publish 世代内では形が揃う)。
+// Phase 8 決定 4: snapshotEmbed "value" の関係はアセットの埋め込み情報のオブジェクトとして fields に
+// 現れる(ID 文字列そのものと排他 — 同じフィールドの同じ `publish_seq` 内では形が揃う)。
 export interface PublicAssetEmbed extends AssetEmbed {
   id: string;
 }

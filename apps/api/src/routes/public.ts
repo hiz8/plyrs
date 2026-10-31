@@ -16,7 +16,7 @@ import { buildListQuery, type ListRow } from "../public/sql";
 import { resolveTenantId } from "../public/tenant-resolver";
 import { TENANT_SLUG_MAX_LENGTH, TENANT_SLUG_PATTERN } from "./tenants";
 
-// design-spec §12.4〜12.7 / G3: 公開 read API。投影 D1（+ コントロールプレーン D1 と KV の
+// design-spec §12.4〜12.7 / G3: 公開 read API。公開用 DB（`PROJECTION_DB`。+ コントロールプレーン D1 と KV の
 // テナント解決）だけを読み、DO は絶対に起こさない。認証なし（公開経路）。
 // projection_tombstones は読まない: projected_records に行が無ければ見えない、が公開状態の全て。
 
@@ -134,7 +134,7 @@ async function serveSingle(
       return c.json({ error: "not_found" }, 404);
     }
     const record = toPublicRecord(row);
-    // 既定でも関係フィールドは ID 配列として fields に現れる（裁定: include は included[] の
+    // 既定でも関係フィールドは ID 配列として fields に現れる（決定: include は included[] の
     // 同梱だけを制御し、fields の形を変えない。未公開参照先の ID も残る — ソフト参照で
     // included にだけ現れない）。
     const relationIds = await loadFieldRelationIdsForRecords(c.env.PROJECTION_DB, tenantId, [
@@ -159,7 +159,7 @@ async function serveSingle(
           }
         : base;
     const response = c.json(body);
-    // 裁定: publish_seq は公開しないが ETag の弱い検証子としての内部利用は可
+    // 決定: publish_seq は公開しないが ETag の弱い検証子としての内部利用は可
     response.headers.set("etag", `W/"${row.publish_seq}"`);
     return response;
   });
@@ -167,8 +167,8 @@ async function serveSingle(
 
 export const publicRoutes = new Hono<PublicEnv>()
   .use("*", cors({ origin: "*", allowMethods: ["GET", "HEAD", "OPTIONS"] }))
-  // Phase 8 裁定 3: 公開アセット配信。公開ゲート = projected_records に asset の投影行が
-  // あること（publish 済みの真実源の公開側投影）。DO を起こさない（§8/§12.7）。バイナリは
+  // Phase 8 決定 3: 公開アセット配信。公開ゲート = projected_records に asset の行が
+  // あること（publish 済みの正本を公開用 DB へ反映した行）。DO を起こさない（§8/§12.7）。バイナリは
   // 不変（アップロード後の差し替え無し）なので Cache API の短 TTL はゲートの陳腐化だけを
   // 有界化する（unpublish 後も最大 TTL 秒は配信されうる — §12.6 の既存トレードオフと同じ）。
   .get("/:tenantSlug/assets/:assetId", async (c) => {
@@ -203,7 +203,7 @@ export const publicRoutes = new Hono<PublicEnv>()
       }
       const object = await c.env.ASSETS.get(r2Key);
       if (object === null) {
-        // 投影はあるがバイナリが無い（削除競合の窓）。ソフト参照と同じく不在として扱う
+        // 公開用 DB に行はあるがバイナリが無い（削除競合の窓）。ソフト参照と同じく不在として扱う
         return c.json({ error: "not_found" }, 404);
       }
       const contentType = data["content_type"];
@@ -238,9 +238,9 @@ export const publicRoutes = new Hono<PublicEnv>()
     const params = c.req.queries();
     const cacheUrl = canonicalCacheUrl(tenantId, `records/${type}`, params);
     // Phase 5c: 検証・カタログ読み込み・クエリ実行のすべてを produce の中へ（ヒット時に
-    // 投影 D1 を一切読まない）。400 は withEdgeCache が保存しないためキャッシュを汚さない。
+    // 公開用 DB を一切読まない）。400 は withEdgeCache が保存しないためキャッシュを汚さない。
     return withEdgeCache(edgeCacheContextFor(c), cacheUrl, async () => {
-      // 最頻の「素の一覧」（フィルタ/ソート/include なし）でカタログの 1 クエリを節約する。
+      // 最頻の「条件なしの一覧」（フィルタ/ソート/include なし）でカタログの 1 クエリを節約する。
       // 空カタログでも既定ソート（システム published_at）と limit/cursor 検証は成立する。
       const needsCatalog = Object.keys(params).some(
         (key) => key === "sort" || key === "include" || key.startsWith("filter["),
@@ -270,7 +270,7 @@ export const publicRoutes = new Hono<PublicEnv>()
               id: last.record_id,
             })
           : null;
-      // 裁定（2026-07-14 controller amendment）: 一覧 items にも単体と同じく関係フィールドを
+      // 決定（2026-07-14 controller amendment）: 一覧 items にも単体と同じく関係フィールドを
       // ID 配列として常時マージする（§6 の通り関係は data に入らないため、そのままでは items の
       // fields から欠落し単体レスポンスと形が食い違う）。include の有無で fields の形は変えない
       // （include は included[] の同梱だけを制御）。ページの record_id 全件をチャンク内 1 回で引く。

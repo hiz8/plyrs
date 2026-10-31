@@ -1,7 +1,7 @@
 import type { FieldDefinition } from "@plyrs/metamodel";
 
-// Phase 8 裁定 4: snapshotEmbed "value" の凍結埋め込み(asset 限定の固定語彙)。
-// publish 時点の asset record から凍結し、以後 asset 側の変更には追従しない
+// Phase 8 決定 4: snapshotEmbed "value" のアセットの埋め込み情報(asset 限定の固定の種類)。
+// publish 時点の asset record から取り込んで保存し、以後 asset 側の変更には追従しない
 // (L1: 埋め込むのは実質不変値のみ / L2: 古くなったら記事を再 publish — design-spec §7)。
 export interface AssetEmbed {
   url: string;
@@ -18,8 +18,8 @@ export interface ProjectionRelationRow {
   targetId: string;
   ordinal: number;
   origin: string; // 'field' | 'body'
-  // Phase 8 より前の snapshot の JSON には存在しないため optional。null = 凍結対象だったが
-  // 参照先が dangling(素の ID 参照として投影される)。
+  // Phase 8 より前の snapshot の JSON には存在しないため optional。null = 埋め込み対象だったが
+  // 参照先が dangling(ID だけの参照として公開用 DB へ反映される)。
   embed?: AssetEmbed | null;
 }
 
@@ -36,8 +36,8 @@ export interface ProjectionIndexRow {
 export const CATALOG_KINDS = ["text", "num", "bool", "date", "relation"] as const;
 export type CatalogKind = (typeof CATALOG_KINDS)[number];
 
-// Phase 5c housekeeping: projection_fields の kind は将来語彙が増えうる（record upsert への
-// LWW 相乗り更新のため、旧コードが新 kind の行を読む窓がある）。未知 kind の行は
+// Phase 5c housekeeping: projection_fields の kind は将来指定できる値が増えうる（record upsert と同時に更新する
+// LWW 更新のため、旧コードが新 kind の行を読む窓がある）。未知 kind の行は
 // 「宣言されていない」扱いで skip する保険（loadCatalog が使う）。
 export function isCatalogKind(value: string): value is CatalogKind {
   return (CATALOG_KINDS as readonly string[]).includes(value);
@@ -58,10 +58,10 @@ export interface PublishedSnapshot {
   publishedAt: string;
   publishedBy: string;
   sourceVersion: number; // どの records.version を publish したか（参考情報。順序トークンではない）
-  publishSeq: number; // CRITICAL fix: 投影ジョブの順序ガード本体（DO 全体で単調な publish 世代番号）
+  publishSeq: number; // CRITICAL fix: 反映ジョブの順序ガード本体（DO 全体で単調な `publish_seq`）
 }
 
-// 投影 D1 の 3 テーブルへ書き込む全量（consumer はこれを D1 batch に落とすだけ）
+// 公開用 DB の 3 テーブルへ書き込む全量（consumer はこれを D1 batch に落とすだけ）
 export interface ProjectionPayload {
   recordId: string;
   type: string;
@@ -69,13 +69,13 @@ export interface ProjectionPayload {
   publishedAt: string;
   data: Record<string, unknown>;
   sourceVersion: number; // 参考情報として projected_records に書く（順序ガードには使わない）
-  publishSeq: number; // CRITICAL fix: 投影ジョブの順序ガード本体
+  publishSeq: number; // CRITICAL fix: 反映ジョブの順序ガード本体
   relations: ProjectionRelationRow[];
   index: ProjectionIndexRow[];
   catalog: CatalogRow[]; // Phase 5b: 公開 read API のフィルタ/ソート検証用（型レベル情報）
 }
 
-// G4: 新しい宣言語彙を増やさず「key が 'slug' の unique な text フィールド」を実カラムへ昇格する
+// G4: 新しい宣言の種類を増やさず「key が 'slug' の unique な text フィールド」を専用カラムへ切り出す
 export function promoteSlug(
   fields: FieldDefinition[],
   data: Record<string, unknown>,
@@ -96,7 +96,7 @@ function row(fieldKey: string, part: Partial<ProjectionIndexRow>): ProjectionInd
 }
 
 // design-spec §12.2: 値は型別カラムに振り分ける（数値・日付を TEXT 一列で持つとソートが壊れる）。
-// data は寛容読み（型定義とズレた値がありうる）なので、型が合わない値は索引に入れない。
+// data は tolerant read（型定義とズレた値がありうる）なので、型が合わない値は索引に入れない。
 function indexRowsForField(
   field: FieldDefinition,
   data: Record<string, unknown>,
@@ -143,7 +143,7 @@ function indexRowsForField(
 }
 
 // indexed 宣言済みスカラーと関係フィールドだけが載る。関係は projected_relations が常に全量
-// 投影されるため宣言不要でフィルタ（メンバーシップ）可能。
+// 公開用 DB へ反映されるため宣言不要でフィルタ（メンバーシップ）可能。
 export function catalogRowsForFields(fields: FieldDefinition[]): CatalogRow[] {
   const rows: CatalogRow[] = [];
   for (const field of fields) {

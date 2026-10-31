@@ -9,21 +9,21 @@ import type { ProjectionPayload } from "./payload";
 
 // 順序ガードの要（CRITICAL fix: publish_seq を使う。source_version は publish/unpublish で
 // 変化しないため順序トークンになれない — unpublish→無編集republish が同じ source_version の
-// upsert/delete を生み、Queues の配信順序非保証と組み合わさると新しい世代を古いジョブが消しうる）:
+// upsert/delete を生み、Queues の配信順序非保証と組み合わさると新しい publish_seq の行を古いジョブが消しうる）:
 // 1) projected_records を「自分の publish_seq が現行以上のときだけ」条件付き upsert する。
-// 2) relations / index は「upsert 後に自分の publish_seq が現に載っているときだけ」張り替える。
-// これで古いジョブは 1) で弾かれ、2) も EXISTS が偽になるため新しい投影を壊せない。
+// 2) relations / index は「upsert 後に自分の publish_seq が現に載っているときだけ」入れ替える。
+// これで古いジョブは 1) で弾かれ、2) も EXISTS が偽になるため新しい公開用 DB の行を壊せない。
 // 再配信（同一 publish_seq）は 1) が >= で通り、2) も真になるので同じ内容を冪等に書き直す。
-// >= であって > ではない: 同一世代の再配信でも projected_at を更新する必要がある
-// （再投影の mark-and-sweep が projected_at >= epoch を生存判定に使うため。Task 7）。
+// >= であって > ではない: 同一 publish_seq の再配信でも projected_at を更新する必要がある
+// （公開用 DB の再構築の mark-and-sweep が projected_at >= epoch を生存判定に使うため。Task 7）。
 //
 // CRITICAL fix（レビュー指摘、probe で再現済み）: 上の 1) は ON CONFLICT の UPDATE 枝でしか
-// 効かない。行が既に消えている（unpublish 済み）ときは無条件 INSERT になり、再投影がページを
+// 機能しない。行が既に消えている（unpublish 済み）ときは無条件 INSERT になり、公開用 DB の再構築がページを
 // 読んだ「後」に unpublish の delete ジョブが先着すると、古い publish_seq を運ぶ書き込みが
 // 消えたはずのレコードを復活させてしまう（relations/index の EXISTS ガードは書き込み「後」の
-// 状態を見るため、復活した行がある限り一緒に張り替わる — 防波堤にならない）。
+// 状態を見るため、復活した行がある限り一緒に入れ替わる — 防御策にならない）。
 // projection_tombstones に「この publish_seq 以下はもう有効な公開ではない」を記録し、
-// INSERT を SELECT ... WHERE NOT EXISTS(自分より新しい墓標が無い) にすることで、行の有無に
+// INSERT を SELECT ... WHERE NOT EXISTS(自分より新しい projection_tombstones の行が無い) にすることで、行の有無に
 // 関わらず古い書き込みを弾く。SQLite は SELECT に WHERE 節がある INSERT...SELECT に対しても
 // upsert（ON CONFLICT）を許す。
 export function upsertStatements(
@@ -61,8 +61,8 @@ export function upsertStatements(
         payload.publishSeq,
         projectedAt,
       ),
-    // 勝った書き込みは自分の世代以下の墓標を消す（republish の publish_seq は常にそれ以前の
-    // unpublish より真に大きいため、これは自分が上書きした墓標しか消さない）。
+    // 勝った書き込みは自分の publish_seq 以下の projection_tombstones の行を消す（republish の publish_seq は常にそれ以前の
+    // unpublish より真に大きいため、これは自分が上書きした projection_tombstones の行しか消さない）。
     db
       .prepare(
         `DELETE FROM projection_tombstones
@@ -137,13 +137,13 @@ export function upsertStatements(
   }
 
   // Phase 5b: フィールドカタログ（型レベル情報）。publish_seq ガードは意図的に掛けない ——
-  // カタログは record の世代ではなく「payload を組み立てた時点の content_types」を写すため、
+  // カタログは record の publish_seq ではなく「payload を組み立てた時点の content_types」を写すため、
   // stale な record ジョブが運ぶカタログも内容的には現在の宣言である（LWW で十分。型定義変更と
-  // 競合してズレても、次の publish か再投影が上書きする）。record 側のガードで弾かれたジョブが
+  // 競合してズレても、次の publish か公開用 DB の再構築が上書きする）。record 側のガードで弾かれたジョブが
   // カタログだけ更新しても無害。record の EXISTS ガードにも載せない: 400/空結果の区別は宣言
   // （カタログ）だけに依存させ、公開レコードの有無に依存させない設計だから ―― 検証は「宣言が
   // あるか」だけを見るべきで、宣言はあるが公開レコードが 0 件の型でもフィルタは 400 ではなく
-  // 空配列を返すべき（Finding 3: この不変条件を守るため、再投影の終端 sweep 直前に
+  // 空配列を返すべき（Finding 3: この不変条件を守るため、公開用 DB の再構築の終端 sweep 直前に
   // handleReprojectJob が DO の getProjectionCatalog() からカタログを取り直して upsert する。
   // record が 0 件でも宣言が生きている限りカタログが消えないようにするのがその実装）。
   for (const catalogRow of payload.catalog) {
@@ -172,10 +172,10 @@ export function upsertStatements(
 
 // §12.3: delete も publish_seq でガードする（unpublish 発行後に republish が先着した場合に消さない。
 // CRITICAL fix: 以前は source_version でガードしていたが、それは publish/unpublish で変化しないため
-// 同一世代を装った古い delete が新しい世代を消せてしまっていた）
+// 同一 publish_seq を装った古い delete が新しい publish_seq の行を消せてしまっていた）
 //
-// CRITICAL fix（レビュー指摘）: delete と同じ batch で墓標を立てる。これが無いと、この delete の
-// 後に届く「delete より古い publish_seq を運ぶ」書き込み（stale な再投影のページ読み取りなど）が
+// CRITICAL fix（レビュー指摘）: delete と同じ batch で projection_tombstones の行を立てる。これが無いと、この delete の
+// 後に届く「delete より古い publish_seq を運ぶ」書き込み（stale な公開用 DB の再構築のページ読み取りなど）が
 // 行の不在に乗じて平文 INSERT で復活できてしまう（upsertStatements 側のコメント参照）。
 export function deleteStatements(
   db: D1Database,
@@ -223,10 +223,10 @@ function stubFor(env: Env, tenantId: string) {
   return env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
 }
 
-// §12.3b: 投影は snapshot から決定的に再構築できる派生物。
-// mark-and-sweep: このジョブが投影した行は projected_at >= epoch になる。全ページを投影し終えたら
-// projected_at < epoch の行（= snapshot に無い / 別テナント時代の残骸）を掃く。
-// 再投影の最中に走った通常の publish も projected_at >= epoch になるので巻き込まれない。
+// §12.3b: 公開用 DB は snapshot から決定的に再構築できる派生物。
+// mark-and-sweep: このジョブが反映した行は projected_at >= epoch になる。全ページを反映し終えたら
+// projected_at < epoch の行（= snapshot に無い / 別テナント時代の残骸）を削除する。
+// 公開用 DB の再構築の最中に走った通常の publish も projected_at >= epoch になるので巻き込まれない。
 async function handleReprojectJob(env: Env, job: ReprojectJob, nowMs: number): Promise<void> {
   const page = asPublishedPage(
     await stubFor(env, job.tenantId).getPublishedPage(job.cursor, REPROJECT_PAGE_SIZE),
@@ -237,7 +237,7 @@ async function handleReprojectJob(env: Env, job: ReprojectJob, nowMs: number): P
     );
   }
   if (page.nextCursor !== null) {
-    // 共有 D1 への書き込み集中を避けるため 1 ページずつ自己連鎖する（§12.3b の運用注記）。
+    // 共有 D1 への書き込み集中を避けるため 1 ページずつ次のジョブを自分で送る（§12.3b の運用注記）。
     // nextCursor は payloads.length === limit のときに非 null になる（loadPublishedPage の
     // 仕様）ため、ちょうど limit 件で終わる場合は「もう次が無い」空ページを取りに行く
     // 追加の 1 往復が発生する。その空ページは payloads.length(0) !== limit なので
@@ -251,16 +251,16 @@ async function handleReprojectJob(env: Env, job: ReprojectJob, nowMs: number): P
     return;
   }
   // Finding 3（important）: sweep の前に DO から content_types 由来のカタログを取り直して
-  // upsert する。カタログは record payload への相乗り（upsertStatements）でしか更新されないため、
-  // 全件 unpublish 済みの型（公開レコード 0 件）は歩きのページ読み取りに一度も乗らない ――
+  // upsert する。カタログは record payload と同時に更新する経路（upsertStatements）でしか更新されないため、
+  // 全件 unpublish 済みの型（公開レコード 0 件）は公開用 DB の再構築の実行のページ読み取りに一度も乗らない ――
   // 宣言（content_types）はまだ生きているのに、この後の sweep（projected_at < epoch - margin）
-  // だけがカタログ行を「触られなかった残骸」として掃いてしまうと、以後そのテナントのフィルタ/
+  // だけがカタログ行を「触られなかった残骸」として削除してしまうと、以後そのテナントのフィルタ/
   // include 検証が「索引宣言なし」の 400 に化ける（upsertStatements 内のコメント参照: 400/空結果
   // の区別は宣言だけに依存すべきで、公開レコードの有無に依存させてはならない）。
-  // 再投影はそもそも DO を起こす管理経路（オーナー操作）であり、§12.7 が「公開 read の本線に
+  // 公開用 DB の再構築はそもそも DO を起こす管理経路（オーナー操作）であり、§12.7 が「公開 read の本線に
   // DO を挟まない」というコスト前提を置いたのは高頻度の read 経路の話なので、ここで DO を
   // もう1回追加で叩くことは設計上問題ない。カタログは content_types からも決定的に再構築できる
-  // 派生物である（§12.3b の「投影は snapshot から再構築できる派生物」と同じ考え方）ので、
+  // 派生物である（§12.3b の「公開用 DB は snapshot から再構築できる派生物」と同じ考え方）ので、
   // record の生死とは独立に生存できるべきもの、という不変条件をこれで守る。
   const catalogTypes = asProjectionCatalog(await stubFor(env, job.tenantId).getProjectionCatalog());
   const catalogStatements = catalogTypes.flatMap(({ type, catalog }) =>
@@ -287,17 +287,17 @@ async function handleReprojectJob(env: Env, job: ReprojectJob, nowMs: number): P
   }
   // レビュー指摘（重大）: job.epoch は DO のアイソレートで刻んだ Date.now()、projected_at は
   // この consumer のアイソレートで刻んだ Date.now() ―― 別アイソレートの別時計であり、
-  // 単純な大小比較で「歩きより前」を判定できる関係にない（他の GC を epoch ベースで比較する
-  // 手を退けた理由と同種の話。上の Task 7 コメント参照）。歩きの開始直後に publish された
+  // 単純な大小比較で「公開用 DB の再構築の実行より前」を判定できる関係にない（他の GC を epoch ベースで比較する
+  // 手を退けた理由と同種の話。上の Task 7 コメント参照）。公開用 DB の再構築の開始直後に publish された
   // 行が、わずかに遅れた consumer の時計で job.epoch より前の projected_at を刻んでしまうと
-  // （歩きのページ読み取りには載らないので通常の張り替えでは救われない）、この sweep が
+  // （公開用 DB の再構築のページ読み取りには載らないので通常の入れ替えでは救われない）、この sweep が
   // 現に公開中の行を誤って消してしまう。
-  // SWEEP_SKEW_MARGIN_MS だけ境界を過去へずらす（= より新しいものまで「まだ歩きの前」と
-  // 許容する）方向だけが安全である: 境界を甘くし過ぎて本来消すべき幽霊行を見逃しても、
+  // SWEEP_SKEW_MARGIN_MS だけ境界を過去へずらす（= より新しいものまで「まだ公開用 DB の再構築の実行より前」と
+  // 許容する）方向だけが安全である: 境界を甘くし過ぎて本来消すべき残骸の行を見逃しても、
   // その行は次にどの書き込みからも触られないため projected_at が古いまま残り、次回の
-  // 再投影ウォークの sweep が同じ境界で確実に掃く（1 ウォーク分だけ延命する無害な遅延）。
+  // 公開用 DB の再構築の sweep が同じ境界で確実に削除する（再構築 1 回分だけ延命する無害な遅延）。
   // 逆に境界を厳しくする方向の間違いは、生きている公開行を削除するという取り返しのつかない
-  // 事故になる（消えた行を復活させるのは手動の再投影しかない）。
+  // 事故になる（消えた行を復活させるのは手動の公開用 DB の再構築しかない）。
   await env.PROJECTION_DB.batch([
     env.PROJECTION_DB.prepare(
       "DELETE FROM projected_records WHERE tenant_id = ?1 AND projected_at < ?2",
@@ -314,35 +314,35 @@ async function handleReprojectJob(env: Env, job: ReprojectJob, nowMs: number): P
          AND NOT EXISTS (SELECT 1 FROM projected_records
                          WHERE tenant_id = ?1 AND record_id = projection_index.record_id)`,
     ).bind(job.tenantId),
-    // Phase 5b: 宣言から消えたフィールドのカタログ行を掃く。境界の向きの議論は上の
+    // Phase 5b: 宣言から消えたフィールドのカタログ行を削除する。境界の向きの議論は上の
     // projected_records と同一（甘い方向にしか間違えない）。
     env.PROJECTION_DB.prepare(
       "DELETE FROM projection_fields WHERE tenant_id = ?1 AND projected_at < ?2",
     ).bind(job.tenantId, job.epoch - SWEEP_SKEW_MARGIN_MS),
   ]);
-  // Task 7（レビュー指摘、probe で決定的に再現済み）: ここで墓標を GC してはならない。
-  // startReprojection にロックが無いため、2 つの歩きが独立した epoch を持って同時に走りうる
-  // （オーナーが「再構築」を連打するだけで起きる）。時刻ベースの GC（epoch より前の墓標を消す、
-  // 猶予時間を延ばす、等）はどう変えても同じ穴が開き直す: 後発の歩きの epoch は先発の歩きが
-  // まだ守り続けたい墓標の tombstoned_at より新しくなり得るため、後発の sweep が先発のために
-  // 立っている墓標を消し、先発が遅れて発行する stale な書き込みが無防備になって消えたはずの
+  // Task 7（レビュー指摘、probe で決定的に再現済み）: ここで projection_tombstones の行を GC してはならない。
+  // startReprojection にロックが無いため、2 回の公開用 DB の再構築の実行が独立した epoch を持って同時に走りうる
+  // （オーナーが「再構築」を連打するだけで起きる）。時刻ベースの GC（epoch より前の projection_tombstones の行を消す、
+  // 猶予時間を延ばす、等）はどう変えても同じ不具合が再発する: 後から始まった実行の epoch は先に始まった実行が
+  // まだ守り続けたい projection_tombstones の行の tombstoned_at より新しくなり得るため、後から始まった実行の sweep が先に始まった実行のために
+  // 立っている projection_tombstones の行を消し、先に始まった実行が遅れて発行する stale な書き込みが無防備になって消えたはずの
   // レコードを復活させる（しかも projected_at はどちらの epoch より新しくなるため、以後どちらの
-  // 歩きの sweep にも掃かれない — レビューが再現した実際の障害）。epoch と tombstoned_at は
+  // 実行の sweep にも削除されない — レビューが再現した実際の障害）。epoch と tombstoned_at は
   // そもそも別のアイソレートが別のタイミングで刻む別の時計であり、時刻を比較して安全に GC
   // できる関係にない。
-  // 墓標の GC が無くても安全かつ有界である: 墓標は基本的には「次の勝った書き込み」が自分で消す
+  // projection_tombstones の行の GC が無くても安全かつ有界である: この行は基本的には「次の勝った書き込み」が自分で消す
   // （upsertStatements の `DELETE FROM projection_tombstones WHERE ... publish_seq <= ours`）ため、
-  // 定常状態で墓標が残っているのは「一度は公開されて、今は非公開のレコード」に対応する。
+  // 定常状態で projection_tombstones の行が残っているのは「一度は公開されて、今は非公開のレコード」に対応する。
   // ただし Queues は at-least-once なので常にそうとは限らない: publish(seq1) →
-  // unpublish(seq2, 墓標が立って配信済み) → republish(seq3, 墓標は消えて行は生きている) の後に
+  // unpublish(seq2, projection_tombstones の行が立って配信済み) → republish(seq3, その行は消えて公開用 DB の行は生きている) の後に
   // seq2 の delete ジョブが再配信されると、deleteStatements の INSERT ... ON CONFLICT DO UPDATE は
-  // 無条件なので、現に公開中（seq3）のレコードに対して古い世代（seq2）の墓標が孤児として
-  // 再び立つことがある。これは無害である: 墓標が弾くのは「自分より新しい publish_seq を運ぶ
-  // 書き込み」だけ（upsertStatements の `publish_seq > ?8` ガード）なので、この孤児墓標が
+  // 無条件なので、現に公開中（seq3）のレコードに対して古い publish_seq（seq2）の projection_tombstones の行が孤児として
+  // 再び立つことがある。これは無害である: projection_tombstones の行が弾くのは「自分より新しい publish_seq を運ぶ
+  // 書き込み」だけ（upsertStatements の `publish_seq > ?8` ガード）なので、この孤児の projection_tombstones 行が
   // 弾けるのは seq2 以下の書き込みに限られ、それは定義上すでに stale であり seq3 以降の
   // 正当な書き込みを妨げたり行を復活させたりはできない。かつ主キーが (tenant_id, record_id)
   // なので、1 レコードにつき最大 1 行にしか増えない。
-  // したがって墓標テーブルの行数は「操作回数」ではなく「レコード数」に有界であり、定期的な
+  // したがって projection_tombstones の行数は「操作回数」ではなく「レコード数」に有界であり、定期的な
   // 運用 GC は Phase 10 の関心事とする（tombstoned_at 列はそのために残してある。今回は対象外）。
 }
 
@@ -360,7 +360,7 @@ export async function handleProjectionJob(
         // 送出後に unpublish された。その delete ジョブが後から正しい状態にする（ここでは触らない）
         return;
       }
-      // 3 テーブルの張り替えは batch()（暗黙トランザクション）で原子的に（§12.3）
+      // 3 テーブルの入れ替えは batch()（暗黙トランザクション）で原子的に（§12.3）
       await env.PROJECTION_DB.batch(
         upsertStatements(env.PROJECTION_DB, job.tenantId, payload, nowMs),
       );
