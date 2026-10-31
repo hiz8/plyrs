@@ -86,7 +86,7 @@ function sniffGif(bytes: Uint8Array): ImageSize | null {
 }
 
 function sniffWebp(bytes: Uint8Array): ImageSize | null {
-  // 長さの下限は形式ごとに異なるため、読み出しは ?? 0 畳み(u16le/u24le)と matches の
+  // 長さの下限は形式ごとに異なるため、読み出しは ?? 0 にまとめる方式(u16le/u24le)と matches の
   // 境界チェックに任せ、ここではコンテナ判定のみ行う。
   if (!matches(bytes, 0, "RIFF") || !matches(bytes, 8, "WEBP")) {
     return null;

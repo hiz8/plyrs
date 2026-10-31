@@ -882,7 +882,7 @@ export class TenantDO extends DurableObject<Env> {
   }
 
   // §9.6: モジュール alarm のディスパッチ。ハンドラはトランザクション内で走り、
-  // schedule はレジストリ登録のみ(物理再アームは alarm() 末尾の minDueAt 経路が担う —
+  // schedule はレジストリ登録のみ(物理的な再設定は alarm() 末尾の minDueAt 経路が担う —
   // §9 引き継ぎ事項: モジュールに ctx.storage.setAlarm を触らせない)。
   //
   // Important fix(レビュー指摘): try/catch は transactionSync の**外側**、モジュール単位で
@@ -890,7 +890,7 @@ export class TenantDO extends DurableObject<Env> {
   // throw すると transactionSync のクロージャごと throw し、clearAlarm を含む書き込みが
   // 丸ごとロールバックされる(= 次回起床でリトライされ、alarm の再設定が失われない)。ここで
   // catch して console.error するだけに留め、他モジュールの alarm 実行・末尾の物理 setAlarm
-  // 再アームは呼び出し元(alarm())の for ループで継続させる(ensureAssetContentType /
+  // 再設定は呼び出し元(alarm())の for ループで継続させる(ensureAssetContentType /
   // ensureEnabledModuleTypes と同じテナント全損回避の方針)。
   private runModuleAlarm(moduleId: string, nowMs: number): void {
     const written: string[] = [];
@@ -971,7 +971,7 @@ export class TenantDO extends DurableObject<Env> {
     purgeSent(this.ctx.storage.sql);
   }
 
-  // module_events 版の sweepOutbox。多重化・再アーム方針は完全に同じ形(§9.6)。
+  // module_events 版の sweepOutbox。多重化・再設定の方針は完全に同じ形(§9.6)。
   private async sweepModuleEvents(): Promise<void> {
     await this.drainModuleEvents();
     clearAlarm(this.ctx.storage.sql, MODULE_EVENTS_SWEEP);
@@ -1144,7 +1144,7 @@ export class TenantDO extends DurableObject<Env> {
       // CRITICAL fix（レビュー指摘）: push 経路の delete は deleteRecordCore → cascadeUnpublish
       // 経由で outbox に delete 行を積みうる（決定 2026-07-13）。deleteRecord/publishRecord/
       // unpublishRecord の各 RPC 経路はコミット直後に sweep を張って outbox を送出するが、
-      // この経路だけそれを欠いていた ―― レジストリが空のままだと constructor の再アーム保険も
+      // この経路だけそれを欠いていた ―― レジストリが空のままだと constructor の再設定の保険も
       // 機能せず、以後このテナントで publish/unpublish/HTTP delete が一度も呼ばれなければ、
       // コミット済みの unpublish が outbox に永遠に取り残される（公開停止したはずのレコードが
       // 公開用 DB に残り続ける）。setAlarm は transactionSync に参加し、ロールバックで巻き戻る
