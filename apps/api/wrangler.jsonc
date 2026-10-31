@@ -26,14 +26,14 @@
     { "binding": "TENANT_SLUGS", "id": "00000000000000000000000000000001" },
   ],
   "r2_buckets": [
-    // Phase 8 裁定 1: アセットのバイナリ。キーは `${tenantId}/${assetId}`(バイナリは不変 —
-    // 差し替えは新しい asset として作る。凍結 URL / キャッシュ安全性の根拠)。
+    // Phase 8 決定 1: アセットのバイナリ。キーは `${tenantId}/${assetId}`(バイナリは不変 —
+    // 差し替えは新しい asset として作る。埋め込み URL / キャッシュ安全性の根拠)。
     { "binding": "ASSETS", "bucket_name": "plyrs-assets" },
   ],
   "queues": {
     "producers": [
       { "binding": "PROJECTION_QUEUE", "queue": "plyrs-projection" },
-      // Phase 9 §9.4: モジュールイベント(afterWrite/afterPublish)の排出先
+      // Phase 9 §9.4: モジュールイベント(afterWrite/afterPublish)の送出先
       { "binding": "MODULES_QUEUE", "queue": "plyrs-modules" },
     ],
     "consumers": [
@@ -94,7 +94,7 @@
   "triggers": { "crons": ["17 3 * * *"] },
   // Task 15: preview/production 環境分割。main/compatibility_date/migrations はトップレベルから
   // 継承されるが、binding 系(d1/kv/r2/queues/unsafe/triggers/durable_objects)は wrangler の
-  // 仕様上 env ごとに全定義が必要(継承されない)。素の `wrangler deploy`(--env なし)は禁止 —
+  // 仕様上 env ごとに全定義が必要(継承されない)。`--env` なしの `wrangler deploy`(--env なし)は禁止 —
   // トップレベルは dev/vitest 用のダミー ID のまま(docs/deploy.md §0 参照)。
   "env": {
     "preview": {

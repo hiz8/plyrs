@@ -4,7 +4,7 @@
 //   minor (0.x)    : PR のみ・手動マージ(semver 上 0.x の minor は破壊的変更を許す)
 //   major          : PR のみ・手動マージ
 //   exact pin      : 更新種別によらず PR のみ・手動マージ(catalog / package.json の値が x.y.z のもの)
-// 自動マージは CI(check / e2e)が緑であることが条件。公開から 7 日経過した版のみ取り込む。
+// 自動マージは CI(check / e2e)が通ることが条件。公開から 7 日経過した版のみ取り込む。
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: ["config:recommended", ":timezone(Asia/Tokyo)"],

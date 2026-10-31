@@ -23,13 +23,13 @@
 
 - 開く props の無い部品は、プレビューのラッパーで描画後に開く: Menu 系は 50ms 後にトリガーの button を click、Tooltip は内側の button を focus(delay=0)。ToastRegion は createToaster() + useEffect で success / error。ModalDialog / ConfirmDialog は isOpen
 - 構成部品(MenuItem / MenuSection / MenuSeparator / TableHeader / Column / TableBody / Row / Cell)は親を含む全体で描き、その部品が主役の構成にする(Menu の複製にしない)
-- DS は body のフォント・色を指定しない。プレビューで部品の外に地の文を置くときは、外側の div に font-family(system-ui … 'Noto Sans JP')を当てる。admin の画面側にも同じ穴がある(styles.css に body の font 指定が無い)
+- DS は body のフォント・色を指定しない。プレビューで部品の外に地の文を置くときは、外側の div に font-family(system-ui … 'Noto Sans JP')を当てる。admin の画面側にも同じ漏れがある(styles.css に body の font 指定が無い)
 - 幅の広い部品は overrides で `cardMode: column`、Select は `single`(候補の Popover が fixed で枠外に出るため)
 - 静的に描けない状態: IconButton のツールチップ(Tooltip のカードで代表)、Select の開いた一覧、DropZone のドラッグ中、表の無効行・ホバー・フォーカス
 - Badge の tone は neutral / accent / success / warning / danger のみ(info は無い)
 - Drawer は浮く部品。overrides で `cardMode: single`・`viewport: 720x480`、プレビューは `isOpen` で開く(ModalDialog と同じ)
 - Avatar は `name` と `size`(sm / md)だけの小さな部品で、カードは `column` でよい
-- SidePanel は `position: fixed`(top 0 / bottom 0)で画面の高さに従うため、撮影では本文が潰れる。プレビューでは `transform: translateZ(0)` を持つ 720×460 の枠で包んで包含ブロックにする(SidePanel.tsx)。撮影幅が 960px 未満なので `full` は全面のシート、`sheet` は下から出る面として写り、右パネル(420 / 360px)は実機でだけ見える
+- SidePanel は `position: fixed`(top 0 / bottom 0)で画面の高さに従うため、撮影では本文が潰れる。プレビューでは `transform: translateZ(0)` を持つ 720×460 の枠で包んで包含ブロックにする(SidePanel.tsx)。撮影幅が 960px 未満なので `full` は全面のシート、`sheet` は下から出る面として写り、右パネル(420 / 360px)は実環境でだけ見える
 - TileGrid / FileDropTarget のサムネイルは画像の代わりに種類のアイコンと拡張子のタグで描く(撮影環境に画像が無い)。FileDropTarget の暗幕はドラッグ中にしか出ないので、受け口に包まれた本文だけを示す
 - UploadTile の `state` は型定義の展開で `unknown` になるため、config の `dtsPropsFor.UploadTile` に手書きの props(5 状態の union)を置いている。upload-tile.tsx の `UploadTileState` を変えたらここも直す
 
@@ -74,7 +74,7 @@
 - `Select`(`isLabelHidden`: ラベルを VisuallyHidden で包み、アクセシブルネームだけ残して見た目を出さない。表の行内の選択用)
 - `Toaster.clear()`(溜まった通知をすべて消す)
 - `HomeWidgetContribution`(`size?: "half" | "full"`、`moduleId?: string`。型だけの変更で見た目は無し)
-- `SegmentedControl`(RAC RadioGroup ベースの 3 択 pill。案 G 6.2 のテーマ切り替え用、裁定 G2)
+- `SegmentedControl`(RAC RadioGroup ベースの 3 択 pill。案 G 6.2 のテーマ切り替え用、決定 G2)
 - `Tabs`(`keyboardActivation?: "automatic" | "manual"`。manual は矢印キーでフォーカスだけ動かし、Enter / Space で選ぶ。URL を移るタブ用、設定のタブ)
 - `SortableList`(新規。RAC GridList + useDragAndDrop の並べ替え。つまみ + キーボード DnD、行の間に点線の DropIndicator、E1。`isBusy` で保存中は DnD だけ止める(つまみは描いたまま。フォーカスを失わないよう GridList を作り直さない)。`isDisabled` は読み取り専用でつまみを描かない)
 - `ModalDialog`(`size?: "md" | "lg"`。lg は幅 640px、既定 md は 440px、E23)
