@@ -6,6 +6,7 @@ import {
   MAX_FILTER_VALUES,
   MAX_FILTERS,
   MAX_LIMIT,
+  MAX_TOTAL_FILTER_VALUES,
   parseScalarValues,
   type ScalarKind,
 } from "../public/query";
@@ -37,7 +38,13 @@ export const recordListInputSchema = z.object({
     .optional(),
   limit: z.number().int().min(1).max(MAX_LIMIT).optional(),
   cursor: z.string().min(1).optional(),
-  status: z.array(z.enum(WORKFLOW_STATUSES)).min(1).optional(),
+  // 重複は畳む。状態の種類数を超える配列は重複しか含みえないので受けない(バインド数の上限を守る)
+  status: z
+    .array(z.enum(WORKFLOW_STATUSES))
+    .min(1)
+    .max(WORKFLOW_STATUSES.length)
+    .transform((statuses) => [...new Set(statuses)])
+    .optional(),
 });
 
 export type RecordListInput = z.infer<typeof recordListInputSchema>;
@@ -125,9 +132,15 @@ export function parseRecordListInput(
   }
   const raw = parsed.data;
   const filters: ColumnFilter[] = [];
+  let totalFilterValues = 0;
   for (const [fieldKey, rawValues] of Object.entries(raw.filter ?? {})) {
     if (filters.length >= MAX_FILTERS) {
       return invalid("too many filters");
+    }
+    // フィルタ値の総数は公開側と同じ上限(1 クエリのバインド数を 100 未満に収める)
+    totalFilterValues += rawValues.length;
+    if (totalFilterValues > MAX_TOTAL_FILTER_VALUES) {
+      return invalid("too many filter values");
     }
     const resolved = resolveColumn(type, fieldKey);
     if (resolved === null) {
