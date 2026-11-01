@@ -172,6 +172,8 @@
   - CMS 用途の実績・拡張エコシステム(mention、placeholder、カスタム embed)が最も厚い。
   - 将来オプションの「本文限定の協調編集」(仕様第10章)にも y-prosemirror という確立経路がある(採用は保留のまま)。
 - **AST 永続化の規約**: エディタの JSON をそのまま正本にするが、**スキーマバージョンを AST ルートに刻む**(`{"schemaVersion": 1, "doc": {...}}`)。エディタ拡張の追加=スキーマ進化であり、tolerant read(第4.2章)の対象として扱う。
+- **ブロックの安定 ID(2026-11-01、決定 46)**: MCP のブロック単位の編集のため、`schemaVersion: 2` で最上位ブロックに `attrs.id` を持たせる。エディタ側は `@tiptap/extension-unique-id`、v1 を読むときの ID は位置と内容のハッシュから決定的に導く(design-spec 第 16.10 章)。Portable Text への移行は M0-2 の試作で比較したうえで不採用(入れ子ブロックが無く往復が不可逆、影響範囲が 4〜5 本の L)。
+- **Markdown ⇄ AST(2026-11-01)**: `@tiptap/markdown`(marked ベース、`@tiptap/core` と同じ版に揃える)の `MarkdownManager` を Editor 無しで Worker に置く。`@tiptap/static-renderer` の `renderToMarkdown` は出力が異なるため使わない。変換後は ProseMirror のスキーマ検証を通す。
 - **代替案(不採用理由明記)**:
   - **Lexical**(Meta): StyleX と同じ開発元で思想は近いが、2026年時点でも 0.x であり、リリースごとに非互換変更・deprecated 削除が続いている。**AST を年単位で永続化する本用途では、ドキュメントフォーマットの安定性を最優先**し ProseMirror 系を採る。
   - Plate / BlockNote: ProseMirror ではなく Slate 系/Tiptap ラッパー。抽象が厚く、AST の完全な制御という要求に合わない。
