@@ -192,6 +192,7 @@
   - **パスワード**: 初期は **WebCrypto PBKDF2**(Workers ネイティブ、外部依存ゼロ)。将来 **passkey(WebAuthn)** を第一認証に格上げする余地を残す。特権テナント(第11.6章)は当初から passkey または TOTP を必須化。
 - **根拠**: 仕様第11章は「中央 D1 正本 + 短命 JWT + KV ブロックリスト + 2段認可」という**具体的な独自構造を既に確定**している。Better Auth 等の認証フレームワークはそれ自身のスキーマ・セッションモデルを持ち込むため、この設計に合わせて歪めるより、プリミティブ(jose + WebCrypto)の上に薄く自作する方が総コストが低い。「自分専用の理想 CMS」原則(第9.1章)とも整合。
 - **代替案**: Better Auth(D1/Drizzle 対応あり。もし OAuth プロバイダ連携を多数持ちたくなったら、認証**入口だけ**を委ね、セッション・認可は仕様どおり自作構造に落とす形で部分採用を検討)。
+- **MCP 向けの認可サーバー(2026-11-01、決定 47〜49)**: `@cloudflare/workers-oauth-provider` v1 の分割 API(`OAuthAuthorizationServer` / `OAuthResourceServer`)を api Worker に置く。OAuth 2.1(認可コード + PKCE)、CIMD / DCR の登録、Authorization Server Metadata、PRM、同意ページのヘルパー、`insufficient_scope` の challenge をライブラリが担い、利用者の認証・セッション・ロール判定は上の自作構造のまま。状態は api の KV(`OAUTH_KV`)。CIMD の取得に compatibility flag `global_fetch_strictly_public` が要る。PAT は D1 の自作表で検証し、同じ `validateToken` に合流させる(design-spec 第 16.3 章)。バージョンは catalog で固定し、1.x の semver に従う(enterprise-managed authorization だけは実験的で対象外)。
 
 ### 2.10 ID 生成: uuid(UUIDv7)
 
