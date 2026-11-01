@@ -86,11 +86,14 @@ Markdown は `@tiptap/markdown` の `MarkdownManager` を使った。`@tiptap/st
 
 ## M2 への引き継ぎ事項
 
-1. **M2-1**: `RICH_TEXT_SCHEMA_VERSION` を 2 に上げ、`ensureTopLevelBlockIds`(試作の `block-ids.ts`)を metamodel の tolerant read に置く。エディタには `UniqueID.configure({ types: <ブロック種>, attributeName: "id" })` を足す。ID の契約は最上位ブロックのみ。DO の書き込みでは重複 ID を振り直す
-2. **M2-2**: `@tiptap/markdown` の `MarkdownManager` を Editor 無しで Worker に置く(`packages/metamodel` か新パッケージ。ui の拡張一覧と語彙を共有する必要があるので、拡張の定義を React 非依存の場所に切り出す)。変換後にスキーマ検証を通す。独自 2 ノードの Markdown 文法を確定し、ツール説明に書く
+1. **M2-1**: `RICH_TEXT_SCHEMA_VERSION` を 2 に上げ、`ensureTopLevelBlockIds`(試作の `block-ids.ts`)を metamodel の tolerant read に置く。定数の実体は今 `packages/ui/src/rich-text-editor.tsx` にあるので、導出関数と一緒に metamodel へ移し、ui はそれを import する(metamodel の `richTextEnvelopeSchema` は版を正の整数としか検証しないため、移さなくても v2 の読み込みは通るが、正本を 1 か所にする)。エディタには `UniqueID.configure({ types: <ブロック種>, attributeName: "id" })` を足す。ID の契約は最上位ブロックのみ。DO の書き込みでは重複 ID を振り直す
+   - **エディタで v1 の record を開く経路**: クライアントは v1 の生 JSON をエディタへ渡さず、**必ず `ensureTopLevelBlockIds` を通してから渡す**。UniqueID は新規ブロックの採番だけに使う。通さないと、同じ未更新 record に対して DO 側は導出 ID、エディタ側は UniqueID の UUID となり、保存時に全ブロックの ID が入れ替わる(内容が同じでも field version が上がり、エージェント側で競合になる)
+   - **確認項目**: UniqueID の `onCreate` による ID 付与(ID の無いブロックが残っていた場合)が自動保存の push を起こさないこと。起こすなら、付与を履歴に乗せない現在の挙動に加えて、同期側でも「ID だけの差分」を push しないようにする
+2. **M2-2**: `@tiptap/markdown` の `MarkdownManager` を Editor 無しで Worker に置く(`packages/metamodel` か新パッケージ。ui の拡張一覧と語彙を共有する必要があるので、拡張の定義を React 非依存の場所に切り出す)。変換後にスキーマ検証を通す。独自 2 ノードの Markdown 文法を確定し、ツール説明に書く。本試作の「DOM 無しで動く」は vitest の node 環境での確認なので、M2-2 では `marked` と `@tiptap/pm` が **workerd 上(`@cloudflare/vitest-plugin`、apps/api のテスト)で動くこと**を最初に確かめる
 3. **M1-6 の片方向 Markdown** は `MarkdownManager.serialize` をそのまま使えるので、M2-2 の置き換えは「parse 側と検証を足す」だけになる(計画の「捨てる実装」はさらに小さい)
 4. `@tiptap/markdown` `@tiptap/extension-unique-id` `@tiptap/static-renderer`(HTML 描画が要る場合)は `@tiptap/core` と同じ版(3.31.4)に揃えて catalog に足す。`minimumReleaseAge` の 7 日に注意
 5. Portable Text 系のパッケージは採らない(catalog に入れない)
+6. 本書が番号で引く M1-6 / M2-1 / M2-2 / M4-5 は、MCP 導入の実装計画の索引 `2026-11-01-mcp-roadmap.md`(M0-4)の表を指す
 
 ## 試作の実行方法
 
