@@ -1,0 +1,752 @@
+[
+  {
+    "name": "paragraph",
+    "note": "段落",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "本文です。",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "k1",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "本文です。",
+            "_key": "k2"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "name": "heading",
+    "note": "見出し 1〜3",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "# 見出し1\n\n## 見出し2\n\n### 見出し3",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "k3",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "見出し1",
+            "_key": "k4"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "h1"
+      },
+      {
+        "_key": "k5",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "見出し2",
+            "_key": "k6"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "h2"
+      },
+      {
+        "_key": "k7",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "見出し3",
+            "_key": "k8"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "h3"
+      }
+    ]
+  },
+  {
+    "name": "marks",
+    "note": "太字・斜体・取り消し線・下線・インラインコード",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "**太字***斜体*~~取り消し~~++下線++`code`",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "k9",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [
+              "strong"
+            ],
+            "text": "太字",
+            "_key": "ka"
+          },
+          {
+            "_type": "span",
+            "marks": [
+              "em"
+            ],
+            "text": "斜体",
+            "_key": "kb"
+          },
+          {
+            "_type": "span",
+            "marks": [
+              "strike-through"
+            ],
+            "text": "取り消し",
+            "_key": "kc"
+          },
+          {
+            "_type": "span",
+            "marks": [
+              "underline"
+            ],
+            "text": "下線",
+            "_key": "kd"
+          },
+          {
+            "_type": "span",
+            "marks": [
+              "code"
+            ],
+            "text": "code",
+            "_key": "ke"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "name": "marks-nested",
+    "note": "重ねたマーク(太字 + 斜体 + リンク)",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "[***重ね***](https://example.com/a)",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "kg",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [
+              "em",
+              "strong",
+              "kf"
+            ],
+            "text": "重ね",
+            "_key": "kh"
+          }
+        ],
+        "markDefs": [
+          {
+            "_key": "kf",
+            "_type": "link",
+            "href": "https://example.com/a"
+          }
+        ],
+        "_type": "block",
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "name": "link",
+    "note": "外部リンク(href・target・rel)",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "[リンク](https://example.com/?a=1&b=2)",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "kj",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [
+              "ki"
+            ],
+            "text": "リンク",
+            "_key": "kk"
+          }
+        ],
+        "markDefs": [
+          {
+            "_key": "ki",
+            "_type": "link",
+            "href": "https://example.com/?a=1&b=2"
+          }
+        ],
+        "_type": "block",
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "name": "bulletList",
+    "note": "箇条書き(2 階層の入れ子)",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "- 一\n- 二\n  - 二の一",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "kl",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "一",
+            "_key": "km"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal",
+        "level": 1,
+        "listItem": "bullet"
+      },
+      {
+        "_key": "kn",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "二",
+            "_key": "ko"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal",
+        "level": 1,
+        "listItem": "bullet"
+      },
+      {
+        "_key": "kp",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "二の一",
+            "_key": "kq"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal",
+        "level": 2,
+        "listItem": "bullet"
+      }
+    ]
+  },
+  {
+    "name": "orderedList-start",
+    "note": "番号リスト(start=3)",
+    "pmId": "○",
+    "portableText": "×",
+    "portableTextDiff": [
+      "doc.orderedList[0]: attrs {\"start\":3} → {\"start\":1}"
+    ],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "3. 三\n4. 四",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "kr",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "三",
+            "_key": "ks"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal",
+        "level": 1,
+        "listItem": "number"
+      },
+      {
+        "_key": "kt",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "四",
+            "_key": "ku"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal",
+        "level": 1,
+        "listItem": "number"
+      }
+    ]
+  },
+  {
+    "name": "listItem-multi-paragraph",
+    "note": "1 つの項目に 2 段落",
+    "pmId": "○",
+    "portableText": "×",
+    "portableTextDiff": [
+      "doc.bulletList[0].listItem[0]: 子の数 2 → 1(paragraph)"
+    ],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "- 前半\n\n  後半",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "kv",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "前半後半",
+            "_key": "kw"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal",
+        "level": 1,
+        "listItem": "bullet"
+      }
+    ]
+  },
+  {
+    "name": "blockquote",
+    "note": "引用(段落 2 つ)",
+    "pmId": "○",
+    "portableText": "×",
+    "portableTextDiff": [
+      "doc.blockquote[0]: 子の数 2 → 1(paragraph)"
+    ],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "> 一文目\n>\n> 二文目",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "kx",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "一文目\n二文目",
+            "_key": "ky"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "blockquote"
+      }
+    ]
+  },
+  {
+    "name": "blockquote-nested-list",
+    "note": "引用の中の箇条書き",
+    "pmId": "○",
+    "portableText": "×",
+    "portableTextDiff": [
+      "doc: 子の数 1 → 2(blockquote,bulletList)"
+    ],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "> 前置き\n>\n> - 項目",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "kz",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "前置き\n",
+            "_key": "k10"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "blockquote"
+      },
+      {
+        "_key": "k11",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "項目",
+            "_key": "k12"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal",
+        "level": 1,
+        "listItem": "bullet"
+      }
+    ]
+  },
+  {
+    "name": "codeBlock",
+    "note": "コードブロック(language 付き、複数行)",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "```ts\nconst a = 1;\nconsole.log(a);\n```",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_type": "codeBlock",
+        "code": "const a = 1;\nconsole.log(a);",
+        "language": "ts",
+        "_key": "k13"
+      }
+    ]
+  },
+  {
+    "name": "codeBlock-no-language",
+    "note": "コードブロック(language 無し、Markdown 風の記号を含む)",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "```\n# not a heading\n* not a list\n```",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_type": "codeBlock",
+        "code": "# not a heading\n* not a list",
+        "_key": "k14"
+      }
+    ]
+  },
+  {
+    "name": "hardBreak",
+    "note": "段落内の改行",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "一行目  \n二行目",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "k15",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "一行目\n二行目",
+            "_key": "k16"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "name": "horizontalRule",
+    "note": "区切り線",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "前\n\n---\n\n後",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "k17",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "前",
+            "_key": "k18"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      },
+      {
+        "_type": "horizontalRule",
+        "_key": "k19"
+      },
+      {
+        "_key": "k1a",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "後",
+            "_key": "k1b"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "name": "recordMention",
+    "note": "本文中の record 参照(インライン独自ノード)",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "著者は [@ recordType=\"author\" recordId=\"018f2b6a-7a0a-7000-8000-000000000001\" label=\"山田\"] です",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "k1d",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "著者は ",
+            "_key": "k1e"
+          },
+          {
+            "_type": "recordMention",
+            "_key": "k1f",
+            "recordType": "author",
+            "recordId": "018f2b6a-7a0a-7000-8000-000000000001",
+            "label": "山田"
+          },
+          {
+            "_type": "span",
+            "marks": [],
+            "text": " です",
+            "_key": "k1g"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "name": "assetImage",
+    "note": "本文中の画像(ブロック独自ノード)",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "図:\n\n![hero.png](plyrs://asset/018f2b6a-7a0a-7000-8000-000000000002)\n\n以上",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "k1h",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "図:",
+            "_key": "k1i"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      },
+      {
+        "_type": "assetImage",
+        "recordType": "asset",
+        "recordId": "018f2b6a-7a0a-7000-8000-000000000002",
+        "label": "hero.png",
+        "_key": "k1j"
+      },
+      {
+        "_key": "k1k",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "以上",
+            "_key": "k1l"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "name": "empty-paragraphs",
+    "note": "空段落の連続(エディタで Enter を連打した状態)",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "前\n\n\n\n&nbsp;\n\n後",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "k1m",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "前",
+            "_key": "k1n"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      },
+      {
+        "_key": "k1o",
+        "children": [
+          {
+            "_type": "span",
+            "_key": "k1p",
+            "text": "",
+            "marks": []
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      },
+      {
+        "_key": "k1q",
+        "children": [
+          {
+            "_type": "span",
+            "_key": "k1r",
+            "text": "",
+            "marks": []
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      },
+      {
+        "_key": "k1s",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "後",
+            "_key": "k1t"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "name": "markdown-special-chars",
+    "note": "Markdown の記号を含む平文(* _ ` # [ ] < >)",
+    "pmId": "○",
+    "portableText": "○",
+    "portableTextDiff": [],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "a\\*b\\_c\\`d#e\\[f\\]&lt;g&gt;h",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "k1u",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "a*b_c`d#e[f]<g>h",
+            "_key": "k1v"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      }
+    ]
+  },
+  {
+    "name": "whitespace",
+    "note": "先頭・末尾・連続の空白",
+    "pmId": "○",
+    "portableText": "×",
+    "portableTextDiff": [
+      "doc.paragraph[0].text[0]: text \"  前  中  後  \" → \"前 中 後\""
+    ],
+    "markdown": "○",
+    "markdownDiff": [],
+    "markdownText": "  前  中  後  ",
+    "markdownStaticSame": false,
+    "portableTextJson": [
+      {
+        "_key": "k1w",
+        "children": [
+          {
+            "_type": "span",
+            "marks": [],
+            "text": "前 中 後",
+            "_key": "k1x"
+          }
+        ],
+        "markDefs": [],
+        "_type": "block",
+        "style": "normal"
+      }
+    ]
+  }
+]

@@ -1,0 +1,35 @@
+{
+  "name": "@plyrs/richtext-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "M0-2: リッチテキスト形式(論点 A1)の変換忠実度の試作。main にはマージしない",
+  "scripts": {
+    "test": "vitest run",
+    "report": "vitest run --reporter=dot && node --import tsx src/report.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@plyrs/metamodel": "workspace:*",
+    "@portabletext/block-tools": "^6.0.5",
+    "@portabletext/html": "^2.0.2",
+    "@portabletext/schema": "^1.2.0",
+    "@portabletext/to-html": "^6.0.0",
+    "@portabletext/types": "^4.0.1",
+    "@tiptap/core": "catalog:",
+    "@tiptap/extension-mention": "catalog:",
+    "@tiptap/extension-unique-id": "3.31.4",
+    "@tiptap/html": "3.31.4",
+    "@tiptap/markdown": "3.31.4",
+    "@tiptap/pm": "catalog:",
+    "@tiptap/starter-kit": "catalog:",
+    "@tiptap/static-renderer": "3.31.4"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7",
+    "jsdom": "catalog:",
+    "tsx": "^4.20.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
