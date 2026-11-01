@@ -54,7 +54,7 @@ admin の `vite dev` が api を auxiliary worker として起こす構成で、
   (長命トークンなのでロール変更を即時に反映する)。
 - OAuth は同意時に grant の props に `{userId, tenantId, role}` を入れ、`validateToken` が復号して返す。ロールは access token の
   15 分の間は固定(既存 JWT と同じ遅れ)。refresh のたびに `tokenExchangeCallback` の `newProps` で `memberships` から読み直す(M3-4)。
-- 合流後の認可コンテキストは `{userId, role, tenantId, exp, scopes, tokenId, via}`。BLOCKLIST の `blocked:user` / `blocked:membership`
+- 合流後の認可コンテキストは `{userId, role, tenantId, exp, scopes, tokenId, tokenKind}`(試作コードでは `via` と名付けているが、経路 `via` と衝突するため実装では `tokenKind` にする)。BLOCKLIST の `blocked:user` / `blocked:membership`
   を両方に適用し、BAN が PAT と OAuth の両方を同時に止めることを確認した。
 - `OAuthResourceServer` をホストにすると、401(`WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/mcp/t/<id>", scope="record:read"`)、
   PRM(`resource` / `authorization_servers` / `scopes_supported`)、`insufficientScope(ctx.auth, ["record:delete"])` の 403 を

@@ -722,7 +722,7 @@ single-writer の DO が競合を判定する。分散マージの難問が「DO
 | 46 | **リッチテキストの形式は (a) ProseMirror JSON + 最上位ブロックの `attrs.id`**（M0-2、2026-11-01）。Portable Text は不採用、論点 A と tech-selection 2.7 は維持。Markdown ⇄ AST は `@tiptap/markdown` を Worker で使い、変換後にスキーマ検証を通す | 全ノード種の往復が (a) と Markdown で可逆、Portable Text は入れ子ブロックが無く 5 件が不可逆。(b) は M2-1 が 4〜5 本の L に膨らむ |
 | 47 | **認可サーバーは `@cloudflare/workers-oauth-provider` v1 の分割 API を api Worker に置く**（M0-3、2026-11-01）。issuer は admin オリジンのテナント別パス `/oauth/t/:tenantId`（admin が api へ同一オリジン転送）、`resources` はテナントの MCP URL 1 つ。要求ごとに組み立てる。状態は api の `OAUTH_KV`。CIMD は `global_fetch_strictly_public` を有効化して使い、DCR は `clientRegistrationEndpoint` を設定して fallback に残す | 認可コード + PKCE・同意ヘルパー・PRM・`insufficient_scope` まで揃い、試作で一巡した。`resources` は構築時固定なので、テナントを URL（issuer のパス）で運べば metadata・authorize・token のどの入口でもテナントが決まる。セッションと D1 は api にしかなく、admin に置くと api への往復が増える |
 | 48 | **MCP エンドポイントは api Worker の直接オリジン** `https://<api>/mcp/t/:tenantId`（論点 D2）。api → admin の逆向き Service Binding は dev（auxiliary worker）で成立するが採らない | Bearer 専用で cookie を使わず、admin 経由は 1 ホップ増えるだけ。逆向き binding は vitest にスタブが要り 3 環境分の定義も増える |
-| 49 | **PAT と OAuth の検証経路を `OAuthResourceServer` の `validateToken` で合流させる**。PAT は接頭辞で振り分け D1 を `memberships` と join した 1 照会、OAuth は同 Worker 内の `validateToken`（KV 1 回 + 復号）。両方に BLOCKLIST 2 キーを適用し `{userId, role, tenantId, exp, scopes, tokenId, via}` にする | workerd ローカルで検証 1 回あたり OAuth 約 2 ms・PAT 約 2〜3 ms（BLOCKLIST 込み）。401 / 403 の challenge をライブラリに任せ、スコープ判定は入口に残す |
+| 49 | **PAT と OAuth の検証経路を `OAuthResourceServer` の `validateToken` で合流させる**。PAT は接頭辞で振り分け D1 を `memberships` と join した 1 照会、OAuth は同 Worker 内の `validateToken`（KV 1 回 + 復号）。両方に BLOCKLIST 2 キーを適用し `{userId, role, tenantId, exp, scopes, tokenId, tokenKind}` にする（`tokenKind` は `"pat" | "oauth"`。経路 `via` とは別の概念） | workerd ローカルで検証 1 回あたり OAuth 約 2 ms・PAT 約 2〜3 ms（BLOCKLIST 込み）。401 / 403 の challenge をライブラリに任せ、スコープ判定は入口に残す |
 
 ---
 
@@ -766,7 +766,7 @@ MCP は、管理画面の同期（第 8・10 章）と REST（`/v1/t/:tenantId/.
 **検証経路の具体（決定 49）**: MCP の入口は `OAuthResourceServer` をホストにし（401 の challenge・PRM・403 `insufficient_scope` をライブラリが出す）、その `validateToken` に次の合流関数を差す。
 - **PAT**: 接頭辞 `plyrs_pat_` で振り分け、D1 の `personal_access_tokens`（SHA-256 ハッシュ・テナント・スコープ・有効期限・失効日時）を `memberships` と join した 1 回の照会で検証する。ロールは PAT に焼き込まず毎回 `memberships` から引く（長命なので、ロール変更を即時に反映する）。
 - **OAuth**: 同じ api Worker 内で `OAuthAuthorizationServer.validateToken`（KV 1 回 + props の復号）を呼ぶ。Service Binding の RPC は無い。ロールは同意時に grant の props に入れ、refresh のたびに `memberships` から読み直す（access token の 15 分は JWT と同じ遅れ）。
-- 両方とも BLOCKLIST の 2 キーを照会し、認可コンテキスト `{userId, role, tenantId, exp, scopes, tokenId, via}` に合流する。PAT の `tokenId` は D1 の行 ID、OAuth は grant の識別子（失効の単位に合わせる）。
+- 両方とも BLOCKLIST の 2 キーを照会し、認可コンテキスト `{userId, role, tenantId, exp, scopes, tokenId, tokenKind}` に合流する。`tokenKind`（`"pat" | "oauth"`）はトークンの種別で、書き込み経路の `via`（16.4・16.5。MCP 経由ならどちらの種別でも `via` は MCP）とは別に持つ。PAT の `tokenId` は D1 の行 ID、OAuth は grant の識別子（失効の単位に合わせる）。
 
 **スコープ（論点 C3）**: DO の `Operation`（`record:read` `record:write` `record:delete` `record:publish` `type:manage` など、`auth/permissions.ts`）をそのままスコープ名にする。**実効権限 = スコープ ∩ ロール**を DO の第 2 段（第 11.5 章）で判定する。スコープは権限を絞るだけで増やさない。認可コンテキスト `{userId, role, tenantId, exp}` に `scopes` と `tokenId` を足し、`record:read` の `requireOperation` を MCP で初めて実装する（読み取り拒否はここが最初）。型単位のスコープ（例 `record:write:article`）は初期には採らない（第 11.4 章の決定の見直しが先。未処理論点）。
 
