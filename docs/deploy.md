@@ -58,7 +58,7 @@ pnpm exec wrangler d1 migrations apply DB --remote -c apps/api/wrangler.jsonc --
 pnpm exec wrangler d1 migrations apply PROJECTION_DB --remote -c apps/api/wrangler.jsonc --env preview
 ```
 
-Rate limit(`unsafe.bindings` の `ratelimit`)の `namespace_id` はダッシュボード上の実 ID ではなく **アカウント内で一意な任意の文字列**(wrangler が要求する識別子)。本リポジトリでは `env.preview` = `2001`(`PUBLIC_WRITE_LIMITER`)/ `2002`(`AUTH_LIMITER`)/ `2003`(`MCP_LIMITER`、M1-5)、`env.production` = `3001` / `3002` / `3003` を割り当てている。`MCP_LIMITER` は MCP の入口(`/mcp/t/:tenantId`)を `テナント:ユーザー:操作名` 単位で 60 回 / 60 秒に制限する binding で、**未設定だと入口が 503 で fail-closed になる**(design-spec 16.2)。ratelimit binding は事前のリソース作成が不要で、`wrangler.jsonc` の定義だけでデプロイ時に有効になる。**同一アカウント内の他の Worker が同じ `namespace_id` を使っていないことを確認する**(衝突するとレート制限バケットが共有されてしまう)。衝突が判明した場合はここと `wrangler.jsonc` の両方を新しい未使用の数値に差し替える。
+Rate limit(`unsafe.bindings` の `ratelimit`)の `namespace_id` はダッシュボード上の実 ID ではなく **アカウント内で一意な任意の文字列**(wrangler が要求する識別子)。本リポジトリでは `env.preview` = `2001`(`PUBLIC_WRITE_LIMITER`)/ `2002`(`AUTH_LIMITER`)/ `2003`(`MCP_LIMITER`、M1-5)/ `2004`(`MCP_IP_LIMITER`、M1-5)、`env.production` = `3001` / `3002` / `3003` / `3004` を割り当てている。`MCP_LIMITER` は MCP の入口(`/mcp/t/:tenantId`)を `テナント:ユーザー:操作名` 単位で 60 回 / 60 秒に制限する binding、`MCP_IP_LIMITER` はトークン検証の前に接続元 IP 単位で 600 回 / 60 秒に制限する binding(未認証の連打で D1 の PAT 照会を無制限に起こさないため)で、**どちらも未設定だと入口が 503 で fail-closed になる**(design-spec 16.2)。`ADMIN_ORIGIN`(vars)も同様に未設定なら入口と PRM が 503 になる。ratelimit binding は事前のリソース作成が不要で、`wrangler.jsonc` の定義だけでデプロイ時に有効になる。**同一アカウント内の他の Worker が同じ `namespace_id` を使っていないことを確認する**(衝突するとレート制限バケットが共有されてしまう)。衝突が判明した場合はここと `wrangler.jsonc` の両方を新しい未使用の数値に差し替える。
 
 ## 2. secrets(環境ごと)
 

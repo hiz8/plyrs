@@ -188,6 +188,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 - M1-6 の Markdown 変換(`apps/api/src/mcp/richtext-markdown.ts`)は ui のエディタの拡張集合(StarterKit + recordMention + assetImage)を api 側に最小複製している。M2-2 で metamodel 側へ寄せて共有し、逆方向(Markdown → JSON)とスキーマ検証を足す。独自ノードの Markdown は M0-2 の仮置き(`[@ recordType=".." recordId=".." label=".."]`、`![label](plyrs://asset/<id>)`)のまま
 - `@tiptap/markdown` は peer を完全一致で要求するため catalog で `3.31.4` に固定。tiptap を上げるときは同時に上げる
 - `tools/list` の `ttlMs` / `cacheScope` は SDK(`@modelcontextprotocol/server` 2.4.0)が一覧全体に 1 つしか持てないため、各操作の `cache` のうち最も保守的な値(現状 0 / private)。`resources/read`(`plyrs://types/{key}`)は `type_get` の 60 秒
+- MCP の入口の Rate Limiting は 2 段: トークン検証の前に接続元 IP 単位(`MCP_IP_LIMITER`、600 回 / 60 秒。未認証の連打で D1 の PAT 照会を起こさないため)、検証の後にテナント・利用者・ツール名単位(`MCP_LIMITER`、60 回 / 60 秒。DO を起こす経路の保護)。IP 単位の上限は NAT 配下の複数利用者を想定して緩めにしてあり、実測で見直す
 - `@modelcontextprotocol/hono` は使わず、`createMcpHandler` を要求ごとに直接呼ぶ(ヘッダと本文の照合とレート制限を SDK より前に置くため)。dev の E2E は admin の `DEV_PROXY_PUBLIC=1` で `/mcp` を api へ転送する(本番は転送しない)
 - `record_get` の `markdown` は Worker 層で付け、richtext フィールドの判定のため `type_get` をもう 1 回 DO に呼ぶ(record_get 1 回あたり DO 往復 2 回)。往復時間の実測で問題なら DO 側で型を同梱する
 - 入力の Zod 不一致は SDK の `inputSchema` 検証が先に `isError`(text のみ)で返す。DO の `invalid_input` は MCP 経路では到達しない
