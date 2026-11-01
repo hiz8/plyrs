@@ -60,7 +60,8 @@ const MAX_INCLUDE_FIELDS = 5;
 // D1 の 1 クエリのバインド上限は 100 なので、60 を上限にすれば 30 + 60 = 90 に収まり、
 // 実装の細部が多少ずれても耐える 10 バインドの安全マージンを残せる（本番のみ 500 化する
 // 事故を防ぐのが目的で、ローカル SQLite は上限が緩くテストは通ったままだった）。
-const MAX_TOTAL_FILTER_VALUES = 60;
+// M1-2: DO の一覧(do/list-records.ts)も同じ上限を使う(DO SQLite のバインド上限も 100)。
+export const MAX_TOTAL_FILTER_VALUES = 60;
 
 const FILTER_KEY_PATTERN = /^filter\[([a-z][a-z0-9_]*)\]$/u;
 const SORT_PATTERN = /^(-?)([a-z][a-z0-9_]*)$/u;
