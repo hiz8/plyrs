@@ -98,6 +98,12 @@
         "namespace_id": "1003",
         "simple": { "limit": 60, "period": 60 },
       },
+      {
+        "name": "MCP_IP_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "1004",
+        "simple": { "limit": 600, "period": 60 },
+      },
     ],
   },
   // §6: 期限切れ・失効済みセッションの日次掃除
@@ -191,6 +197,12 @@
             "namespace_id": "2003",
             "simple": { "limit": 60, "period": 60 },
           },
+          {
+            "name": "MCP_IP_LIMITER",
+            "type": "ratelimit",
+            "namespace_id": "2004",
+            "simple": { "limit": 600, "period": 60 },
+          },
         ],
       },
       "triggers": { "crons": ["17 3 * * *"] },
@@ -278,6 +290,12 @@
             "type": "ratelimit",
             "namespace_id": "3003",
             "simple": { "limit": 60, "period": 60 },
+          },
+          {
+            "name": "MCP_IP_LIMITER",
+            "type": "ratelimit",
+            "namespace_id": "3004",
+            "simple": { "limit": 600, "period": 60 },
           },
         ],
       },
