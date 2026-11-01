@@ -716,7 +716,7 @@ single-writer の DO が競合を判定する。分散マージの難問が「DO
 | 38 | 認可=**スコープ ∩ ロール**を DO の第2段で判定。スコープ名は DO の `Operation` をそのまま使う。トークン入手経路は **PAT と OAuth 2.1 の両方を恒久的に併設**（CIMD 優先、DCR は fallback）。検証後に既存 BLOCKLIST を照会 | 第11章の 2 段認可を変えずにスコープを足す。PAT はヘッダに貼れるクライアント、OAuth はホスト型クライアント向け |
 | 39 | **書き込み MCP は PAT 接続で公開し、OAuth（M3）の完成を待たない** | 安全性は変更履歴・strict 判定・冪等性・publish 既定オフ（M2）が担保し、DO 側の判定はトークンの経路で変わらない |
 | 40 | **読み取り専用 MCP（M1）を preview と production に限定公開**（告知しない・PAT 発行は所有者のみ・M4 まで互換性の約束なし） | 環境差を早く踏み、安定した URL で実利用する。顧客がいないため露出が小さい |
-| 41 | **変更履歴**を DO 内に `records.version` キーで置く。区切りは actor / via の切り替え・15 分・status 変更・publish。保持は最新 100 版かつ 365 日（直近 10 版は全文、以降は差分）、publish の版は record がある間は消さない（仮置き、M2-3a で実測） | 書き込みごとの履歴は同期の細かな push で膨らむ。compare / history / restore を同じ表から作る |
+| 41 | **変更履歴**を DO 内の履歴表に置き、キーは履歴表自身の連番（`records.version` は属性として併記し、publish の版は `source_version` で識別）。区切りは actor / via の切り替え・15 分・status 変更・publish。保持は最新 100 版かつ 365 日（直近 10 版は全文、以降は差分）、publish の版は record がある間は消さない（仮置き、M2-3a で実測） | 書き込みごとの履歴は同期の細かな push で膨らむ。compare / history / restore を同じ表から作る |
 | 42 | **エージェント経路の競合判定は strict**（`baseFieldVersions` 必須、スカラーも conflict）。`_rev` は新設せず既存の `field_versions` を使う。`record_create` はクライアント指定 UUIDv7 で冪等 | 人の直前の編集を黙って上書きさせない。切断時の再発行（仕様の MUST）に耐える |
 | 43 | **publish は既定で人が行う**。`record:publish` は PAT 発行画面・OAuth 同意画面とも既定で外し、所有者だけが付与。同一利用者の確認は MRTR elicitation、別人の承認は提案（change set、M5）。**編集側の全文検索を DO-SQLite FTS5 で目標化**（第13章の非目標を部分的に見直し。公開側は非目標のまま） | 取り返しのつかない操作に人を挟む。エージェントの `record_search` に下書き検索が要る |
 | 44 | **リッチテキストは最上位ブロックへの安定 ID 付与を決定**（形式は M0-2 で決める）。v1 を読むときの ID は位置と内容のハッシュから決定的に導き、永続化後は保存された ID を優先 | 部分編集とブロック単位の競合判定の土台。ランダムな ID だと未更新 record の ID が読むたびに変わり、ブロック操作が通らない |
@@ -776,10 +776,10 @@ MCP は、管理画面の同期（第 8・10 章）と REST（`/v1/t/:tenantId/.
 
 ### 16.5 変更履歴（論点 A2・C4）
 
-record の変更履歴を **DO 内**に置く。`records.version` をキーにした履歴表で、公開版も履歴の 1 点として参照できる形にし、`compare`（公開版との差分）と `history` を同じ表から作る。`audit_logs` は super / tenant / member / dlq 系の操作だけを記録するため、record 編集の記録の置き場はこの履歴になる。
+record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴表自身の連番**（record ごとに単調増加）とし、`records.version` は属性として併記する。`records.version` は `writeRecord` でしか増えず publish / unpublish では変わらない（第 7 章、`do/publish.ts`）ため、publish で切った版を直前の編集版と区別するには独自のキーが要る。publish の版には `published_snapshots.source_version` と同じ値を持たせ、公開版を履歴の 1 点として参照できる形にし、`compare`（公開版との差分）と `history` を同じ表から作る。`audit_logs` は super / tenant / member / dlq 系の操作だけを記録するため、record 編集の記録の置き場はこの履歴になる。
 
 - **区切り規則**: 書き込みごとに版を作らない（同期の push は入力中の細かな差分で届く）。次のいずれかで新しい版を切る: (1) actor（誰の権限か）または `via` が前の版と違う、(2) 前の版から **15 分**以上経っている、(3) `status` が変わる、(4) publish / unpublish。それ以外の連続した書き込みは直前の版に畳み込む。
-- **記録する属性**: `records.version`、`data` と `fieldVersions`、`status`、actor（`userId`）、`via`（管理画面の同期 / MCP / REST）、MCP と OAuth では `tokenId` と `client_id`。`clientInfo` は自己申告で未検証なので表示の補足に限り、認可には使わない。
+- **記録する属性**: 履歴の連番、`records.version`、publish の版なら `source_version`、`data` と `fieldVersions`、`status`、actor（`userId`）、`via`（管理画面の同期 / MCP / REST）、MCP と OAuth では `tokenId` と `client_id`。`clientInfo` は自己申告で未検証なので表示の補足に限り、認可には使わない。
 - **保持（仮置き。M2-3a で実測して見直す）**: 1 record あたり **最新 100 版**かつ **365 日**。直近 10 版は全文、それより古い版は直前の版との差分で保存する。publish の区切りの版は、保持上限に達しても **record が存在する間は消さない**（公開版の履歴を失わないため）。
 - deleted_at の付いた record の履歴も残し、削除の取り消し（`record_restore`）に使う。publish と delete は `writeRecord` を通らないので、それぞれに記録点を足す。
 - `restore` は `writeRecord` を通す。validate-on-write の対象なので、型定義が変わっていれば失敗しうる（遅延マイグレーションの帰結として受け入れる）。
@@ -798,7 +798,7 @@ record の変更履歴を **DO 内**に置く。`records.version` をキーに�
 
 **冪等性（E3）**: 応答ストリームが切れたらクライアントは新しい request ID で再発行する（仕様の MUST）ため、書き込み系ツールは冪等でなければならない。
 
-- `record_create` はクライアント指定の UUIDv7 を受ける（第 6 章の ID 規約と同じ）。同じ ID で同じ内容なら既存の結果を返し、内容が違えば `already_exists` で拒否する（切断後の再送と、ID の使い回しという誤用を区別する）。
+- `record_create` はクライアント指定の UUIDv7 を受ける（第 6 章の DDL は ULID と書くが、tech-selection 2.10 で UUIDv7 に読み替えている。その規約と同じ）。同じ ID で同じ内容なら既存の結果を返し、内容が違えば `already_exists` で拒否する（切断後の再送と、ID の使い回しという誤用を区別する）。
 - `publish` / `unpublish` / `delete` は状態遷移として冪等にする（既にその状態なら成功を返す）。
 
 **エラーの層分け（E2）**: 3 層に分け、クライアントが「再認可すれば通る」か「内容を直す」か「実装が違う」かを区別できるようにする。
@@ -807,7 +807,7 @@ record の変更履歴を **DO 内**に置く。`records.version` をキーに�
 | --- | --- | --- |
 | トークンのスコープ不足 | `record:publish` の無い PAT で publish | HTTP `403` + `WWW-Authenticate: Bearer error="insufficient_scope", scope="…"`。必要なスコープは 1 回の challenge にまとめる。OAuth 接続は step-up（再認可）し、PAT 接続は `error_description` の導線（所有者が該当スコープ付きの PAT を発行する）に従う |
 | 業務エラー | ロール不足・検証失敗・一意性違反・競合・`already_exists` | `isError: true`。ロール不足は DO の第 2 段で判定し、再認可しても変わらないのでこちら。`structuredContent` に `code` / `details` を載せ、業務エラーの形も `outputSchema` に含める |
-| プロトコル違反 | ヘッダと本文の不一致、不正な JSON-RPC | JSON-RPC エラー。独自コードは予約範囲 `-32768〜-32000` の外に置き、legacy の `-32000〜-32019` は使わない |
+| プロトコル違反 | ヘッダと本文の不一致、不正な JSON-RPC | JSON-RPC エラー。仕様が定めるコード（`-32020〜-32099` は MCP 予約。例: ヘッダ不一致の `-32020`、16.2）はそのまま使う。独自コードは `-32000〜-32019`（implementation-defined）か予約範囲 `-32768〜-32000` の外に置く |
 
 ### 16.8 publish の方針と確認（論点 C5・B4）
 
