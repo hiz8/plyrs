@@ -289,9 +289,6 @@ importers:
       '@plyrs/sync-client':
         specifier: workspace:*
         version: link:../../packages/sync-client
-      '@types/node':
-        specifier: 'catalog:'
-        version: 26.6.4
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
