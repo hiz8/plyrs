@@ -4,6 +4,7 @@ import { z } from "zod";
 import { writeAudit } from "../audit";
 import {
   defaultExpiryDays,
+  disallowedScopes,
   issuePat,
   listPats,
   maxExpiryDays,
@@ -13,7 +14,7 @@ import {
   revokePat,
 } from "../auth/pat";
 import type { GateVariables } from "../middleware/tenant-gate";
-import { requireCurrent } from "./tenant-settings";
+import { requireCurrent, requireCurrentRole } from "./tenant-settings";
 
 // design-spec 16.3(M1-3a): PAT の発行・一覧・失効。発行できるのは所有者だけ(16.12 の限定公開の条件)で、
 // tenant-settings.ts と同じく D1 の現在のロールで確かめ直す。発行対象は自分自身(他人の PAT は作れない)。
@@ -39,11 +40,17 @@ export const tenantTokensRoutes = new Hono<GateEnv>()
     return c.json({ tokens: await listPats(c.env.DB, c.req.param("tenantId")) });
   })
   .post("/:tenantId/tokens", zValidator("json", issueSchema), async (c) => {
-    const denied = await requireCurrent(c, "member:manage");
-    if (denied !== null) {
-      return denied;
+    const current = await requireCurrentRole(c, "member:manage");
+    if ("denied" in current) {
+      return current.denied;
     }
     const { name, scopes } = c.req.valid("json");
+    // スコープは現在のロールが付与できる範囲に限る(16.3: record:publish と type:manage は所有者だけ)。
+    // 今は member:manage で所有者しか通らないが、将来 editor に自分の PAT 発行を許しても規則が生きる
+    const rejected = disallowedScopes(current.role, scopes);
+    if (rejected.length > 0) {
+      return c.json({ error: "scope_not_allowed", scopes: rejected }, 400);
+    }
     const expiresInDays = c.req.valid("json").expiresInDays ?? defaultExpiryDays(scopes);
     // 書き込みスコープを含むトークンは期限を短くする(16.3)
     if (expiresInDays > maxExpiryDays(scopes)) {
