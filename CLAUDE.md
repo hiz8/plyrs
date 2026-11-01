@@ -11,6 +11,7 @@ plyrs は Cloudflare 上のマルチテナント CMS/BaaS(kintone 的に「型�
 - `docs/deploy.md` — preview / production デプロイ手順、super 管理者 bootstrap
 - `docs/glossary.md` — 用語集。新しい文章(ドキュメント・コメント・画面の文言・コミットメッセージ)は用語集に従う。旧語は過去の計画書にだけ残るので、用語集の対応表で引く
 - `docs/superpowers/plans/2026-07-12-implementation-roadmap.md` — フェーズ計画の索引(各フェーズの引き継ぎ事項・未決定事項)。フェーズ別詳細計画は同ディレクトリ
+- `docs/superpowers/plans/2026-11-01-mcp-roadmap.md` — MCP 導入(M0〜M5)の索引。設計の正本は design-spec 第 16 章
 
 ドキュメント・コメント・コミットメッセージは日本語。
 
