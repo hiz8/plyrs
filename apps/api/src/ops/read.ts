@@ -2,7 +2,7 @@ import { contentTypeDefinitionSchema, uuidSchema, WORKFLOW_STATUSES } from "@ply
 import { z } from "zod";
 import { loadAllContentTypeRows, loadContentTypeByKey, rowToDefinition } from "../do/content-types";
 import { loadRecord } from "../do/write-record";
-import { defineOperation, type OpSpec } from "./catalog";
+import { defineOperation, type OpSpec } from "./spec";
 
 // M1-1 / 16.11: 読み取り操作(型の参照・record の一覧と単体取得)の宣言と DO 内の実装。
 // 実装は DO の既存の内部関数(getRecord / listContentTypes が使う読み取り)を共有する。
