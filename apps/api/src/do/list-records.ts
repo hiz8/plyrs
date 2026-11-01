@@ -121,16 +121,12 @@ function invalid(message: string): ParseRecordListResult {
   return { ok: false, code: "invalid_input", message };
 }
 
-// Zod の形は通った入力を、型定義に照らして列と値に解決する
+// Zod(recordListInputSchema)を通った入力を、型定義に照らして列と値に解決する。Zod は invoke の
+// runOperation が 1 回だけ通す(ここで parse し直すと status の transform が 2 回走る)
 export function parseRecordListInput(
   type: ContentTypeDefinition,
-  input: unknown,
+  raw: RecordListInput,
 ): ParseRecordListResult {
-  const parsed = recordListInputSchema.safeParse(input);
-  if (!parsed.success) {
-    return invalid(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
-  }
-  const raw = parsed.data;
   const filters: ColumnFilter[] = [];
   let totalFilterValues = 0;
   for (const [fieldKey, rawValues] of Object.entries(raw.filter ?? {})) {
@@ -213,7 +209,8 @@ export function buildListRecordsQuery(
     query.titleKey === undefined
       ? "NULL AS title"
       : `json_extract(data, '$.${query.titleKey}') AS title`;
-  let sql = `SELECT id, type, status, seq, version, updated_at, ${titleExpr} FROM records WHERE type = ? AND deleted_at IS NULL`;
+  // sort_value は次ページの cursor に使うソートキー(後から文字列置換で足すと SELECT の変更で壊れる)
+  let sql = `SELECT ${query.sort.column} AS sort_value, id, type, status, seq, version, updated_at, ${titleExpr} FROM records WHERE type = ? AND deleted_at IS NULL`;
   binds.push(query.type);
   if (query.statuses.length > 0) {
     sql += ` AND status IN (${placeholders(query.statuses.length)})`;
@@ -254,12 +251,7 @@ export function listRecords(
   query: RecordListQuery,
 ): { items: RecordSummary[]; nextCursor: string | null } {
   const built = buildListRecordsQuery(query);
-  // 次ページの cursor に使うソートキーも一緒に読む
-  const withSort = built.sql.replace(
-    "SELECT id,",
-    `SELECT ${query.sort.column} AS sort_value, id,`,
-  );
-  const rows = sql.exec<ListRow>(withSort, ...built.binds).toArray();
+  const rows = sql.exec<ListRow>(built.sql, ...built.binds).toArray();
   const hasMore = rows.length > query.limit;
   const page = hasMore ? rows.slice(0, query.limit) : rows;
   const items = page.map((row) => ({
