@@ -39,7 +39,13 @@ describe("コンテンツの削除", () => {
 
     const dialog = await screen.findByRole("alertdialog", { name: "記事を削除しますか？" });
     expect(within(dialog).getByText(/この記事は公開中です/)).toBeInTheDocument();
-    expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "キャンセル" }));
+    // RAC の autoFocus は描画後に非同期で当たる(media-delete.test.tsx と同じ待ち方)。CI の負荷で
+    // 同期に見ると body のままのことがある
+    await vi.waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(dialog).getByRole("button", { name: "キャンセル" }),
+      ),
+    );
 
     fireEvent.click(within(dialog).getByRole("button", { name: "削除する" }));
 
