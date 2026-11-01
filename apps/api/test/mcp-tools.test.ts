@@ -98,8 +98,8 @@ function envelope(method: string, params: Record<string, unknown> = {}) {
   };
 }
 
-async function rpc(method: string, params: Record<string, unknown> = {}) {
-  const res = await app.request(
+async function rpcRaw(method: string, params: Record<string, unknown> = {}) {
+  return app.request(
     `${ORIGIN}/mcp/t/${tenantId}`,
     {
       method: "POST",
@@ -114,9 +114,13 @@ async function rpc(method: string, params: Record<string, unknown> = {}) {
       },
       body: JSON.stringify(envelope(method, params)),
     },
-    { ...env, MCP_LIMITER: fakeLimiter(true) },
+    { ...env, MCP_LIMITER: fakeLimiter(true), MCP_IP_LIMITER: fakeLimiter(true) },
     CTX,
   );
+}
+
+async function rpc(method: string, params: Record<string, unknown> = {}) {
+  const res = await rpcRaw(method, params);
   expect(res.status, await res.clone().text()).toBe(200);
   const json = await res.json<{ result?: Record<string, unknown>; error?: unknown }>();
   expect(json.error, JSON.stringify(json)).toBeUndefined();
@@ -229,6 +233,15 @@ describe("resources", () => {
     const list = await rpc("resources/templates/list");
     const templates = list["resourceTemplates"] as Record<string, unknown>[];
     expect(templates.map((t) => t["uriTemplate"])).toEqual(["plyrs://types/{key}"]);
+  });
+
+  it("resources/read で型が無ければリソース不在(-32602 + data.uri)を返す", async () => {
+    // 仕様 2026-07-28 はリソース不在を -32602 + data.uri と定め、SDK は ResourceNotFoundError を
+    // そこへ写す(旧版の -32002 は受信側の互換のみ)。汎用の Error だと内部エラー -32603 になる
+    const res = await rpcRaw("resources/read", { uri: "plyrs://types/no-such-type" });
+    const json = await res.json<{ error?: { code: number; data?: { uri?: string } } }>();
+    expect(json.error?.code).toBe(-32602);
+    expect(json.error?.data?.uri).toBe("plyrs://types/no-such-type");
   });
 
   it("resources/read は型の定義を JSON で返す", async () => {

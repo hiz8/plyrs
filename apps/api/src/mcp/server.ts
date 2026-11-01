@@ -1,5 +1,5 @@
 import { richTextEnvelopeSchema, type ContentTypeDefinition } from "@plyrs/metamodel";
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
+import { McpServer, ResourceNotFoundError, ResourceTemplate } from "@modelcontextprotocol/server";
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import type { McpAuth } from "../do/authorize";
 import { OPERATIONS, type OpSpec } from "../ops/catalog";
@@ -198,6 +198,10 @@ function registerResources(server: McpServer, deps: McpServerDeps): void {
         : (variables["key"] ?? "");
       const result = await invoke(deps, "type_get", { key });
       if (!result.ok) {
+        // 仕様はリソース不在に -32002 を定める(汎用の Error だと SDK は -32603 にする)
+        if (result.code === "not_found") {
+          throw new ResourceNotFoundError(uri.href, result.message);
+        }
         throw new Error(`${result.code}: ${result.message}`);
       }
       return {

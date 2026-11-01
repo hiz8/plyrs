@@ -12,8 +12,9 @@ import { buildMcpServer } from "./server";
 
 // design-spec 16.2(決定 48、M1-5): MCP の入口 `/mcp/t/:tenantId`。api Worker の直接オリジンで受け、
 // OAuthResourceServer(決定 49)をホストにして PAT を検証する(401 の challenge・PRM・403 はライブラリが出す)。
-// 入口の順序: POST のみ(405) → Origin の許可リスト → トークン検証 → ヘッダと本文の照合(-32020)
-// → Mcp-Name 単位の Rate Limiting → SDK(server/discover・tools/list・tools/call)。
+// 入口の順序: POST のみ(405) → Origin の許可リスト → 接続元 IP の Rate Limiting(未認証の連打で
+// D1 の PAT 照会を無制限に起こさないため。/auth と同じ考え方)→ トークン検証 → ヘッダと本文の照合
+// (-32020)→ ツール名単位の Rate Limiting → SDK(server/discover・tools/list・tools/call)。
 
 export const MCP_REQUIRED_SCOPES = ["record:read"];
 
@@ -160,6 +161,8 @@ async function serveMcp(
 }
 
 // OAuthResourceServer は tenantId ごとに組み立てる(構築コストは無視できる。M0-3 結果 2 節)
+// ADMIN_ORIGIN(テナント別 issuer の元)が未設定なら組み立てない。ライブラリは相対パスの issuer を
+// 例外(500)にするが、設定事故として MCP_LIMITER と同じ 503 に揃える(呼び出し側で判定する)
 export function createTenantResourceServer(
   origin: string,
   adminOrigin: string,
@@ -196,22 +199,36 @@ export function workerContext(c: { executionCtx: unknown }): ExecutionContext {
   return c.executionCtx as ExecutionContext;
 }
 
+function notConfigured(what: string): Response {
+  return Response.json({ error: "not_configured", what }, { status: 503 });
+}
+
 export const mcpRoutes = new Hono<{ Bindings: Env }>().all("/t/:tenantId", async (c) => {
   if (c.req.method !== "POST") {
     // 旧クライアントの GET(SSE)/ DELETE(セッション終了)は受けない。Mcp-Session-Id は無視する
     return c.json({ error: "method_not_allowed" }, 405, { allow: "POST" });
   }
+  const adminOrigin = c.env.ADMIN_ORIGIN;
+  if (adminOrigin === undefined) {
+    return notConfigured("ADMIN_ORIGIN");
+  }
   // ブラウザからの直接呼び出しは想定しない。Origin が付いていれば許可リスト(admin のオリジン)だけを通す
   const origin = c.req.header("origin");
-  if (origin !== undefined && origin !== c.env.ADMIN_ORIGIN) {
+  if (origin !== undefined && origin !== adminOrigin) {
     return c.json({ error: "forbidden_origin" }, 403);
   }
+  // 未認証の要求が D1 の PAT 照会(SHA-256 + memberships の join)を無制限に起こさないよう、トークン
+  // 検証の前に接続元 IP 単位で制限する(ローカル/テストは "unknown" に縮退)。未構成は fail-closed
+  const ipLimiter = c.env.MCP_IP_LIMITER;
+  if (ipLimiter === undefined) {
+    return notConfigured("MCP_IP_LIMITER");
+  }
+  const { success } = await ipLimiter.limit({ key: c.req.header("cf-connecting-ip") ?? "unknown" });
+  if (!success) {
+    return c.json({ error: "rate_limited" }, 429, { "retry-after": RETRY_AFTER_SECONDS });
+  }
   const tenantId = c.req.param("tenantId");
-  const server = createTenantResourceServer(
-    originOf(c.req.raw),
-    c.env.ADMIN_ORIGIN ?? "",
-    tenantId,
-  );
+  const server = createTenantResourceServer(originOf(c.req.raw), adminOrigin, tenantId);
   return server.fetch(c.req.raw, c.env, workerContext(c));
 });
 
@@ -222,7 +239,10 @@ export function serveProtectedResourceMetadata(
   ctx: ExecutionContext,
   tenantId: string,
 ): Promise<Response> {
-  return createTenantResourceServer(originOf(request), env.ADMIN_ORIGIN ?? "", tenantId).fetch(
+  if (env.ADMIN_ORIGIN === undefined) {
+    return Promise.resolve(notConfigured("ADMIN_ORIGIN"));
+  }
+  return createTenantResourceServer(originOf(request), env.ADMIN_ORIGIN, tenantId).fetch(
     request,
     env,
     ctx,
