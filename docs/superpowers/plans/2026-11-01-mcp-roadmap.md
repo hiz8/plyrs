@@ -71,8 +71,8 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 
 | PR | 内容 | 論点 | 規模 |
 | --- | --- | --- | --- |
-| M2-1 | 最上位ブロックへの安定 ID 付与(`RICH_TEXT_SCHEMA_VERSION` 2、決定的な導出、エディタの ID 拡張)。決定 46 | A1 | M |
-| M2-2 | Markdown ⇄ AST の双方向変換と忠実度テスト(`@tiptap/markdown`)。M1-6 の片方向変換を置き換える | A1・A4 | M |
+| M2-1 | 最上位ブロックへの安定 ID 付与(`RICH_TEXT_SCHEMA_VERSION` を metamodel へ移して 2 に、決定的な導出、エディタの ID 拡張)。エディタへ渡す前に必ず導出を通し、`onCreate` の付与が push を起こさないことを確認する。決定 46 | A1 | M |
+| M2-2 | Markdown ⇄ AST の双方向変換と忠実度テスト(`@tiptap/markdown`)。最初に `marked` と `@tiptap/pm` が workerd 上で動くことを確かめる。M1-6 の片方向変換を置き換える | A1・A4 | M |
 | M2-3a | 変更履歴の表と `writeRecord` での記録(区切り規則、actor / via、保持と差分圧縮)。決定 41 | A2・C4 | L |
 | M2-3b | publish と delete の履歴の記録点 | A2 | M |
 | M2-4 | 履歴の操作(`record_history` / `record_compare` / `record_restore`)をカタログに追加 | A2・D3 | M |
