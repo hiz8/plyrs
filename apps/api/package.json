@@ -10,6 +10,7 @@
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "catalog:",
     "@hono/zod-validator": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
     "@plyrs/db": "workspace:*",
     "@plyrs/metamodel": "workspace:*",
     "@plyrs/sync-protocol": "workspace:*",
@@ -23,6 +24,7 @@
     "@cloudflare/vitest-plugin": "catalog:",
     "@cloudflare/workers-types": "catalog:",
     "@plyrs/sync-client": "workspace:*",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"

@@ -21,6 +21,9 @@ catalogs:
     '@hono/zod-validator':
       specifier: ^0.8.0
       version: 0.8.0
+    '@modelcontextprotocol/server':
+      specifier: ^2.4.0
+      version: 2.4.0
     '@playwright/test':
       specifier: ^1.63.0
       version: 1.63.0
@@ -249,6 +252,9 @@ importers:
       '@hono/zod-validator':
         specifier: 'catalog:'
         version: 0.8.0(hono@4.13.12)(zod@4.6.5)
+      '@modelcontextprotocol/server':
+        specifier: 'catalog:'
+        version: 2.4.0
       '@plyrs/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -283,6 +289,9 @@ importers:
       '@plyrs/sync-client':
         specifier: workspace:*
         version: link:../../packages/sync-client
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.4
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -1528,6 +1537,14 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
+
+  '@modelcontextprotocol/core@2.4.0':
+    resolution: {integrity: sha512-z8QBKqdfXLPzkLQuG4xp8hrVEMm1PZ1IgxMN2sMbJiFiAKOWXnAzogXn2W4aqIBlP1ea6U5yiqVquvUNM1Cj6Q==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/server@2.4.0':
+    resolution: {integrity: sha512-rgR9yxSaAJ+bcsi/XroT/S2AfPiIWloXAnrdfYSCms9ivVju0ishu/wW0J21Ho6+ZOR1r7RyeRbjiRuF87ix5Q==}
+    engines: {node: '>=20'}
 
   '@oozcitak/dom@2.0.2':
     resolution: {integrity: sha512-GjpKhkSYC3Mj4+lfwEyI1dqnsKTgwGy48ytZEhm4A/xnH/8z9M3ZVXKr/YGQi3uCLs1AEBS+x5T2JPiueEDW8w==}
@@ -4391,6 +4408,15 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@modelcontextprotocol/core@2.4.0':
+    dependencies:
+      zod: 4.6.5
+
+  '@modelcontextprotocol/server@2.4.0':
+    dependencies:
+      '@modelcontextprotocol/core': 2.4.0
+      zod: 4.6.5
 
   '@oozcitak/dom@2.0.2':
     dependencies:

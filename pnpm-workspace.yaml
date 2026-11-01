@@ -9,6 +9,8 @@ catalog:
   # M1-3b(決定 47・49): OAuthResourceServer を MCP の入口のホストにする(M3-1 で認可サーバー側も使う)
   "@cloudflare/workers-oauth-provider": ^1.2.4
   "@hono/zod-validator": ^0.8.0
+  # M1-5: MCP サーバー SDK v2(仕様 2026-07-28、stateless Streamable HTTP。ロードマップ 7 章の申し送り)
+  "@modelcontextprotocol/server": ^2.4.0
   "@playwright/test": ^1.63.0
   "@stylexjs/stylex": 0.19.1
   "@stylexjs/unplugin": 0.19.1

@@ -29,6 +29,11 @@ interface EnvBindings {
   // (wrangler.jsonc の unsafe.bindings に宣言済み。apps/api は `wrangler types` 生成を使わないため
   // TURNSTILE_SECRET_KEY と同じ方式でここに手書きする)。未構成は fail-closed(503)。
   AUTH_LIMITER: RateLimit;
+  // M1-5(design-spec 16.2): MCP の Mcp-Name 単位のレート制限。未構成は fail-closed(503)
+  MCP_LIMITER?: RateLimit;
+  // M1-5(16.2): MCP の入口の Origin 許可リスト(admin のオリジン)と、PRM の authorization_servers の
+  // 元になる admin オリジン(テナント別 issuer `${ADMIN_ORIGIN}/oauth/t/:tenantId`)。wrangler.jsonc の vars
+  ADMIN_ORIGIN?: string;
   // §6: 認証系エンドポイント専用の Turnstile。未設定なら Turnstile 不要(optional 設計)。
   // secret/site key とも TURNSTILE_SECRET_KEY と同じ管理(テスト = vitest.config、dev = .dev.vars、
   // 本番 = wrangler secret / vars)。

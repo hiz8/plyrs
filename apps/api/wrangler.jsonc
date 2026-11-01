@@ -2,6 +2,8 @@
   "name": "plyrs-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-12",
+  // M1-5(design-spec 16.2): MCP の入口の Origin 許可リスト兼 PRM の issuer のオリジン(dev/vitest 用)
+  "vars": { "ADMIN_ORIGIN": "http://localhost:5173" },
   "durable_objects": {
     "bindings": [{ "name": "TENANT_DO", "class_name": "TenantDO" }],
   },
@@ -88,6 +90,14 @@
         "namespace_id": "1002",
         "simple": { "limit": 10, "period": 60 },
       },
+      // design-spec 16.2(M1-5): MCP の Mcp-Name 単位のレート制限。キーはテナント×利用者×ツール名。
+      // limit/period は仮置き(限定公開で実測して見直す)
+      {
+        "name": "MCP_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "1003",
+        "simple": { "limit": 60, "period": 60 },
+      },
     ],
   },
   // §6: 期限切れ・失効済みセッションの日次掃除
@@ -100,7 +110,10 @@
     "preview": {
       "name": "plyrs-api-preview",
       // 公開値(secret ではない)。設定時のみ /auth/turnstile-config が siteKey を返し signup/login で検証必須化
-      "vars": { "AUTH_TURNSTILE_SITE_KEY": "0x4AAAAAAD80uG0GCAIRGlqo" },
+      "vars": {
+        "AUTH_TURNSTILE_SITE_KEY": "0x4AAAAAAD80uG0GCAIRGlqo",
+        "ADMIN_ORIGIN": "https://plyrs-admin-preview.hiz.workers.dev",
+      },
       "durable_objects": {
         "bindings": [{ "name": "TENANT_DO", "class_name": "TenantDO" }],
       },
@@ -172,6 +185,12 @@
             "namespace_id": "2002",
             "simple": { "limit": 10, "period": 60 },
           },
+          {
+            "name": "MCP_LIMITER",
+            "type": "ratelimit",
+            "namespace_id": "2003",
+            "simple": { "limit": 60, "period": 60 },
+          },
         ],
       },
       "triggers": { "crons": ["17 3 * * *"] },
@@ -179,7 +198,10 @@
     "production": {
       "name": "plyrs-api",
       // 公開値(secret ではない)。設定時のみ /auth/turnstile-config が siteKey を返し signup/login で検証必須化
-      "vars": { "AUTH_TURNSTILE_SITE_KEY": "0x4AAAAAAD9i8S_Y_vk6e5rw" },
+      "vars": {
+        "AUTH_TURNSTILE_SITE_KEY": "0x4AAAAAAD9i8S_Y_vk6e5rw",
+        "ADMIN_ORIGIN": "https://plyrs-admin.hiz.workers.dev",
+      },
       "durable_objects": {
         "bindings": [{ "name": "TENANT_DO", "class_name": "TenantDO" }],
       },
@@ -250,6 +272,12 @@
             "type": "ratelimit",
             "namespace_id": "3002",
             "simple": { "limit": 10, "period": 60 },
+          },
+          {
+            "name": "MCP_LIMITER",
+            "type": "ratelimit",
+            "namespace_id": "3003",
+            "simple": { "limit": 60, "period": 60 },
           },
         ],
       },
