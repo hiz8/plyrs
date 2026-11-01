@@ -91,7 +91,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | --- | --- | --- | --- |
 | M3-1 | 認可サーバー(`@cloudflare/workers-oauth-provider` 分割 API、api Worker)。テナント別 issuer、`OAUTH_KV` と `global_fetch_strictly_public` を 3 環境分、CIMD 優先・DCR fallback、admin の転送接頭辞に `/oauth` と `/.well-known/oauth-authorization-server`、M1-5 の PRM に `authorization_servers` | C1 | L |
 | M3-2 | 同意画面(api が HTML を描画)。`/login` に `return_to`、Turnstile 付きログインを経て `/authorize` に戻る。会員でなければ進ませない。`record:publish` は既定で外し所有者だけ | C3・C5・D1 | M |
-| M3-3 | リソースサーバー側の検証。`validateToken` で OAuth を PAT と同じ判定に合流、`insufficient_scope` の step-up、スコープの階層 | C2・C3・E2 | M |
+| M3-3 | リソースサーバー側の検証。`validateToken` で OAuth を PAT と同じ判定に合流、`insufficient_scope` の step-up(スコープに階層は設けない。16.3) | C2・C3・E2 | M |
 | M3-4 | access token の TTL 15 分、refresh 時のロール読み直し(`tokenExchangeCallback`)、`purgeExpiredData` を日次 cron に | C3 | S |
 | M3-5 | 管理画面の「接続中のアプリ」画面(OAuth の付与と PAT を 1 つの一覧に) | C1・C4 | M |
 

@@ -235,6 +235,7 @@ M0-3 の試作 `spike/mcp-oauth` の `src/spike/mcp-gate.ts` を本実装に移�
 - [ ] E2E: `core-journey` に依存する project `mcp-smoke` を足す。管理画面で PAT を発行(UI 経由)→ `request` で `/mcp/t/<tenantId>` に `initialize` → `tools/list` → `record_get`(core-journey が作った record)→ 期限切れ風の不正 token で 401。`DEV_PROXY_PUBLIC` と同様に dev では admin 経由で `/mcp` を転送しない(api 直接オリジン = auxiliary worker の URL を `playwright.config.ts` から渡す)
 - [ ] preview へデプロイし、Claude Code(`claude mcp add --transport http`)、Cursor、VS Code、MCP Inspector から接続してツール説明を直す。claude.ai のコネクタは OAuth 必須なので M3 まで対象外
 - [ ] production は `workflow_dispatch` 後にスモーク(MCP Inspector で `tools/list` と `record_get`)。`docs/deploy.md` に `MCP_LIMITER` の作成、`ADMIN_ORIGIN`、両環境への接続手順、限定公開の注意(16.12)を書く
+- [ ] preview / production で PAT 検証(D1 1 照会)を含む `tools/list` と `record_get` の往復時間を実測する(M0-3 の計測は workerd ローカルの値のため。決定 49)。結果を申し送りに書く
 - [ ] ロードマップ(`2026-11-01-mcp-roadmap.md`)の M1 の表に完了日と PR 番号を追記。G1 の確認結果(preview / production で接続できたクライアント)を申し送りに書く
 - [ ] コミット `test(e2e): MCP のスモークと接続手順を追加する`
 
