@@ -41,18 +41,31 @@ export interface AuditEntry {
   detail?: unknown;
 }
 
+function auditRow(entry: AuditEntry, createdAt: string) {
+  return {
+    id: uuidv7(),
+    actorId: entry.actorId,
+    action: entry.action,
+    targetType: entry.targetType,
+    targetId: entry.targetId,
+    detail: JSON.stringify(entry.detail ?? {}),
+    createdAt,
+  };
+}
+
 export async function writeAudit(d1: D1Database, entry: AuditEntry): Promise<void> {
+  await drizzle(d1).insert(auditLogs).values(auditRow(entry, new Date().toISOString()));
+}
+
+// 複数行を 1 回の INSERT で書く(BAN のように件数が利用者の加入数に比例する後始末のため)
+export async function writeAudits(d1: D1Database, entries: readonly AuditEntry[]): Promise<void> {
+  if (entries.length === 0) {
+    return;
+  }
+  const createdAt = new Date().toISOString();
   await drizzle(d1)
     .insert(auditLogs)
-    .values({
-      id: uuidv7(),
-      actorId: entry.actorId,
-      action: entry.action,
-      targetType: entry.targetType,
-      targetId: entry.targetId,
-      detail: JSON.stringify(entry.detail ?? {}),
-      createdAt: new Date().toISOString(),
-    });
+    .values(entries.map((entry) => auditRow(entry, createdAt)));
 }
 
 // 会員資格の喪失(会員を外す・運営者の剥奪・BAN)に伴って失効させた PAT を 1 件ずつ記録する。
@@ -64,13 +77,14 @@ export async function auditRevokedTokens(
   tokenIds: readonly string[],
   reason: AuditAction,
 ): Promise<void> {
-  for (const tokenId of tokenIds) {
-    await writeAudit(d1, {
+  await writeAudits(
+    d1,
+    tokenIds.map((tokenId) => ({
       actorId,
-      action: "token.revoke",
+      action: "token.revoke" as const,
       targetType: "pat",
       targetId: tokenId,
       detail: tenantId === null ? { reason } : { tenantId, reason },
-    });
-  }
+    })),
+  );
 }

@@ -1,4 +1,4 @@
-import { OAuthError } from "@cloudflare/workers-oauth-provider";
+import { OAuthError, type OAuthResourceTokenValidation } from "@cloudflare/workers-oauth-provider";
 import { isBlocked, isMembershipBlocked } from "../auth/blocklist";
 import { isPatShaped, verifyPat } from "../auth/pat";
 import type { Role } from "../auth/permissions";
@@ -55,20 +55,15 @@ export interface McpTokenProps {
   tokenKind: McpAuth["tokenKind"];
 }
 
-export interface ValidatedMcpToken {
-  props: McpTokenProps;
-  audience: string;
-  expiresAt?: number;
-  scope?: string[];
-  userId?: string;
-  clientId?: string;
-}
-
-// OAuthResourceServer の validateToken に差し込む形。null は 401 の challenge、blocked は
-// OAuthError(403)で表現する(ライブラリが WWW-Authenticate を出す)
+// OAuthResourceServer の validateToken に差し込む形(戻り値の型はライブラリの
+// OAuthResourceTokenValidation をそのまま使い、手書きで追従しない)。null は 401 の challenge、
+// blocked は OAuthError(403)で表現する(ライブラリが WWW-Authenticate を出す)
 export function mcpTokenValidator(tenantId: string) {
   return (env: Env) =>
-    async (resource: string, token: string): Promise<ValidatedMcpToken | null> => {
+    async (
+      resource: string,
+      token: string,
+    ): Promise<OAuthResourceTokenValidation<McpTokenProps> | null> => {
       const result = await authenticateMcpToken(env, tenantId, token);
       if (!result.ok) {
         if (result.code === "blocked") {

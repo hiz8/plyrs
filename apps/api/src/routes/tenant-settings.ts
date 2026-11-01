@@ -8,7 +8,7 @@ import { auditRevokedTokens, membershipAuditTarget, writeAudit } from "../audit"
 import { cutOffMembership } from "../auth/ban";
 import { unblockMembership } from "../auth/blocklist";
 import { normalizeEmail } from "../auth/email";
-import { can, isRole, ROLES, type Operation } from "../auth/permissions";
+import { can, isRole, ROLES, type Operation, type Role } from "../auth/permissions";
 import type { GateVariables } from "../middleware/tenant-gate";
 
 // 案 G 3・4 章: テナントの owner がサイト名とメンバーを自分で管理する API。
@@ -28,9 +28,19 @@ export async function requireCurrent(
   c: Context<GateEnv>,
   operation: Operation,
 ): Promise<Response | null> {
+  const current = await requireCurrentRole(c, operation);
+  return "denied" in current ? current.denied : null;
+}
+
+// 403 にならなければ D1 の現在のロールを返す(トークンに焼き込まれたロールではなく、今のロールで
+// 規則を適用したい呼び出し元のため。例: PAT のスコープを allowedScopes(role) と照合する)
+export async function requireCurrentRole(
+  c: Context<GateEnv>,
+  operation: Operation,
+): Promise<{ role: Role } | { denied: Response }> {
   const auth = c.get("auth");
   if (!can(auth.role, operation)) {
-    return c.json({ error: "forbidden" }, 403);
+    return { denied: c.json({ error: "forbidden" }, 403) };
   }
   const row = (
     await drizzle(c.env.DB)
@@ -40,9 +50,9 @@ export async function requireCurrent(
       .limit(1)
   )[0];
   if (row === undefined || !isRole(row.role) || !can(row.role, operation)) {
-    return c.json({ error: "forbidden" }, 403);
+    return { denied: c.json({ error: "forbidden" }, 403) };
   }
-  return null;
+  return { role: row.role };
 }
 
 async function findMember(
