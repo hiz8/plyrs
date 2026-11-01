@@ -74,3 +74,16 @@ describe("resolveServerRoute", () => {
     expect(resolveServerRoute(request, { devProxyPublic: false })).toBe("ssr");
   });
 });
+
+describe("MCP の dev 限定転送(M1-7)", () => {
+  it("devProxyPublic のときだけ /mcp と PRM を api へ転送する(本番は api 直接オリジン、決定 48)", () => {
+    const mcp = new Request("https://admin.example.com/mcp/t/abc", { method: "POST" });
+    const prm = new Request(
+      "https://admin.example.com/.well-known/oauth-protected-resource/mcp/t/abc",
+    );
+    expect(resolveServerRoute(mcp, { devProxyPublic: true })).toBe("api");
+    expect(resolveServerRoute(prm, { devProxyPublic: true })).toBe("api");
+    expect(resolveServerRoute(mcp, { devProxyPublic: false })).toBe("ssr");
+    expect(resolveServerRoute(prm, { devProxyPublic: false })).toBe("ssr");
+  });
+});

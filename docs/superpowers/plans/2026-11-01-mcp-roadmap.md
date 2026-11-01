@@ -53,16 +53,16 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 目的は、A1・A2 に依存しない読み取りだけの MCP を先に出し、ツール説明と一覧 API の設計を実利用で確かめること。
 ここで作る入口・カタログ・一覧 RPC・PAT は M4 でそのまま使う。
 
-| PR | 内容 | 論点 | 規模 |
-| --- | --- | --- | --- |
-| M1-1 | 操作カタログの骨格と DO の `invoke(op, input)` RPC。最初の操作は `type_list` / `type_get` / `record_get` | B1 | M |
-| M1-2 | DO の一覧 RPC(`record_list`)。文法は `public/query.ts` を共有し、`records.data` に対する実行器を新設 | A4 | M |
-| M1-3a | PAT の表と発行・失効 API(例外としてスキーマ変更と同じ PR)。`AuditAction` に `token.issue` / `token.revoke` | C1 ④・C2 | M |
-| M1-3b | PAT の検証と認可コンテキスト(`scopes` `tokenId` `tokenKind`)。`record:read` の `requireOperation` を初めて実装 | C2・C3 | L |
-| M1-4 | 管理画面の PAT 画面(発行・一覧・失効)。`record:publish` は既定で外し所有者だけが付与 | C3・C5 | M |
-| M1-5 | MCP の入口 `/mcp/t/:tenantId`(api 直接オリジン、決定 48)。`server/discover`、405、Origin 検証、ヘッダと本文の照合、エラーの 3 層、PRM、`Mcp-Name` 単位の Rate Limiting | D1・D2・E2・E4・E5 | L |
-| M1-6 | 読み取りツールの公開。カタログから `tools/list` を生成、型スキーマを resources で配る、本文の包み方、Markdown の片方向変換 | A3・B2・E1 | M |
-| M1-7 | 実クライアントでの検証と公開(Claude Code・Cursor・VS Code・MCP Inspector)。E2E のスモーク、`docs/deploy.md` | — | M |
+| PR | 内容 | 論点 | 規模 | 状態 |
+| --- | --- | --- | --- | --- |
+| M1-1 | 操作カタログの骨格と DO の `invoke(op, input)` RPC。最初の操作は `type_list` / `type_get` / `record_get` | B1 | M | 実装済み(2026-11-01、PR #39、スタック PR で順にマージ) |
+| M1-2 | DO の一覧 RPC(`record_list`)。文法は `public/query.ts` を共有し、`records.data` に対する実行器を新設 | A4 | M | 実装済み(2026-11-01、PR #40、スタック PR で順にマージ) |
+| M1-3a | PAT の表と発行・失効 API(例外としてスキーマ変更と同じ PR)。`AuditAction` に `token.issue` / `token.revoke` | C1 ④・C2 | M | 実装済み(2026-11-01、PR #41、スタック PR で順にマージ) |
+| M1-3b | PAT の検証と認可コンテキスト(`scopes` `tokenId` `tokenKind`)。`record:read` の `requireOperation` を初めて実装 | C2・C3 | L | 実装済み(2026-11-01、PR #42、スタック PR で順にマージ) |
+| M1-4 | 管理画面の PAT 画面(発行・一覧・失効)。`record:publish` は既定で外し所有者だけが付与 | C3・C5 | M | 実装済み(2026-11-01、PR #45、スタック PR で順にマージ) |
+| M1-5 | MCP の入口 `/mcp/t/:tenantId`(api 直接オリジン、決定 48)。`server/discover`、405、Origin 検証、ヘッダと本文の照合、エラーの 3 層、PRM、`Mcp-Name` 単位の Rate Limiting | D1・D2・E2・E4・E5 | L | 実装済み(2026-11-01、PR #43、スタック PR で順にマージ) |
+| M1-6 | 読み取りツールの公開。カタログから `tools/list` を生成、型スキーマを resources で配る、本文の包み方、Markdown の片方向変換 | A3・B2・E1 | M | 実装済み(2026-11-01、PR #44、スタック PR で順にマージ) |
+| M1-7 | 実クライアントでの検証と公開(Claude Code・Cursor・VS Code・MCP Inspector)。E2E のスモーク、`docs/deploy.md` | — | M | E2E と手順書は実装済み(2026-11-01、PR #46)。preview / production での実クライアント確認と実測は未了(7 章) |
 
 ゲート G1: preview と production で、外部の MCP クライアントから PAT で接続し、型の参照・一覧・単体取得ができること。
 `Mcp-Name` 単位の Rate Limiting が入っていること。
@@ -181,7 +181,18 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | M1 | `2026-11-01-m1-readonly-mcp.md` | 計画済み |
 | M2〜M5 | 着手時に作る | — |
 
-## 7. M0 完了時の申し送り(2026-11-01)
+## 7. M1 完了時の申し送り(2026-11-01)
+
+- PR は #39 → #40 → #41 → #42 → #43 → #44 → #45 → #46 のスタック(base が前の PR)。順にマージする
+- **ゲート G1 のうち preview / production での実クライアント確認と往復時間の実測は未了**。#46 までが `main` にマージされ preview へ自動デプロイされた後に、`docs/deploy.md` 3.5 節の手順で Claude Code / Cursor / VS Code / MCP Inspector から接続し、`tools/list` と `record_get` の往復時間(PAT 検証の D1 1 照会を含む)を測って本節に追記する。production は `workflow_dispatch` 後に MCP Inspector でスモーク
+- M1-6 の Markdown 変換(`apps/api/src/mcp/richtext-markdown.ts`)は ui のエディタの拡張集合(StarterKit + recordMention + assetImage)を api 側に最小複製している。M2-2 で metamodel 側へ寄せて共有し、逆方向(Markdown → JSON)とスキーマ検証を足す。独自ノードの Markdown は M0-2 の仮置き(`[@ recordType=".." recordId=".." label=".."]`、`![label](plyrs://asset/<id>)`)のまま
+- `@tiptap/markdown` は peer を完全一致で要求するため catalog で `3.31.4` に固定。tiptap を上げるときは同時に上げる
+- `tools/list` の `ttlMs` / `cacheScope` は SDK(`@modelcontextprotocol/server` 2.4.0)が一覧全体に 1 つしか持てないため、各操作の `cache` のうち最も保守的な値(現状 0 / private)。`resources/read`(`plyrs://types/{key}`)は `type_get` の 60 秒
+- `@modelcontextprotocol/hono` は使わず、`createMcpHandler` を要求ごとに直接呼ぶ(ヘッダと本文の照合とレート制限を SDK より前に置くため)。dev の E2E は admin の `DEV_PROXY_PUBLIC=1` で `/mcp` を api へ転送する(本番は転送しない)
+- `record_get` の `markdown` は Worker 層で付け、richtext フィールドの判定のため `type_get` をもう 1 回 DO に呼ぶ(record_get 1 回あたり DO 往復 2 回)。往復時間の実測で問題なら DO 側で型を同梱する
+- 入力の Zod 不一致は SDK の `inputSchema` 検証が先に `isError`(text のみ)で返す。DO の `invalid_input` は MCP 経路では到達しない
+
+## 8. M0 完了時の申し送り(2026-11-01)
 
 - 試作ブランチ `spike/mcp-richtext` と `spike/mcp-oauth` は origin に残し、マージしない。依存を足したのも試作ブランチ内だけ
 - M1-5 の MCP サーバーの SDK は `@modelcontextprotocol/server` 2.x(仕様 2026-07-28 対応、stateless Streamable HTTP)+ `@modelcontextprotocol/hono` を第一候補にする。Cloudflare の `agents` は Durable Object にセッションを置く作りで、stateless の方針(16.2)に合わない。版は M1-5 の着手時に `minimumReleaseAge`(7 日)を満たすものを catalog に置く

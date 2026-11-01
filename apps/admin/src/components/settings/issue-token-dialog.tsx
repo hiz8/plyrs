@@ -173,7 +173,9 @@ function IssuedTokenView({
       title={labels.title}
       isOpen
       onOpenChange={onOpenChange}
+      // 保存し忘れを防ぐ: 暗幕クリックや右上の × ではなく、注意書きの下の「閉じる」だけで閉じる
       isDismissable={false}
+      showCloseButton={false}
       footer={
         <Button variant="primary" onPress={() => onOpenChange(false)}>
           {labels.close}
