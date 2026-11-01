@@ -97,8 +97,11 @@ admin の `vite dev` が api を auxiliary worker として起こす構成で、
   認可サーバーは要求ごとに `tenantFromIssuerPath` で組み立てる。ライブラリの版は catalog に置く。
 - **M3-2(同意画面)**: `/login` に `return_to`(同一オリジン・`/oauth/t/` 配下のみ)。同意ページは api が HTML を描画(案 i)。
   `record:publish` は所有者以外に見せない、既定で外す(決定 43)。利用者が当該テナントの会員でなければ同意に進ませない。
-- **M3-3(リソースサーバー側)**: 合流関数の BLOCKLIST 照会と `insufficientScope`。スコープの階層(`record:write` が `record:read`
-  を含む等)を判定に入れる。
+- **M3-3(リソースサーバー側)**: 合流関数の BLOCKLIST 照会と `insufficientScope`。スコープに階層は**設けない**(16.3 のとおり
+  スコープ名は DO の `Operation` そのもので、実効権限はスコープ ∩ ロール。`record:write` だけのトークンで読み取りも要るなら
+  クライアントが `record:read` も要求する)。
+- **実環境の遅延**: 本書の計測は workerd ローカルの値(決定 49 の根拠欄)。実環境の D1 往復(PAT 検証 1 照会)は M1-7 の
+  限定公開で実測し、ロードマップの申し送りに書く。
 - **M3-4(TTL とロール)**: `accessTokenTTL: 900`、`tokenExchangeCallback` の refresh で `memberships` からロールを読み直す。
 - **運用**: `purgeExpiredData` を既存の日次 cron(`scheduled`)に足す。`onError` で `internal.category/reason` をログに出す。
 
