@@ -5,7 +5,13 @@ import { describe, expect, it } from "vitest";
 import { auditLogs, memberships, tenants, users } from "@plyrs/db/control-plane";
 import { signTenantToken } from "../src/auth/jwt";
 import { banUserEverywhere } from "../src/auth/ban";
-import { allowedScopes, issuePat, maxExpiryDays, verifyPat } from "../src/auth/pat";
+import {
+  allowedScopes,
+  disallowedScopes,
+  issuePat,
+  maxExpiryDays,
+  verifyPat,
+} from "../src/auth/pat";
 import type { Role } from "../src/auth/permissions";
 import { app } from "../src/index";
 
@@ -79,6 +85,15 @@ describe("純関数", () => {
     ]);
     expect(allowedScopes("editor")).toEqual(["record:read", "record:write", "record:delete"]);
     expect(allowedScopes("viewer")).toEqual(["record:read"]);
+  });
+
+  it("disallowedScopes: ロールに許されないスコープだけを返す(発行ルートが 400 にする)", () => {
+    expect(disallowedScopes("owner", ["record:read", "record:publish", "type:manage"])).toEqual([]);
+    expect(disallowedScopes("editor", ["record:read", "record:publish", "type:manage"])).toEqual([
+      "record:publish",
+      "type:manage",
+    ]);
+    expect(disallowedScopes("viewer", ["record:write"])).toEqual(["record:write"]);
   });
 
   it("maxExpiryDays: 読み取りのみは 365 日、書き込みスコープを含めば 90 日", () => {
