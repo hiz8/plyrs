@@ -31,6 +31,8 @@ interface EnvBindings {
   AUTH_LIMITER: RateLimit;
   // M1-5(design-spec 16.2): MCP の Mcp-Name 単位のレート制限。未構成は fail-closed(503)
   MCP_LIMITER?: RateLimit;
+  // MCP の入口の接続元 IP 単位の制限(トークン検証の前)。未設定は 503 で fail-closed
+  MCP_IP_LIMITER?: RateLimit;
   // M1-5(16.2): MCP の入口の Origin 許可リスト(admin のオリジン)と、PRM の authorization_servers の
   // 元になる admin オリジン(テナント別 issuer `${ADMIN_ORIGIN}/oauth/t/:tenantId`)。wrangler.jsonc の vars
   ADMIN_ORIGIN?: string;

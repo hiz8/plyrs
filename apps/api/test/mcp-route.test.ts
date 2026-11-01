@@ -66,8 +66,10 @@ interface CallOptions {
   token?: string;
   headers?: Record<string, string>;
   limiter?: RateLimit | null;
+  ipLimiter?: RateLimit | null;
   tenant?: string;
   body?: unknown;
+  env?: Partial<Env>;
 }
 
 async function post(
@@ -86,9 +88,12 @@ async function post(
     ...options.headers,
   };
   const limiter = options.limiter === undefined ? fakeLimiter(true) : options.limiter;
+  const ipLimiter = options.ipLimiter === undefined ? fakeLimiter(true) : options.ipLimiter;
   const testEnv = {
     ...env,
     ...(limiter === null ? { MCP_LIMITER: undefined } : { MCP_LIMITER: limiter }),
+    ...(ipLimiter === null ? { MCP_IP_LIMITER: undefined } : { MCP_IP_LIMITER: ipLimiter }),
+    ...options.env,
   };
   return app.request(
     `${ORIGIN}/mcp/t/${options.tenant ?? tenantId}`,
@@ -182,6 +187,39 @@ describe("/mcp/t/:tenantId の入口", () => {
     expect(limited.headers.get("retry-after")).toBe("60");
     const missing = await post("tools/list", {}, { token: pat, limiter: null });
     expect(missing.status).toBe(503);
+  });
+
+  it("未認証の連打は接続元 IP の Rate Limiting(PAT 検証の前)で 429 になる。未構成は 503", async () => {
+    const keys: string[] = [];
+    const recording = {
+      limit: async ({ key }: { key: string }) => (keys.push(key), { success: false }),
+    } as RateLimit;
+    const limited = await post(
+      "server/discover",
+      {},
+      { ipLimiter: recording, headers: { "cf-connecting-ip": "203.0.113.9" } },
+    );
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("60");
+    expect(keys).toEqual(["203.0.113.9"]);
+    const missing = await post("server/discover", {}, { token: pat, ipLimiter: null });
+    expect(missing.status).toBe(503);
+  });
+
+  it("ADMIN_ORIGIN 未設定は入口も PRM も 503(壊れた issuer を返さない)", async () => {
+    const entry = await post(
+      "server/discover",
+      {},
+      { token: pat, env: { ADMIN_ORIGIN: undefined } },
+    );
+    expect(entry.status).toBe(503);
+    const prm = await app.request(
+      `${ORIGIN}/.well-known/oauth-protected-resource/mcp/t/${tenantId}`,
+      {},
+      { ...env, ADMIN_ORIGIN: undefined },
+      CTX,
+    );
+    expect(prm.status).toBe(503);
   });
 
   it("Rate Limiting のキーはテナント・利用者・ツール名(tools/call 以外はメソッド名)", async () => {
