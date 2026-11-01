@@ -68,12 +68,21 @@ export const typeGet = defineOperation({
   cache: { ttlMs: 60_000, cacheScope: "private" },
 });
 
+// MCP 経路では Worker がリッチテキストのフィールドを Markdown に変換して併記する(M1-6、論点 E1)。
+// DO の出力には含まれない(DO に tiptap を持ち込まない)ので optional
+export const recordGetOutputSchema = recordSnapshotSchema.extend({
+  markdown: z
+    .record(z.string(), z.string())
+    .optional()
+    .describe("リッチテキストのフィールド key → Markdown(読み取り用の一方向変換)"),
+});
+
 export const recordGet = defineOperation({
   name: "record_get",
   title: "record の取得",
-  description: `record を ID で 1 件取得する。下書きを含む現在の内容(data)・フィールドごとの版(fieldVersions)・ワークフロー状態(status)を返す。削除済みは not_found。${UNTRUSTED_NOTE}`,
+  description: `record を ID で 1 件取得する。下書きを含む現在の内容(data)・フィールドごとの版(fieldVersions)・ワークフロー状態(status)を返す。リッチテキストのフィールドは markdown に Markdown 表現を併記する。削除済みは not_found。${UNTRUSTED_NOTE}`,
   input: z.object({ recordId: uuidSchema }),
-  output: recordSnapshotSchema,
+  output: recordGetOutputSchema,
   requires: "record:read",
   via: ["mcp"],
   hints: { readOnly: true, destructive: false, idempotent: true, openWorld: false },
