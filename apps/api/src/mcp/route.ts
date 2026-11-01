@@ -1,5 +1,10 @@
 import { OAuthResourceServer } from "@cloudflare/workers-oauth-provider";
-import { createMcpHandler } from "@modelcontextprotocol/server";
+import {
+  createMcpHandler,
+  DEFAULT_MAX_REQUEST_BODY_SIZE,
+  isJsonContentType,
+  readRequestBody,
+} from "@modelcontextprotocol/server";
 import { Hono } from "hono";
 import type { McpAuth } from "../do/authorize";
 import { mcpTokenValidator, type McpTokenProps } from "../middleware/mcp-gate";
@@ -34,22 +39,27 @@ function jsonRpcError(status: number, code: number, message: string, id: unknown
 interface ParsedRpc {
   id: unknown;
   method: string | undefined;
+  // Mcp-Name と照合する値(tools/call のツール名、resources/read の uri)
   name: string | undefined;
+  // Rate Limiting のキーに使うツール名(tools/call だけ。uri は数が無限なのでキーにしない)
+  tool: string | undefined;
 }
 
 function readRpc(body: unknown): ParsedRpc {
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    return { id: null, method: undefined, name: undefined };
+    return { id: null, method: undefined, name: undefined, tool: undefined };
   }
   const record = body as Record<string, unknown>;
   const params = record["params"];
   const paramsRecord =
     typeof params === "object" && params !== null ? (params as Record<string, unknown>) : {};
   const nameLike = paramsRecord["name"] ?? paramsRecord["uri"];
+  const tool = paramsRecord["name"];
   return {
     id: record["id"] ?? null,
     method: typeof record["method"] === "string" ? record["method"] : undefined,
     name: typeof nameLike === "string" ? nameLike : undefined,
+    tool: typeof tool === "string" ? tool : undefined,
   };
 }
 
@@ -89,9 +99,22 @@ async function serveMcp(
   tenantId: string,
   auth: McpAuth,
 ): Promise<Response> {
+  // 本文は入口で読んで SDK に parsedBody で渡す(ヘッダとの照合と Rate Limiting を SDK より前に行うため)。
+  // parsedBody は SDK の本文サイズ上限を通らないので、SDK と同じ readRequestBody で上限(4 MiB)を守る
+  if (!isJsonContentType(request.headers.get("content-type"))) {
+    return jsonRpcError(
+      415,
+      -32000,
+      "Unsupported Media Type: Content-Type must be application/json",
+    );
+  }
+  const read = await readRequestBody(request, DEFAULT_MAX_REQUEST_BODY_SIZE);
+  if (read.tooLarge) {
+    return jsonRpcError(413, -32000, "Payload Too Large: the request body exceeds 4 MiB");
+  }
   let body: unknown;
   try {
-    body = await request.json();
+    body = JSON.parse(read.text);
   } catch {
     return jsonRpcError(400, -32700, "Parse error: the request body is not valid JSON");
   }
@@ -105,13 +128,14 @@ async function serveMcp(
       rpc.id,
     );
   }
-  // 16.1 / 16.2: 読み取りも DO を起こすので Mcp-Name(ツール名)単位で制限する。未構成は fail-closed
-  // (公開 write と同じ方針)。キーは テナント:利用者:名前(名前の無いメソッドはメソッド名)
+  // 16.1 / 16.2: 読み取りも DO を起こすのでツール名単位で制限する。未構成は fail-closed
+  // (公開 write と同じ方針)。キーは テナント:利用者:ツール名(tools/call 以外はメソッド名。
+  // resources/read の uri をキーにすると uri の数だけ枠が増えるので使わない)
   const limiter = env.MCP_LIMITER;
   if (limiter === undefined) {
     return jsonRpcError(503, -32000, "Service Unavailable: rate limiter is not configured", rpc.id);
   }
-  const limitKey = `${tenantId}:${auth.userId}:${rpc.name ?? rpc.method ?? "unknown"}`;
+  const limitKey = `${tenantId}:${auth.userId}:${rpc.tool ?? rpc.method ?? "unknown"}`;
   const { success } = await limiter.limit({ key: limitKey });
   if (!success) {
     const res = jsonRpcError(429, -32000, "Too Many Requests", rpc.id);
