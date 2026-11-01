@@ -22,7 +22,10 @@ export type AuditAction =
   | "site.rename"
   | "member.add"
   | "member.role_change"
-  | "member.remove";
+  | "member.remove"
+  // M1-3a(design-spec 16.3): PAT の発行・失効。targetId は PAT の行 ID
+  | "token.issue"
+  | "token.revoke";
 
 // メンバーシップを対象にした操作の targetId(運営者の剥奪と owner のメンバー管理で同じ形式にそろえ、
 // 同じ対象の履歴を 1 つの値で検索できるようにする)

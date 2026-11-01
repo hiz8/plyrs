@@ -23,7 +23,11 @@ const roleSchema = z.enum(ROLES);
 
 // JWT の role は最大 15 分古い。ロールを下げられた直後の owner が操作し続けられないよう、
 // JWT で弾けるものは D1 を引かずに弾き、通ったものは D1 の現在のロールで確かめ直す。
-async function requireCurrent(c: Context<GateEnv>, operation: Operation): Promise<Response | null> {
+// M1-3a: PAT の発行(routes/tenant-tokens.ts)も同じ確かめ直しを使う
+export async function requireCurrent(
+  c: Context<GateEnv>,
+  operation: Operation,
+): Promise<Response | null> {
   const auth = c.get("auth");
   if (!can(auth.role, operation)) {
     return c.json({ error: "forbidden" }, 403);
