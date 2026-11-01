@@ -172,6 +172,8 @@
   - CMS 用途の実績・拡張エコシステム(mention、placeholder、カスタム embed)が最も厚い。
   - 将来オプションの「本文限定の協調編集」(仕様第10章)にも y-prosemirror という確立経路がある(採用は保留のまま)。
 - **AST 永続化の規約**: エディタの JSON をそのまま正本にするが、**スキーマバージョンを AST ルートに刻む**(`{"schemaVersion": 1, "doc": {...}}`)。エディタ拡張の追加=スキーマ進化であり、tolerant read(第4.2章)の対象として扱う。
+- **ブロックの安定 ID(2026-11-01、決定 46)**: MCP のブロック単位の編集のため、`schemaVersion: 2` で最上位ブロックに `attrs.id` を持たせる。エディタ側は `@tiptap/extension-unique-id`、v1 を読むときの ID は位置と内容のハッシュから決定的に導く(design-spec 第 16.10 章)。Portable Text への移行は M0-2 の試作で比較したうえで不採用(入れ子ブロックが無く往復が不可逆、影響範囲が 4〜5 本の L)。
+- **Markdown ⇄ AST(2026-11-01)**: `@tiptap/markdown`(marked ベース、`@tiptap/core` と同じ版に揃える)の `MarkdownManager` を Editor 無しで Worker に置く。`@tiptap/static-renderer` の `renderToMarkdown` は出力が異なるため使わない。変換後は ProseMirror のスキーマ検証を通す。
 - **代替案(不採用理由明記)**:
   - **Lexical**(Meta): StyleX と同じ開発元で思想は近いが、2026年時点でも 0.x であり、リリースごとに非互換変更・deprecated 削除が続いている。**AST を年単位で永続化する本用途では、ドキュメントフォーマットの安定性を最優先**し ProseMirror 系を採る。
   - Plate / BlockNote: ProseMirror ではなく Slate 系/Tiptap ラッパー。抽象が厚く、AST の完全な制御という要求に合わない。
@@ -190,6 +192,7 @@
   - **パスワード**: 初期は **WebCrypto PBKDF2**(Workers ネイティブ、外部依存ゼロ)。将来 **passkey(WebAuthn)** を第一認証に格上げする余地を残す。特権テナント(第11.6章)は当初から passkey または TOTP を必須化。
 - **根拠**: 仕様第11章は「中央 D1 正本 + 短命 JWT + KV ブロックリスト + 2段認可」という**具体的な独自構造を既に確定**している。Better Auth 等の認証フレームワークはそれ自身のスキーマ・セッションモデルを持ち込むため、この設計に合わせて歪めるより、プリミティブ(jose + WebCrypto)の上に薄く自作する方が総コストが低い。「自分専用の理想 CMS」原則(第9.1章)とも整合。
 - **代替案**: Better Auth(D1/Drizzle 対応あり。もし OAuth プロバイダ連携を多数持ちたくなったら、認証**入口だけ**を委ね、セッション・認可は仕様どおり自作構造に落とす形で部分採用を検討)。
+- **MCP 向けの認可サーバー(2026-11-01、決定 47〜49)**: `@cloudflare/workers-oauth-provider` v1 の分割 API(`OAuthAuthorizationServer` / `OAuthResourceServer`)を api Worker に置く。OAuth 2.1(認可コード + PKCE)、CIMD / DCR の登録、Authorization Server Metadata、PRM、同意ページのヘルパー、`insufficient_scope` の challenge をライブラリが担い、利用者の認証・セッション・ロール判定は上の自作構造のまま。状態は api の KV(`OAUTH_KV`)。CIMD の取得に compatibility flag `global_fetch_strictly_public` が要る。PAT は D1 の自作表で検証し、同じ `validateToken` に合流させる(design-spec 第 16.3 章)。バージョンは catalog で固定し、1.x の semver に従う(enterprise-managed authorization だけは実験的で対象外)。
 
 ### 2.10 ID 生成: uuid(UUIDv7)
 

@@ -663,8 +663,6 @@ single-writer の DO が競合を判定する。分散マージの難問が「DO
 
 - **スロットの種類の具体リスト（論点P 残件）**: 管理画面コアが定義する拡張スロットの具体セット。UI 実装フェーズで決定。
 - **公開 write の濫用防止の具体（論点W 残件）**: レート制限・検証の具体仕様。実装フェーズで決定。
-- **リッチテキストの形式（第16章・論点 A1）**: ProseMirror JSON + `attrs.id` か Portable Text か。M0-2 の変換忠実度の試作で決める（M2 着手前）。
-- **認可サーバーの方式と置き場、PAT の検証経路、MCP エンドポイントのオリジン（第16章・論点 C1・D2）**: ライブラリか自前か、admin か api か。M0-3 の試作で決める（M1 着手前）。
 - **型単位のスコープ（第16章・論点 C3）**: `record:write:article` のような型単位のスコープを採るか。第11.4章「権限マトリクスは JWT に載せない」の見直しが先。M5 で判断。
 - **ブロック単位の競合判定（第16章・論点 B3 ④）**: `field_versions` をブロック単位にするか DO 内 3-way merge にするか。A1 確定後、M5 で判断。
 - **サービスアカウント・公開側 MCP の認証・意味検索（第16章・論点 C4・D4・A4）**: いずれも M5 で設計。
@@ -721,6 +719,10 @@ single-writer の DO が競合を判定する。分散マージの難問が「DO
 | 43 | **publish は既定で人が行う**。`record:publish` は PAT 発行画面・OAuth 同意画面とも既定で外し、所有者だけが付与。同一利用者の確認は MRTR elicitation、別人の承認は提案（change set、M5）。**編集側の全文検索を DO-SQLite FTS5 で目標化**（第13章の非目標を部分的に見直し。公開側は非目標のまま） | 取り返しのつかない操作に人を挟む。エージェントの `record_search` に下書き検索が要る |
 | 44 | **リッチテキストは最上位ブロックへの安定 ID 付与を決定**（形式は M0-2 で決める）。v1 を読むときの ID は位置と内容のハッシュから決定的に導き、永続化後は保存された ID を優先 | 部分編集とブロック単位の競合判定の土台。ランダムな ID だと未更新 record の ID が読むたびに変わり、ブロック操作が通らない |
 | 45 | **super 管理者向け MCP・Roots / Sampling / Logging は非目標**。公開側 MCP・サービスアカウント・型単位スコープは M5 以降の未処理論点 | 運用操作は運営管理画面に閉じる。Deprecated 機能に依存しない |
+| 46 | **リッチテキストの形式は (a) ProseMirror JSON + 最上位ブロックの `attrs.id`**（M0-2、2026-11-01）。Portable Text は不採用、論点 A と tech-selection 2.7 は維持。Markdown ⇄ AST は `@tiptap/markdown` を Worker で使い、変換後にスキーマ検証を通す | 全ノード種の往復が (a) と Markdown で可逆、Portable Text は入れ子ブロックが無く 5 件が不可逆。(b) は M2-1 が 4〜5 本の L に膨らむ |
+| 47 | **認可サーバーは `@cloudflare/workers-oauth-provider` v1 の分割 API を api Worker に置く**（M0-3、2026-11-01）。issuer は admin オリジンのテナント別パス `/oauth/t/:tenantId`（admin が api へ同一オリジン転送）、`resources` はテナントの MCP URL 1 つ。要求ごとに組み立てる。状態は api の `OAUTH_KV`。CIMD は `global_fetch_strictly_public` を有効化して使い、DCR は `clientRegistrationEndpoint` を設定して fallback に残す | 認可コード + PKCE・同意ヘルパー・PRM・`insufficient_scope` まで揃い、試作で一巡した。`resources` は構築時固定なので、テナントを URL（issuer のパス）で運べば metadata・authorize・token のどの入口でもテナントが決まる。セッションと D1 は api にしかなく、admin に置くと api への往復が増える |
+| 48 | **MCP エンドポイントは api Worker の直接オリジン** `https://<api>/mcp/t/:tenantId`（論点 D2）。api → admin の逆向き Service Binding は dev（auxiliary worker）で成立するが採らない | Bearer 専用で cookie を使わず、admin 経由は 1 ホップ増えるだけ。逆向き binding は vitest にスタブが要り 3 環境分の定義も増える |
+| 49 | **PAT と OAuth の検証経路を `OAuthResourceServer` の `validateToken` で合流させる**。PAT は接頭辞で振り分け D1 を `memberships` と join した 1 照会、OAuth は同 Worker 内の `validateToken`（KV 1 回 + 復号）。両方に BLOCKLIST 2 キーを適用し `{userId, role, tenantId, exp, scopes, tokenId, tokenKind}` にする（`tokenKind` は `"pat" | "oauth"`。経路 `via` とは別の概念） | workerd ローカルで検証 1 回あたり OAuth 約 2 ms・PAT 約 2〜3 ms（BLOCKLIST 込み）。401 / 403 の challenge をライブラリに任せ、スコープ判定は入口に残す |
 
 ---
 
@@ -741,7 +743,8 @@ MCP は、管理画面の同期（第 8・10 章）と REST（`/v1/t/:tenantId/.
 ### 16.2 テナント別 URL・配置・入口（論点 D1・D2・E4）
 
 - **テナント別 URL**: `/mcp/t/:tenantId`。Protected Resource Metadata（RFC 9728）もパス付きで出し、`resource` はパス込みの canonical URI としてテナントを運ぶ。トークンは `resource` に束縛されるので、同意画面で選ぶのはスコープだけになる。
-- **配置（論点 D2）**: api Worker の直接オリジンで受けるか、admin オリジン経由にするかは **M0-3 で決める**。dev で api → admin の逆向き Service Binding が組めなければ api 直接オリジンにする（認可サーバーの置き場と揃える。16.3）。
+- **配置（論点 D2）**: **api Worker の直接オリジン**で受ける（`https://<api>/mcp/t/:tenantId`、決定 48）。`resource` と PRM はこのオリジンで出す。admin オリジン経由（同一オリジン転送）にはしない: MCP はセッション cookie を使わず、1 ホップ増えるだけで得るものがない。dev で api → admin の逆向き Service Binding は組める（M0-3 で確認）が、認可サーバーを api に置くので不要（16.3）。
+- **認可サーバーの入口**は admin オリジンのテナント別パス `https://<admin>/oauth/t/:tenantId/{authorize,oauth/token,oauth/register}` と `https://<admin>/.well-known/oauth-authorization-server/oauth/t/:tenantId`。admin は既存の同一オリジン転送（`/auth` `/v1` と同じ仕組み）に `/oauth` と `/.well-known/oauth-authorization-server` を足して api へ渡す。ログイン状態（セッション cookie）を見るのは `/authorize` だけで、cookie は admin オリジンのものがそのまま届く。
 - **トランスポート**: stateless Streamable HTTP。POST のみ受け、旧クライアントの GET / DELETE には 405、`Mcp-Session-Id` は無視する。`server/discover` を実装する。
 - **ヘッダと本文の一致検証（論点 E4）**: 入口で `Mcp-Method` / `Mcp-Name` を本文と照合し、不一致は `400` + JSON-RPC `-32020` で拒否する。照合後はヘッダの `Mcp-Name`（ツール名）単位で Rate Limiting を掛ける（公開 write の `ratelimit` binding と同じ仕組み。MCP 用の namespace を別に持つ）。
 - **Origin の検証**: ブラウザからの直接呼び出しを想定しないため、`Origin` ヘッダ付きの要求は許可リストに無ければ拒否する。
@@ -756,9 +759,14 @@ MCP は、管理画面の同期（第 8・10 章）と REST（`/v1/t/:tenantId/.
 | 経路 | 用途 | 備考 |
 | --- | --- | --- |
 | PAT（Personal Access Token） | Claude Code・Cursor・自作エージェント・CI など、ヘッダにトークンを貼れるクライアント。自動化・長期利用 | 管理画面で発行。D1 にハッシュ・スコープ・有効期限を保存する。有効期限に上限を設け、書き込みスコープ付きは短くする（OAuth の refresh が無いぶん、漏えいの影響を期限で押さえる）。発行できるのはテナントの所有者だけ |
-| OAuth 2.1（認可コード + PKCE） | claude.ai や ChatGPT のコネクタのように PAT を貼れないホスト型クライアント | 登録は CIMD を優先し、DCR（RFC 7591、Deprecated）は fallback として残す。認可サーバーの実装方式（ライブラリか自前か）と置き場は **M0-3 で決める**。access token の TTL は既存 JWT と同じ 15 分 |
+| OAuth 2.1（認可コード + PKCE） | claude.ai や ChatGPT のコネクタのように PAT を貼れないホスト型クライアント | 登録は CIMD を優先し、DCR（RFC 7591、Deprecated）は fallback として残す。認可サーバーは **`@cloudflare/workers-oauth-provider` v1 の分割 API（`OAuthAuthorizationServer` / `OAuthResourceServer`）を api Worker に置く**（決定 47、M0-3 の試作 `docs/superpowers/plans/2026-11-01-m0-3-oauth-spike-result.md`）。issuer は admin オリジンのテナント別パス（16.2）、`resources` は `https://<api>/mcp/t/:tenantId` の 1 つ。どちらも URL から決まるので、認可サーバーのオブジェクトは要求ごとに組み立てる（構築コストは無視できる）。状態は api の `OAUTH_KV` に置く。access token の TTL は既存 JWT と同じ 15 分、refresh token はライブラリ既定の 30 日 |
 
 **検証と失効**: どちらの経路でも、Worker の入口でトークンを検証した後に既存の BLOCKLIST（`blocked:user` / `blocked:membership`）を照会し、同じ認可コンテキストに合流させる。BAN とメンバー削除は既に BLOCKLIST に書かれているので新規作業はない。ロール変更は BLOCKLIST に書かず、JWT と同じく TTL 内の遅れを受け入れる（`membership` キーは管理画面のセッションも止めるため）。
+
+**検証経路の具体（決定 49）**: MCP の入口は `OAuthResourceServer` をホストにし（401 の challenge・PRM・403 `insufficient_scope` をライブラリが出す）、その `validateToken` に次の合流関数を差す。
+- **PAT**: 接頭辞 `plyrs_pat_` で振り分け、D1 の `personal_access_tokens`（SHA-256 ハッシュ・テナント・スコープ・有効期限・失効日時）を `memberships` と join した 1 回の照会で検証する。ロールは PAT に焼き込まず毎回 `memberships` から引く（長命なので、ロール変更を即時に反映する）。
+- **OAuth**: 同じ api Worker 内で `OAuthAuthorizationServer.validateToken`（KV 1 回 + props の復号）を呼ぶ。Service Binding の RPC は無い。ロールは同意時に grant の props に入れ、refresh のたびに `memberships` から読み直す（access token の 15 分は JWT と同じ遅れ）。
+- 両方とも BLOCKLIST の 2 キーを照会し、認可コンテキスト `{userId, role, tenantId, exp, scopes, tokenId, tokenKind}` に合流する。`tokenKind`（`"pat" | "oauth"`）はトークンの種別で、書き込み経路の `via`（16.4・16.5。MCP 経由ならどちらの種別でも `via` は MCP）とは別に持つ。PAT の `tokenId` は D1 の行 ID、OAuth は grant の識別子（失効の単位に合わせる）。
 
 **スコープ（論点 C3）**: DO の `Operation`（`record:read` `record:write` `record:delete` `record:publish` `type:manage` など、`auth/permissions.ts`）をそのままスコープ名にする。**実効権限 = スコープ ∩ ロール**を DO の第 2 段（第 11.5 章）で判定する。スコープは権限を絞るだけで増やさない。認可コンテキスト `{userId, role, tenantId, exp}` に `scopes` と `tokenId` を足し、`record:read` の `requireOperation` を MCP で初めて実装する（読み取り拒否はここが最初）。型単位のスコープ（例 `record:write:article`）は初期には採らない（第 11.4 章の決定の見直しが先。未処理論点）。
 
@@ -829,9 +837,9 @@ record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴�
 
 **決定事項は「最上位ブロックへの安定 ID 付与」**であり、形式の変更ではない。部分編集・ブロック単位の競合判定・生成しやすさは、いずれも安定 ID から来る利点で、特定の形式に固有ではない。
 
-- 形式は (a) ProseMirror JSON のまま各最上位ブロックに `attrs.id` を持たせる（`@tiptap/extension-unique-id`）か、(b) Portable Text に移すかを、**M0-2 の変換忠実度の試作で決める**。Tiptap の全ノード種を往復させ、Markdown との往復も含めて不可逆になる箇所と、影響する PR の本数を比較する。(b) を採る場合は論点 A（JSON AST 採用、tech-selection 2.7）を覆すので決定ログに記載する。
-- (a) の場合、`RICH_TEXT_SCHEMA_VERSION` を 2 に上げ、v1 のエンベロープを読むときに最上位ブロックへ ID を振り、次の書き込みで永続化する（一括変換しない。第 4.2 章の遅延マイグレーション）。**読むときの ID はランダムにせず、ブロックの位置と内容のハッシュから決定的に導く**。未更新の record でも `record_get` で見た ID が `record_update` で通り、その間に内容が変われば `baseFieldVersions` の不一致で競合になる。永続化後は保存された ID を優先する。
-- **Markdown ⇄ AST の双方向変換**はどちらの形式でも必要。エージェントは Markdown で読み書きし、複雑なブロックだけ AST を直接送る。変換の忠実度はテストで固定する。
+- **形式は (a) ProseMirror JSON のまま各最上位ブロックに `attrs.id` を持たせる（`@tiptap/extension-unique-id`）**。M0-2 の試作（`docs/superpowers/plans/2026-11-01-m0-2-richtext-spike-result.md`）で、Tiptap の全ノード種 19 件の往復が (a) と Markdown では全て可逆、(b) Portable Text では入れ子ブロックが無いため 5 件が不可逆（番号リストの start、項目内の複数段落、引用内の複数段落・リスト、空白）と出たため。(b) は影響する PR も 4〜5 本の L に膨らむ。論点 A（JSON AST 採用、tech-selection 2.7）は維持する（決定 46）。
+- `RICH_TEXT_SCHEMA_VERSION` を 2 に上げ、v1 のエンベロープを読むときに最上位ブロックへ ID を振り、次の書き込みで永続化する（一括変換しない。第 4.2 章の遅延マイグレーション）。**読むときの ID はランダムにせず、ブロックの位置と内容のハッシュから決定的に導く**。未更新の record でも `record_get` で見た ID が `record_update` で通り、その間に内容が変われば `baseFieldVersions` の不一致で競合になる。永続化後は保存された ID を優先する。
+- **Markdown ⇄ AST の双方向変換**は `@tiptap/markdown` の `MarkdownManager` を Editor 無し・DOM 無しで Worker に置く（試作で動作を確認）。変換後は必ず ProseMirror のスキーマ検証を通し、語彙に無い構造（表・タスクリスト・外部 URL の画像など）は業務エラーで返す。エージェントは Markdown で読み書きし、複雑なブロックだけ AST を直接送る。独自ノード（record 参照・本文中画像）の Markdown 文法は M2-2 で確定する。変換の忠実度はテストで固定する。
 - **信頼されないコンテンツ（論点 E1）**: record の本文は他の利用者が書いたデータなので、エージェントに指示として扱わせない。本文は `structuredContent` のデータ領域に置き、ツール説明でも明示する。本文中の指示に従った誤編集・誤公開は、この包み方・publish の既定オフ（16.8）・履歴からの復元（16.5）の 3 重で受ける。
 
 ### 16.11 初期リリースのツールとアセット（論点 D3）
