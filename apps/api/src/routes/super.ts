@@ -13,7 +13,7 @@ import {
   users,
 } from "@plyrs/db/control-plane";
 import { assetKeyBelongsToTenant } from "../assets/ownership";
-import { membershipAuditTarget, writeAudit } from "../audit";
+import { auditRevokedTokens, membershipAuditTarget, writeAudit } from "../audit";
 import { banUserEverywhere, revokeMembership } from "../auth/ban";
 import { unblockUser } from "../auth/blocklist";
 import { normalizeEmail } from "../auth/email";
@@ -195,7 +195,7 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
   })
   .post("/users/:userId/ban", async (c) => {
     const userId = c.req.param("userId");
-    const { disconnected } = await banUserEverywhere(c.env, userId);
+    const { disconnected, revokedTokens } = await banUserEverywhere(c.env, userId);
     await writeAudit(c.env.DB, {
       actorId: c.get("superAdmin").adminId,
       action: "user.ban",
@@ -203,6 +203,13 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       targetId: userId,
       detail: { disconnected },
     });
+    await auditRevokedTokens(
+      c.env.DB,
+      c.get("superAdmin").adminId,
+      null,
+      revokedTokens,
+      "user.ban",
+    );
     return c.json({ ok: true, disconnected });
   })
   .post("/users/:userId/unban", async (c) => {
@@ -233,7 +240,7 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
   .delete("/tenants/:tenantId/members/:userId", async (c) => {
     const tenantId = c.req.param("tenantId");
     const userId = c.req.param("userId");
-    const { disconnected } = await revokeMembership(c.env, userId, tenantId);
+    const { disconnected, revokedTokens } = await revokeMembership(c.env, userId, tenantId);
     await writeAudit(c.env.DB, {
       actorId: c.get("superAdmin").adminId,
       action: "membership.revoke",
@@ -241,6 +248,13 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       targetId: membershipAuditTarget(userId, tenantId),
       detail: { disconnected },
     });
+    await auditRevokedTokens(
+      c.env.DB,
+      c.get("superAdmin").adminId,
+      tenantId,
+      revokedTokens,
+      "membership.revoke",
+    );
     return c.json({ ok: true, disconnected });
   })
   // design-spec §7 の確定事項(archived かつ公開中)/ §14(レガシー user 型 asset・旧形式 richtext)

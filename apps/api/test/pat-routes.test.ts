@@ -4,7 +4,8 @@ import { drizzle } from "drizzle-orm/d1";
 import { describe, expect, it } from "vitest";
 import { auditLogs, memberships, tenants, users } from "@plyrs/db/control-plane";
 import { signTenantToken } from "../src/auth/jwt";
-import { allowedScopes, maxExpiryDays, verifyPat } from "../src/auth/pat";
+import { banUserEverywhere } from "../src/auth/ban";
+import { allowedScopes, issuePat, maxExpiryDays, verifyPat } from "../src/auth/pat";
 import type { Role } from "../src/auth/permissions";
 import { app } from "../src/index";
 
@@ -301,5 +302,72 @@ describe("verifyPat", () => {
 
     await drizzle(env.DB).delete(memberships).where(eq(memberships.userId, ownerId));
     expect(await verifyPat(env.DB, tenantId, issued.token, now)).toBeNull();
+  });
+});
+
+describe("会員資格と PAT の連動", () => {
+  it("会員を外すとその人の PAT は失効し、再招待しても戻らない。監査に token.revoke が残る", async () => {
+    const { tenantId, ownerId, editorId } = await setupSite();
+    const auth = await bearer(ownerId, tenantId, "owner");
+    const now = new Date();
+    const issued = await issuePat(
+      env.DB,
+      { userId: editorId, tenantId, name: "editor-ci", scopes: ["record:read"], expiresInDays: 1 },
+      now,
+    );
+    expect(await verifyPat(env.DB, tenantId, issued.token, now)).not.toBeNull();
+
+    const removed = await call("DELETE", `/v1/t/${tenantId}/members/${editorId}`, auth);
+    expect(removed.status).toBe(200);
+    expect(await verifyPat(env.DB, tenantId, issued.token, now)).toBeNull();
+
+    // 再招待(ブロックの解除)で PAT が蘇らない
+    const editorEmail = (
+      await drizzle(env.DB).select({ email: users.email }).from(users).where(eq(users.id, editorId))
+    )[0]?.email;
+    const readded = await call("POST", `/v1/t/${tenantId}/members`, auth, {
+      email: editorEmail,
+      role: "editor",
+    });
+    expect(readded.status).toBe(201);
+    expect(await verifyPat(env.DB, tenantId, issued.token, now)).toBeNull();
+
+    const audits = await drizzle(env.DB)
+      .select({ action: auditLogs.action, actorId: auditLogs.actorId, detail: auditLogs.detail })
+      .from(auditLogs)
+      .where(eq(auditLogs.targetId, issued.id));
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({ action: "token.revoke", actorId: ownerId });
+    expect(JSON.parse(audits[0]?.detail ?? "{}")).toStrictEqual({
+      tenantId,
+      reason: "member.remove",
+    });
+  });
+
+  it("BAN はその人の全テナントの PAT を失効させる", async () => {
+    const a = await setupSite();
+    const b = await setupSite();
+    const now = new Date();
+    await drizzle(env.DB)
+      .insert(memberships)
+      .values({
+        userId: a.editorId,
+        tenantId: b.tenantId,
+        role: "editor",
+        createdAt: now.toISOString(),
+      });
+    const tokens = await Promise.all(
+      [a.tenantId, b.tenantId].map((tenantId) =>
+        issuePat(
+          env.DB,
+          { userId: a.editorId, tenantId, name: "t", scopes: ["record:read"], expiresInDays: 1 },
+          now,
+        ),
+      ),
+    );
+    const { revokedTokens } = await banUserEverywhere(env, a.editorId);
+    expect(revokedTokens.toSorted()).toEqual(tokens.map((t) => t.id).toSorted());
+    expect(await verifyPat(env.DB, a.tenantId, tokens[0]?.token ?? "", now)).toBeNull();
+    expect(await verifyPat(env.DB, b.tenantId, tokens[1]?.token ?? "", now)).toBeNull();
   });
 });
