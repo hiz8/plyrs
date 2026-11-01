@@ -44,7 +44,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | M0-1 | design-spec に第 16 章を新設、§13・§14・決定ログ(36〜45)、用語集 | A2・A4・B1・C5・D1・E1〜E5 | S | #33 |
 | M0-2 | リッチテキスト形式の試作(`spike/mcp-richtext`)。結果は `2026-11-01-m0-2-richtext-spike-result.md`、決定 46 | A1 | M | #34 |
 | M0-3 | 認可サーバーの試作(`spike/mcp-oauth`)。結果は `2026-11-01-m0-3-oauth-spike-result.md`、決定 47〜49 | C1・C2・D2 | M | #35 |
-| M0-4 | 本書と M1 の詳細計画 | — | S | — |
+| M0-4 | 本書と M1 の詳細計画 | — | S | #36 |
 
 ゲート G0(A1 の形式、C1 の方式、PAT の検証経路、D2 の配置が決定ログにある)は決定 46〜49 で満たした。
 
@@ -58,7 +58,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | M1-1 | 操作カタログの骨格と DO の `invoke(op, input)` RPC。最初の操作は `type_list` / `type_get` / `record_get` | B1 | M |
 | M1-2 | DO の一覧 RPC(`record_list`)。文法は `public/query.ts` を共有し、`records.data` に対する実行器を新設 | A4 | M |
 | M1-3a | PAT の表と発行・失効 API(例外としてスキーマ変更と同じ PR)。`AuditAction` に `token.issue` / `token.revoke` | C1 ④・C2 | M |
-| M1-3b | PAT の検証と認可コンテキスト(`scopes` `tokenId` `via`)。`record:read` の `requireOperation` を初めて実装 | C2・C3 | L |
+| M1-3b | PAT の検証と認可コンテキスト(`scopes` `tokenId` `tokenKind`)。`record:read` の `requireOperation` を初めて実装 | C2・C3 | L |
 | M1-4 | 管理画面の PAT 画面(発行・一覧・失効)。`record:publish` は既定で外し所有者だけが付与 | C3・C5 | M |
 | M1-5 | MCP の入口 `/mcp/t/:tenantId`(api 直接オリジン、決定 48)。`server/discover`、405、Origin 検証、ヘッダと本文の照合、エラーの 3 層、PRM、`Mcp-Name` 単位の Rate Limiting | D1・D2・E2・E4・E5 | L |
 | M1-6 | 読み取りツールの公開。カタログから `tools/list` を生成、型スキーマを resources で配る、本文の包み方、Markdown の片方向変換 | A3・B2・E1 | M |
@@ -149,7 +149,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | 変更履歴の保持本数・期間、区切り | — | M0-1 | **決定 41**(仮置き、M2-3a で実測) |
 | DO 側の一覧でフィルタできるフィールドの範囲 | 索引宣言済み + システム列 | M1-2 | 未決 |
 | PAT の有効期限の上限 | 書き込みスコープ付きは短くする | M1-3a | 未決(M1 計画の仮置き: 読み取りのみ 365 日、書き込み付き 90 日) |
-| 旧版プロトコルのクライアントへの対応 | 2026-07-28 のみ | M1-5 | 未決 |
+| 旧版プロトコルのクライアントへの対応(廃止済みの `initialize` / `notifications/initialized` を送るクライアントに何を返すか) | 2026-07-28 のみ | M1-5 | 未決 |
 | 同意画面の実装形(api の HTML か admin の SPA 経路か) | api の HTML | M3-2 | 未決(M0-3 結果 4 節) |
 | エージェント経路の競合判定の既定(B3 ①) | strict | M2-6 | **決定 42** |
 | 再適用回数の数え方(B3 ③) | `attempt` 引数の自己申告 | M4-1 | 未決 |
