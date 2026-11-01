@@ -1,7 +1,11 @@
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { McpAuth } from "../src/do/authorize";
-import { buildListRecordsQuery, parseRecordListInput } from "../src/do/list-records";
+import {
+  buildListRecordsQuery,
+  parseRecordListInput,
+  recordListInputSchema,
+} from "../src/do/list-records";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import { asInvokeResult, asWriteResult } from "./rpc-unwrap";
 
@@ -66,32 +70,42 @@ beforeAll(async () => {
   expect((await stub.deleteRecord(uuid(741), owner)).ok).toBe(true);
 });
 
-describe("parseRecordListInput(純関数)", () => {
-  const type = articleType();
+// Zod(recordListInputSchema)は invoke の runOperation が通す。ここでは解決(列・値・cursor)だけを見る
+function resolve(input: Record<string, unknown>) {
+  return parseRecordListInput(articleType(), recordListInputSchema.parse(input));
+}
 
-  it("索引宣言の無いフィールドでのフィルタ・ソートは invalid_input", () => {
-    expect(parseRecordListInput(type, { type: "article", filter: { title: ["x"] } })).toMatchObject(
-      {
-        ok: false,
-        code: "invalid_input",
-      },
-    );
+describe("recordListInputSchema(Zod)", () => {
+  it("limit は上限 100、status は重複を畳み、状態の種類数を超える配列は受けない", () => {
+    expect(recordListInputSchema.safeParse({ type: "article", limit: 101 }).success).toBe(false);
+    expect(recordListInputSchema.safeParse({ type: "article", limit: 0 }).success).toBe(false);
     expect(
-      parseRecordListInput(type, { type: "article", sort: { field: "tags", direction: "asc" } }),
-    ).toMatchObject({ ok: false, code: "invalid_input" });
+      recordListInputSchema.parse({ type: "article", status: ["draft", "draft"] }).status,
+    ).toEqual(["draft"]);
+    expect(
+      recordListInputSchema.safeParse({
+        type: "article",
+        status: ["draft", "draft", "draft", "draft", "draft"],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("parseRecordListInput(純関数)", () => {
+  it("索引宣言の無いフィールドでのフィルタ・ソートは invalid_input", () => {
+    expect(resolve({ type: "article", filter: { title: ["x"] } })).toMatchObject({
+      ok: false,
+      code: "invalid_input",
+    });
+    expect(resolve({ type: "article", sort: { field: "tags", direction: "asc" } })).toMatchObject({
+      ok: false,
+      code: "invalid_input",
+    });
   });
 
-  it("limit は既定 20、上限 100", () => {
-    const ok = parseRecordListInput(type, { type: "article" });
+  it("limit は既定 20", () => {
+    const ok = resolve({ type: "article" });
     expect(ok.ok && ok.query.limit).toBe(20);
-    expect(parseRecordListInput(type, { type: "article", limit: 101 })).toMatchObject({
-      ok: false,
-      code: "invalid_input",
-    });
-    expect(parseRecordListInput(type, { type: "article", limit: 0 })).toMatchObject({
-      ok: false,
-      code: "invalid_input",
-    });
   });
 
   it("フィルタ値の総数は公開 API と同じ上限(60)で、超えると invalid_input", () => {
@@ -101,38 +115,26 @@ describe("parseRecordListInput(純関数)", () => {
       (_, i) => `2026-01-${String(i + 1).padStart(2, "0")}T00:00:00Z`,
     );
     const filter = { slug: slugs, published_at: dates, updatedAt: dates, createdAt: dates };
-    expect(parseRecordListInput(type, { type: "article", filter })).toMatchObject({
+    expect(resolve({ type: "article", filter })).toMatchObject({
       ok: false,
       code: "invalid_input",
       message: "too many filter values",
     });
     const within = { slug: slugs, published_at: dates, updatedAt: dates };
-    expect(parseRecordListInput(type, { type: "article", filter: within })).toMatchObject({
-      ok: true,
-    });
-  });
-
-  it("status は重複を畳み、状態の種類数を超える配列は invalid_input", () => {
-    const deduped = parseRecordListInput(type, { type: "article", status: ["draft", "draft"] });
-    expect(deduped.ok && deduped.query.statuses).toEqual(["draft"]);
-    expect(
-      parseRecordListInput(type, {
-        type: "article",
-        status: ["draft", "draft", "draft", "draft", "draft"],
-      }),
-    ).toMatchObject({ ok: false, code: "invalid_input" });
+    expect(resolve({ type: "article", filter: within })).toMatchObject({ ok: true });
   });
 
   it("datetime の値は ISO8601 UTC だけを受ける", () => {
-    expect(
-      parseRecordListInput(type, { type: "article", filter: { published_at: ["2026-01-01"] } }),
-    ).toMatchObject({ ok: false, code: "invalid_input" });
+    expect(resolve({ type: "article", filter: { published_at: ["2026-01-01"] } })).toMatchObject({
+      ok: false,
+      code: "invalid_input",
+    });
   });
 });
 
 describe("buildListRecordsQuery(純関数)", () => {
   it("生成列・システム列・cursor を WHERE に積み、ユーザー入力は補間しない", () => {
-    const parsed = parseRecordListInput(articleType(), {
+    const parsed = resolve({
       type: "article",
       filter: { slug: ["a01", "a02"] },
       status: ["draft"],
@@ -144,6 +146,8 @@ describe("buildListRecordsQuery(純関数)", () => {
       return;
     }
     const built = buildListRecordsQuery(parsed.query, { k: "2025-01-02T00:00:00Z", seq: 3 });
+    // 次ページの cursor に使うソートキーを最初から選ぶ(後から文字列置換で足さない)
+    expect(built.sql).toContain("SELECT g_article_published_at AS sort_value, id,");
     expect(built.sql).toContain("deleted_at IS NULL");
     expect(built.sql).toContain("g_article_slug IN (?, ?)");
     expect(built.sql).toContain("status IN (?)");
