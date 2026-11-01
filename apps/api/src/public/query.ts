@@ -48,8 +48,9 @@ export type ParseResult = { ok: true; query: ListQuery } | { ok: false; error: s
 
 export const DEFAULT_LIMIT = 20;
 export const MAX_LIMIT = 100;
-const MAX_FILTERS = 8;
-const MAX_FILTER_VALUES = 20;
+// M1-2: DO の一覧(do/list-records.ts)も同じ上限と値の検証を使う(design-spec 16.9: 文法の解釈を共有する)
+export const MAX_FILTERS = 8;
+export const MAX_FILTER_VALUES = 20;
 const MAX_INCLUDE_FIELDS = 5;
 // Finding 1（critical）: フィルタ値の総数上限。sql.ts の buildListQuery が単一クエリに積む
 // バインド数は「固定 6」（tenant_id/type 2 + カーソル 2 + limit 1 + 索引ソート用フィールド 1）＋
@@ -78,9 +79,9 @@ const COLUMN_BY_KIND = {
   date: "value_date",
 } as const;
 
-type ScalarKind = keyof typeof COLUMN_BY_KIND;
+export type ScalarKind = keyof typeof COLUMN_BY_KIND;
 
-function parseScalarValues(kind: ScalarKind, raw: string[]): (string | number)[] | null {
+export function parseScalarValues(kind: ScalarKind, raw: string[]): (string | number)[] | null {
   switch (kind) {
     case "num": {
       const values = raw.map((value) => Number(value));
