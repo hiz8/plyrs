@@ -35,7 +35,7 @@ function renderFrame(props: {
 it("読み込み中は入れ物に aria-busy が付き、h1 とタブは最初から出て本文は出ない", () => {
   renderFrame({ isLoading: true });
   expect(screen.getByRole("heading", { level: 1, name: "設定" })).toBeInTheDocument();
-  expect(screen.getAllByRole("tab")).toHaveLength(4);
+  expect(screen.getAllByRole("tab")).toHaveLength(5);
   expect(screen.queryByText("本文")).not.toBeInTheDocument();
   expect(screen.getByRole("tabpanel").firstElementChild).toHaveAttribute("aria-busy", "true");
 });
