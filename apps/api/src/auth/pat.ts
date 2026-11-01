@@ -46,6 +46,12 @@ export function allowedScopes(role: Role): PatScope[] {
   }
 }
 
+// 発行ルートが現在のロールと照合する。allowedScopes に無いスコープを返す(空なら発行できる)
+export function disallowedScopes(role: Role, scopes: readonly PatScope[]): PatScope[] {
+  const allowed = new Set<PatScope>(allowedScopes(role));
+  return scopes.filter((scope) => !allowed.has(scope));
+}
+
 export function isReadOnly(scopes: readonly Operation[]): boolean {
   return scopes.every((scope) => scope === "record:read");
 }
