@@ -202,3 +202,26 @@ export async function revokePat(
     .returning({ id: personalAccessTokens.id });
   return updated.length > 0;
 }
+
+// 会員資格を失った人の PAT をまとめて失効させる(tenantId を省くと全テナント)。会員を外す・BAN の
+// 後始末に使う。KV のブロックは最長 20 分で消えるが、PAT は 365 日生きうるので revoked_at を立てる
+// (再招待の unblockMembership で蘇らない)。失効させた id を返し、監査は呼び出し元が書く
+export async function revokeUserPats(
+  d1: D1Database,
+  userId: string,
+  now: Date,
+  tenantId?: string,
+): Promise<string[]> {
+  const updated = await drizzle(d1)
+    .update(personalAccessTokens)
+    .set({ revokedAt: now.toISOString() })
+    .where(
+      and(
+        eq(personalAccessTokens.userId, userId),
+        tenantId === undefined ? undefined : eq(personalAccessTokens.tenantId, tenantId),
+        isNull(personalAccessTokens.revokedAt),
+      ),
+    )
+    .returning({ id: personalAccessTokens.id });
+  return updated.map((row) => row.id);
+}

@@ -94,6 +94,35 @@ describe("parseRecordListInput(純関数)", () => {
     });
   });
 
+  it("フィルタ値の総数は公開 API と同じ上限(60)で、超えると invalid_input", () => {
+    const slugs = Array.from({ length: 20 }, (_, i) => `a${i}`);
+    const dates = Array.from(
+      { length: 20 },
+      (_, i) => `2026-01-${String(i + 1).padStart(2, "0")}T00:00:00Z`,
+    );
+    const filter = { slug: slugs, published_at: dates, updatedAt: dates, createdAt: dates };
+    expect(parseRecordListInput(type, { type: "article", filter })).toMatchObject({
+      ok: false,
+      code: "invalid_input",
+      message: "too many filter values",
+    });
+    const within = { slug: slugs, published_at: dates, updatedAt: dates };
+    expect(parseRecordListInput(type, { type: "article", filter: within })).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it("status は重複を畳み、状態の種類数を超える配列は invalid_input", () => {
+    const deduped = parseRecordListInput(type, { type: "article", status: ["draft", "draft"] });
+    expect(deduped.ok && deduped.query.statuses).toEqual(["draft"]);
+    expect(
+      parseRecordListInput(type, {
+        type: "article",
+        status: ["draft", "draft", "draft", "draft", "draft"],
+      }),
+    ).toMatchObject({ ok: false, code: "invalid_input" });
+  });
+
   it("datetime の値は ISO8601 UTC だけを受ける", () => {
     expect(
       parseRecordListInput(type, { type: "article", filter: { published_at: ["2026-01-01"] } }),

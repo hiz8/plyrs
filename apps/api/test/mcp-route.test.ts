@@ -184,7 +184,7 @@ describe("/mcp/t/:tenantId の入口", () => {
     expect(missing.status).toBe(503);
   });
 
-  it("Rate Limiting のキーはテナント・利用者・Mcp-Name(無ければ Mcp-Method)", async () => {
+  it("Rate Limiting のキーはテナント・利用者・ツール名(tools/call 以外はメソッド名)", async () => {
     const keys: string[] = [];
     const recording = {
       limit: async ({ key }: { key: string }) => (keys.push(key), { success: true }),
@@ -195,8 +195,31 @@ describe("/mcp/t/:tenantId の入口", () => {
       { name: "type_list", arguments: {} },
       { token: pat, limiter: recording },
     );
+    // resources/read の uri をキーにすると uri の数だけ枠が増えるので、メソッド名で 1 つにまとめる
+    await post(
+      "resources/read",
+      { uri: "plyrs://types/anything-goes" },
+      { token: pat, limiter: recording, headers: { "mcp-name": "plyrs://types/anything-goes" } },
+    );
     expect(keys[0]).toMatch(new RegExp(`^${tenantId}:[0-9a-f-]{36}:tools/list$`));
     expect(keys[1]).toMatch(new RegExp(`^${tenantId}:[0-9a-f-]{36}:type_list$`));
+    expect(keys[2]).toMatch(new RegExp(`^${tenantId}:[0-9a-f-]{36}:resources/read$`));
+  });
+
+  it("本文は SDK と同じ上限(4 MiB)で、超えると 413。JSON 以外の Content-Type は 415", async () => {
+    const padding = "x".repeat(4 * 1024 * 1024);
+    const huge = await post(
+      "tools/list",
+      {},
+      { token: pat, body: { ...envelope("tools/list"), padding } },
+    );
+    expect(huge.status).toBe(413);
+    const text = await post(
+      "tools/list",
+      {},
+      { token: pat, headers: { "content-type": "text/plain" } },
+    );
+    expect(text.status).toBe(415);
   });
 
   it("別テナントの PAT は 401", async () => {

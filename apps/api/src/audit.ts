@@ -54,3 +54,23 @@ export async function writeAudit(d1: D1Database, entry: AuditEntry): Promise<voi
       createdAt: new Date().toISOString(),
     });
 }
+
+// 会員資格の喪失(会員を外す・運営者の剥奪・BAN)に伴って失効させた PAT を 1 件ずつ記録する。
+// token.revoke の対象は PAT の id で、手動の失効と同じ値で履歴を引ける。reason に元の操作を残す
+export async function auditRevokedTokens(
+  d1: D1Database,
+  actorId: string,
+  tenantId: string | null,
+  tokenIds: readonly string[],
+  reason: AuditAction,
+): Promise<void> {
+  for (const tokenId of tokenIds) {
+    await writeAudit(d1, {
+      actorId,
+      action: "token.revoke",
+      targetType: "pat",
+      targetId: tokenId,
+      detail: tenantId === null ? { reason } : { tenantId, reason },
+    });
+  }
+}
