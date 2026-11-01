@@ -14,6 +14,9 @@ interface EnvBindings {
   BLOCKLIST: KVNamespace;
   // Phase 5b (G3): 公開 read の tenantSlug→tenantId 解決キャッシュ（公開経路は DO を起こさない）
   TENANT_SLUGS: KVNamespace;
+  // spike(M0-3): 認可サーバーの KV と、admin への逆向き Service Binding(dev 検証用)
+  OAUTH_KV: KVNamespace;
+  ADMIN?: Fetcher;
   // Phase 8: アセットのバイナリ(R2)。メタデータは各テナント DO の asset record
   ASSETS: R2Bucket;
   // 本番: `wrangler secret put JWT_SECRET`。ローカル dev: .dev.vars。テスト: vitest.config の miniflare.bindings。

@@ -2,6 +2,8 @@
   "name": "plyrs-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-12",
+  // spike(M0-3): CIMD(Client ID Metadata Document)の取得に必要(workers-oauth-provider README)
+  "compatibility_flags": ["global_fetch_strictly_public"],
   "durable_objects": {
     "bindings": [{ "name": "TENANT_DO", "class_name": "TenantDO" }],
   },
@@ -20,8 +22,12 @@
       "migrations_dir": "../../packages/db/drizzle-projection",
     },
   ],
+  // spike(M0-3): api → admin の逆向き Service Binding が dev(auxiliary worker)で成立するかの確認
+  "services": [{ "binding": "ADMIN", "service": "plyrs-admin" }],
   "kv_namespaces": [
     { "binding": "BLOCKLIST", "id": "00000000000000000000000000000000" },
+    // spike(M0-3): @cloudflare/workers-oauth-provider が要求する固定名の KV
+    { "binding": "OAUTH_KV", "id": "00000000000000000000000000000002" },
     // Phase 5b (G3): 公開 read の tenantSlug→tenantId 解決キャッシュ。BLOCKLIST は認証用なので流用しない
     { "binding": "TENANT_SLUGS", "id": "00000000000000000000000000000001" },
   ],

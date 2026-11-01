@@ -23,6 +23,14 @@ app.use("/v1/*", requireSaneSecret);
 app.use("/super-auth/*", requireSaneSecret);
 app.use("/super/v1/*", requireSaneSecret);
 app.route("/auth", authRoutes);
+// spike(M0-3): admin → api → admin の往復が dev で成立するかの確認用。admin の /_config を叩き返す
+app.get("/v1/_spike/admin-ping", async (c) => {
+  if (c.env.ADMIN === undefined) {
+    return c.json({ error: "no_admin_binding" }, 503);
+  }
+  const res = await c.env.ADMIN.fetch(new Request(new URL("/_config", c.req.url)));
+  return c.json({ status: res.status, body: await res.json() });
+});
 // 決定 9: self-serve テナント作成(旧 POST /v1/tenants)は撤去。作成は /super/v1/tenants 専用。
 app.route("/v1/t", tenantRoutes);
 app.route("/super-auth", superAuthRoutes);

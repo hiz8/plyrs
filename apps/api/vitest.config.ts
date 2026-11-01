@@ -16,6 +16,9 @@ export default defineConfig(async () => {
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
           r2Buckets: ["ASSETS"],
+          // spike(M0-3): wrangler.jsonc の ADMIN(逆向き Service Binding)は vitest では相手が
+          // いないため起動に失敗する。スタブで埋める(逆向き binding を採る場合の運用コスト)
+          serviceBindings: { ADMIN: async () => Response.json({ stub: true }) },
           bindings: {
             TEST_MIGRATIONS: migrations,
             TEST_PROJECTION_MIGRATIONS: projectionMigrations,

@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.4",
     "@hono/zod-validator": "catalog:",
     "@plyrs/db": "workspace:*",
     "@plyrs/metamodel": "workspace:*",
