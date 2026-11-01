@@ -1,6 +1,5 @@
 import { requireOperation, type AuthContext, type McpAuth } from "../do/authorize";
-import type { OpSpec } from "./catalog";
-import { findOperation } from "./catalog";
+import { findOperation, OPERATIONS, type OpSpec } from "./catalog";
 import { READ_HANDLERS, type OpContext, type OpFailure } from "./read";
 
 // 操作の失敗はここで表現し、HTTP や JSON-RPC のエラーにしない(design-spec 16.7 の「業務エラー」層)。
@@ -20,7 +19,15 @@ export type InvokeResult =
 
 export type OpHandler = (ctx: OpContext, input: never) => { ok: true; output: unknown } | OpFailure;
 
-const HANDLERS: Readonly<Record<string, OpHandler>> = { ...READ_HANDLERS };
+// 宣言(OPERATIONS)と実装(HANDLERS)は名前文字列で対応する。片方だけ足し忘れると unknown_operation
+// として静かに失敗するので、モジュール読み込み時に対応を確かめる(export はテストのため)
+export const HANDLERS: Readonly<Record<string, OpHandler>> = { ...READ_HANDLERS };
+
+for (const spec of OPERATIONS) {
+  if (HANDLERS[spec.name] === undefined) {
+    throw new Error(`operation ${spec.name} is declared in the catalog but has no handler`);
+  }
+}
 
 function hasScopes(auth: AuthContext | McpAuth): auth is McpAuth {
   return Array.isArray((auth as McpAuth).scopes);
