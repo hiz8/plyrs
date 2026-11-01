@@ -348,14 +348,12 @@ describe("会員資格と PAT の連動", () => {
     const a = await setupSite();
     const b = await setupSite();
     const now = new Date();
-    await drizzle(env.DB)
-      .insert(memberships)
-      .values({
-        userId: a.editorId,
-        tenantId: b.tenantId,
-        role: "editor",
-        createdAt: now.toISOString(),
-      });
+    await drizzle(env.DB).insert(memberships).values({
+      userId: a.editorId,
+      tenantId: b.tenantId,
+      role: "editor",
+      createdAt: now.toISOString(),
+    });
     const tokens = await Promise.all(
       [a.tenantId, b.tenantId].map((tenantId) =>
         issuePat(
