@@ -83,7 +83,7 @@ export const recordGet = defineOperation({
 export const recordList = defineOperation({
   name: "record_list",
   title: "record の一覧",
-  description: `型(type)を指定して record を一覧する。下書きを含み、削除済みは含まない。本文は返さず、ID・状態(status)・版・更新日時・タイトルだけを返す(本文は record_get で取る)。filter は索引宣言済み(config.indexed)のフィールドとシステム列(status / updatedAt / createdAt)にだけ使える。同じフィールドの複数の値はいずれか一致、別のフィールド同士は AND。sort も同じ範囲。limit は既定 20・最大 100。続きは nextCursor を cursor に渡す。${UNTRUSTED_NOTE}`,
+  description: `型(type)を指定して record を一覧する。下書きを含み、削除済みは含まない。本文は返さず、ID・状態(status)・版・更新日時・タイトルだけを返す(本文は record_get で取る)。filter は索引宣言済み(config.indexed)のフィールドとシステム列(status / updatedAt / createdAt)にだけ使える。同じフィールドの複数の値はいずれか一致、別のフィールド同士は AND。sort も同じ範囲。limit は既定 20・最大 100。続きは nextCursor を cursor に渡す(cursor は同じ type・filter・sort の呼び出しでだけ使う。条件を変えたら cursor は付けない)。${UNTRUSTED_NOTE}`,
   input: recordListInputSchema,
   output: z.object({ items: z.array(recordSummarySchema), nextCursor: z.string().nullable() }),
   requires: "record:read",
