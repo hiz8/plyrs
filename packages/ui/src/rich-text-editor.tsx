@@ -178,6 +178,39 @@ const EMPTY_DOC: JSONContent = { type: "doc", content: [{ type: "paragraph" }] }
 
 // doc は unknown(metamodel 検証済みの AST)。Tiptap の JSONContent への境界 cast は
 // 「data JSON の脱出ハッチを 1 箇所に閉じ込める」規約(tech-selection 2.1)の editor 側対応物。
+// 比較専用の JSON(保存する値には触らない)。最上位以外のノードから attrs.id を外し、末尾の空段落
+// (StarterKit の TrailingNode が最上位の最後が段落でないときに足すもの。保存値には無い)も外す
+function comparableDoc(doc: unknown): string {
+  const strip = (node: unknown, depth: number): unknown => {
+    if (typeof node !== "object" || node === null || Array.isArray(node)) {
+      return node;
+    }
+    const record = node as Record<string, unknown>;
+    const attrs = record["attrs"];
+    const nextAttrs =
+      depth > 1 && typeof attrs === "object" && attrs !== null && "id" in attrs
+        ? Object.fromEntries(Object.entries(attrs).filter(([key]) => key !== "id"))
+        : attrs;
+    const content = Array.isArray(record["content"])
+      ? record["content"].map((child) => strip(child, depth + 1))
+      : record["content"];
+    return {
+      ...record,
+      ...(nextAttrs === undefined || Object.keys(nextAttrs as object).length === 0
+        ? { attrs: undefined }
+        : { attrs: nextAttrs }),
+      ...(content === undefined ? {} : { content }),
+    };
+  };
+  const stripped = strip(doc, 0) as { content?: unknown[] };
+  const blocks = Array.isArray(stripped.content) ? stripped.content : undefined;
+  const last = blocks?.at(-1) as { type?: string; content?: unknown[] } | undefined;
+  if (blocks !== undefined && last?.type === "paragraph" && (last.content ?? []).length === 0) {
+    return JSON.stringify({ ...stripped, content: blocks.slice(0, -1) });
+  }
+  return JSON.stringify(stripped);
+}
+
 function docContent(value: RichTextValue | undefined): JSONContent {
   return value === undefined ? EMPTY_DOC : (value.doc as JSONContent);
 }
@@ -360,11 +393,15 @@ export function RichTextEditor({
 
   // 競合解決の「サーバー版を採用」等、外部からの値差し替えを反映する。編集者自身の
   // 変更(onUpdate 由来)は getJSON と一致するため setContent は走らない。
+  // 比較では最上位以外の attrs.id を無視する: 契約(決定 44)は最上位ブロックの ID だけで、
+  // UniqueID は入れ子の段落にも ID を振るため、v1 を導出で開いた直後は value と getJSON が
+  // 入れ子の ID だけで食い違う。そこで setContent すると親の再描画ごとに文書が置き換わり、
+  // カーソル位置と undo 履歴が飛ぶ
   useEffect(() => {
     if (editor === null || value === undefined) {
       return;
     }
-    if (JSON.stringify(value.doc) !== JSON.stringify(editor.getJSON())) {
+    if (comparableDoc(value.doc) !== comparableDoc(editor.getJSON())) {
       editor.commands.setContent(docContent(value), { emitUpdate: false });
     }
   }, [editor, value]);

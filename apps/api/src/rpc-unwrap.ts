@@ -69,8 +69,12 @@ export function asPublishedPage(value: unknown): {
 
 export function asReindexResult(
   value: unknown,
-): { ok: true; indexed: number } | { ok: false; code: "forbidden"; message: string } {
-  return value as { ok: true; indexed: number } | { ok: false; code: "forbidden"; message: string };
+):
+  | { ok: true; indexed: number; done: boolean }
+  | { ok: false; code: "forbidden"; message: string } {
+  return value as
+    | { ok: true; indexed: number; done: boolean }
+    | { ok: false; code: "forbidden"; message: string };
 }
 
 export function asReprojectResult(

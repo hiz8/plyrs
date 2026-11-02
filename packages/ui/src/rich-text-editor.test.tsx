@@ -362,6 +362,37 @@ describe("RichTextEditor block ids", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("re-rendering with the same value does not replace the document (nested ids differ only inside)", async () => {
+    let editor: Editor | undefined;
+    // 親(admin の record-form)は描画ごとに導出を通した新しい参照を渡しうるので、同じ内容の別参照で再描画する
+    const same = () => structuredClone(v2WithList);
+    const { rerender } = render(
+      <RichTextEditor
+        label="body"
+        value={same()}
+        onChange={() => {}}
+        onEditorReady={(e) => (editor = e)}
+      />,
+    );
+    await screen.findByRole("textbox", { name: "body" });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // UniqueID は入れ子(listItem 内の段落)にも ID を振るので getJSON は value と一致しない。
+    // それでも最上位以外の差だけなら setContent で文書を置き換えない(カーソルと undo が飛ぶ)
+    // editor.commands は取得ごとに作られるので spy できない。setContent は state.doc を置き換えるので参照で見る
+    const before = editor!.state.doc;
+    expect(JSON.stringify(editor!.getJSON())).not.toBe(JSON.stringify(v2WithList.doc));
+    rerender(
+      <RichTextEditor
+        label="body"
+        value={same()}
+        onChange={() => {}}
+        onEditorReady={(e) => (editor = e)}
+      />,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(editor!.state.doc).toBe(before);
+  });
+
   it("assigns an id to a newly created top-level block and keeps stored ids", async () => {
     const onChange = vi.fn();
     let editor: Editor | undefined;

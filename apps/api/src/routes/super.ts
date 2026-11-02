@@ -346,7 +346,7 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       action: "tenant.search_reindex",
       targetType: "tenant",
       targetId: tenantId,
-      detail: { indexed: result.indexed },
+      detail: { indexed: result.indexed, done: result.done },
     });
     return c.json(result);
   })

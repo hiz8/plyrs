@@ -30,7 +30,13 @@ import {
   type DeleteContentTypeResult,
   type RegisterContentTypeResult,
 } from "./do/content-types";
-import { ensureSearchIndex, reindexAll } from "./do/search";
+import {
+  ensureSearchIndex,
+  reindexStep,
+  SEARCH_REINDEX_ALARM,
+  SEARCH_REINDEX_STEP_DELAY_MS,
+  startReindex,
+} from "./do/search";
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
 import { ensureAssetContentType } from "./do/ensure-asset-type";
 import { healthCheckCore, listAssetR2KeysCore, type HealthReport } from "./do/health";
@@ -122,8 +128,12 @@ export class TenantDO extends DurableObject<Env> {
         ctx.storage.sql,
         new Date().toISOString(),
       );
-      // 16.9(M2-9): 全文検索の索引が無い(この機能より前からあるテナント)なら一度だけ全件を入れる
-      ensureSearchIndex(ctx.storage.sql);
+      // 16.9(M2-9): 全文検索の索引が無い(この機能より前からあるテナント)なら 1 歩だけ入れ、
+      // 続きは alarm で回す(blockConcurrencyWhile を全件の再索引で塞がない)
+      const reindex = ensureSearchIndex(ctx.storage.sql);
+      if (reindex !== null && !reindex.done) {
+        registerAlarm(ctx.storage.sql, SEARCH_REINDEX_ALARM, Date.now());
+      }
       if (assetTypeChanged || moduleTypesChanged) {
         this.broadcastAll({
           type: "content-types",
@@ -956,6 +966,16 @@ export class TenantDO extends DurableObject<Env> {
         await this.sweepModuleEvents();
         continue;
       }
+      if (kind === SEARCH_REINDEX_ALARM) {
+        // 16.9: 再索引の続き。1 歩ずつ進め、残りがあれば次の起床を張り直す(due は過去のまま残すと
+        // registerAlarm の MIN で前倒しされ続けるので、いったん消して登録する)
+        const step = this.ctx.storage.transactionSync(() => reindexStep(this.ctx.storage.sql));
+        clearAlarm(this.ctx.storage.sql, kind);
+        if (step !== null && !step.done) {
+          registerAlarm(this.ctx.storage.sql, kind, Date.now() + SEARCH_REINDEX_STEP_DELAY_MS);
+        }
+        continue;
+      }
       const moduleId = moduleIdFromAlarmKind(kind);
       if (moduleId !== null) {
         this.runModuleAlarm(moduleId, now);
@@ -1098,16 +1118,27 @@ export class TenantDO extends DurableObject<Env> {
     }));
   }
 
-  // 16.9(M2-9): 全文検索の索引の作り直し(super の運用操作)。DO 内で同期に完了する
-  reindexSearch(
+  // 16.9(M2-9): 全文検索の索引の作り直し(super の運用操作)。索引を空にして最初の 1 歩を進め、
+  // 残りは alarm で回す(reproject と同じく「開始する」操作。done が false なら続きは alarm)
+  async reindexSearch(
     auth: AuthContext,
-  ): { ok: true; indexed: number } | { ok: false; code: "forbidden"; message: string } {
+  ): Promise<
+    { ok: true; indexed: number; done: boolean } | { ok: false; code: "forbidden"; message: string }
+  > {
     const denial = requireOperation(auth, "projection:rebuild");
     if (denial !== null) {
       return denial;
     }
-    const indexed = this.ctx.storage.transactionSync(() => reindexAll(this.ctx.storage.sql));
-    return { ok: true, indexed };
+    const step = this.ctx.storage.transactionSync(() => {
+      startReindex(this.ctx.storage.sql);
+      return reindexStep(this.ctx.storage.sql);
+    });
+    const result = step ?? { indexed: 0, done: true };
+    if (!result.done) {
+      const min = registerAlarm(this.ctx.storage.sql, SEARCH_REINDEX_ALARM, Date.now());
+      await this.ctx.storage.setAlarm(min);
+    }
+    return { ok: true, ...result };
   }
 
   // §12.3b: テナント単位の公開用 DB の再構築を開始する（owner 限定）。epoch を刻んで最初の reproject

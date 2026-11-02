@@ -2,7 +2,14 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { McpAuth } from "../src/do/authorize";
-import { ensureSearchIndex, reindexAll, searchRecords, searchText } from "../src/do/search";
+import {
+  ensureSearchIndex,
+  reindexAll,
+  reindexStep,
+  searchRecords,
+  searchText,
+  startReindex,
+} from "../src/do/search";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import {
   asDeleteResult,
@@ -169,25 +176,41 @@ describe("再索引", () => {
     });
   });
 
-  it("ensureSearchIndex は do_config.search_indexed が無いときだけ全件を索引に入れる", async () => {
+  it("ensureSearchIndex は do_config.search_indexed が無いときだけ索引を作り、完了で '1' を書く", async () => {
     await runInDurableObject(stub, (_instance, state) => {
       const sql = state.storage.sql;
       expect(ensureSearchIndex(sql)).toBeNull();
       sql.exec("DELETE FROM records_fts");
       sql.exec("DELETE FROM do_config WHERE key = 'search_indexed'");
       expect(searchRecords(sql, { query: "本文", limit: 20 }).items).toHaveLength(0);
-      expect(ensureSearchIndex(sql)).toBe(2);
+      expect(ensureSearchIndex(sql)).toEqual({ indexed: 2, done: true });
       expect(searchRecords(sql, { query: "本文", limit: 20 }).items).toHaveLength(2);
       expect(ensureSearchIndex(sql)).toBeNull();
     });
   });
 
-  it("reindexSearch RPC は projection:rebuild を要し、件数を返す", async () => {
+  it("再索引は seq カーソルで分割でき、途中の書き込みも取りこぼさない(DO の起動を 30 秒で止めないため)", async () => {
+    await runInDurableObject(stub, (_instance, state) => {
+      const sql = state.storage.sql;
+      startReindex(sql);
+      expect(searchRecords(sql, { query: "本文", limit: 20 }).items).toHaveLength(0);
+      // 1 件ずつ: 1 歩目は未完、2 歩目で全件、3 歩目で完了(件数 0)、以後は何もしない
+      expect(reindexStep(sql, 1)).toEqual({ indexed: 1, done: false });
+      expect(searchRecords(sql, { query: "本文", limit: 20 }).items).toHaveLength(1);
+      expect(reindexStep(sql, 1)).toEqual({ indexed: 1, done: false });
+      expect(reindexStep(sql, 1)).toEqual({ indexed: 0, done: true });
+      expect(reindexStep(sql, 1)).toBeNull();
+      expect(searchRecords(sql, { query: "本文", limit: 20 }).items).toHaveLength(2);
+    });
+  });
+
+  it("reindexSearch RPC は projection:rebuild を要し、作り直しを始めて件数を返す", async () => {
     const denied = asReindexResult(
       await stub.reindexSearch({ ...auth("editor", "editor"), tenantId: TENANT }),
     );
     expect(denied.ok).toBe(false);
     const result = asReindexResult(await stub.reindexSearch(owner));
-    expect(result).toEqual({ ok: true, indexed: 2 });
+    expect(result).toEqual({ ok: true, indexed: 2, done: true });
+    expect((await search({ query: "本文" })).items).toHaveLength(2);
   });
 });

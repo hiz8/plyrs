@@ -193,6 +193,89 @@ describe("書き込み操作", () => {
     expect(unpublished.sourceVersion).toBe(1);
   });
 
+  it("record_update の status 変更は現在の fieldVersions を全部見ていなければ conflict(人の直前の判断を黙って戻さない)", async () => {
+    const created = output<RecordSnapshot>(
+      await stub.invoke("record_create", createInput(), mcpAuth()),
+    );
+    // 人が管理画面で状態を進める(REST 相当)
+    const human = asInvokeResult(
+      await stub.invoke(
+        "record_update",
+        {
+          recordId: RECORD,
+          input: { title: "人が直した" },
+          changedFields: ["title"],
+          baseFieldVersions: created.fieldVersions,
+          status: "in_review",
+        },
+        { ...auth("editor", "editor"), tenantId: TENANT },
+      ),
+    );
+    expect(human.ok).toBe(true);
+    // エージェントは古い fieldVersions のまま status だけ戻そうとする → conflict
+    const stale = asInvokeResult(
+      await stub.invoke(
+        "record_update",
+        {
+          recordId: RECORD,
+          input: {},
+          changedFields: [],
+          baseFieldVersions: created.fieldVersions,
+          status: "draft",
+        },
+        mcpAuth(),
+      ),
+    );
+    expect(stale).toMatchObject({ ok: false, code: "conflict" });
+    expect(!stale.ok && (stale.details as { conflicts: { fieldKey: string }[] }).conflicts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ fieldKey: "title" })]),
+    );
+    // 現在の fieldVersions を見ていれば status だけの変更も通る
+    const current = output<RecordSnapshot>(
+      await stub.invoke("record_get", { recordId: RECORD }, mcpAuth()),
+    );
+    const fresh = output<RecordSnapshot>(
+      await stub.invoke(
+        "record_update",
+        {
+          recordId: RECORD,
+          input: {},
+          changedFields: [],
+          baseFieldVersions: current.fieldVersions,
+          status: "draft",
+        },
+        mcpAuth(),
+      ),
+    );
+    expect(fresh.status).toBe("draft");
+  });
+
+  it("公開中 record の record_delete / record_unpublish は outbox に取り下げを積む(Review Focus 4)", async () => {
+    const outboxCount = () =>
+      runInDurableObject(
+        stub,
+        (_instance, state) =>
+          state.storage.sql
+            .exec<{ n: number }>("SELECT COUNT(*) AS n FROM outbox WHERE record_id = ?", RECORD)
+            .one().n,
+      );
+    output(await stub.invoke("record_create", createInput(), mcpAuth()));
+    output(
+      await stub.invoke("record_publish", { recordId: RECORD }, mcpAuth(), { tenantSlug: "t" }),
+    );
+    expect(await outboxCount()).toBe(1);
+    output(await stub.invoke("record_unpublish", { recordId: RECORD }, mcpAuth()));
+    expect(await outboxCount()).toBe(2);
+    expect(asPublicationState(await stub.getPublication(RECORD)).published).toBe(false);
+    output(
+      await stub.invoke("record_publish", { recordId: RECORD }, mcpAuth(), { tenantSlug: "t" }),
+    );
+    expect(await outboxCount()).toBe(3);
+    output(await stub.invoke("record_delete", { recordId: RECORD }, mcpAuth()));
+    expect(await outboxCount()).toBe(4);
+    expect(asPublicationState(await stub.getPublication(RECORD)).published).toBe(false);
+  });
+
   it("record:write だけのスコープで publish は insufficient_scope", async () => {
     output(await stub.invoke("record_create", createInput(), mcpAuth()));
     const result = asInvokeResult(

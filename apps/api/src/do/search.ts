@@ -59,48 +59,107 @@ interface IndexRow extends Record<string, SqlStorageValue> {
   id: string;
   type: string;
   data: string;
+  seq: number;
 }
 
-// 全 records(削除済みを除く)を現在の型定義で抽出し直す。型が無い record は索引から外す。
-// 戻り値は索引に入れた件数
-export function reindexAll(sql: SqlStorage): number {
+// 1 歩で索引に入れる record 数。DO の constructor(blockConcurrencyWhile は 30 秒で DO を
+// リセットする)や alarm の 1 回を有界にするための分割単位
+export const SEARCH_REINDEX_BATCH = 200;
+// alarm の多重化 kind(§9.6)。再索引の続きを alarm で回す
+export const SEARCH_REINDEX_ALARM = "search_reindex";
+// 再索引の歩と歩の間(他の alarm と DO の要求に割り込む余地を残す)
+export const SEARCH_REINDEX_STEP_DELAY_MS = 500;
+
+// do_config.search_indexed の値: 無し = 未着手、'1' = 完了、それ以外 = 処理済みの seq カーソル
+function readCursor(
+  sql: SqlStorage,
+): { state: "none" } | { state: "done" } | { state: "cursor"; seq: number } {
+  const row = sql
+    .exec<{ value: string }>("SELECT value FROM do_config WHERE key = ?", SEARCH_INDEXED_FLAG)
+    .toArray()[0];
+  if (row === undefined) {
+    return { state: "none" };
+  }
+  if (row.value === "1") {
+    return { state: "done" };
+  }
+  return { state: "cursor", seq: Number(row.value) };
+}
+
+function writeFlag(sql: SqlStorage, value: string): void {
+  sql.exec(
+    "INSERT OR REPLACE INTO do_config (key, value) VALUES (?, ?)",
+    SEARCH_INDEXED_FLAG,
+    value,
+  );
+}
+
+// 作り直しの開始: 索引を空にしてカーソルを 0 に置く(以後 reindexStep が進める)
+export function startReindex(sql: SqlStorage): void {
+  sql.exec("DELETE FROM records_fts");
+  writeFlag(sql, "0");
+}
+
+// カーソル(seq)から batch 件を現在の型定義で抽出し直す。型が無い record は索引から外す。
+// 途中で書かれた record は seq が進んでカーソルより後ろに来るので、次の歩で改めて索引される
+// (indexRecord は DELETE → INSERT なので二重にならない)。完了したら '1' を書く。
+// 戻り値: 完了済みなら null、それ以外は今回入れた件数と完了したか
+export function reindexStep(
+  sql: SqlStorage,
+  batch: number = SEARCH_REINDEX_BATCH,
+): { indexed: number; done: boolean } | null {
+  const cursor = readCursor(sql);
+  if (cursor.state === "done") {
+    return null;
+  }
+  const from = cursor.state === "cursor" ? cursor.seq : 0;
   const definitions = new Map(
     loadAllContentTypeRows(sql).map((row) => [row.key, rowToDefinition(row)] as const),
   );
-  sql.exec("DELETE FROM records_fts");
-  let indexed = 0;
   const rows = sql
-    .exec<IndexRow>("SELECT id, type, data FROM records WHERE deleted_at IS NULL ORDER BY seq")
+    .exec<IndexRow>(
+      "SELECT id, type, data, seq FROM records WHERE deleted_at IS NULL AND seq > ? ORDER BY seq LIMIT ?",
+      from,
+      batch,
+    )
     .toArray();
+  let indexed = 0;
   for (const row of rows) {
     const definition = definitions.get(row.type);
     if (definition === undefined) {
       continue;
     }
     const data = JSON.parse(row.data) as Record<string, unknown>;
-    sql.exec(
-      "INSERT INTO records_fts (record_id, type, text) VALUES (?, ?, ?)",
-      row.id,
-      row.type,
-      searchText(definition, data),
-    );
+    indexRecord(sql, row.id, row.type, searchText(definition, data));
     indexed += 1;
   }
-  return indexed;
+  const done = rows.length < batch;
+  const last = rows.at(-1);
+  writeFlag(sql, done ? "1" : String(last === undefined ? from : last.seq));
+  return { indexed, done };
 }
 
-// DO 起動時の一回限りの再索引。do_config.search_indexed が無ければ全件を索引に入れて '1' を書く
-// (マイグレーションは SQL だけなので型定義の解釈ができず、ここで行う)。再索引したら件数、不要なら null
-export function ensureSearchIndex(sql: SqlStorage): number | null {
-  const done = sql
-    .exec<{ value: string }>("SELECT value FROM do_config WHERE key = ?", SEARCH_INDEXED_FLAG)
-    .toArray()[0];
-  if (done !== undefined) {
-    return null;
+// 全件を同期に作り直す(テストと小さなテナント向け。大きなテナントは reindexStep を alarm で回す)
+export function reindexAll(sql: SqlStorage): number {
+  startReindex(sql);
+  let total = 0;
+  for (;;) {
+    const step = reindexStep(sql);
+    if (step === null) {
+      return total;
+    }
+    total += step.indexed;
+    if (step.done) {
+      return total;
+    }
   }
-  const indexed = reindexAll(sql);
-  sql.exec("INSERT OR REPLACE INTO do_config (key, value) VALUES (?, '1')", SEARCH_INDEXED_FLAG);
-  return indexed;
+}
+
+// DO 起動時の一回限りの再索引の 1 歩。do_config.search_indexed が '1' なら何もしない(null)。
+// 無ければ(この機能より前からあるテナント)最初の 1 歩を進め、続きがあれば呼び出し元が alarm で回す
+// (マイグレーションは SQL だけなので型定義の解釈ができず、ここで行う)
+export function ensureSearchIndex(sql: SqlStorage): { indexed: number; done: boolean } | null {
+  return reindexStep(sql);
 }
 
 export interface SearchQuery {

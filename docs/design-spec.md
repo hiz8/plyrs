@@ -798,7 +798,7 @@ record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴�
 
 新しい `_rev` は作らない。`record_get` が返す既存の `fieldVersions` を、更新時に `baseFieldVersions` として **必須**にし、`resolveSyncWrite`（第 10.3 章）に通す。
 
-- **判定モード**: `resolveSyncWrite` に判定モードの引数を足す。管理画面の同期は現行どおり（別フィールドはマージ、同一スカラーは LWW、同一リッチテキストは conflict）。**エージェント経路の既定は strict**（`changedFields` のどれか 1 つでも version が違えば、スカラーも含めて conflict）。エージェントが人の直前のタイトルや slug の編集を黙って上書きするのを避けるため。
+- **判定モード**: `resolveSyncWrite` に判定モードの引数を足す。管理画面の同期は現行どおり（別フィールドはマージ、同一スカラーは LWW、同一リッチテキストは conflict）。**エージェント経路の既定は strict**（`changedFields` のどれか 1 つでも version が違えば、スカラーも含めて conflict）。エージェントが人の直前のタイトルや slug の編集を黙って上書きするのを避けるため。ワークフロー状態（`status`）には fieldVersion が無いので、`status` を変える更新は `baseFieldVersions` が現在の `fieldVersions` 全体と一致することを要求する（人が進めた状態を、古い record を見たエージェントが黙って戻さない。M2 レビューで追加）。
 - **競合応答**: `isError: true` で、現在値・現在の `fieldVersions`・競合フィールドを返す。`record_update` の `outputSchema` は成功形と競合形の oneOf にする（`structuredContent` は `outputSchema` に準拠しなければならない）。
 - **再適用の打ち切り**: ツール説明で再適用を 2 回までとし、超えたら提案（16.8）へ回すよう競合応答で導く。stateless なのでサーバーは回数を知らない。回数は `record_update` の `attempt` 引数で自己申告させる（改ざんできるが用途が導線なので足りる）。
 - **ブロック単位の競合判定**は、リッチテキストのブロック ID（16.10）が確定した後に、`fieldVersions` をブロック単位にするか DO 内 3-way merge にするかを決める（M5。未処理論点）。

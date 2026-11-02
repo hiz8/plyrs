@@ -1,5 +1,13 @@
 import * as stylex from "@stylexjs/stylex";
-import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from "react";
 import { useForm, useStore } from "@tanstack/react-form";
 import {
   ASSET_SYSTEM_MANAGED_FIELD_KEYS,
@@ -511,6 +519,12 @@ function FieldInput({
 }) {
   const label = field.label ?? field.key;
   const description = field.description;
+  // M2-1: 導出(ensureTopLevelBlockIds)は v1 の値に対して描画ごとに新しい参照を返すので、
+  // draft の値が変わらない限り同じ参照を渡す(エディタ側の差し替え effect を無駄に走らせない)
+  const editorRichTextValue = useMemo(
+    () => (field.type === "richtext" ? asEditorRichTextValue(value) : undefined),
+    [field.type, value],
+  );
   switch (field.type) {
     case "text":
       return (
@@ -624,7 +638,7 @@ function FieldInput({
         <WithDescription description={description}>
           <RichTextEditor
             label={label}
-            value={asEditorRichTextValue(value)}
+            value={editorRichTextValue}
             onChange={onChange}
             mentionCandidates={mentionCandidates}
             errorMessage={error}

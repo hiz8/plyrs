@@ -247,12 +247,29 @@ export const WRITE_HANDLERS = {
       current,
       conflictModeFor(ctx.via),
     );
-    if (resolution.kind === "conflict") {
+    // 16.6: ワークフロー状態には fieldVersion が無いので、status を変える更新は「現在の fieldVersions
+    // を全部見ている」ことを要求する(人が進めた状態を、古い record を見たエージェントが黙って戻さない)
+    const statusConflicts =
+      resolution.kind === "conflict" ||
+      input.status === undefined ||
+      input.status === current.status
+        ? []
+        : Object.entries(current.fieldVersions)
+            .filter(([key, version]) => (input.baseFieldVersions[key] ?? 0) !== version)
+            .map(([fieldKey, currentVersion]) => ({
+              fieldKey,
+              baseVersion: input.baseFieldVersions[fieldKey] ?? 0,
+              currentVersion,
+            }));
+    if (resolution.kind === "conflict" || statusConflicts.length > 0) {
       return {
         ok: false,
         code: "conflict",
         message: "another change was saved since baseFieldVersions; re-read and re-apply",
-        details: { conflicts: resolution.conflicts, current: loadRecord(ctx.sql, input.recordId) },
+        details: {
+          conflicts: resolution.kind === "conflict" ? resolution.conflicts : statusConflicts,
+          current: loadRecord(ctx.sql, input.recordId),
+        },
       };
     }
     const result = writeRecordCore(writeDepsOf(ctx), guarded.typeRow, {
