@@ -1,4 +1,5 @@
 import {
+  conflictModeFor,
   PROTOCOL_VERSION,
   resolveSyncWrite,
   type ClientChange,
@@ -167,7 +168,13 @@ export function handlePush(
     }
 
     const current = loadSyncRecord(deps.sql, change.recordId);
-    const resolution = resolveSyncWrite(rowToDefinition(contentTypeRow), change, current);
+    // 16.6: 管理画面の同期は merge(別フィールドはマージ、同一スカラーは LWW)
+    const resolution = resolveSyncWrite(
+      rowToDefinition(contentTypeRow),
+      change,
+      current,
+      conflictModeFor("sync"),
+    );
     if (resolution.kind === "conflict") {
       acks.push({
         type: "ack",
