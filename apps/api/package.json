@@ -8,10 +8,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "catalog:",
     "@hono/zod-validator": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
     "@plyrs/db": "workspace:*",
     "@plyrs/metamodel": "workspace:*",
     "@plyrs/sync-protocol": "workspace:*",
+    "@tiptap/core": "catalog:",
+    "@tiptap/extension-mention": "catalog:",
+    "@tiptap/markdown": "catalog:",
+    "@tiptap/pm": "catalog:",
+    "@tiptap/starter-kit": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",

@@ -22,7 +22,10 @@ export type AuditAction =
   | "site.rename"
   | "member.add"
   | "member.role_change"
-  | "member.remove";
+  | "member.remove"
+  // M1-3a(design-spec 16.3): PAT の発行・失効。targetId は PAT の行 ID
+  | "token.issue"
+  | "token.revoke";
 
 // メンバーシップを対象にした操作の targetId(運営者の剥奪と owner のメンバー管理で同じ形式にそろえ、
 // 同じ対象の履歴を 1 つの値で検索できるようにする)
@@ -38,16 +41,50 @@ export interface AuditEntry {
   detail?: unknown;
 }
 
+function auditRow(entry: AuditEntry, createdAt: string) {
+  return {
+    id: uuidv7(),
+    actorId: entry.actorId,
+    action: entry.action,
+    targetType: entry.targetType,
+    targetId: entry.targetId,
+    detail: JSON.stringify(entry.detail ?? {}),
+    createdAt,
+  };
+}
+
 export async function writeAudit(d1: D1Database, entry: AuditEntry): Promise<void> {
+  await drizzle(d1).insert(auditLogs).values(auditRow(entry, new Date().toISOString()));
+}
+
+// 複数行を 1 回の INSERT で書く(BAN のように件数が利用者の加入数に比例する後始末のため)
+export async function writeAudits(d1: D1Database, entries: readonly AuditEntry[]): Promise<void> {
+  if (entries.length === 0) {
+    return;
+  }
+  const createdAt = new Date().toISOString();
   await drizzle(d1)
     .insert(auditLogs)
-    .values({
-      id: uuidv7(),
-      actorId: entry.actorId,
-      action: entry.action,
-      targetType: entry.targetType,
-      targetId: entry.targetId,
-      detail: JSON.stringify(entry.detail ?? {}),
-      createdAt: new Date().toISOString(),
-    });
+    .values(entries.map((entry) => auditRow(entry, createdAt)));
+}
+
+// 会員資格の喪失(会員を外す・運営者の剥奪・BAN)に伴って失効させた PAT を 1 件ずつ記録する。
+// token.revoke の対象は PAT の id で、手動の失効と同じ値で履歴を引ける。reason に元の操作を残す
+export async function auditRevokedTokens(
+  d1: D1Database,
+  actorId: string,
+  tenantId: string | null,
+  tokenIds: readonly string[],
+  reason: AuditAction,
+): Promise<void> {
+  await writeAudits(
+    d1,
+    tokenIds.map((tokenId) => ({
+      actorId,
+      action: "token.revoke" as const,
+      targetType: "pat",
+      targetId: tokenId,
+      detail: tenantId === null ? { reason } : { tenantId, reason },
+    })),
+  );
 }

@@ -20,7 +20,7 @@ import {
   listAssetUsage as loadAssetUsage,
   type AssetUsageRow,
 } from "./do/asset-usage";
-import { requireOperation, type AuthContext } from "./do/authorize";
+import { requireOperation, type AuthContext, type McpAuth } from "./do/authorize";
 import {
   deleteContentTypeCore,
   loadAllContentTypeRows,
@@ -60,6 +60,7 @@ import {
   type ModuleEventJob,
 } from "./modules/events";
 import { countUnsent, markOutboxSent, purgeSent, unsentOutbox } from "./do/outbox";
+import { invokeOperation, type InvokeResult } from "./ops/invoke";
 import {
   loadProjectionPayload,
   loadPublications,
@@ -556,6 +557,21 @@ export class TenantDO extends DurableObject<Env> {
 
   getRecord(id: string): RecordSnapshot | null {
     return loadRecord(this.ctx.storage.sql, id);
+  }
+
+  // design-spec 16.4(M1-1): 操作カタログの実行入口。MCP の層はこの RPC だけを呼ぶ(既存の
+  // getRecord 等を直接呼ばない)。スコープ ∩ ロールの判定(16.3)と、認可コンテキストのテナントと
+  // この DO のテナント(do_config.tenant_id)の照合は ops/invoke.ts が行う。
+  // do_config.tenant_id は publish / モジュールイベントの経路でしか刻まれないため、未設定なら
+  // 同期の push(webSocketMessage)と同じく Worker ゲートが検証した auth.tenantId で刻む
+  // (auth は Worker binding 経由でしか届かず偽造されない)。以後の照合はその値に対して行う。
+  invoke(op: string, input: unknown, auth: AuthContext | McpAuth): InvokeResult {
+    let tenantId = this.tenantId();
+    if (tenantId === null && auth.tenantId !== undefined) {
+      this.rememberTenant(auth.tenantId);
+      tenantId = auth.tenantId;
+    }
+    return invokeOperation(op, { sql: this.ctx.storage.sql, tenantId }, input, auth);
   }
 
   // Phase 6b: 公開状態の読み取り（読み取り系は getRecord と同じく role 不問 — authorize.ts 冒頭コメント参照）

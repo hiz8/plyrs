@@ -14,11 +14,11 @@ const tenantsOf = (name: string) =>
   jsonResponse(200, { tenants: [{ id: "t1", slug: "blog", name, role: "owner" }] });
 
 describe("設定 › 一般", () => {
-  it("/settings は一般へ転送し、h1「設定」とタブ 4 つが出て、一般が選ばれている", async () => {
+  it("/settings は一般へ転送し、h1「設定」とタブ 5 つが出て、一般が選ばれている", async () => {
     const router = renderAt("/t/blog/settings", socketHarness());
     expect(await screen.findByRole("heading", { level: 1, name: "設定" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/t/blog/settings/general");
-    expect(screen.getAllByRole("tab")).toHaveLength(4);
+    expect(screen.getAllByRole("tab")).toHaveLength(5);
     expect(screen.getByRole("tab", { name: "一般" })).toHaveAttribute("aria-selected", "true");
   });
 

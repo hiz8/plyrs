@@ -14,6 +14,7 @@ import type {
 } from "./do/publish";
 import type { RecordSnapshot, WriteRecordResult } from "./do/types";
 import type { EnableModuleResult, ModuleSummary } from "./modules/enablement";
+import type { InvokeResult } from "./ops/invoke";
 import type { CatalogRow, ProjectionPayload } from "./projection/payload";
 
 // Cloudflare の Rpc.Result 型は Record<string, unknown>（RecordSnapshot.data）を
@@ -109,4 +110,9 @@ export function asHealthReport(value: unknown): HealthReport {
 
 export function asStringArray(value: unknown): string[] {
   return value as string[];
+}
+
+// M1-1: 操作カタログの invoke RPC(design-spec 16.4)
+export function asInvokeResult(value: unknown): InvokeResult {
+  return value as InvokeResult;
 }

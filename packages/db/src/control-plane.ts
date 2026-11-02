@@ -64,6 +64,29 @@ export const sessions = sqliteTable(
   ],
 );
 
+// design-spec 16.3(M1-3a): PAT(Personal Access Token)。管理画面で所有者が発行する長命の Bearer
+// トークンで、MCP の入口がこれを検証する。sessions と同じく平文は保存せず SHA-256 ハッシュのみ。
+// ロールは焼き込まず、検証のたびに memberships から引く(ロール変更を即時に反映する)。
+export const personalAccessTokens = sqliteTable(
+  "personal_access_tokens",
+  {
+    id: text("id").primaryKey(), // UUIDv7
+    tokenHash: text("token_hash").notNull(), // SHA-256 hex。raw は発行応答の 1 回だけ
+    userId: text("user_id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    name: text("name").notNull(), // 利用者が付ける表示名(最大 100 字)
+    scopes: text("scopes").notNull(), // 空白区切りの Operation(apps/api 側 auth/pat.ts が正本)
+    expiresAt: text("expires_at").notNull(),
+    createdAt: text("created_at").notNull(),
+    lastUsedAt: text("last_used_at"),
+    revokedAt: text("revoked_at"),
+  },
+  (table) => [
+    uniqueIndex("idx_pat_token_hash").on(table.tokenHash),
+    index("idx_pat_user_tenant").on(table.userId, table.tenantId),
+  ],
+);
+
 // Phase 9: モジュール有効化の control-plane ミラー。正本は各テナント DO の module_registry
 // で、この表は型定義再配布(§4.2 の Queues 配信)が「どのテナントに配るか」を DO を起こさずに
 // 列挙するための派生。enable/disable の HTTP ルートが best-effort で書く(失敗しても DO 側の

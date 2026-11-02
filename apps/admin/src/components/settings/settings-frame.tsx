@@ -8,7 +8,7 @@ import { SETTINGS_LABELS } from "../../lib/labels";
 import { PageBody, TenantPageHeader } from "../tenant-page-header";
 import { CardError, CardLoading } from "./card-state";
 
-export type SettingsTab = "general" | "content-types" | "members" | "modules";
+export type SettingsTab = "general" | "content-types" | "members" | "modules" | "tokens";
 
 export const SETTINGS_MAX_WIDTH = "880px";
 
@@ -17,9 +17,16 @@ const TAB_TO = {
   "content-types": "/t/$tenantSlug/settings/content-types",
   members: "/t/$tenantSlug/settings/members",
   modules: "/t/$tenantSlug/settings/modules",
+  tokens: "/t/$tenantSlug/settings/tokens",
 } as const satisfies Record<SettingsTab, string>;
 
-const TAB_ORDER: readonly SettingsTab[] = ["general", "content-types", "members", "modules"];
+const TAB_ORDER: readonly SettingsTab[] = [
+  "general",
+  "content-types",
+  "members",
+  "modules",
+  "tokens",
+];
 
 // タブを選ぶとルートが変わり枠が作り直されるため、選んだタブを次の枠へ引き継いでフォーカスを戻す
 let pendingTabFocus: SettingsTab | null = null;

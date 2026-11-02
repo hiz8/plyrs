@@ -393,6 +393,7 @@ export const SETTINGS_LABELS = {
     "content-types": TERMS.contentType,
     members: "メンバー",
     modules: TERMS.module,
+    tokens: "接続トークン",
   },
   loadFailed: "設定を読み込めませんでした",
   retry: "再試行",
@@ -475,6 +476,80 @@ export const MEMBER_LABELS = {
   roleOf: (email: string) => `${email}のロール`,
   removeOf: (email: string) => `${email}を外す`,
   ownersJoin: "、",
+} as const;
+
+// M1-4(design-spec 16.3・16.12): 接続トークン(PAT)。発行できるのは管理者だけ
+export const TOKEN_LABELS = {
+  tab: "接続トークン",
+  issue: "トークンを発行",
+  tableLabel: "接続トークンの一覧",
+  columns: {
+    name: "名前",
+    scopes: "スコープ",
+    expires: "有効期限",
+    lastUsed: "最終利用",
+    actions: "操作",
+  },
+  empty:
+    "接続トークンはまだありません。発行すると、エージェント(Claude Code など)からこのサイトに接続できます",
+  loadFailed: "接続トークンの一覧を取得できませんでした",
+  status: { active: "有効", expired: "期限切れ", revoked: "失効済み" },
+  neverUsed: "未使用",
+  expiresIn: (days: number) => `残り ${days} 日`,
+  revoke: "失効",
+  revokeOf: (name: string) => `${name}を失効`,
+  revoked: (name: string) => `${name} を失効しました`,
+  revokeFailed: "トークンを失効できませんでした",
+  revokeDialog: {
+    title: (name: string) => `「${name}」を失効しますか？`,
+    body: "このトークンで接続しているクライアントは、すぐに使えなくなります。元に戻せないので、必要なら新しく発行し直してください。",
+    confirm: "失効する",
+  },
+  scopes: {
+    "record:read": "読み取り(record:read)",
+    "record:write": "作成・編集(record:write)",
+    "record:delete": "削除(record:delete)",
+    "record:publish": "公開(record:publish)",
+    "type:manage": "コンテンツタイプの変更(type:manage)",
+  },
+  scopeDescriptions: {
+    "record:read": `${TERMS.contentType}と${TERMS.content}を読み取ります。下書きも含みます`,
+    "record:write": `${TERMS.content}を作成・編集します`,
+    "record:delete": `${TERMS.content}を削除します`,
+    "record:publish": `${TERMS.content}を公開します。既定では外れています。人が公開する運用のままにするなら付けないでください`,
+    "type:manage": `${TERMS.contentType}の定義を変更します`,
+  },
+  expiryOption: (days: number) => `${days} 日`,
+  issueDialog: {
+    title: "接続トークンを発行",
+    name: "名前",
+    nameHelp: "どのクライアントで使うか分かる名前(例: Claude Code、CI)",
+    scopes: "スコープ",
+    scopesHelp: "実際にできる操作は、スコープとあなたのロールの両方で許されたものに限られます",
+    expiry: "有効期限",
+    writeExpiryNote:
+      "書き込みを含むトークンは漏えい時の影響を抑えるため、有効期限が最長 90 日になります",
+    submit: "発行する",
+    failed: "トークンを発行できませんでした",
+    expiryTooLong: "この有効期限はスコープに対して長すぎます",
+  },
+  issued: {
+    title: "トークンを発行しました",
+    token: "トークン",
+    copy: "トークンをコピー",
+    onceWarning:
+      "このトークンは今だけ表示されます。閉じると二度と見られないので、使う場所に保存してからダイアログを閉じてください",
+    close: "閉じる",
+  },
+  connect: {
+    title: "接続のしかた",
+    description:
+      "MCP に対応したクライアントから、次の URL に Authorization ヘッダでトークンを渡して接続します。現在は読み取り専用です",
+    endpoint: "接続先(MCP)",
+    header: "ヘッダ",
+    headerValue: "Authorization: Bearer <トークン>",
+    limited: "限定公開中のため、ツール名や返り値の形は予告なく変わることがあります",
+  },
 } as const;
 
 export const MODULE_LABELS = {

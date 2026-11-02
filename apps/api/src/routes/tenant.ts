@@ -27,6 +27,7 @@ import {
   asWriteResult,
 } from "../rpc-unwrap";
 import { tenantSettingsRoutes } from "./tenant-settings";
+import { tenantTokensRoutes } from "./tenant-tokens";
 import { AUTH_HEADER, extractTokenProtocol } from "../sync/session";
 
 const ERROR_STATUS: Record<string, ContentfulStatusCode> = {
@@ -120,6 +121,8 @@ export const tenantRoutes = new Hono<GateEnv>()
   })
   .use("/:tenantId/*", tenantGate)
   .route("/", tenantSettingsRoutes)
+  // M1-3a: PAT の発行・一覧・失効(design-spec 16.3)
+  .route("/", tenantTokensRoutes)
   .post("/:tenantId/assets", async (c) => {
     const filename = c.req.query("filename") ?? "";
     if (filename.length === 0 || filename.length > MAX_ASSET_FILENAME_LENGTH) {

@@ -29,6 +29,13 @@
       "when": 1784387313167,
       "tag": "0003_normalize-email-lowercase",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793531105311,
+      "tag": "0004_personal-access-tokens",
+      "breakpoints": true
     }
   ]
 }

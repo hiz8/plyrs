@@ -65,6 +65,30 @@ export interface MemberSummary {
 const JSON_HEADERS = { "content-type": "application/json" } as const;
 
 // F9・K6: アップロードのファイルごとの進捗。fetch は送信の進捗を取れないので XHR で送る
+// M1-4(design-spec 16.3): 接続トークン(PAT)。token 本体は発行の応答にしか現れない
+export interface TokenSummary {
+  id: string;
+  userId: string;
+  name: string;
+  scopes: string[];
+  expiresAt: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface IssueTokenInput {
+  name: string;
+  scopes: string[];
+  expiresInDays: number;
+}
+
+export interface IssuedToken {
+  id: string;
+  token: string;
+  expiresAt: string;
+}
+
 export interface UploadProgress {
   loaded: number;
   total: number;
@@ -300,6 +324,20 @@ export function createAdminApi(
     },
     async removeMember(tenantId: string, userId: string): Promise<void> {
       await requestJson<{ ok: true }>(tenantId, `/members/${userId}`, { method: "DELETE" });
+    },
+    async listTokens(tenantId: string): Promise<TokenSummary[]> {
+      const result = await requestJson<{ tokens: TokenSummary[] }>(tenantId, "/tokens");
+      return result.tokens;
+    },
+    async issueToken(tenantId: string, input: IssueTokenInput): Promise<IssuedToken> {
+      return requestJson<IssuedToken>(tenantId, "/tokens", {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify(input),
+      });
+    },
+    async revokeToken(tenantId: string, tokenId: string): Promise<void> {
+      await requestJson<{ ok: true }>(tenantId, `/tokens/${tokenId}`, { method: "DELETE" });
     },
   };
 }

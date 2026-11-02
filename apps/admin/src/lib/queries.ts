@@ -40,6 +40,15 @@ export function contentTypesQueryOptions(adminApi: AdminApi, tenantId: string) {
 }
 
 // 案 G 4 章: メンバーの変更の直後に必ず取り直す(古い一覧で最後の管理者の判定を誤らない)
+export function tokensQueryOptions(adminApi: AdminApi, tenantId: string) {
+  return queryOptions({
+    queryKey: ["tokens", tenantId],
+    queryFn: () => adminApi.listTokens(tenantId),
+    staleTime: 0,
+    retry: 1,
+  });
+}
+
 export function membersQueryOptions(adminApi: AdminApi, tenantId: string) {
   return queryOptions({
     queryKey: ["members", tenantId],

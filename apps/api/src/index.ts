@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { purgeExpiredSessions } from "./auth/session";
+import { mcpRoutes, serveProtectedResourceMetadata, workerContext } from "./mcp/route";
 import { requireSaneSecret } from "./middleware/sane-secret";
 import { handleModuleJob, type ModuleQueueJob } from "./modules/events";
 import { parkDeadLetter } from "./ops/dead-letters";
@@ -22,11 +23,19 @@ app.use("/auth/*", requireSaneSecret);
 app.use("/v1/*", requireSaneSecret);
 app.use("/super-auth/*", requireSaneSecret);
 app.use("/super/v1/*", requireSaneSecret);
+// design-spec 16.2(決定 48、M1-5): MCP の入口。JWT は使わないが設定事故時は道連れで閉じる方針に合わせる
+app.use("/mcp/*", requireSaneSecret);
+app.use("/.well-known/oauth-protected-resource/*", requireSaneSecret);
 app.route("/auth", authRoutes);
 // 決定 9: self-serve テナント作成(旧 POST /v1/tenants)は撤去。作成は /super/v1/tenants 専用。
 app.route("/v1/t", tenantRoutes);
 app.route("/super-auth", superAuthRoutes);
 app.route("/super/v1", superRoutes);
+app.route("/mcp", mcpRoutes);
+// RFC 9728: MCP の Protected Resource Metadata(テナント別パス付き。16.2)
+app.get("/.well-known/oauth-protected-resource/mcp/t/:tenantId", (c) =>
+  serveProtectedResourceMetadata(c.req.raw, c.env, workerContext(c), c.req.param("tenantId")),
+);
 // §11.7(論点W): 公開 write。publicRoutes(GET のみ)より前に置く — メソッドが違うため衝突しない。
 // POST の 404 を read 側の notFound に食わせない順序。
 app.route("/public/v1", publicWriteRoutes);

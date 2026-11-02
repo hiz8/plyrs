@@ -48,8 +48,9 @@ export type ParseResult = { ok: true; query: ListQuery } | { ok: false; error: s
 
 export const DEFAULT_LIMIT = 20;
 export const MAX_LIMIT = 100;
-const MAX_FILTERS = 8;
-const MAX_FILTER_VALUES = 20;
+// M1-2: DO の一覧(do/list-records.ts)も同じ上限と値の検証を使う(design-spec 16.9: 文法の解釈を共有する)
+export const MAX_FILTERS = 8;
+export const MAX_FILTER_VALUES = 20;
 const MAX_INCLUDE_FIELDS = 5;
 // Finding 1（critical）: フィルタ値の総数上限。sql.ts の buildListQuery が単一クエリに積む
 // バインド数は「固定 6」（tenant_id/type 2 + カーソル 2 + limit 1 + 索引ソート用フィールド 1）＋
@@ -59,7 +60,8 @@ const MAX_INCLUDE_FIELDS = 5;
 // D1 の 1 クエリのバインド上限は 100 なので、60 を上限にすれば 30 + 60 = 90 に収まり、
 // 実装の細部が多少ずれても耐える 10 バインドの安全マージンを残せる（本番のみ 500 化する
 // 事故を防ぐのが目的で、ローカル SQLite は上限が緩くテストは通ったままだった）。
-const MAX_TOTAL_FILTER_VALUES = 60;
+// M1-2: DO の一覧(do/list-records.ts)も同じ上限を使う(DO SQLite のバインド上限も 100)。
+export const MAX_TOTAL_FILTER_VALUES = 60;
 
 const FILTER_KEY_PATTERN = /^filter\[([a-z][a-z0-9_]*)\]$/u;
 const SORT_PATTERN = /^(-?)([a-z][a-z0-9_]*)$/u;
@@ -78,9 +80,9 @@ const COLUMN_BY_KIND = {
   date: "value_date",
 } as const;
 
-type ScalarKind = keyof typeof COLUMN_BY_KIND;
+export type ScalarKind = keyof typeof COLUMN_BY_KIND;
 
-function parseScalarValues(kind: ScalarKind, raw: string[]): (string | number)[] | null {
+export function parseScalarValues(kind: ScalarKind, raw: string[]): (string | number)[] | null {
   switch (kind) {
     case "num": {
       const values = raw.map((value) => Number(value));

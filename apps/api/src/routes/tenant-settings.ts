@@ -4,11 +4,11 @@ import { drizzle } from "drizzle-orm/d1";
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { memberships, tenants, users } from "@plyrs/db/control-plane";
-import { membershipAuditTarget, writeAudit } from "../audit";
+import { auditRevokedTokens, membershipAuditTarget, writeAudit } from "../audit";
 import { cutOffMembership } from "../auth/ban";
 import { unblockMembership } from "../auth/blocklist";
 import { normalizeEmail } from "../auth/email";
-import { can, isRole, ROLES, type Operation } from "../auth/permissions";
+import { can, isRole, ROLES, type Operation, type Role } from "../auth/permissions";
 import type { GateVariables } from "../middleware/tenant-gate";
 
 // 案 G 3・4 章: テナントの owner がサイト名とメンバーを自分で管理する API。
@@ -23,10 +23,24 @@ const roleSchema = z.enum(ROLES);
 
 // JWT の role は最大 15 分古い。ロールを下げられた直後の owner が操作し続けられないよう、
 // JWT で弾けるものは D1 を引かずに弾き、通ったものは D1 の現在のロールで確かめ直す。
-async function requireCurrent(c: Context<GateEnv>, operation: Operation): Promise<Response | null> {
+// M1-3a: PAT の発行(routes/tenant-tokens.ts)も同じ確かめ直しを使う
+export async function requireCurrent(
+  c: Context<GateEnv>,
+  operation: Operation,
+): Promise<Response | null> {
+  const current = await requireCurrentRole(c, operation);
+  return "denied" in current ? current.denied : null;
+}
+
+// 403 にならなければ D1 の現在のロールを返す(トークンに焼き込まれたロールではなく、今のロールで
+// 規則を適用したい呼び出し元のため。例: PAT のスコープを allowedScopes(role) と照合する)
+export async function requireCurrentRole(
+  c: Context<GateEnv>,
+  operation: Operation,
+): Promise<{ role: Role } | { denied: Response }> {
   const auth = c.get("auth");
   if (!can(auth.role, operation)) {
-    return c.json({ error: "forbidden" }, 403);
+    return { denied: c.json({ error: "forbidden" }, 403) };
   }
   const row = (
     await drizzle(c.env.DB)
@@ -36,9 +50,9 @@ async function requireCurrent(c: Context<GateEnv>, operation: Operation): Promis
       .limit(1)
   )[0];
   if (row === undefined || !isRole(row.role) || !can(row.role, operation)) {
-    return c.json({ error: "forbidden" }, 403);
+    return { denied: c.json({ error: "forbidden" }, 403) };
   }
-  return null;
+  return { role: row.role };
 }
 
 async function findMember(
@@ -225,6 +239,13 @@ export const tenantSettingsRoutes = new Hono<GateEnv>()
       targetId: membershipAuditTarget(userId, tenantId),
       detail: { role: removed.role },
     });
-    const { disconnected } = await cutOffMembership(c.env, userId, tenantId);
+    const { disconnected, revokedTokens } = await cutOffMembership(c.env, userId, tenantId);
+    await auditRevokedTokens(
+      c.env.DB,
+      c.get("auth").userId,
+      tenantId,
+      revokedTokens,
+      "member.remove",
+    );
     return c.json({ ok: true, disconnected });
   });

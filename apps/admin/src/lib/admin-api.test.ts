@@ -374,6 +374,40 @@ describe("site settings endpoints (案 G 3・4 章)", () => {
     ]);
   });
 
+  it("接続トークン(PAT)の一覧・発行・失効を期待するパスで呼ぶ(M1-4)", async () => {
+    const calls: string[] = [];
+    const token = {
+      id: "tok1",
+      userId: "u1",
+      name: "CI",
+      scopes: ["record:read"],
+      expiresAt: "2099-01-01T00:00:00Z",
+      createdAt: "",
+      lastUsedAt: null,
+      revokedAt: null,
+    };
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const method = init?.method ?? "GET";
+      calls.push(
+        `${method} ${String(input)} ${typeof init?.body === "string" ? init.body : ""}`.trim(),
+      );
+      if (method === "GET") return jsonResponse(200, { tokens: [token] });
+      if (method === "DELETE") return jsonResponse(200, { ok: true });
+      return jsonResponse(201, { id: "tok1", token: "plyrs_pat_x", expiresAt: token.expiresAt });
+    };
+    const api = createAdminApi(manager(), fetchImpl);
+    expect(await api.listTokens("t1")).toStrictEqual([token]);
+    expect(
+      await api.issueToken("t1", { name: "CI", scopes: ["record:read"], expiresInDays: 90 }),
+    ).toStrictEqual({ id: "tok1", token: "plyrs_pat_x", expiresAt: token.expiresAt });
+    await api.revokeToken("t1", "tok1");
+    expect(calls).toStrictEqual([
+      "GET /v1/t/t1/tokens",
+      'POST /v1/t/t1/tokens {"name":"CI","scopes":["record:read"],"expiresInDays":90}',
+      "DELETE /v1/t/t1/tokens/tok1",
+    ]);
+  });
+
   it("surfaces the last-owner rejection as an ApiError", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(409, { error: "last_owner" }));
     const api = createAdminApi(manager(), fetchImpl);
