@@ -212,7 +212,7 @@ describe("resolveSyncWrite strict", () => {
     updatedAt: "2026-11-02T00:00:00.000Z",
     updatedBy: "u1",
   };
-  const change = (overrides: Partial<ClientChange>): ClientChange => ({
+  const agentChange = (overrides: Partial<ClientChange>): ClientChange => ({
     changeId: "c1",
     recordId: server.id,
     typeKey: "article",
@@ -224,7 +224,7 @@ describe("resolveSyncWrite strict", () => {
   });
 
   it("スカラーの版が違えば strict では conflict(merge なら LWW で apply)", () => {
-    const stale = change({ baseFieldVersions: { title: 1, body: 1 } });
+    const stale = agentChange({ baseFieldVersions: { title: 1, body: 1 } });
     expect(resolveSyncWrite(type, stale, server, "strict")).toEqual({
       kind: "conflict",
       conflicts: [{ fieldKey: "title", baseVersion: 1, currentVersion: 2 }],
@@ -234,7 +234,7 @@ describe("resolveSyncWrite strict", () => {
   });
 
   it("baseFieldVersions にキーが無く current が 1 以上なら conflict(省略は 0 と見る)", () => {
-    const missing = change({ baseFieldVersions: {} });
+    const missing = agentChange({ baseFieldVersions: {} });
     expect(resolveSyncWrite(type, missing, server, "strict")).toEqual({
       kind: "conflict",
       conflicts: [{ fieldKey: "title", baseVersion: 0, currentVersion: 2 }],
@@ -242,7 +242,7 @@ describe("resolveSyncWrite strict", () => {
   });
 
   it("全フィールドの版が一致すれば apply で、結果は merge と同じ(現在値に変更キーだけ重ねる)", () => {
-    const fresh = change({});
+    const fresh = agentChange({});
     const strict = resolveSyncWrite(type, fresh, server, "strict");
     expect(strict).toEqual(resolveSyncWrite(type, fresh, server, "merge"));
     expect(strict).toEqual({
@@ -252,7 +252,7 @@ describe("resolveSyncWrite strict", () => {
   });
 
   it("新規(current が無い)は strict でも apply", () => {
-    expect(resolveSyncWrite(type, change({}), null, "strict")).toEqual({
+    expect(resolveSyncWrite(type, agentChange({}), null, "strict")).toEqual({
       kind: "apply",
       input: { title: "エージェントの題" },
     });
