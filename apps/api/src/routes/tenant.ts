@@ -8,6 +8,7 @@ import { sniffImageSize } from "../assets/image-size";
 import { assetKeyBelongsToTenant } from "../assets/ownership";
 import { can } from "../auth/permissions";
 import { authenticateTenantToken, tenantGate, type GateVariables } from "../middleware/tenant-gate";
+import { findOperation } from "../ops/catalog";
 import {
   asAssetUsage,
   asContentTypeRow,
@@ -15,6 +16,7 @@ import {
   asDeleteContentTypeResult,
   asDeleteResult,
   asEnableModuleResult,
+  asInvokeResult,
   asModuleSummaries,
   asOrphanIds,
   asPublicationState,
@@ -43,6 +45,13 @@ const ERROR_STATUS: Record<string, ContentfulStatusCode> = {
   record_deleted: 410,
   already_deleted: 410,
   not_published: 409,
+  // M2-4: 操作カタログ(invoke)の失敗コード(16.7)
+  conflict: 409,
+  already_exists: 409,
+  insufficient_scope: 403,
+  unknown_operation: 404,
+  invalid_input: 400,
+  unsupported_markdown: 400,
 };
 
 function statusFor(code: string): ContentfulStatusCode {
@@ -243,6 +252,43 @@ export const tenantRoutes = new Hono<GateEnv>()
   .get("/:tenantId/content-types/:key", async (c) => {
     const row = asContentTypeRow(await stubFor(c).getContentType(c.req.param("key")));
     return row === null ? c.json({ error: "not_found" }, 404) : c.json(row);
+  })
+  // 16.4(M2-4): 操作カタログの REST の生成面。body は操作の input そのまま。via に rest を含む操作だけ
+  // 受ける(MCP 専用の操作は 404)。needsTenantSlug の操作だけ D1 から slug を引く(publish ルートと同じ 1 照会)
+  .post("/:tenantId/ops/:op", async (c) => {
+    const name = c.req.param("op");
+    const spec = findOperation(name);
+    if (spec === undefined || !spec.via.includes("rest")) {
+      return c.json(
+        { ok: false, code: "unknown_operation", message: `unknown operation: ${name}` },
+        404,
+      );
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ ok: false, code: "invalid_input", message: "body must be JSON" }, 400);
+    }
+    let tenantSlug: string | undefined;
+    if (spec.needsTenantSlug === true) {
+      const slugRow = await c.env.DB.prepare("SELECT slug FROM tenants WHERE id = ?")
+        .bind(c.req.param("tenantId"))
+        .first<{ slug: string }>();
+      if (slugRow === null) {
+        return c.json({ ok: false, code: "not_found", message: "tenant not found" }, 404);
+      }
+      tenantSlug = slugRow.slug;
+    }
+    const result = asInvokeResult(
+      await stubFor(c).invoke(
+        name,
+        body,
+        c.get("auth"),
+        tenantSlug === undefined ? {} : { tenantSlug },
+      ),
+    );
+    return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
   })
   .put("/:tenantId/records/:typeKey/:recordId", zValidator("json", writeBodySchema), async (c) => {
     const { input, status } = c.req.valid("json");

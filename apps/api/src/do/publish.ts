@@ -8,6 +8,7 @@ import {
 } from "../projection/payload";
 import { loadContentTypeByKey } from "./content-types";
 import { recordHistory, type HistoryActor } from "./history";
+import { loadRecordInput } from "../sync/records";
 import { emitModuleEvents } from "../modules/events";
 import { enqueueOutbox } from "./outbox";
 import type { RecordSnapshot } from "./types";
@@ -129,7 +130,7 @@ function writeSnapshot(
       version: record.version,
       sourceVersion: record.version,
       status: record.status,
-      data: record.data,
+      data: loadRecordInput(deps.sql, record),
       fieldVersions: record.fieldVersions,
     });
   }
@@ -249,7 +250,7 @@ export function unpublishRecordCore(deps: PublishDeps, recordId: string): Unpubl
       version: record.version,
       sourceVersion: row.source_version,
       status: record.status,
-      data: record.data,
+      data: loadRecordInput(deps.sql, record),
       fieldVersions: record.fieldVersions,
     });
   }

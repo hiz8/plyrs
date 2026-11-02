@@ -1,27 +1,48 @@
 import { requireOperation, type AuthContext, type McpAuth } from "../do/authorize";
 import { findOperation, OPERATIONS, type OpSpec } from "./catalog";
+import { HISTORY_HANDLERS } from "./history";
 import { READ_HANDLERS, type OpContext, type OpFailure } from "./read";
 
 // 操作の失敗はここで表現し、HTTP や JSON-RPC のエラーにしない(design-spec 16.7 の「業務エラー」層)。
+// code は入口の判定(unknown_operation / invalid_input / forbidden / insufficient_scope)と、各操作の
+// 業務エラー(not_found / conflict / already_exists / unsupported_markdown / validation_failed /
+// record_deleted / unique_violation / invalid_status / unknown_type / not_published、モジュール拒否
+// `${moduleId}:${reason}`)。モジュール拒否を通すため string を含む(WriteErrorCode と同じ扱い)
+export type InvokeErrorCode =
+  | "unknown_operation"
+  | "invalid_input"
+  | "forbidden"
+  | "insufficient_scope"
+  | "not_found"
+  | "conflict"
+  | "already_exists"
+  | "unsupported_markdown"
+  | "validation_failed"
+  | "record_deleted"
+  | "unique_violation"
+  | "invalid_status"
+  | "unknown_type"
+  | "not_published"
+  | (string & {});
+
 export type InvokeResult =
   | { ok: true; output: unknown }
   | {
       ok: false;
-      code:
-        | "unknown_operation"
-        | "invalid_input"
-        | "forbidden"
-        | "insufficient_scope"
-        | "not_found";
+      code: InvokeErrorCode;
       message: string;
       issues?: unknown;
+      details?: unknown;
     };
 
 export type OpHandler = (ctx: OpContext, input: never) => { ok: true; output: unknown } | OpFailure;
 
 // 宣言(OPERATIONS)と実装(HANDLERS)は名前文字列で対応する。片方だけ足し忘れると unknown_operation
 // として静かに失敗するので、モジュール読み込み時に対応を確かめる(export はテストのため)
-export const HANDLERS: Readonly<Record<string, OpHandler>> = { ...READ_HANDLERS };
+export const HANDLERS: Readonly<Record<string, OpHandler>> = {
+  ...READ_HANDLERS,
+  ...HISTORY_HANDLERS,
+};
 
 for (const spec of OPERATIONS) {
   if (HANDLERS[spec.name] === undefined) {
@@ -29,7 +50,7 @@ for (const spec of OPERATIONS) {
   }
 }
 
-function hasScopes(auth: AuthContext | McpAuth): auth is McpAuth {
+export function hasScopes(auth: AuthContext | McpAuth): auth is McpAuth {
   return Array.isArray((auth as McpAuth).scopes);
 }
 

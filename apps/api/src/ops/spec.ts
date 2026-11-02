@@ -21,6 +21,9 @@ export interface OpSpec<I extends z.ZodType = z.ZodType, O extends z.ZodType = z
   hints: { readOnly: boolean; destructive: boolean; idempotent: boolean; openWorld: false };
   // tools/list の ttlMs / cacheScope(仕様 2026-07-28)。null は付けない
   cache: { ttlMs: number; cacheScope: "public" | "private" } | null;
+  // 公開 URL の組み立てにテナントの slug が要る操作(record_publish)。REST の入口はこのときだけ
+  // D1 から slug を引く(M2-4)
+  needsTenantSlug?: true;
 }
 
 export function defineOperation<I extends z.ZodType, O extends z.ZodType>(

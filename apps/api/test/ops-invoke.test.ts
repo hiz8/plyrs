@@ -50,15 +50,17 @@ beforeAll(async () => {
 });
 
 describe("操作カタログ", () => {
-  it("読み取り 4 操作を宣言順に持ち、すべて mcp 経路の読み取り専用", () => {
+  it("読み取り 4 操作と履歴 3 操作を宣言順に持ち、mcp 経路の操作はすべて読み取り専用(書き込みの MCP 公開は M4-1)", () => {
     expect(OPERATIONS.map((op) => op.name)).toEqual([
       "type_list",
       "type_get",
       "record_list",
       "record_get",
+      "record_history",
+      "record_compare",
+      "record_restore",
     ]);
-    for (const op of OPERATIONS) {
-      expect(op.via).toContain("mcp");
+    for (const op of OPERATIONS.filter((candidate) => candidate.via.includes("mcp"))) {
       expect(op.hints.readOnly).toBe(true);
       expect(op.hints.destructive).toBe(false);
     }

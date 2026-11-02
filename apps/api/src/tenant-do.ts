@@ -60,7 +60,9 @@ import {
   type ModuleEventJob,
 } from "./modules/events";
 import { countUnsent, markOutboxSent, purgeSent, unsentOutbox } from "./do/outbox";
-import { invokeOperation, type InvokeResult } from "./ops/invoke";
+import { findOperation } from "./ops/catalog";
+import { hasScopes, invokeOperation, type InvokeResult } from "./ops/invoke";
+import type { OpContext } from "./ops/read";
 import {
   loadProjectionPayload,
   loadPublications,
@@ -572,13 +574,74 @@ export class TenantDO extends DurableObject<Env> {
   // do_config.tenant_id は publish / モジュールイベントの経路でしか刻まれないため、未設定なら
   // 同期の push(webSocketMessage)と同じく Worker ゲートが検証した auth.tenantId で刻む
   // (auth は Worker binding 経由でしか届かず偽造されない)。以後の照合はその値に対して行う。
-  invoke(op: string, input: unknown, auth: AuthContext | McpAuth): InvokeResult {
+  //
+  // M2-4: 書き込み操作も通る。readOnly でない操作は transactionSync で包み、コミット後に
+  // writeRecord / publishRecord の各 RPC と同じ後処理(変更 record の broadcast、outbox と
+  // module_events の sweep と drain)を行う。via は認可コンテキストから決める(MCP なら mcp、
+  // それ以外は rest。同期経路は invoke を通らない)。
+  async invoke(
+    op: string,
+    input: unknown,
+    auth: AuthContext | McpAuth,
+    options: { tenantSlug?: string } = {},
+  ): Promise<InvokeResult> {
     let tenantId = this.tenantId();
     if (tenantId === null && auth.tenantId !== undefined) {
       this.rememberTenant(auth.tenantId);
       tenantId = auth.tenantId;
     }
-    return invokeOperation(op, { sql: this.ctx.storage.sql, tenantId }, input, auth);
+    const armed: Promise<void>[] = [];
+    const ctx: OpContext = {
+      sql: this.ctx.storage.sql,
+      tenantId,
+      tenantSlug: options.tenantSlug ?? null,
+      via: hasScopes(auth) ? "mcp" : "rest",
+      auth,
+      deps: {
+        nextSeq: () => ++this.seq,
+        now: () => new Date().toISOString(),
+        newId: () => uuidv7(),
+        nextPublishSeq: () => this.nextPublishSeq(),
+        newEventId: () => uuidv7(),
+        scheduleModuleAlarm: (moduleId, dueAt) => {
+          const min = registerAlarm(this.ctx.storage.sql, moduleAlarmKind(moduleId), dueAt);
+          armed.push(this.ctx.storage.setAlarm(min));
+        },
+      },
+      effects: { changedRecordIds: new Set<string>() },
+    };
+    const spec = findOperation(op);
+    if (spec === undefined || spec.hints.readOnly) {
+      return invokeOperation(op, ctx, input, auth);
+    }
+    let outboxPending = false;
+    let moduleEventsPending = false;
+    const result = this.ctx.storage.transactionSync(() => {
+      const inner = invokeOperation(op, ctx, input, auth);
+      if (countUnsent(this.ctx.storage.sql) > 0) {
+        outboxPending = true;
+        armed.push(this.armSweep(Date.now() + SWEEP_DELAY_MS));
+      }
+      if (countUnsentModuleEvents(this.ctx.storage.sql) > 0 && tenantId !== null) {
+        moduleEventsPending = true;
+        armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
+      }
+      return inner;
+    });
+    await Promise.all(armed);
+    for (const recordId of ctx.effects.changedRecordIds) {
+      const stored = loadSyncRecord(this.ctx.storage.sql, recordId);
+      if (stored !== null) {
+        this.broadcastAll({ type: "change", record: stored });
+      }
+    }
+    if (outboxPending) {
+      await this.drainOutbox();
+    }
+    if (moduleEventsPending) {
+      await this.drainModuleEvents();
+    }
+    return result;
   }
 
   // Phase 6b: 公開状態の読み取り（読み取り系は getRecord と同じく role 不問 — authorize.ts 冒頭コメント参照）

@@ -85,6 +85,9 @@ const systemBeforeWriteHooks: readonly BeforeWriteHook[] = [assetGuardHook, uniq
 
 export interface WriteOptions {
   systemWrite?: boolean;
+  // record_restore(M2-4): 削除済み record の復元は data が同じでも書き込みとして扱う
+  // (deleted_at を戻した変更を seq に乗せて同期へ流すため)
+  force?: boolean;
 }
 
 export function writeRecordCore(
@@ -148,7 +151,8 @@ export function writeRecordCore(
     change.dataChanged ||
     change.changedFields.length > 0 ||
     statusChanged ||
-    staleRelationFieldRemoved;
+    staleRelationFieldRemoved ||
+    options.force === true;
   if (!applied && prev !== null) {
     return { ok: true, record: prev, changedFields: [], applied: false };
   }
@@ -212,13 +216,14 @@ export function writeRecordCore(
     );
   }
 
-  // 16.5(M2-3a): 変更履歴。区切り・畳み込み・差分圧縮・保持は history.ts が担う
+  // 16.5(M2-3a): 変更履歴。区切り・畳み込み・差分圧縮・保持は history.ts が担う。
+  // data は relations を統合した input 形式(record_restore がそのまま書き戻せる形)
   recordHistory(deps.sql, now, {
     recordId: params.recordId,
     kind: params.restoredFrom === undefined ? "write" : "restore",
     version,
     status: nextStatus,
-    data: change.data,
+    data: input,
     fieldVersions,
     actor: params.actor,
     via: params.via,
