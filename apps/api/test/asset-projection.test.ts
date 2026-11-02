@@ -113,7 +113,7 @@ async function uploadAssetWithAlt(
   );
   expect(upload.status).toBe(201);
   const { record } = (await upload.json()) as {
-    record: { id: string; data: Record<string, unknown> };
+    record: { id: string; data: Record<string, unknown>; fieldVersions: Record<string, number> };
   };
   const assetId = record.id;
   const patched = await app.request(
@@ -131,6 +131,8 @@ async function uploadAssetWithAlt(
           height: record.data["height"],
           alt: "ヒーロー",
         },
+        // M2-7b: 既存 record の更新は baseFieldVersions 必須(16.6)
+        baseFieldVersions: record.fieldVersions,
       }),
     },
     env,
