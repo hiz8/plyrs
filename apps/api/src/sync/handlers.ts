@@ -186,6 +186,7 @@ export function handlePush(
       recordId: change.recordId,
       input: resolution.input,
       actor: auth.userId,
+      via: "sync",
       ...(change.status === undefined ? {} : { status: change.status }),
     });
     if (!written.ok) {

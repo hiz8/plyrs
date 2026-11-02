@@ -18,3 +18,4 @@ export {
   type SyncRecord,
 } from "./messages";
 export { resolveSyncWrite, type SyncResolution } from "./resolve";
+export { conflictModeFor, VIAS, type ConflictMode, type Via } from "./via";

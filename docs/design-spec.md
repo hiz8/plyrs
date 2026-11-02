@@ -788,7 +788,8 @@ record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴�
 
 - **区切り規則**: 書き込みごとに版を作らない（同期の push は入力中の細かな差分で届く）。次のいずれかで新しい版を切る: (1) actor（誰の権限か）または `via` が前の版と違う、(2) 前の版から **15 分**以上経っている、(3) `status` が変わる、(4) publish / unpublish。それ以外の連続した書き込みは直前の版に畳み込む。
 - **記録する属性**: 履歴の連番、`records.version`、publish の版なら `source_version`、`data` と `fieldVersions`、`status`、actor（`userId`）、`via`（管理画面の同期 / MCP / REST）、MCP と OAuth では `tokenId` と `client_id`。`clientInfo` は自己申告で未検証なので表示の補足に限り、認可には使わない。
-- **保持（仮置き。M2-3a で実測して見直す）**: 1 record あたり **最新 100 版**かつ **365 日**。直近 10 版は全文、それより古い版は直前の版との差分で保存する。publish の区切りの版は、保持上限に達しても **record が存在する間は消さない**（公開版の履歴を失わないため）。
+- **保持（仮置き。M4-6 で実測して見直す）**: 1 record あたり **最新 100 版**かつ **365 日**。直近 10 版は全文、それより古い版は **1 つ新しい版からの逆差分**（`{set, unset}`）で保存する。逆差分にするのは、復元を新しい側（常に全文がある）から辿るためで、保持上限で古い版を消しても残った版の鎖が切れない。publish / unpublish の区切りの版は **常に全文**で持ち、保持上限に達しても **record が存在する間は消さない**（公開版の履歴を失わないため。差分の鎖の途中に残っても全文なので復元の起点になる）。
+- **実装の置き場（M2-3a）**: `packages/db/src/schema.ts` の `record_history`（主キー `(record_id, history_seq)`、`changed_fields` に直前の版との差分キーを持つ）と `apps/api/src/do/history.ts`。`writeRecordCore` が INSERT / UPDATE の直後に `recordHistory()` を呼び、`applied: false` の書き込みは記録しない。区切り規則の (2) は「前の版を**開いた**時刻（`created_at`）から 15 分」で、畳み込みで `updated_at` が進んでも起点は動かない。経路の列挙 `Via`（`"sync" | "mcp" | "rest"`）は `@plyrs/sync-protocol` が正本で、モジュールの書き戻し・alarm・アップロードなど同期でも MCP でもない書き込みは `rest` に分類する。
 - deleted_at の付いた record の履歴も残し、削除の取り消し（`record_restore`）に使う。publish と delete は `writeRecord` を通らないので、それぞれに記録点を足す。
 - `restore` は `writeRecord` を通す。validate-on-write の対象なので、型定義が変わっていれば失敗しうる（遅延マイグレーションの帰結として受け入れる）。
 - 履歴と FTS5（16.9）は DO-SQLite の容量と書き込み行数を増やす。区切り規則と保持上限で有界化し、M4 で実測する。

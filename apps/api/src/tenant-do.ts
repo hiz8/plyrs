@@ -76,6 +76,7 @@ import {
 } from "./do/publish";
 import { loadRecord, writeRecordCore } from "./do/write-record";
 import type { RecordSnapshot, WriteRecordInput, WriteRecordResult } from "./do/types";
+import type { Via } from "@plyrs/sync-protocol";
 import type { ProjectionJob } from "./projection/jobs";
 import {
   catalogRowsForFields,
@@ -328,10 +329,12 @@ export class TenantDO extends DurableObject<Env> {
     return { ok: true, applied: changed };
   }
 
+  // via(16.5): HTTP の REST からの呼び出しが既定。M2-7 以降は REST も invoke 経由になる
   async writeRecord(
     typeKey: string,
     params: WriteRecordInput,
     auth: AuthContext,
+    via: Via = "rest",
   ): Promise<WriteRecordResult> {
     const denial = requireOperation(auth, "record:write");
     if (denial !== null) {
@@ -364,7 +367,7 @@ export class TenantDO extends DurableObject<Env> {
           },
         },
         contentType,
-        { ...params, actor: auth.userId },
+        { ...params, actor: auth.userId, via },
       );
       // module_events の宛先(do_config.tenant_id)は write 経路でも刻む(§14 の push 教訓と同じ形:
       // 実際に積まれた時だけ)。auth.tenantId は HTTP ゲート由来のときのみ存在する。
@@ -416,7 +419,8 @@ export class TenantDO extends DurableObject<Env> {
           },
         },
         contentType,
-        { ...params, actor: auth.userId },
+        // アップロード API(HTTP)からの経路なので via は rest
+        { ...params, actor: auth.userId, via: "rest" },
         { systemWrite: true },
       );
       if (countUnsentModuleEvents(this.ctx.storage.sql) > 0 && auth.tenantId !== undefined) {
@@ -477,7 +481,9 @@ export class TenantDO extends DurableObject<Env> {
           },
         },
         contentType,
-        { ...params, actor: `module:${moduleId}` },
+        // モジュールの書き戻し(Queues consumer)。経路の列挙は 3 つ(sync / mcp / rest)で、同期でも
+        // MCP でもないので rest に分類する(16.4)
+        { ...params, actor: `module:${moduleId}`, via: "rest" },
         { systemWrite: true },
       );
     });
@@ -537,7 +543,8 @@ export class TenantDO extends DurableObject<Env> {
           },
         },
         contentType,
-        { ...params, actor: `public:${moduleId}` },
+        // 公開 write(HTTP)なので via は rest
+        { ...params, actor: `public:${moduleId}`, via: "rest" },
       );
       if (inner.ok && inner.applied && countUnsentModuleEvents(this.ctx.storage.sql) > 0) {
         armed.push(this.armModuleEventsSweep(Date.now() + SWEEP_DELAY_MS));
@@ -945,7 +952,8 @@ export class TenantDO extends DurableObject<Env> {
                 newEventId: () => uuidv7(),
               },
               contentType,
-              { ...params, actor: `module:${moduleId}` },
+              // モジュール alarm からの書き込み。moduleWrite と同じ分類(rest)
+              { ...params, actor: `module:${moduleId}`, via: "rest" },
             );
             if (result.ok && result.applied) {
               written.push(params.recordId);

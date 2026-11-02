@@ -10,6 +10,7 @@ import {
 import { assetGuardHook } from "./asset-guard";
 import { issuesToMessage, rowToDefinition, type ContentTypeRow } from "./content-types";
 import { computeChangeSet } from "./diff";
+import { recordHistory } from "./history";
 import { runBeforeWriteHooks, type BeforeWriteHook } from "./hooks";
 import { moduleBeforeWriteHooks } from "../modules/hooks";
 import { emitModuleEvents } from "../modules/events";
@@ -210,6 +211,21 @@ export function writeRecordCore(
       params.recordId,
     );
   }
+
+  // 16.5(M2-3a): 変更履歴。区切り・畳み込み・差分圧縮・保持は history.ts が担う
+  recordHistory(deps.sql, now, {
+    recordId: params.recordId,
+    kind: params.restoredFrom === undefined ? "write" : "restore",
+    version,
+    status: nextStatus,
+    data: change.data,
+    fieldVersions,
+    actor: params.actor,
+    via: params.via,
+    tokenId: params.tokenId,
+    clientId: params.clientId,
+    restoredFrom: params.restoredFrom,
+  });
 
   // relations は派生データ: この record の field 由来行を全消しして張り直す（design-spec §6）。
   // 型定義から外れた旧フィールドの残骸もここで一掃される。
