@@ -328,3 +328,63 @@ it("isReadOnly はツールバーを出さず編集できない", async () => {
   expect(surface.style.paddingLeft).toBe("0px");
   expect(surface.style.paddingRight).toBe("0px");
 });
+
+// M2-1(決定 44): 最上位ブロックの安定 ID。エディタへ渡す前に ID 導出を通す契約なので、
+// 版 2 の文書を開いただけで onChange が走らない(UniqueID の onCreate による入れ子ノードへの
+// 付与は履歴にも onChange にも乗せない)。新しいブロックには UniqueID が ID を振る。
+describe("RichTextEditor block ids", () => {
+  const v2WithList: RichTextValue = {
+    schemaVersion: 2,
+    doc: {
+      type: "doc",
+      content: [
+        { type: "paragraph", attrs: { id: "p1" }, content: [{ type: "text", text: "先頭" }] },
+        {
+          type: "bulletList",
+          attrs: { id: "l1" },
+          content: [
+            {
+              type: "listItem",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "項目" }] }],
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  it("does not emit onChange when opening a v2 document whose nested nodes lack ids", async () => {
+    const onChange = vi.fn();
+    render(<Harness initial={v2WithList} onChange={onChange} />);
+    await screen.findByRole("textbox", { name: "body" });
+    // UniqueID の onCreate は setTimeout で遅延するので 1 tick 待つ
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("assigns an id to a newly created top-level block and keeps stored ids", async () => {
+    const onChange = vi.fn();
+    let editor: Editor | undefined;
+    render(<Harness initial={v2WithList} onChange={onChange} onReady={(e) => (editor = e)} />);
+    await screen.findByRole("textbox", { name: "body" });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    editor!
+      .chain()
+      .focus("end")
+      .insertContentAt(editor!.state.doc.content.size, {
+        type: "paragraph",
+        content: [{ type: "text", text: "新規" }],
+      })
+      .run();
+    const value = lastValue(onChange);
+    expect(value.schemaVersion).toBe(RICH_TEXT_SCHEMA_VERSION);
+    const blocks = (value.doc as { content: { type: string; attrs?: Record<string, unknown> }[] })
+      .content;
+    expect(blocks[0]?.attrs?.["id"]).toBe("p1");
+    expect(blocks[1]?.attrs?.["id"]).toBe("l1");
+    const added = blocks.find((b) => JSON.stringify(b).includes("新規"));
+    const addedId = added?.attrs?.["id"];
+    expect(typeof addedId).toBe("string");
+    expect(addedId).not.toBe("");
+  });
+});

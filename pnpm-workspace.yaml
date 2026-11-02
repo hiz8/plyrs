@@ -25,6 +25,7 @@ catalog:
   "@testing-library/user-event": ^14.6.7
   "@tiptap/core": ^3.31.4
   "@tiptap/extension-mention": ^3.31.4
+  "@tiptap/extension-unique-id": 3.31.4
   # tiptap は全パッケージで版を揃える必要があり、markdown は peer を完全一致で要求するので固定
   "@tiptap/markdown": 3.31.4
   "@tiptap/pm": ^3.31.4

@@ -2,6 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Editor, JSONContent } from "@tiptap/core";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
+import UniqueID from "@tiptap/extension-unique-id";
 import StarterKit from "@tiptap/starter-kit";
 import {
   ToggleButton as RacToggleButton,
@@ -152,7 +153,24 @@ export interface RichTextValue {
   doc: unknown;
 }
 
-export const RICH_TEXT_SCHEMA_VERSION = 1;
+// M2-1(決定 44): 版 2 = 最上位ブロックの attrs.id に安定 ID を持つ。正本は @plyrs/metamodel の
+// RICH_TEXT_SCHEMA_VERSION / BLOCK_ID_ATTR で、ui は metamodel に依存しない方針のため値を写し、
+// 一致は apps/admin/src/lib/mention-contract.test.ts が固定する。
+export const RICH_TEXT_SCHEMA_VERSION = 2;
+export const BLOCK_ID_ATTR_NAME = "id";
+
+// UniqueID が ID を振るノード種。契約は最上位ブロックだけだが、types は「ノード種」の指定なので
+// 箇条書きの中の段落にも付く(害は無い。M0-2 結果 2 節)。
+const BLOCK_ID_NODE_TYPES = [
+  "paragraph",
+  "heading",
+  "bulletList",
+  "orderedList",
+  "blockquote",
+  "codeBlock",
+  "horizontalRule",
+  ASSET_IMAGE_NODE_NAME,
+];
 
 const EMPTY_DOC: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
 
@@ -292,6 +310,10 @@ export function RichTextEditor({
         }),
         createRecordMention(glue),
         createAssetImage(() => resolveAssetUrlRef.current),
+        // 新規ブロックの採番だけに使う。既存の文書は呼び出し側が ensureTopLevelBlockIds を通して
+        // 渡す契約(通さないと DO 側の導出 ID とここで振る UUID が食い違い、保存時に全ブロックの
+        // ID が入れ替わる — M0-2 結果の引き継ぎ 1)
+        UniqueID.configure({ attributeName: BLOCK_ID_ATTR_NAME, types: BLOCK_ID_NODE_TYPES }),
       ],
       content: docContent(value),
       editable: isReadOnly !== true,
@@ -299,7 +321,13 @@ export function RichTextEditor({
       // ツールバーの活性状態は useEditorState が購読する。
       shouldRerenderOnTransaction: false,
       editorProps: { attributes: editorAttributes(label, isReadOnly === true) },
-      onUpdate: ({ editor: current }) => {
+      onUpdate: ({ editor: current, transaction }) => {
+        // UniqueID の onCreate(ID の無い入れ子ノードへの付与)は addToHistory: false の transaction
+        // で dispatch される(@tiptap/extension-unique-id 3.31.4 の dist を確認)。これは内容の変更
+        // ではないので onChange に流さない — 流すと開いただけの record が push され版が上がる
+        if (transaction.getMeta("addToHistory") === false) {
+          return;
+        }
         onChangeRef.current({
           schemaVersion: RICH_TEXT_SCHEMA_VERSION,
           doc: current.getJSON(),

@@ -1,5 +1,6 @@
 import {
   buildRecordInputSchema,
+  ensureRecordBlockIds,
   extractBodyRelations,
   uuidSchema,
   WORKFLOW_STATUSES,
@@ -111,6 +112,10 @@ export function writeRecordCore(
   if (!parsed.success) {
     return { ok: false, code: "validation_failed", message: issuesToMessage(parsed.error.issues) };
   }
+  // M2-1(決定 44): リッチテキストの最上位ブロックに安定 ID を永続化する(v1 は版 2 に上がる)。
+  // 一括変換はせず、書き込まれた record からこの形になる。重複 ID の振り直しもここで行う
+  // (エディタの insertContent 経路や MCP の record_update は重複を解消しないため)。
+  const input = ensureRecordBlockIds(definition, parsed.data as Record<string, unknown>).data;
 
   const prev = loadRecord(deps.sql, params.recordId);
   if (prev !== null && prev.deletedAt !== null) {
@@ -126,12 +131,7 @@ export function writeRecordCore(
 
   const prevRelations =
     prev === null ? new Map<string, RelationRef[]>() : loadRelationRefs(deps.sql, params.recordId);
-  const change = computeChangeSet(
-    definition,
-    parsed.data as Record<string, unknown>,
-    prev?.data ?? null,
-    prevRelations,
-  );
+  const change = computeChangeSet(definition, input, prev?.data ?? null, prevRelations);
 
   const nextStatus: WorkflowStatus = params.status ?? prev?.status ?? "draft";
   const statusChanged = prev !== null && nextStatus !== prev.status;

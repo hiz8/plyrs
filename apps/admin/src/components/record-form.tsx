@@ -24,6 +24,7 @@ import type { AssetServices } from "../lib/asset-services";
 import { MEDIA_PICKER_LABELS, RECORD_FORM_LABELS } from "../lib/labels";
 import { labelForRecord } from "../lib/record-label";
 import {
+  asEditorRichTextValue,
   asRichTextValue,
   draftValueEquals,
   fromDraftValues,
@@ -623,7 +624,7 @@ function FieldInput({
         <WithDescription description={description}>
           <RichTextEditor
             label={label}
-            value={asRichTextValue(value)}
+            value={asEditorRichTextValue(value)}
             onChange={onChange}
             mentionCandidates={mentionCandidates}
             errorMessage={error}

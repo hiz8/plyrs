@@ -3,13 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 import { render } from "@testing-library/react";
 import {
   ASSET_IMAGE_NODE_TYPE,
+  BLOCK_ID_ATTR,
   RECORD_MENTION_NODE_TYPE,
+  RICH_TEXT_SCHEMA_VERSION as METAMODEL_RICH_TEXT_SCHEMA_VERSION,
   extractBodyRelations,
   type ContentTypeDefinition,
 } from "@plyrs/metamodel";
 import {
   ASSET_IMAGE_NODE_NAME,
+  BLOCK_ID_ATTR_NAME,
   RECORD_MENTION_NODE_NAME,
+  RICH_TEXT_SCHEMA_VERSION,
   RichTextEditor,
   type RichTextEditorProps,
 } from "@plyrs/ui";
@@ -30,6 +34,12 @@ describe("record mention / asset image contract", () => {
   it("ui node names match the metamodel extraction targets", () => {
     expect(RECORD_MENTION_NODE_NAME).toBe(RECORD_MENTION_NODE_TYPE);
     expect(ASSET_IMAGE_NODE_NAME).toBe(ASSET_IMAGE_NODE_TYPE);
+  });
+
+  // M2-1(決定 44): エディタが書く版とブロック ID の属性名は metamodel の導出(正本)と一致する
+  it("ui schema version and block id attribute match the metamodel", () => {
+    expect(RICH_TEXT_SCHEMA_VERSION).toBe(METAMODEL_RICH_TEXT_SCHEMA_VERSION);
+    expect(BLOCK_ID_ATTR_NAME).toBe(BLOCK_ID_ATTR);
   });
 
   // ロードマップ §13 推奨: ノード名だけでなく attrs キーまで(ui 産の実 doc を

@@ -52,3 +52,14 @@ export {
   ASSET_TYPE_ID,
   ASSET_TYPE_KEY,
 } from "./asset-type";
+export {
+  BLOCK_ID_ATTR,
+  DERIVED_ID_PREFIX,
+  RICH_TEXT_SCHEMA_VERSION,
+  canonicalJson,
+  ensureRecordBlockIds,
+  ensureTopLevelBlockIds,
+  hashBlock,
+  type BlockIdsResult,
+  type RecordBlockIdsResult,
+} from "./block-ids";

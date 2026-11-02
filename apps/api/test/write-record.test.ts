@@ -415,7 +415,7 @@ describe("writeRecord", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     // richtext は data に残る(mention は data と relations の両方に現れる — relations は派生)
-    expect(result.record.data["body"]).toMatchObject({ schemaVersion: 1 });
+    expect(result.record.data["body"]).toMatchObject({ schemaVersion: 2 }); // M2-1 で版 2 に上がる
     expect(result.record.fieldVersions["body"]).toBe(1);
   });
 });

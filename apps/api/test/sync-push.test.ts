@@ -164,8 +164,9 @@ describe("sync push", () => {
       expect(result.conflicts?.[0]?.fieldKey).toBe("body");
     }
     const stored = asRecordSnapshot(await stub.getRecord(uuid(90)));
-    expect(stored?.data["body"]).toEqual({
-      schemaVersion: 1,
+    // M2-1: 保存される本文は版 2(最上位ブロックに ID)。中身はサーバー版のまま
+    expect(stored?.data["body"]).toMatchObject({
+      schemaVersion: 2,
       doc: {
         type: "doc",
         content: [{ type: "paragraph", content: [{ type: "text", text: "server" }] }],

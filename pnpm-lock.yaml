@@ -66,6 +66,9 @@ catalogs:
     '@tiptap/extension-mention':
       specifier: ^3.31.4
       version: 3.31.4
+    '@tiptap/extension-unique-id':
+      specifier: 3.31.4
+      version: 3.31.4
     '@tiptap/markdown':
       specifier: 3.31.4
       version: 3.31.4
@@ -422,6 +425,9 @@ importers:
       '@tiptap/extension-mention':
         specifier: 'catalog:'
         version: 3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/suggestion@3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))
+      '@tiptap/extension-unique-id':
+        specifier: 'catalog:'
+        version: 3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)
       '@tiptap/pm':
         specifier: 'catalog:'
         version: 3.31.4
@@ -2317,6 +2323,12 @@ packages:
     resolution: {integrity: sha512-0iFGPIqmqGkCrOFh1OPo7Dzv5s86dVN3bZaugsz0jK04otkb8bn04ZDKP2/6Wq+lcK0M9DfJ0QqfW5hC2nBZxQ==}
     peerDependencies:
       '@tiptap/core': 3.31.4
+
+  '@tiptap/extension-unique-id@3.31.4':
+    resolution: {integrity: sha512-UtdgDSWAMzxQ+fsu3ZFNmFPrYFS64ixyZr7GF08RHf3DyUXYPWqyhwRVmA4/Bh7DQPRerz1GTS7VwFGL+Wc1Ew==}
+    peerDependencies:
+      '@tiptap/core': 3.31.4
+      '@tiptap/pm': 3.31.4
 
   '@tiptap/extensions@3.31.4':
     resolution: {integrity: sha512-nIupIne/sHpV2Kw1M4MOmr4+G454KI8BXM5+LWKOU2EpzfALZWVSy7koF9lVRna4Zp5Gv8hfg5Z8kvmrYQvhkw==}
@@ -5102,6 +5114,12 @@ snapshots:
   '@tiptap/extension-underline@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))':
     dependencies:
       '@tiptap/core': 3.31.4(@tiptap/pm@3.31.4)
+
+  '@tiptap/extension-unique-id@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)':
+    dependencies:
+      '@tiptap/core': 3.31.4(@tiptap/pm@3.31.4)
+      '@tiptap/pm': 3.31.4
+      uuid: 14.0.2
 
   '@tiptap/extensions@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)':
     dependencies:

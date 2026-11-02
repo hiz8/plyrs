@@ -81,8 +81,9 @@ it("本文の画像ボタンから 1 件を選ぶと assetImage が本文に入�
   const change = pushes(harness.latest())[0];
   if (change === undefined) throw new Error("expected a pushed change");
   const body = change.input["body"] as { doc: { content: Array<Record<string, unknown>> } };
+  // M2-1: 最上位ブロックには UniqueID が id を振る
   expect(body.doc.content).toContainEqual({
     type: "assetImage",
-    attrs: { recordType: "asset", recordId: ASSET_1, label: "one.png" },
+    attrs: { recordType: "asset", recordId: ASSET_1, label: "one.png", id: expect.any(String) },
   });
 });

@@ -1,4 +1,9 @@
-import { contentTypeDefinitionSchema, uuidSchema, WORKFLOW_STATUSES } from "@plyrs/metamodel";
+import {
+  contentTypeDefinitionSchema,
+  ensureRecordBlockIds,
+  uuidSchema,
+  WORKFLOW_STATUSES,
+} from "@plyrs/metamodel";
 import { z } from "zod";
 import { loadAllContentTypeRows, loadContentTypeByKey, rowToDefinition } from "../do/content-types";
 import {
@@ -126,7 +131,12 @@ export const READ_HANDLERS = {
     if (record === null || record.deletedAt !== null) {
       return { ok: false, code: "not_found", message: `record not found: ${input.recordId}` };
     }
-    return { ok: true, output: record };
+    // M2-1(決定 44): v1 のまま保存されている本文には読み取り時に決定的な ID を導出して返す
+    // (保存行は書き換えない。次の書き込みで永続化される)。型定義が無ければそのまま返す
+    const row = loadContentTypeByKey(ctx.sql, record.type);
+    const data =
+      row === null ? record.data : ensureRecordBlockIds(rowToDefinition(row), record.data).data;
+    return { ok: true, output: data === record.data ? record : { ...record, data } };
   },
   record_list: (
     ctx: OpContext,

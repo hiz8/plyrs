@@ -156,6 +156,36 @@ async function toggleHeadingAndSave(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("richtext のワイヤレベル編集(/t/$tenantSlug/content/$typeKey/$recordId)", () => {
+  // M2-1(決定 44、Review Focus 1): v1 の record(入れ子リスト込み)を開いただけでは push が起きない。
+  // UniqueID の onCreate による ID 付与が onChange に乗ると、未更新 record の版が開くたびに上がる
+  it("does not push when merely opening a v1 record with nested blocks", async () => {
+    const harness = socketHarness();
+    renderEditor(harness);
+    await vi.waitFor(() => expect(harness.sockets.length).toBe(1));
+    const body = {
+      schemaVersion: 1,
+      doc: {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "旧本文" }] },
+          {
+            type: "bulletList",
+            content: [
+              {
+                type: "listItem",
+                content: [{ type: "paragraph", content: [{ type: "text", text: "項目" }] }],
+              },
+            ],
+          },
+        ],
+      },
+    };
+    await bootstrapped(harness.latest(), [article({ input: { title: "旧タイトル", body } })]);
+    await screen.findByRole("textbox", { name: "body" });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(pushes(harness.latest())).toEqual([]);
+  });
+
   it("pushes only the body with its base version and the schemaVersion envelope", async () => {
     const harness = socketHarness();
     renderEditor(harness);
@@ -174,8 +204,10 @@ describe("richtext のワイヤレベル編集(/t/$tenantSlug/content/$typeKey/$
       schemaVersion: number;
       doc: { content: Array<{ type: string }> };
     };
-    expect(body.schemaVersion).toBe(1);
+    // M2-1: v1 の本文はエディタへ渡す前に ID 導出を通るので、保存される本文は版 2 で ID 付き
+    expect(body.schemaVersion).toBe(2);
     expect(body.doc.content[0]?.type).toBe("heading");
+    expect(typeof (body.doc.content[0] as { attrs?: { id?: unknown } }).attrs?.id).toBe("string");
     expect(change.input["title"]).toBe("旧タイトル");
 
     // ack で確定 → エラーバナーなし
