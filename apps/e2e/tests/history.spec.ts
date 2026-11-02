@@ -32,15 +32,13 @@ test("edit history shows versions and restores the first one", async ({ page }) 
   await openRecordEditor(page, first);
   await publishRecord(page);
 
-  // 2 版目: 改題して下書き保存(publish の後なので新しい版になる)
+  // 2 版目: 改題して公開せずに保存(publish の後なので新しい版になる。公開中の record では
+  // 公開ボックスのボタンが「公開せずに保存」/「更新」になる)
   const second = "改題した記事";
   const title = page.getByRole("textbox", { name: "title" });
   await title.clear();
   await title.fill(second);
-  await page
-    .getByRole("region", { name: "公開", exact: true })
-    .getByRole("button", { name: "下書き保存" })
-    .click();
+  await page.getByRole("button", { name: "公開せずに保存" }).first().click();
   await expect(page.getByRole("region", { name: "通知" }).getByText("保存しました")).toBeVisible();
 
   // 履歴画面: 公開版の疑似行 + 版(write / publish / write)
@@ -65,8 +63,9 @@ test("edit history shows versions and restores the first one", async ({ page }) 
   await page.waitForURL(/\/content\/article\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("textbox", { name: "title" })).toHaveValue(first);
 
-  // 復元も履歴に残る(restore の版が先頭に増える)
+  // 復元も履歴に残る(公開版の疑似行の次、版の先頭に restore の版が増える)
   await page.getByRole("button", { name: "履歴" }).click();
   await expect(page.getByRole("heading", { name: "履歴", level: 1 })).toBeVisible();
-  await expect(list.getByRole("listitem").first()).toContainText("復元");
+  await expect(list.getByRole("listitem")).toHaveCount(5);
+  await expect(list.getByRole("listitem").nth(1)).toContainText("復元");
 });
