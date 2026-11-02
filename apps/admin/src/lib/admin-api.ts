@@ -21,6 +21,8 @@ export interface ContentTypeSummary {
   titleField: string | null;
   listColumns: string[] | null;
   menuOrder: number | null;
+  // 16.11(M2-8): 型単位の執筆ガイド(null は未指定)
+  writingGuide: string | null;
 }
 
 // apps/api/src/do/publish.ts の PublicationState と構造一致(HTTP 契約)

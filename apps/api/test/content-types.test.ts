@@ -229,3 +229,27 @@ describe("display metadata (案 E 2 章)", () => {
     });
   });
 });
+
+describe("writingGuide(16.11 / M2-8)", () => {
+  it("執筆ガイドを保存し、getContentType と型定義の往復で保たれる。同じ定義の再登録は no-op", async () => {
+    const stub = freshStub();
+    const guide = "見出しは 1 つ。本文は 3 段落で、最後に次の記事への導線を置く。";
+    const first = await stub.registerContentType(
+      { ...articleType(), writingGuide: guide },
+      auth("admin"),
+    );
+    expect(first.ok).toBe(true);
+    const row = await stub.getContentType("article");
+    expect(row?.writingGuide).toBe(guide);
+    const again = await stub.registerContentType(
+      { ...articleType(), writingGuide: guide },
+      auth("admin"),
+    );
+    expect(again.ok && again.applied).toBe(false);
+    expect(again.ok && again.contentType.version).toBe(1);
+    // 外すと NULL に戻り、version が進む
+    const removed = await stub.registerContentType(articleType(), auth("admin"));
+    expect(removed.ok && removed.contentType.writingGuide).toBeNull();
+    expect(removed.ok && removed.contentType.version).toBe(2);
+  });
+});

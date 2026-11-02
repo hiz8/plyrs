@@ -71,6 +71,12 @@ export const relationRefSchema = z.strictObject({
 export type RelationRef = z.infer<typeof relationRefSchema>;
 
 export function buildFieldValueSchema(field: FieldDefinition): z.ZodType<unknown> {
+  const schema = buildBareFieldValueSchema(field);
+  // 16.11(M2-8): フィールドの description は JSON Schema(recordInputJsonSchema)にも載せる
+  return field.description === undefined ? schema : schema.describe(field.description);
+}
+
+function buildBareFieldValueSchema(field: FieldDefinition): z.ZodType<unknown> {
   switch (field.type) {
     case "text": {
       const maxLength = field.config?.maxLength;
@@ -122,6 +128,18 @@ export function buildRecordInputSchema(contentType: ContentTypeDefinition) {
   return z.looseObject(shape);
 }
 
+export type JsonSchema = Record<string, unknown>;
+
+// 16.11(M2-8): record の input の JSON Schema。MCP の resource plyrs://types/{key}/schema で配り、
+// エージェントが型の構造(フィールド・必須・説明)を 1 回の read で知るためのもの。
+// 型定義に無いキーは looseObject と同じく許す(additionalProperties は zod の既定に従う)
+export function recordInputJsonSchema(contentType: ContentTypeDefinition): JsonSchema {
+  const schema = buildRecordInputSchema(contentType).meta({
+    title: contentType.name,
+    ...(contentType.description === undefined ? {} : { description: contentType.description }),
+  });
+  return z.toJSONSchema(schema, { io: "input", unrepresentable: "any" }) as JsonSchema;
+}
 export interface SplitRecordInput {
   data: Record<string, unknown>;
   relations: Array<{ fieldKey: string; refs: RelationRef[] }>;

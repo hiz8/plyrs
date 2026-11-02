@@ -847,7 +847,7 @@ record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴�
 
 初期リリースのツールは、型の参照（`type_list` / `type_get`、型スキーマは MCP の resources `plyrs://types/{key}` でも配る）、record の `list` / `search` / `get` / `create` / `update`（ブロック操作を含む）/ `delete`、`history` / `restore`、`publish` / `unpublish` / `compare`、アセット登録。型の変更・メンバー管理・モジュール有効化は後回し。
 
-型とフィールドの `description` と、型単位の「執筆ガイド」欄（論点 A3）をメタモデルに足し、`type_get`・JSON Schema・resources・prompts に載せる。型をデータで持つ本システムでは、記事の構造と書き方を知る手がかりが型定義しかないため。
+型とフィールドの `description` と、型単位の「執筆ガイド」欄（論点 A3、`writingGuide`、4000 文字以内）をメタモデルに足し、`type_get`・JSON Schema・resources・prompts に載せる（M2-8 で実装）。型をデータで持つ本システムでは、記事の構造と書き方を知る手がかりが型定義しかないため。配り方は 3 つ: `type_get` と resource `plyrs://types/{key}` の定義に `writingGuide` が載る。resource `plyrs://types/{key}/schema` は record の input の JSON Schema（`z.toJSONSchema`、フィールドの `description` と必須を含む。`application/schema+json`）。prompt `writing_guide`（引数 `type`）は型の説明・執筆ガイド・フィールドごとの型と必須と説明を 1 通にまとめる。執筆ガイドと型の説明は利用者が書いた設定なので、prompt の本文にも record と同じ前置き（16.10）を付ける。
 
 アセットは、使い切りのアップロードトークンを返すツール + 既存の `POST /assets`（20MB 上限、assetGuard の beforeWrite）と、URL からの取り込みの 2 経路。R2 の Workers binding では署名付き URL を作れない。URL 取り込みは Worker から任意 URL を fetch するので、公開アドレスのみ許可・リダイレクト先の再検証・サイズ上限で SSRF を防ぐ。
 

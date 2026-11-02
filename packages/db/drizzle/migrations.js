@@ -6,6 +6,7 @@ import m0003 from "./0003_high_sersi.sql";
 import m0004 from "./0004_aberrant_killraven.sql";
 import m0005 from "./0005_famous_mister_sinister.sql";
 import m0006 from "./0006_brown_roland_deschain.sql";
+import m0007 from "./0007_equal_roland_deschain.sql";
 
 export default {
   journal,
@@ -17,5 +18,6 @@ export default {
     m0004,
     m0005,
     m0006,
+    m0007,
   },
 };

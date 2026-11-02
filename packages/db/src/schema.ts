@@ -27,6 +27,8 @@ export const contentTypes = sqliteTable(
     titleField: text("title_field"),
     listColumns: text("list_columns"), // JSON: string[]
     menuOrder: integer("menu_order"),
+    // 16.11(M2-8): 型単位の執筆ガイド(NULL は未指定)。MCP の prompt writing_guide で配る
+    writingGuide: text("writing_guide"),
   },
   (table) => [uniqueIndex("idx_content_types_key").on(table.key)],
 );

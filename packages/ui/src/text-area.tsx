@@ -5,7 +5,7 @@ import {
   type InputRenderProps,
 } from "react-aria-components";
 import { stylexRenderProps } from "./compose";
-import { FieldErrorMessage, FieldLabel, fieldClassName } from "./field";
+import { FieldDescription, FieldErrorMessage, FieldLabel, fieldClassName } from "./field";
 import { bg, border, focus, font, radius, space, status, stroke, text } from "./semantic.stylex";
 
 const styles = stylex.create({
@@ -52,6 +52,8 @@ export interface TextAreaProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  /** ラベル直下に表示する短い補足説明(TextField と同じスロット)。 */
+  description?: string;
   rows?: number;
   errorMessage?: string;
   isInvalid?: boolean;
@@ -64,6 +66,7 @@ export function TextArea({
   label,
   value,
   onChange,
+  description,
   rows,
   errorMessage,
   isInvalid,
@@ -82,6 +85,7 @@ export function TextArea({
       className={fieldClassName()}
     >
       <FieldLabel isRequired={isRequired}>{label}</FieldLabel>
+      {description !== undefined && <FieldDescription>{description}</FieldDescription>}
       <RacTextArea
         rows={rows ?? 6}
         className={stylexRenderProps<InputRenderProps>((state) => [

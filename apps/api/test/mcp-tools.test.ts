@@ -21,6 +21,7 @@ const PROTOCOL = "2026-07-28";
 const NOW = new Date();
 const RECORD = uuid(801);
 const AUTHOR = uuid(802);
+const GUIDE = "見出しは 1 つ。本文は 3 段落で、最後に次の記事への導線を置く。";
 
 let tenantId: string;
 let userId: string;
@@ -48,7 +49,9 @@ beforeAll(async () => {
 
   const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
   const owner = { ...auth("owner", "owner"), tenantId };
-  expect((await stub.registerContentType(articleType(), owner)).ok).toBe(true);
+  expect(
+    (await stub.registerContentType({ ...articleType(), writingGuide: GUIDE }, owner)).ok,
+  ).toBe(true);
   const written = asWriteResult(
     await stub.writeRecord(
       "article",
@@ -222,7 +225,11 @@ describe("resources", () => {
     const resources = list["resources"] as Record<string, unknown>[];
     // システム型 asset(ensure-asset-type)も型なので並ぶ。順序は type_list と同じ
     const types = (await call("type_list")).structuredContent?.["types"] as { key: string }[];
-    expect(resources.map((r) => r["uri"])).toEqual(types.map((t) => `plyrs://types/${t.key}`));
+    // M2-8: 型ごとに定義とスキーマの 2 つが並ぶ(定義が先)
+    expect(resources.map((r) => r["uri"])).toEqual([
+      ...types.map((t) => `plyrs://types/${t.key}`),
+      ...types.map((t) => `plyrs://types/${t.key}/schema`),
+    ]);
     expect(resources.map((r) => r["uri"])).toContain("plyrs://types/article");
     expect(resources[0]).toMatchObject({ mimeType: "application/json" });
     expect(list["ttlMs"]).toBe(60_000);
@@ -232,7 +239,10 @@ describe("resources", () => {
   it("resources/templates/list に plyrs://types/{key} がある", async () => {
     const list = await rpc("resources/templates/list");
     const templates = list["resourceTemplates"] as Record<string, unknown>[];
-    expect(templates.map((t) => t["uriTemplate"])).toEqual(["plyrs://types/{key}"]);
+    expect(templates.map((t) => t["uriTemplate"])).toEqual([
+      "plyrs://types/{key}",
+      "plyrs://types/{key}/schema",
+    ]);
   });
 
   it("resources/read で型が無ければリソース不在(-32602 + data.uri)を返す", async () => {
@@ -252,5 +262,68 @@ describe("resources", () => {
     const parsed = typeGet.output.safeParse(JSON.parse(contents[0]?.text ?? ""));
     expect(parsed.success).toBe(true);
     expect(result["ttlMs"]).toBe(60_000);
+  });
+
+  it("resources/list に型スキーマ plyrs://types/{key}/schema も並ぶ", async () => {
+    const result = await rpc("resources/list");
+    const uris = (result["resources"] as { uri: string }[]).map((r) => r.uri);
+    expect(uris).toContain("plyrs://types/article");
+    expect(uris).toContain("plyrs://types/article/schema");
+  });
+
+  it("resources/read plyrs://types/article/schema は record の input の JSON Schema を返す", async () => {
+    const result = await rpc("resources/read", { uri: "plyrs://types/article/schema" });
+    const contents = result["contents"] as { uri: string; mimeType?: string; text?: string }[];
+    expect(contents[0]?.uri).toBe("plyrs://types/article/schema");
+    expect(contents[0]?.mimeType).toBe("application/schema+json");
+    const schema = JSON.parse(contents[0]?.text ?? "") as {
+      title?: string;
+      required?: string[];
+      properties?: Record<string, unknown>;
+    };
+    expect(schema.title).toBe("記事");
+    expect(schema.required).toContain("title");
+    expect(Object.keys(schema.properties ?? {})).toContain("body");
+    const missing = await rpcRaw("resources/read", { uri: "plyrs://types/no-such-type/schema" });
+    const json = await missing.json<{ error?: { code: number } }>();
+    expect(json.error?.code).toBe(-32602);
+  });
+});
+
+describe("prompts(16.11: 執筆ガイド)", () => {
+  it("prompts/list に writing_guide があり、引数 type を要求する", async () => {
+    const result = await rpc("prompts/list");
+    const prompts = result["prompts"] as {
+      name: string;
+      arguments?: { name: string; required?: boolean }[];
+    }[];
+    const guide = prompts.find((p) => p.name === "writing_guide");
+    expect(guide).toBeDefined();
+    expect(guide?.arguments).toEqual([expect.objectContaining({ name: "type", required: true })]);
+  });
+
+  it("prompts/get writing_guide は型の説明・執筆ガイド・フィールドの案内を本文に含む", async () => {
+    const result = await rpc("prompts/get", {
+      name: "writing_guide",
+      arguments: { type: "article" },
+    });
+    const messages = result["messages"] as {
+      role: string;
+      content: { type: string; text?: string };
+    }[];
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.role).toBe("user");
+    const text = messages[0]?.content.text ?? "";
+    expect(text).toContain(GUIDE);
+    expect(text).toContain("記事");
+    expect(text).toContain("title");
+    expect(text).toContain("必須");
+    expect(text).toContain("tools/call record_create");
+  });
+
+  it("prompts/get で型が無ければ invalid params(-32602)", async () => {
+    const res = await rpcRaw("prompts/get", { name: "writing_guide", arguments: { type: "nope" } });
+    const json = await res.json<{ error?: { code: number } }>();
+    expect(json.error?.code).toBe(-32602);
   });
 });

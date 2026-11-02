@@ -18,6 +18,7 @@ export function summary(
     titleField: null,
     listColumns: null,
     menuOrder: null,
+    writingGuide: null,
     ...overrides,
   };
 }

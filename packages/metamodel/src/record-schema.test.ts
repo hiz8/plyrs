@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ContentTypeDefinition } from "./content-type";
-import { buildRecordInputSchema, richTextEnvelopeSchema, splitRecordInput } from "./record-schema";
+import {
+  buildRecordInputSchema,
+  recordInputJsonSchema,
+  richTextEnvelopeSchema,
+  splitRecordInput,
+} from "./record-schema";
 
 const UUID = (n: number) => `018f2b6a-7a0a-7000-8000-00000000000${n}`;
 
@@ -274,5 +279,42 @@ describe("richTextEnvelopeSchema (Phase 7: ノード型名に依存しない構�
     const schema = buildRecordInputSchema(contentType);
     expect(schema.safeParse({ body: { schemaVersion: 1, doc: validDoc } }).success).toBe(true);
     expect(schema.safeParse({ body: { schemaVersion: 1, doc: 42 } }).success).toBe(false);
+  });
+});
+
+describe("recordInputJsonSchema(16.11 / M2-8)", () => {
+  const definition: ContentTypeDefinition = {
+    id: "018f2b6a-7a0a-7000-8000-0000000000aa",
+    key: "article",
+    name: "記事",
+    description: "ブログの記事",
+    source: "user",
+    version: 1,
+    fields: [
+      { key: "title", type: "text", required: true, description: "60 文字以内の見出し" },
+      { key: "body", type: "richtext" },
+      {
+        key: "tags",
+        type: "select",
+        config: { multiple: true, options: [{ value: "a", label: "A" }] },
+      },
+    ],
+  };
+
+  it("型名と説明、フィールドの description と required を JSON Schema に出す", () => {
+    const schema = recordInputJsonSchema(definition) as {
+      title?: string;
+      description?: string;
+      required?: string[];
+      properties?: Record<string, { description?: string; type?: string }>;
+    };
+    expect(schema.title).toBe("記事");
+    expect(schema.description).toBe("ブログの記事");
+    expect(schema.required).toStrictEqual(["title"]);
+    expect(schema.properties?.["title"]?.description).toBe("60 文字以内の見出し");
+    expect(schema.properties?.["title"]?.type).toBe("string");
+    expect(schema.properties?.["body"]).toBeDefined();
+    expect(schema.properties?.["tags"]?.type).toBe("array");
+    expect(JSON.parse(JSON.stringify(schema))).toStrictEqual(schema);
   });
 });

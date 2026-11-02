@@ -21,6 +21,8 @@ export interface ContentTypeRow {
   titleField: string | null;
   listColumns: string[] | null;
   menuOrder: number | null;
+  // 16.11(M2-8): 型単位の執筆ガイド(null は未指定)
+  writingGuide: string | null;
 }
 
 export type RegisterContentTypeResult =
@@ -45,6 +47,7 @@ interface RawContentTypeRow extends Record<string, SqlStorageValue> {
   title_field: string | null;
   list_columns: string | null;
   menu_order: number | null;
+  writing_guide: string | null;
 }
 
 export function issuesToMessage(issues: z.core.$ZodIssue[]): string {
@@ -66,6 +69,7 @@ function rowToContentTypeRow(row: RawContentTypeRow): ContentTypeRow {
     titleField: row.title_field,
     listColumns: row.list_columns === null ? null : (JSON.parse(row.list_columns) as string[]),
     menuOrder: row.menu_order,
+    writingGuide: row.writing_guide,
   };
 }
 
@@ -100,6 +104,7 @@ export function rowToDefinition(row: ContentTypeRow): ContentTypeDefinition {
     ...(row.titleField === null ? {} : { titleField: row.titleField }),
     ...(row.listColumns === null ? {} : { listColumns: row.listColumns }),
     ...(row.menuOrder === null ? {} : { menuOrder: row.menuOrder }),
+    ...(row.writingGuide === null ? {} : { writingGuide: row.writingGuide }),
   };
 }
 
@@ -110,6 +115,7 @@ function displayColumns(def: ContentTypeDefinition) {
     titleField: def.titleField ?? null,
     listColumns: def.listColumns ?? null,
     menuOrder: def.menuOrder ?? null,
+    writingGuide: def.writingGuide ?? null,
   };
 }
 
@@ -174,7 +180,8 @@ export function registerContentTypeCore(
     prev.description === display.description &&
     prev.titleField === display.titleField &&
     JSON.stringify(prev.listColumns) === JSON.stringify(display.listColumns) &&
-    prev.menuOrder === display.menuOrder
+    prev.menuOrder === display.menuOrder &&
+    prev.writingGuide === display.writingGuide
   ) {
     return { ok: true, contentType: prev, applied: false };
   }
@@ -184,7 +191,7 @@ export function registerContentTypeCore(
   const listColumnsJson = display.listColumns === null ? null : JSON.stringify(display.listColumns);
   if (prev === null) {
     sql.exec(
-      "INSERT INTO content_types (id, key, name, fields, source, plugin_id, created_at, updated_at, version, description, title_field, list_columns, menu_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO content_types (id, key, name, fields, source, plugin_id, created_at, updated_at, version, description, title_field, list_columns, menu_order, writing_guide) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       def.id,
       def.key,
       def.name,
@@ -198,10 +205,11 @@ export function registerContentTypeCore(
       display.titleField,
       listColumnsJson,
       display.menuOrder,
+      display.writingGuide,
     );
   } else {
     sql.exec(
-      "UPDATE content_types SET name = ?, fields = ?, source = ?, plugin_id = ?, updated_at = ?, version = ?, description = ?, title_field = ?, list_columns = ?, menu_order = ? WHERE id = ?",
+      "UPDATE content_types SET name = ?, fields = ?, source = ?, plugin_id = ?, updated_at = ?, version = ?, description = ?, title_field = ?, list_columns = ?, menu_order = ?, writing_guide = ? WHERE id = ?",
       def.name,
       fieldsJson,
       def.source,
@@ -212,6 +220,7 @@ export function registerContentTypeCore(
       display.titleField,
       listColumnsJson,
       display.menuOrder,
+      display.writingGuide,
       def.id,
     );
   }

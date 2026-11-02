@@ -726,6 +726,10 @@ export const CONTENT_TYPE_LABELS = {
     descriptionPlaceholder: "この種類の内容を一言で",
     descriptionHelp: "設定の一覧と、はじめての利用の案内に表示します",
     descriptionTooLong: "説明は 1000 文字以内で入力してください",
+    writingGuideLabel: "執筆ガイド",
+    writingGuideHelp:
+      "この種類の内容をどう書くかの案内(構成・文体・長さなど)。AI エージェントが MCP 経由で書くときの手がかりになります",
+    writingGuideTooLong: "執筆ガイドは 4000 文字以内で入力してください",
     fields: "フィールド",
     fieldsHelp: "上から順に入力フォームに並びます",
     emptyTitle: "フィールドはまだありません",

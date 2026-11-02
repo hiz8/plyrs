@@ -166,13 +166,23 @@ export interface TypeDraft {
   name: string;
   key: string;
   description: string;
+  // 16.11(M2-8): 執筆ガイド(複数行)。空文字は未指定
+  writingGuide: string;
   fields: FieldDraft[];
   titleField: string | null;
   listColumns: string[];
 }
 
 export function emptyTypeDraft(): TypeDraft {
-  return { name: "", key: "", description: "", fields: [], titleField: null, listColumns: [] };
+  return {
+    name: "",
+    key: "",
+    description: "",
+    writingGuide: "",
+    fields: [],
+    titleField: null,
+    listColumns: [],
+  };
 }
 
 export function toTypeDraft(row: ContentTypeSummary): TypeDraft {
@@ -180,6 +190,7 @@ export function toTypeDraft(row: ContentTypeSummary): TypeDraft {
     name: row.name,
     key: row.key,
     description: row.description ?? "",
+    writingGuide: row.writingGuide ?? "",
     fields: row.fields.map(toFieldDraft),
     titleField: row.titleField,
     listColumns: row.listColumns ?? [],
@@ -512,6 +523,7 @@ export function buildDefinition(args: {
     draft.fields.some((field) => field.key === key),
   );
   const description = draft.description.trim();
+  const writingGuide = draft.writingGuide.trim();
   const parsed = contentTypeDefinitionSchema.safeParse({
     id: args.id,
     key: draft.key,
@@ -520,6 +532,7 @@ export function buildDefinition(args: {
     source: "user",
     version: args.version,
     ...(description === "" ? {} : { description }),
+    ...(writingGuide === "" ? {} : { writingGuide }),
     ...(titleTarget === undefined ? {} : { titleField: titleTarget.key }),
     ...(listColumns.length === 0 ? {} : { listColumns }),
     ...(args.menuOrder === undefined ? {} : { menuOrder: args.menuOrder }),
@@ -557,5 +570,6 @@ export function summaryToDefinition(row: ContentTypeSummary): ContentTypeDefinit
     ...(row.titleField === null ? {} : { titleField: row.titleField }),
     ...(row.listColumns === null ? {} : { listColumns: row.listColumns }),
     ...(row.menuOrder === null ? {} : { menuOrder: row.menuOrder }),
+    ...(row.writingGuide === null ? {} : { writingGuide: row.writingGuide }),
   };
 }
