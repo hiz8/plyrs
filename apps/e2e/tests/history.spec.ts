@@ -38,8 +38,12 @@ test("edit history shows versions and restores the first one", async ({ page }) 
   const title = page.getByRole("textbox", { name: "title" });
   await title.clear();
   await title.fill(second);
+  // 初版作成の「保存しました」トースト(5 秒で消える)が残っていると、この保存のトーストと
+  // 2 つ並んで strict mode に引っかかる。消えるのを待ってから保存する
+  const toasts = page.getByRole("region", { name: "通知" });
+  await expect(toasts.getByText("保存しました")).toHaveCount(0);
   await page.getByRole("button", { name: "公開せずに保存" }).first().click();
-  await expect(page.getByRole("region", { name: "通知" }).getByText("保存しました")).toBeVisible();
+  await expect(toasts.getByText("保存しました")).toBeVisible();
 
   // 履歴画面: 公開版の疑似行 + 版(write / publish / write)
   await page.getByRole("button", { name: "履歴" }).click();
