@@ -99,6 +99,8 @@ test("PAT を発行して MCP から型と record を読む", async ({ page }) =
     "type_get",
     "record_list",
     "record_get",
+    "record_history",
+    "record_compare",
   ]);
 
   const records = await result(
