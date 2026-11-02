@@ -23,7 +23,7 @@ import { MODULE_REGISTRY } from "../modules/registry";
 import { deleteTenantCascade } from "../ops/tenant-delete";
 import { superGate, type SuperGateVariables } from "../middleware/super-gate";
 import type { ProjectionJob } from "../projection/jobs";
-import { asHealthReport, asReprojectResult, asStringArray } from "../rpc-unwrap";
+import { asHealthReport, asReindexResult, asReprojectResult, asStringArray } from "../rpc-unwrap";
 import { TENANT_SLUG_MAX_LENGTH, TENANT_SLUG_PATTERN } from "./tenants";
 
 // Minor 掃除(§16-3): precheck の SELECT と INSERT の間で同じ slug が挿入される TOCTOU レース
@@ -327,6 +327,26 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       targetType: "tenant",
       targetId: tenantId,
       detail: { epoch: result.epoch },
+    });
+    return c.json(result);
+  })
+  // 16.9(M2-9): 全文検索の索引をテナント単位で作り直す(DO 内で同期に完了する)。認可は reproject と
+  // 同じ projection:rebuild(索引は公開用 DB と同じく再構築可能な派生物)
+  .post("/tenants/:tenantId/search-reindex", async (c) => {
+    const tenantId = c.req.param("tenantId");
+    const stub = c.env.TENANT_DO.get(c.env.TENANT_DO.idFromName(tenantId));
+    const result = asReindexResult(
+      await stub.reindexSearch(superAuthContext(c.get("superAdmin").adminId, tenantId)),
+    );
+    if (!result.ok) {
+      return c.json(result, 403);
+    }
+    await writeAudit(c.env.DB, {
+      actorId: c.get("superAdmin").adminId,
+      action: "tenant.search_reindex",
+      targetType: "tenant",
+      targetId: tenantId,
+      detail: { indexed: result.indexed },
     });
     return c.json(result);
   })

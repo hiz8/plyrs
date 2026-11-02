@@ -12,6 +12,7 @@ import { issuesToMessage, rowToDefinition, type ContentTypeRow } from "./content
 import { computeChangeSet } from "./diff";
 import { recordHistory } from "./history";
 import { runBeforeWriteHooks, type BeforeWriteHook } from "./hooks";
+import { indexRecord, searchText } from "./search";
 import { moduleBeforeWriteHooks } from "../modules/hooks";
 import { emitModuleEvents } from "../modules/events";
 import { uniqueCheckHook } from "./unique-check";
@@ -267,6 +268,9 @@ export function writeRecordCore(
       );
     });
   }
+
+  // 16.9(M2-9): 全文検索の索引は records の派生データとして同じトランザクションで張り直す
+  indexRecord(deps.sql, params.recordId, contentType.key, searchText(definition, change.data));
 
   // §9.4 ステップ5: afterWrite はコミットと同一トランザクションで積む(送出は呼び出し元)。
   if (deps.newEventId !== undefined) {

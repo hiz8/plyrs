@@ -9,6 +9,7 @@ describe("操作カタログの読み込み順", () => {
     vi.resetModules();
     const read = await import("../src/ops/read");
     const history = await import("../src/ops/history");
+    const search = await import("../src/ops/search");
     const write = await import("../src/ops/write");
     const catalog = await import("../src/ops/catalog");
     expect(read.READ_OPERATIONS.map((op) => op.name)).toEqual([
@@ -17,6 +18,7 @@ describe("操作カタログの読み込み順", () => {
       "record_list",
       "record_get",
     ]);
+    expect(search.SEARCH_OPERATIONS.map((op) => op.name)).toEqual(["record_search"]);
     expect(history.HISTORY_OPERATIONS.map((op) => op.name)).toEqual([
       "record_history",
       "record_compare",
@@ -31,6 +33,7 @@ describe("操作カタログの読み込み順", () => {
     ]);
     expect(catalog.OPERATIONS.map((op) => op.name)).toEqual([
       ...read.READ_OPERATIONS.map((op) => op.name),
+      ...search.SEARCH_OPERATIONS.map((op) => op.name),
       ...history.HISTORY_OPERATIONS.map((op) => op.name),
       ...write.WRITE_OPERATIONS.map((op) => op.name),
     ]);

@@ -831,7 +831,7 @@ record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴�
 
 - **一覧（`record_list`）は初期リリースに必須**。文法は公開 API（第 12.4 章、`filter[...]` / `sort` / `include` / `cursor`）に揃え、文法の解釈は `public/query.ts` を共有する。実行器は `records.data`（JSON）に対して新しく作る（公開側の出力型は公開用 DB の索引列に結び付いているため）。
 - フィルタできるフィールドは公開側と同じく **索引宣言済み + システム列**（`type` / `status` / `updated_at`）に限る（仮置き。無制限に `json_extract` を許すと DO の行読み取りが膨らむ）。`limit` に上限を設ける。`cursor` は同期の `seq`。下書きを含め、削除済みは除く。
-- **下書きを含む全文検索**は DO-SQLite の **FTS5** 仮想テーブルで作り、`writeRecord` で更新する。既存 record を索引に入れるため、公開用 DB の再構築と同じ形の再索引ジョブを持つ。FTS5 への書き込みも rows written に計上される。
+- **下書きを含む全文検索**（`record_search`、M2-9 で実装）は DO-SQLite の **FTS5** 仮想テーブル `records_fts` で作り、`writeRecord`（索引の張り直し）と削除（索引から外す）で更新する。対象は text フィールドの値と richtext のプレーンテキスト（json / relation / 数値 / 日時 / select は含めない）。tokenizer は **trigram**（日本語の分かち書きが不要）で、3 文字以上の語は `MATCH`（語ごとに引用符で囲み AND）、**2 文字以下の語を含む問い合わせは `LIKE` の部分一致**に落とす（trigram は 3 文字未満に一致しないため）。既存 record を索引に入れるため、DO 起動時の一回限りの再索引（`do_config.search_indexed`）と、公開用 DB の再構築と同じ形の super の再索引（`POST /super/v1/tenants/:tenantId/search-reindex`）を持つ。FTS5 への書き込みも rows written に計上される。FTS5 の仮想テーブルは drizzle のスキーマで表せないため、このマイグレーションだけ `drizzle-kit generate --custom` で作って手で書く。
 - これは第 13 章の非目標「全文検索」からの部分的な格上げである。**公開側（公開用 DB）の全文検索は引き続き非目標**。意味検索は方式未定（M5）。
 
 ### 16.10 リッチテキスト（論点 A1・E1）

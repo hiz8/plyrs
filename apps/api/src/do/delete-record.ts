@@ -1,6 +1,7 @@
 import { recordHistory, type HistoryActor } from "./history";
 import { loadRecordInput } from "../sync/records";
 import { cascadeUnpublish } from "./publish";
+import { removeFromIndex } from "./search";
 import type { RecordSnapshot } from "./types";
 import { loadRecord } from "./write-record";
 
@@ -43,6 +44,8 @@ export function deleteRecordCore(deps: DeleteDeps, recordId: string): DeleteReco
     recordId,
   );
   deps.sql.exec("DELETE FROM relations WHERE source_id = ?", recordId);
+  // 16.9(M2-9): 削除済みは検索に出さない(復元は writeRecordCore が索引に戻す)
+  removeFromIndex(deps.sql, recordId);
   recordHistory(deps.sql, now, {
     ...deps.history,
     recordId,

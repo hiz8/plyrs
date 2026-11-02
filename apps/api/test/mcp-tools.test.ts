@@ -5,7 +5,7 @@ import { memberships, tenants, users } from "@plyrs/db/control-plane";
 import { issuePat } from "../src/auth/pat";
 import type { McpAuth } from "../src/do/authorize";
 import { app } from "../src/index";
-import { callOperation } from "../src/mcp/server";
+import { callOperation, UNTRUSTED_PREFACE } from "../src/mcp/server";
 import { OPERATIONS } from "../src/ops/catalog";
 import { recordGet, typeGet } from "../src/ops/read";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
@@ -287,6 +287,17 @@ describe("resources", () => {
     const missing = await rpcRaw("resources/read", { uri: "plyrs://types/no-such-type/schema" });
     const json = await missing.json<{ error?: { code: number } }>();
     expect(json.error?.code).toBe(-32602);
+  });
+});
+
+describe("record_search(16.9)", () => {
+  it("tools/call record_search は本文の語で見つけ、snippet を返す", async () => {
+    const result = await call("record_search", { query: "太字" });
+    expect(result.isError).not.toBe(true);
+    const items = result.structuredContent?.["items"] as { id: string; snippet: string }[];
+    expect(items.map((i) => i.id)).toEqual([RECORD]);
+    expect(items[0]?.snippet).toContain("太字");
+    expect(result.content[0]?.text?.startsWith(UNTRUSTED_PREFACE)).toBe(true);
   });
 });
 

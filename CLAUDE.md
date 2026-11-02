@@ -38,7 +38,7 @@ pnpm --filter @plyrs/admin dev       # 管理画面 + api を auxiliary worker �
 pnpm --filter @plyrs/admin build     # routeTree.gen.ts の再生成もこれで行う
 ```
 
-マイグレーション生成(必ず drizzle-kit で生成し手書きしない。生成後は `pnpm format`):
+マイグレーション生成(必ず drizzle-kit で生成し手書きしない。生成後は `pnpm format`。唯一の例外は FTS5 の仮想テーブル `records_fts`(`drizzle/0008_records_fts.sql`)で、drizzle のスキーマで表せないため `drizzle-kit generate --custom` で空ファイルを作って手で書いた):
 
 ```bash
 pnpm --filter @plyrs/db generate             # テナント DO-SQLite(drizzle/、DO 起動時に自動適用)

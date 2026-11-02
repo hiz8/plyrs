@@ -30,6 +30,7 @@ import {
   type DeleteContentTypeResult,
   type RegisterContentTypeResult,
 } from "./do/content-types";
+import { ensureSearchIndex, reindexAll } from "./do/search";
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
 import { ensureAssetContentType } from "./do/ensure-asset-type";
 import { healthCheckCore, listAssetR2KeysCore, type HealthReport } from "./do/health";
@@ -121,6 +122,8 @@ export class TenantDO extends DurableObject<Env> {
         ctx.storage.sql,
         new Date().toISOString(),
       );
+      // 16.9(M2-9): 全文検索の索引が無い(この機能より前からあるテナント)なら一度だけ全件を入れる
+      ensureSearchIndex(ctx.storage.sql);
       if (assetTypeChanged || moduleTypesChanged) {
         this.broadcastAll({
           type: "content-types",
@@ -1093,6 +1096,18 @@ export class TenantDO extends DurableObject<Env> {
       type: row.key,
       catalog: catalogRowsForFields(row.fields),
     }));
+  }
+
+  // 16.9(M2-9): 全文検索の索引の作り直し(super の運用操作)。DO 内で同期に完了する
+  reindexSearch(
+    auth: AuthContext,
+  ): { ok: true; indexed: number } | { ok: false; code: "forbidden"; message: string } {
+    const denial = requireOperation(auth, "projection:rebuild");
+    if (denial !== null) {
+      return denial;
+    }
+    const indexed = this.ctx.storage.transactionSync(() => reindexAll(this.ctx.storage.sql));
+    return { ok: true, indexed };
   }
 
   // §12.3b: テナント単位の公開用 DB の再構築を開始する（owner 限定）。epoch を刻んで最初の reproject

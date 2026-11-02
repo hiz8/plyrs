@@ -15,6 +15,7 @@ export type AuditAction =
   | "user.unban"
   | "membership.revoke"
   | "reproject.start"
+  | "tenant.search_reindex"
   | "module.redistribute"
   | "dlq.replay"
   | "dlq.discard"

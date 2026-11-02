@@ -2,6 +2,7 @@ import { requireOperation, type AuthContext, type McpAuth } from "../do/authoriz
 import { findOperation, OPERATIONS, type OpSpec } from "./catalog";
 import { HISTORY_HANDLERS } from "./history";
 import { READ_HANDLERS, type OpContext, type OpFailure } from "./read";
+import { SEARCH_HANDLERS } from "./search";
 import { WRITE_HANDLERS } from "./write";
 
 // 操作の失敗はここで表現し、HTTP や JSON-RPC のエラーにしない(design-spec 16.7 の「業務エラー」層)。
@@ -42,6 +43,7 @@ export type OpHandler = (ctx: OpContext, input: never) => { ok: true; output: un
 // として静かに失敗するので、モジュール読み込み時に対応を確かめる(export はテストのため)
 export const HANDLERS: Readonly<Record<string, OpHandler>> = {
   ...READ_HANDLERS,
+  ...SEARCH_HANDLERS,
   ...HISTORY_HANDLERS,
   ...WRITE_HANDLERS,
 };

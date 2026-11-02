@@ -117,6 +117,10 @@ function summarize(spec: OpSpec, output: unknown): string {
     lines.push(
       `${output["items"].length} 件。${output["nextCursor"] === null ? "続きは無い。" : "続きは nextCursor で取得する。"}`,
     );
+  } else if (spec.name === "record_search" && isRecord(output) && Array.isArray(output["items"])) {
+    lines.push(
+      `${output["items"].length} 件。該当箇所は structuredContent.items[].snippet を参照。`,
+    );
   } else if (spec.name === "type_list" && isRecord(output) && Array.isArray(output["types"])) {
     lines.push(
       `型 ${output["types"].length} 件: ${output["types"].map((t) => (isRecord(t) ? str(t["key"]) : "")).join(", ")}`,

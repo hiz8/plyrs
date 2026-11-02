@@ -57,6 +57,13 @@
       "when": 1793611704412,
       "tag": "0007_equal_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793612538910,
+      "tag": "0008_records_fts",
+      "breakpoints": true
     }
   ]
 }

@@ -67,6 +67,12 @@ export function asPublishedPage(value: unknown): {
   return value as { payloads: ProjectionPayload[]; nextCursor: string | null };
 }
 
+export function asReindexResult(
+  value: unknown,
+): { ok: true; indexed: number } | { ok: false; code: "forbidden"; message: string } {
+  return value as { ok: true; indexed: number } | { ok: false; code: "forbidden"; message: string };
+}
+
 export function asReprojectResult(
   value: unknown,
 ): { ok: true; epoch: number } | { ok: false; code: "forbidden"; message: string } {
