@@ -2,6 +2,7 @@ import type { ContentTypeDefinition, FieldDefinition } from "@plyrs/metamodel";
 import { apiErrorFromBody, throwApiError } from "./api-client";
 import { NetworkError, withNetworkErrors } from "./network-error";
 import type { Role } from "./permissions";
+import type { CompareResult, HistoryEntry } from "./history";
 import type { TokenManager } from "./token-manager";
 
 // Bearer 付きの管理 API(/v1/t/:tenantId/...)。トークンは token-manager が供給する。
@@ -63,6 +64,12 @@ export interface MemberSummary {
 }
 
 const JSON_HEADERS = { "content-type": "application/json" } as const;
+
+// 16.4(M2-4): 操作カタログの REST の生成面(POST /ops/:op)。成功は { ok: true, output }
+interface InvokeOk<T> {
+  ok: true;
+  output: T;
+}
 
 // F9・K6: アップロードのファイルごとの進捗。fetch は送信の進捗を取れないので XHR で送る
 // M1-4(design-spec 16.3): 接続トークン(PAT)。token 本体は発行の応答にしか現れない
@@ -176,6 +183,16 @@ export function createAdminApi(
       return throwApiError(response);
     }
     return (await response.json()) as T;
+  }
+
+  // 16.4: 操作カタログの呼び出し。業務エラー(not_found など)は 4xx で届き ApiError になる
+  async function invokeOperation<T>(tenantId: string, op: string, input: unknown): Promise<T> {
+    const result = await requestJson<InvokeOk<T>>(tenantId, `/ops/${op}`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(input),
+    });
+    return result.output;
   }
 
   return {
@@ -338,6 +355,36 @@ export function createAdminApi(
     },
     async revokeToken(tenantId: string, tokenId: string): Promise<void> {
       await requestJson<{ ok: true }>(tenantId, `/tokens/${tokenId}`, { method: "DELETE" });
+    },
+    invokeOperation,
+    listHistory(
+      tenantId: string,
+      recordId: string,
+      cursor?: string,
+    ): Promise<{ items: HistoryEntry[]; nextCursor: string | null }> {
+      return invokeOperation(tenantId, "record_history", {
+        recordId,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+    },
+    compareVersions(
+      tenantId: string,
+      recordId: string,
+      from: number | "published",
+      to?: number,
+    ): Promise<CompareResult> {
+      return invokeOperation(tenantId, "record_compare", {
+        recordId,
+        from,
+        ...(to === undefined ? {} : { to }),
+      });
+    },
+    restoreVersion(
+      tenantId: string,
+      recordId: string,
+      historySeq: number,
+    ): Promise<{ id: string; version: number }> {
+      return invokeOperation(tenantId, "record_restore", { recordId, historySeq });
     },
   };
 }
