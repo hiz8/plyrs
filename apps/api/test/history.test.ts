@@ -81,7 +81,7 @@ describe("recordHistory(16.5 / 決定 41: 区切りと畳み込み)", () => {
         recordHistory(
           sql,
           at(3 * MINUTE),
-          entry({ version: 4, actor: "user-b", via: "mcp", status: "review" }),
+          entry({ version: 4, actor: "user-b", via: "mcp", status: "in_review" }),
         ),
       ).toBe(4);
       // 畳み込まれなかった版の直後の write は、同じ条件ならまた畳み込まれる
@@ -89,7 +89,7 @@ describe("recordHistory(16.5 / 決定 41: 区切りと畳み込み)", () => {
         recordHistory(
           sql,
           at(4 * MINUTE),
-          entry({ version: 5, actor: "user-b", via: "mcp", status: "review" }),
+          entry({ version: 5, actor: "user-b", via: "mcp", status: "in_review" }),
         ),
       ).toBe(4);
     });
