@@ -12,7 +12,7 @@ import {
   recordListInputSchema,
   recordSummarySchema,
 } from "../do/list-records";
-import { loadRecord } from "../do/write-record";
+import { loadRecord, type WriteDeps } from "../do/write-record";
 import type { AuthContext, McpAuth } from "../do/authorize";
 import type { HistoryActor } from "../do/history";
 import { defineOperation, type OpSpec, type Via } from "./spec";
@@ -42,6 +42,18 @@ export interface OpContext {
   deps: OpDeps;
   // 書き込み操作が変更した record の id。コミット後に tenant-do.ts が同期へ broadcast する
   effects: { changedRecordIds: Set<string> };
+}
+
+// writeRecordCore / restoreRecordCore に渡す発番・時刻(tenant-do.ts の writeRecord RPC と同じ形)
+export function writeDepsOf(ctx: OpContext): WriteDeps {
+  return {
+    sql: ctx.sql,
+    nextSeq: ctx.deps.nextSeq,
+    now: ctx.deps.now,
+    newRelationId: ctx.deps.newId,
+    newEventId: ctx.deps.newEventId,
+    scheduleModuleAlarm: ctx.deps.scheduleModuleAlarm,
+  };
 }
 
 // 履歴に刻む actor(16.5)。MCP の認可コンテキストなら tokenId も残す

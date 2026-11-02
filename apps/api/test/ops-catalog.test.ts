@@ -5,10 +5,11 @@ import { describe, expect, it, vi } from "vitest";
 // 名前が一致することを確かめる。
 
 describe("操作カタログの読み込み順", () => {
-  it("ops/read を先に import しても OPERATIONS は宣言順(読み取り → 履歴)で初期化される", async () => {
+  it("ops/read を先に import しても OPERATIONS は宣言順(読み取り → 履歴 → 書き込み)で初期化される", async () => {
     vi.resetModules();
     const read = await import("../src/ops/read");
     const history = await import("../src/ops/history");
+    const write = await import("../src/ops/write");
     const catalog = await import("../src/ops/catalog");
     expect(read.READ_OPERATIONS.map((op) => op.name)).toEqual([
       "type_list",
@@ -21,9 +22,17 @@ describe("操作カタログの読み込み順", () => {
       "record_compare",
       "record_restore",
     ]);
+    expect(write.WRITE_OPERATIONS.map((op) => op.name)).toEqual([
+      "record_create",
+      "record_update",
+      "record_delete",
+      "record_publish",
+      "record_unpublish",
+    ]);
     expect(catalog.OPERATIONS.map((op) => op.name)).toEqual([
       ...read.READ_OPERATIONS.map((op) => op.name),
       ...history.HISTORY_OPERATIONS.map((op) => op.name),
+      ...write.WRITE_OPERATIONS.map((op) => op.name),
     ]);
   });
 

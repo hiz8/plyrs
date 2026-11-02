@@ -13,7 +13,13 @@ import { restoreRecordCore } from "../do/restore-record";
 import { loadRecord } from "../do/write-record";
 import type { ProjectionRelationRow } from "../projection/payload";
 import { buildSyncInput, loadRecordInput } from "../sync/records";
-import { historyActorOf, recordSnapshotSchema, type OpContext, type OpFailure } from "./read";
+import {
+  historyActorOf,
+  recordSnapshotSchema,
+  writeDepsOf,
+  type OpContext,
+  type OpFailure,
+} from "./read";
 import { defineOperation, type OpSpec } from "./spec";
 
 // 16.5(M2-4): 変更履歴の操作。一覧(record_history)・差分(record_compare)・復元(record_restore)。
@@ -242,14 +248,7 @@ export const HISTORY_HANDLERS = {
     input: z.infer<typeof recordRestore.input>,
   ): Ok<unknown> | OpFailure => {
     const result = restoreRecordCore(
-      {
-        sql: ctx.sql,
-        nextSeq: ctx.deps.nextSeq,
-        now: ctx.deps.now,
-        newRelationId: ctx.deps.newId,
-        newEventId: ctx.deps.newEventId,
-        scheduleModuleAlarm: ctx.deps.scheduleModuleAlarm,
-      },
+      writeDepsOf(ctx),
       input.recordId,
       input.historySeq,
       historyActorOf(ctx),

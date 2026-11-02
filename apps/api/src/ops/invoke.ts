@@ -2,6 +2,7 @@ import { requireOperation, type AuthContext, type McpAuth } from "../do/authoriz
 import { findOperation, OPERATIONS, type OpSpec } from "./catalog";
 import { HISTORY_HANDLERS } from "./history";
 import { READ_HANDLERS, type OpContext, type OpFailure } from "./read";
+import { WRITE_HANDLERS } from "./write";
 
 // 操作の失敗はここで表現し、HTTP や JSON-RPC のエラーにしない(design-spec 16.7 の「業務エラー」層)。
 // code は入口の判定(unknown_operation / invalid_input / forbidden / insufficient_scope)と、各操作の
@@ -42,6 +43,7 @@ export type OpHandler = (ctx: OpContext, input: never) => { ok: true; output: un
 export const HANDLERS: Readonly<Record<string, OpHandler>> = {
   ...READ_HANDLERS,
   ...HISTORY_HANDLERS,
+  ...WRITE_HANDLERS,
 };
 
 for (const spec of OPERATIONS) {
