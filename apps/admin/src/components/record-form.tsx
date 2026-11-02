@@ -33,7 +33,7 @@ import {
   toDraftValues,
   type DraftValues,
 } from "../lib/record-form-values";
-import { richTextPlainText } from "../lib/richtext-text";
+import { richTextPlainText } from "@plyrs/richtext";
 import { useRecordsOfTypes } from "../lib/use-collection";
 import { AssetRelationPicker } from "./asset-picker";
 import { MediaPickerDialog, type PickedMedia } from "./media/media-picker-dialog";
@@ -106,7 +106,7 @@ function syncConflictFields(cause: unknown): string[] {
 function conflictExcerpt(value: unknown): string {
   const envelope = asRichTextValue(value);
   if (envelope !== undefined) {
-    return richTextPlainText(envelope);
+    return richTextPlainText(envelope, 120);
   }
   if (value === undefined) {
     return RECORD_FORM_LABELS.empty;

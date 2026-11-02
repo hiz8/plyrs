@@ -158,6 +158,8 @@ export interface RichTextValue {
 // 一致は apps/admin/src/lib/mention-contract.test.ts が固定する。
 export const RICH_TEXT_SCHEMA_VERSION = 2;
 export const BLOCK_ID_ATTR_NAME = "id";
+// 見出しのレベル。@plyrs/richtext の HEADING_LEVELS(Worker 側の語彙)と一致する(mention-contract.test.ts)
+export const RICH_TEXT_HEADING_LEVELS = [1, 2, 3] as const;
 
 // UniqueID が ID を振るノード種。契約は最上位ブロックだけだが、types は「ノード種」の指定なので
 // 箇条書きの中の段落にも付く(害は無い。M0-2 結果 2 節)。
@@ -305,7 +307,7 @@ export function RichTextEditor({
     {
       extensions: [
         StarterKit.configure({
-          heading: { levels: [1, 2, 3] },
+          heading: { levels: [...RICH_TEXT_HEADING_LEVELS] },
           link: { openOnClick: false },
         }),
         createRecordMention(glue),

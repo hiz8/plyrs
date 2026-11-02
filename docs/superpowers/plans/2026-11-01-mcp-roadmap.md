@@ -186,7 +186,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 - PR は #39 → #40 → #41 → #42 → #43 → #44 → #45 → #46 のスタック(base が前の PR)。順にマージする
 - **実クライアント確認(2026-11-02)**: #46 までを `main` にマージした後、所有者がローカルの Claude Code から PAT で接続し、型の参照・一覧・単体取得まで一通りのデータを取得できることを確認した(ゲート G1 の接続条件は満たした)。接続先の環境(preview / production)と往復時間は記録していない
 - **未了**: `tools/list` と `record_get` の往復時間(PAT 検証の D1 1 照会を含む)の実測と、Cursor / VS Code / MCP Inspector からの接続確認。`docs/deploy.md` 3.5 節の手順で測って本節に追記する。production は `workflow_dispatch` 後に MCP Inspector でスモーク。`MCP_IP_LIMITER`(600 回 / 60 秒)の上限も同じ実測で見直す
-- M1-6 の Markdown 変換(`apps/api/src/mcp/richtext-markdown.ts`)は ui のエディタの拡張集合(StarterKit + recordMention + assetImage)を api 側に最小複製している。M2-2 で metamodel 側へ寄せて共有し、逆方向(Markdown → JSON)とスキーマ検証を足す。独自ノードの Markdown は M0-2 の仮置き(`[@ recordType=".." recordId=".." label=".."]`、`![label](plyrs://asset/<id>)`)のまま
+- M1-6 の Markdown 変換(`apps/api/src/mcp/richtext-markdown.ts`)は ui のエディタの拡張集合を api 側に最小複製していた。**M2-2 で `@plyrs/richtext` に移し**、逆方向(Markdown → JSON)とスキーマ検証を足した。独自ノードの Markdown は M0-2 の仮置きをそのまま確定(design-spec 16.10)
 - `@tiptap/markdown` は peer を完全一致で要求するため catalog で `3.31.4` に固定。tiptap を上げるときは同時に上げる
 - `tools/list` の `ttlMs` / `cacheScope` は SDK(`@modelcontextprotocol/server` 2.4.0)が一覧全体に 1 つしか持てないため、各操作の `cache` のうち最も保守的な値(現状 0 / private)。`resources/read`(`plyrs://types/{key}`)は `type_get` の 60 秒
 - MCP の入口の Rate Limiting は 2 段: トークン検証の前に接続元 IP 単位(`MCP_IP_LIMITER`、600 回 / 60 秒。未認証の連打で D1 の PAT 照会を起こさないため)、検証の後にテナント・利用者・ツール名単位(`MCP_LIMITER`、60 回 / 60 秒。DO を起こす経路の保護)。IP 単位の上限は NAT 配下の複数利用者を想定して緩めにしてあり、実測で見直す

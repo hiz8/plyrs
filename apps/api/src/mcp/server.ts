@@ -5,7 +5,7 @@ import type { McpAuth } from "../do/authorize";
 import { OPERATIONS, type OpSpec } from "../ops/catalog";
 import type { InvokeResult } from "../ops/invoke";
 import { asInvokeResult } from "../rpc-unwrap";
-import { richTextToMarkdown } from "./richtext-markdown";
+import { richTextToMarkdown } from "@plyrs/richtext";
 
 // design-spec 16.4 / 16.10 / 16.11: MCP サーバーの組み立て。stateless なので要求ごとに作る
 // (createMcpHandler の factory から呼ばれる)。tools はカタログ(OPERATIONS)の宣言順にそのまま

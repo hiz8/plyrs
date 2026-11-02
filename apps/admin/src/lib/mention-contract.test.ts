@@ -13,10 +13,12 @@ import {
   ASSET_IMAGE_NODE_NAME,
   BLOCK_ID_ATTR_NAME,
   RECORD_MENTION_NODE_NAME,
+  RICH_TEXT_HEADING_LEVELS,
   RICH_TEXT_SCHEMA_VERSION,
   RichTextEditor,
   type RichTextEditorProps,
 } from "@plyrs/ui";
+import { HEADING_LEVELS } from "@plyrs/richtext";
 
 // このファイルは .ts(.tsx ではない)なので JSX 構文は使わず createElement を直接呼ぶ
 // (拡張子は brief / セッション規約の git add パスに合わせて固定 — .tsx への改名はしない)。
@@ -40,6 +42,11 @@ describe("record mention / asset image contract", () => {
   it("ui schema version and block id attribute match the metamodel", () => {
     expect(RICH_TEXT_SCHEMA_VERSION).toBe(METAMODEL_RICH_TEXT_SCHEMA_VERSION);
     expect(BLOCK_ID_ATTR_NAME).toBe(BLOCK_ID_ATTR);
+  });
+
+  // M2-2: エディタの見出しレベルは Worker 側(Markdown 変換・スキーマ検証)の語彙と一致する
+  it("ui heading levels match the richtext vocabulary", () => {
+    expect(RICH_TEXT_HEADING_LEVELS).toEqual([...HEADING_LEVELS]);
   });
 
   // ロードマップ §13 推奨: ノード名だけでなく attrs キーまで(ui 産の実 doc を
