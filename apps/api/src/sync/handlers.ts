@@ -142,9 +142,9 @@ export function handlePush(
           now: deps.now,
           newId: deps.newRelationId,
           nextPublishSeq: deps.nextPublishSeq,
+          history: { actor: auth.userId, via: "sync" },
         },
         change.recordId,
-        auth.userId,
       );
       if (!deleted.ok) {
         acks.push({

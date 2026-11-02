@@ -645,9 +645,9 @@ export class TenantDO extends DurableObject<Env> {
           now: () => new Date().toISOString(),
           newId: () => uuidv7(),
           nextPublishSeq: () => this.nextPublishSeq(),
+          history: { actor: auth.userId, via: "rest" },
         },
         recordId,
-        auth.userId,
       );
       // MINOR fix（レビュー指摘）: 未公開レコードの削除は cascadeUnpublish が outbox に
       // 何も積まない。実際に outbox 行が積まれた時だけ sweep を張り、無駄な DO 起床を避ける。
@@ -719,9 +719,9 @@ export class TenantDO extends DurableObject<Env> {
           now: () => new Date().toISOString(),
           newId: () => uuidv7(),
           nextPublishSeq: () => this.nextPublishSeq(),
+          history: { actor: auth.userId, via: "rest" },
         },
         recordId,
-        auth.userId,
         tenantSlug,
       );
       if (inner.ok) {
@@ -763,6 +763,7 @@ export class TenantDO extends DurableObject<Env> {
           now: () => new Date().toISOString(),
           newId: () => uuidv7(),
           nextPublishSeq: () => this.nextPublishSeq(),
+          history: { actor: auth.userId, via: "rest" },
         },
         recordId,
       );
