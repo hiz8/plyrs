@@ -7,6 +7,7 @@ import {
   HEADING_LEVELS,
   RECORD_MENTION_MARKDOWN_NAME,
   REF_ATTRIBUTE_NAMES,
+  UnsupportedMarkdownError,
 } from "./vocabulary";
 
 // Worker / DO 側(DOM 無し・React 無し)で使う拡張集合。ui のエディタ(packages/ui の useEditor に
@@ -45,7 +46,8 @@ export const RecordMention = Mention.extend({
 
 // 本文中画像。標準の画像構文の href を独自スキームにする(image トークンは StarterKit が使わない
 // ので横取りできる)。外部 URL の画像は語彙に無いので受け付けない(アセット取り込みは M4-5)。
-// parseMarkdown で落とす前に markdown.ts が正規表現で検出して unsupported_markdown にする
+// markdown.ts が marked のトークンから先に検出して unsupported_markdown にする。ここまで届いたら
+// `return []` で黙って落とすのではなく例外にして、markdownToRichText が業務エラーに変える
 export const AssetImage = Node.create({
   name: ASSET_IMAGE_NODE_TYPE,
   group: "block",
@@ -57,7 +59,7 @@ export const AssetImage = Node.create({
   parseMarkdown(token, helpers) {
     const href = typeof token["href"] === "string" ? token["href"] : "";
     if (!href.startsWith(ASSET_IMAGE_HREF_PREFIX)) {
-      return [];
+      throw new UnsupportedMarkdownError("external_image", `external image: ${href}`);
     }
     return helpers.createNode(ASSET_IMAGE_NODE_TYPE, {
       recordType: "asset",
