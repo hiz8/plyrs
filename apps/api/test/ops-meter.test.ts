@@ -72,11 +72,6 @@ async function runSequence(tenantId: string, stub: DurableObjectStub): Promise<M
     expect(result.ok, `${label}: ${JSON.stringify(result)}`).toBe(true);
     expect(result.meter).toBeDefined();
     meters[label] = result.meter!;
-    if (process.env["DBG"] && tenantId === (globalThis as any).__big) {
-      for (const [q, c] of (globalThis as any).__q)
-        if (c.rowsRead > 5) console.log(label, c.rowsRead, q.slice(0, 300));
-    }
-    (globalThis as any).__q = [];
     return result.ok ? (result.output as Record<string, unknown>) : {};
   };
   const recordId = uuidv7();
@@ -112,7 +107,6 @@ beforeAll(async () => {
   const a = await seedTenant(SMALL);
   const b = await seedTenant(LARGE);
   small = await runSequence(a.tenantId, a.stub as never);
-  (globalThis as any).__big = b.tenantId;
   large = await runSequence(b.tenantId, b.stub as never);
 }, 120_000);
 

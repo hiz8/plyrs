@@ -160,9 +160,11 @@ test("MCP で書いた record が管理画面に出て、競合・ブロック�
 
   // 3. 読み直して、本文の 2 段落目だけをブロック操作で差し替える → 管理画面の本文に出る
   const fresh = await tool(page.request, endpoint, writer, "record_get", { recordId });
-  const outline = (
-    fresh.structuredContent?.["outline"] as Record<string, { id: string; text: string }[]>
-  )["body"];
+  const outlines = (fresh.structuredContent?.["outline"] ?? {}) as Record<
+    string,
+    { id: string; text: string }[]
+  >;
+  const outline = outlines["body"];
   const second = outline?.find((block) => block.text === "二番目の段落");
   expect(second).toBeDefined();
   const replaced = await tool(page.request, endpoint, writer, "record_update", {
