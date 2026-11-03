@@ -31,11 +31,15 @@ function errorPage(status: number, title: string, message: string): Response {
   return htmlResponse(renderErrorPage(title, message), status);
 }
 
-const NOT_MEMBER = errorPage(
-  403,
-  "接続できません",
-  "このサイトのメンバーではありません。サイトの管理者に招待を依頼してください。",
-);
+// Workers はモジュールのトップレベルで Response を作れない(デプロイ時の検証エラー 10021)ので、
+// 定数にせず毎回組み立てる
+function notMemberPage(): Response {
+  return errorPage(
+    403,
+    "接続できません",
+    "このサイトのメンバーではありません。サイトの管理者に招待を依頼してください。",
+  );
+}
 
 // 同意に進める利用者か。会員でなければ null(呼び出し側が 401 / 403 の画面を返す)
 async function currentMember(
@@ -76,7 +80,7 @@ function memberFailure(reason: "unauthenticated" | "blocked" | "not_member"): Re
   if (reason === "blocked") {
     return errorPage(403, "接続できません", "このアカウントは利用を停止されています。");
   }
-  return NOT_MEMBER.clone();
+  return notMemberPage();
 }
 
 // ライブラリのヘルパーが投げる例外を画面に変える。AuthorizationError に redirectTo があるときだけ
