@@ -93,8 +93,12 @@ test("PAT を発行して MCP から型と record を読む", async ({ page }) =
   const discover = await result(await rpc(page.request, endpoint, token, "server/discover"));
   expect(discover["supportedVersions"]).toContain(PROTOCOL);
 
+  // tools/list はトークンのスコープで絞らない(スコープ不足は tools/call の 403 で step-up する。M3-3)。
+  // 読み取りのツールがカタログの宣言順で先頭に並び、M4 の書き込みツールも出ていることを見る
+  // (全体の一覧は api の mcp-tools.test.ts が固定している)
   const list = await result(await rpc(page.request, endpoint, token, "tools/list"));
-  expect((list["tools"] as { name: string }[]).map((t) => t.name)).toEqual([
+  const names = (list["tools"] as { name: string }[]).map((t) => t.name);
+  expect(names.slice(0, 7)).toEqual([
     "type_list",
     "type_get",
     "record_list",
@@ -103,6 +107,7 @@ test("PAT を発行して MCP から型と record を読む", async ({ page }) =
     "record_history",
     "record_compare",
   ]);
+  expect(names).toContain("record_create");
 
   const records = await result(
     await rpc(page.request, endpoint, token, "tools/call", {
