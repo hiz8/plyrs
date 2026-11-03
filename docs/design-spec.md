@@ -770,6 +770,8 @@ MCP は、管理画面の同期（第 8・10 章）と REST（`/v1/t/:tenantId/.
 
 **スコープ（論点 C3）**: DO の `Operation`（`record:read` `record:write` `record:delete` `record:publish` `type:manage` など、`auth/permissions.ts`）をそのままスコープ名にする。**実効権限 = スコープ ∩ ロール**を DO の第 2 段（第 11.5 章）で判定する。スコープは権限を絞るだけで増やさない。認可コンテキスト `{userId, role, tenantId, exp}` に `scopes` と `tokenId` を足し、`record:read` の `requireOperation` を MCP で初めて実装する（読み取り拒否はここが最初）。型単位のスコープ（例 `record:write:article`）は初期には採らない（第 11.4 章の決定の見直しが先。未処理論点）。
 
+**同意画面とセッション cookie**: 管理画面のセッション cookie は `SameSite=Strict`（CSRF の前提）のまま変えない。ホスト型クライアントから `/authorize` へ遷移すると cookie が送られないので、ログイン済みでも毎回 `/login` を経由して同じ URL へ戻る（仕様。M4-0b で確認）。同意 POST は保存済み要求の `resource` が URL のテナントのものかを照合し、`/authorize` の GET はセッションを確かめてから要求を解釈する（CIMD の外向き fetch を未ログインの要求で起こさない）。会員解除・BAN では PAT と同じく OAuth の付与も失効させる。
+
 **publish 権限の既定（論点 C5）**: PAT の発行画面と OAuth の同意画面の両方で、`record:publish` は **既定で外し、所有者だけが付与できる**。既定は人が公開する。
 
 ### 16.4 操作カタログ（論点 B1）

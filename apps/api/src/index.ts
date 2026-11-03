@@ -38,6 +38,20 @@ app.route("/super-auth", superAuthRoutes);
 app.route("/super/v1", superRoutes);
 app.route("/mcp", mcpRoutes);
 app.route("/oauth", oauthRoutes);
+// M3 の見送り指摘 (f): ブラウザ内で動くクライアントの preflight。metadata は公開情報なので誰にでも返す
+// (Bearer を伴う /mcp の Origin 検証とは別。ここは GET の metadata だけ)
+const metadataPreflight = () =>
+  new Response(null, {
+    status: 204,
+    headers: {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, OPTIONS",
+      "access-control-allow-headers": "mcp-protocol-version, authorization",
+      "access-control-max-age": "86400",
+    },
+  });
+app.options("/.well-known/oauth-authorization-server/oauth/t/:tenantId", metadataPreflight);
+app.options("/.well-known/oauth-protected-resource/mcp/t/:tenantId", metadataPreflight);
 // RFC 8414: テナント別 issuer の Authorization Server Metadata(16.2)
 app.get("/.well-known/oauth-authorization-server/oauth/t/:tenantId", (c) =>
   serveAuthorizationServerMetadata(c.req.raw, c.env, workerContext(c), c.req.param("tenantId")),

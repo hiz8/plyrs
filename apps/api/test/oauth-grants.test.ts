@@ -2,16 +2,22 @@ import { env } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { describe, expect, it } from "vitest";
-import { auditLogs } from "@plyrs/db/control-plane";
+import { auditLogs, memberships } from "@plyrs/db/control-plane";
+import { banUserEverywhere, revokeMembership } from "../src/auth/ban";
+import { unblockUser } from "../src/auth/blocklist";
+import { listTenantGrants } from "../src/oauth/grants";
 import { signTenantToken } from "../src/auth/jwt";
 import type { Role } from "../src/auth/permissions";
 import { app } from "../src/index";
 import { authenticateMcpToken } from "../src/middleware/mcp-gate";
-import { tenantResource } from "../src/oauth/server";
+import { createTenantAuthServer, tenantResource } from "../src/oauth/server";
 import {
   API_ORIGIN,
   authorize,
+  authorizeUrl,
   insertMember,
+  pkce,
+  registerClient,
   insertTenant,
   oauthEnv,
   type Issued,
@@ -30,6 +36,25 @@ interface TenantGrant {
   scopes: string[];
   createdAt: string;
   expiresAt: string | null;
+}
+
+// 同意だけ済ませて認可コードを交換していない付与(クライアントが戻って来なかった場合)
+async function pendingGrant(tenantId: string, userId: string): Promise<string> {
+  const testEnv = oauthEnv();
+  const clientId = await registerClient(tenantId, testEnv);
+  const { challenge } = await pkce();
+  const oauth = createTenantAuthServer(testEnv, tenantId)!.getOAuthApi(testEnv);
+  const request = await oauth.parseAuthRequest(
+    new Request(authorizeUrl(tenantId, clientId, ["record:read"], challenge)),
+  );
+  const { redirectTo } = await oauth.completeAuthorization({
+    request,
+    userId,
+    metadata: { tenantId },
+    scope: request.scope,
+    props: { userId, tenantId, role: "owner" },
+  });
+  return new URL(redirectTo).searchParams.get("code")?.split(":")[1] ?? "";
 }
 
 async function bearer(userId: string, tenantId: string, role: Role): Promise<string> {
@@ -140,6 +165,77 @@ describe("/v1/t/:tenantId/oauth-grants", () => {
       (await call("DELETE", `/v1/t/${tenantId}/oauth-grants/${editor.userId}/${grantId}`, auth))
         .status,
     ).toBe(404);
+  });
+
+  it("他テナントの付与が 100 件を超える利用者でも、このテナントの付与が一覧に出る(M3 の見送り指摘 (d))", async () => {
+    const { tenantId, owner, editor, editorGrant } = await setup();
+    const other = await insertTenant();
+    await drizzle(env.DB).insert(memberships).values({
+      userId: editor.userId,
+      tenantId: other,
+      role: "editor",
+      createdAt: new Date().toISOString(),
+    });
+    for (let i = 0; i < 105; i += 1) {
+      await authorize(other, ["record:read"], { userId: editor.userId, role: "editor" });
+    }
+    const { grants } = await (
+      await call(
+        "GET",
+        `/v1/t/${tenantId}/oauth-grants`,
+        await bearer(owner.userId, tenantId, "owner"),
+      )
+    ).json<{ grants: TenantGrant[] }>();
+    expect(grants.map((g) => g.id)).toContain(editorGrant.access_token.split(":")[1]);
+  });
+
+  it("認可コードを交換していない付与は pending: true(M3 の見送り指摘 (h))", async () => {
+    const { tenantId, owner } = await setup();
+    const pendingId = await pendingGrant(tenantId, owner.userId);
+    const { grants } = await (
+      await call(
+        "GET",
+        `/v1/t/${tenantId}/oauth-grants`,
+        await bearer(owner.userId, tenantId, "owner"),
+      )
+    ).json<{ grants: (TenantGrant & { pending: boolean })[] }>();
+    expect(grants.find((g) => g.id === pendingId)?.pending).toBe(true);
+    expect(grants.filter((g) => g.id !== pendingId).every((g) => !g.pending)).toBe(true);
+  });
+
+  it("会員を外すとその利用者のこのテナントの付与が失効し、監査に oauth.revoke が残る(M3 の見送り指摘 (e))", async () => {
+    const { tenantId, editor, editorGrant } = await setup();
+    const other = await insertTenant();
+    await drizzle(env.DB).insert(memberships).values({
+      userId: editor.userId,
+      tenantId: other,
+      role: "editor",
+      createdAt: new Date().toISOString(),
+    });
+    const kept = await authorize(other, ["record:read"], { userId: editor.userId, role: "editor" });
+    const result = await revokeMembership(oauthEnv(), editor.userId, tenantId);
+    const grantId = editorGrant.access_token.split(":")[1] ?? "";
+    expect(result.revokedGrants).toEqual([grantId]);
+    expect(await listTenantGrants(oauthEnv(), tenantId)).toEqual(
+      expect.not.arrayContaining([expect.objectContaining({ id: grantId })]),
+    );
+    // 別テナントの付与は残る
+    expect((await listTenantGrants(oauthEnv(), other)).map((g) => g.id)).toContain(
+      kept.access_token.split(":")[1],
+    );
+  });
+
+  it("BAN は全テナントの付与を失効させる(M3 の見送り指摘 (e))", async () => {
+    const { tenantId, editor } = await setup();
+    const result = await banUserEverywhere(oauthEnv(), editor.userId);
+    try {
+      expect(result.revokedGrants).toHaveLength(1);
+      expect(
+        (await listTenantGrants(oauthEnv(), tenantId)).some((g) => g.userId === editor.userId),
+      ).toBe(false);
+    } finally {
+      await unblockUser(env.BLOCKLIST, editor.userId);
+    }
   });
 
   it("別テナントの付与は失効できない(404。利用者が両方の会員でも)", async () => {

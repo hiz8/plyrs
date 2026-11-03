@@ -35,6 +35,7 @@ const grant: GrantSummary = {
   scopes: ["record:read"],
   createdAt: "2026-10-15T00:00:00Z",
   expiresAt: null,
+  pending: false,
 };
 
 it("名前・スコープ・期限・最終利用を出し、有効な行だけ失効ボタンがある", async () => {

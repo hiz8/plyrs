@@ -1,8 +1,8 @@
 import { env } from "cloudflare:test";
 import { drizzle } from "drizzle-orm/d1";
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
-import { auditLogs } from "@plyrs/db/control-plane";
+import { describe, expect, it, vi } from "vitest";
+import { auditLogs, memberships } from "@plyrs/db/control-plane";
 import { blockUser, unblockUser } from "../src/auth/blocklist";
 import type { Role } from "../src/auth/permissions";
 import { createSession, SESSION_COOKIE } from "../src/auth/session";
@@ -186,6 +186,19 @@ describe("GET /oauth/t/:tenantId/authorize", () => {
     expect(html).not.toMatch(/name="scope"\s+value="record:publish"[^>]*checked/);
   });
 
+  it("未ログインなら CIMD の取得(外向き fetch)を起こさずに /login へ(M3 の見送り指摘 (b))", async () => {
+    const flow = await startFlow(["record:read"]);
+    flow.url.searchParams.set("client_id", "https://client.example/oauth/metadata.json");
+    const spy = vi.spyOn(globalThis, "fetch");
+    try {
+      const res = await getAuthorize(flow);
+      expect(res.status).toBe(302);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("不正な client_id は 400 の HTML(リダイレクトしない)", async () => {
     const flow = await startFlow(["record:read"]);
     flow.url.searchParams.set("client_id", "nope");
@@ -290,6 +303,27 @@ describe("POST /oauth/t/:tenantId/authorize", () => {
     });
     expect(again.status).toBe(302);
     expect(new URL(again.headers.get("location") ?? "").searchParams.get("code")).not.toBeNull();
+  });
+
+  it("別テナント向けの handle を POST しても、そのテナントのコードは出ない(M3 の見送り指摘 (a))", async () => {
+    const flowA = await startFlow(["record:read"]);
+    const { userId, session } = await memberWithSession(flowA.tenantId, "owner");
+    const tenantB = await insertTenant("別サイト");
+    await drizzle(env.DB)
+      .insert(memberships)
+      .values({ userId, tenantId: tenantB, role: "owner", createdAt: new Date().toISOString() });
+    const page = await getAuthorize(flowA, session);
+    expect(page.status).toBe(200);
+    const handle = handleOf(await page.text());
+    const flowB: Flow = { ...flowA, tenantId: tenantB, url: new URL(flowA.url) };
+    flowB.url.pathname = flowB.url.pathname.replace(flowA.tenantId, tenantB);
+    const res = await postAuthorize(flowB, [session, consentCookie(page)], {
+      decision: "approve",
+      handle,
+      scope: ["record:read"],
+    });
+    expect(res.status).toBe(400);
+    expect(res.headers.get("location")).toBeNull();
   });
 
   it("使い終わった handle の再 POST は 400 の HTML", async () => {

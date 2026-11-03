@@ -96,6 +96,8 @@ export interface GrantSummary {
   scopes: string[];
   createdAt: string;
   expiresAt: string | null;
+  // 同意は済んだが認可コードが未交換(クライアントが戻って来ていない)
+  pending: boolean;
 }
 
 export interface IssueTokenInput {

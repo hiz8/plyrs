@@ -13,7 +13,12 @@ import {
   users,
 } from "@plyrs/db/control-plane";
 import { assetKeyBelongsToTenant } from "../assets/ownership";
-import { auditRevokedTokens, membershipAuditTarget, writeAudit } from "../audit";
+import {
+  auditRevokedGrants,
+  auditRevokedTokens,
+  membershipAuditTarget,
+  writeAudit,
+} from "../audit";
 import { banUserEverywhere, revokeMembership } from "../auth/ban";
 import { unblockUser } from "../auth/blocklist";
 import { normalizeEmail } from "../auth/email";
@@ -195,7 +200,7 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
   })
   .post("/users/:userId/ban", async (c) => {
     const userId = c.req.param("userId");
-    const { disconnected, revokedTokens } = await banUserEverywhere(c.env, userId);
+    const { disconnected, revokedTokens, revokedGrants } = await banUserEverywhere(c.env, userId);
     await writeAudit(c.env.DB, {
       actorId: c.get("superAdmin").adminId,
       action: "user.ban",
@@ -208,6 +213,13 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       c.get("superAdmin").adminId,
       null,
       revokedTokens,
+      "user.ban",
+    );
+    await auditRevokedGrants(
+      c.env.DB,
+      c.get("superAdmin").adminId,
+      null,
+      revokedGrants,
       "user.ban",
     );
     return c.json({ ok: true, disconnected });
@@ -240,7 +252,11 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
   .delete("/tenants/:tenantId/members/:userId", async (c) => {
     const tenantId = c.req.param("tenantId");
     const userId = c.req.param("userId");
-    const { disconnected, revokedTokens } = await revokeMembership(c.env, userId, tenantId);
+    const { disconnected, revokedTokens, revokedGrants } = await revokeMembership(
+      c.env,
+      userId,
+      tenantId,
+    );
     await writeAudit(c.env.DB, {
       actorId: c.get("superAdmin").adminId,
       action: "membership.revoke",
@@ -253,6 +269,13 @@ export const superRoutes = new Hono<{ Bindings: Env; Variables: SuperGateVariabl
       c.get("superAdmin").adminId,
       tenantId,
       revokedTokens,
+      "membership.revoke",
+    );
+    await auditRevokedGrants(
+      c.env.DB,
+      c.get("superAdmin").adminId,
+      tenantId,
+      revokedGrants,
       "membership.revoke",
     );
     return c.json({ ok: true, disconnected });

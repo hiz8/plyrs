@@ -4,7 +4,12 @@ import { drizzle } from "drizzle-orm/d1";
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { memberships, tenants, users } from "@plyrs/db/control-plane";
-import { auditRevokedTokens, membershipAuditTarget, writeAudit } from "../audit";
+import {
+  auditRevokedGrants,
+  auditRevokedTokens,
+  membershipAuditTarget,
+  writeAudit,
+} from "../audit";
 import { cutOffMembership } from "../auth/ban";
 import { unblockMembership } from "../auth/blocklist";
 import { normalizeEmail } from "../auth/email";
@@ -239,12 +244,23 @@ export const tenantSettingsRoutes = new Hono<GateEnv>()
       targetId: membershipAuditTarget(userId, tenantId),
       detail: { role: removed.role },
     });
-    const { disconnected, revokedTokens } = await cutOffMembership(c.env, userId, tenantId);
+    const { disconnected, revokedTokens, revokedGrants } = await cutOffMembership(
+      c.env,
+      userId,
+      tenantId,
+    );
     await auditRevokedTokens(
       c.env.DB,
       c.get("auth").userId,
       tenantId,
       revokedTokens,
+      "member.remove",
+    );
+    await auditRevokedGrants(
+      c.env.DB,
+      c.get("auth").userId,
+      tenantId,
+      revokedGrants,
       "member.remove",
     );
     return c.json({ ok: true, disconnected });

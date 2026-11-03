@@ -309,6 +309,26 @@ describe("/mcp/t/:tenantId の入口", () => {
   // 認可サーバーの resource は API_ORIGIN(= この入口のオリジン)で組むので、env を上書きして渡す
   const OAUTH_ENV = { ADMIN_ORIGIN, API_ORIGIN: ORIGIN };
 
+  it("PRM と AS metadata は OPTIONS(preflight)に 204 と CORS ヘッダで応える(M3 の見送り指摘 (f))", async () => {
+    for (const path of [
+      `/.well-known/oauth-protected-resource/mcp/t/${tenantId}`,
+      `/.well-known/oauth-authorization-server/oauth/t/${tenantId}`,
+    ]) {
+      const res = await app.request(
+        path,
+        {
+          method: "OPTIONS",
+          headers: { origin: "https://client.example", "access-control-request-method": "GET" },
+        },
+        { ...env, ...OAUTH_ENV },
+      );
+      expect(res.status).toBe(204);
+      expect(res.headers.get("access-control-allow-origin")).toBe("*");
+      expect(res.headers.get("access-control-allow-methods")).toContain("GET");
+      expect(res.headers.get("access-control-allow-headers")).toContain("mcp-protocol-version");
+    }
+  });
+
   it("OAuth の access token で tools/list が 200。別テナントで発行した token は 401", async () => {
     const issued = await authorize(tenantId, ["record:read"], { userId, role: "owner" });
     const res = await post("tools/list", {}, { token: issued.access_token, env: OAUTH_ENV });
@@ -336,6 +356,8 @@ describe("/mcp/t/:tenantId の入口", () => {
     // PAT は再認可できないので、所有者がスコープ付きのトークンを発行し直す導線を示す
     expect(body.error_description).toContain("接続トークン");
     expect(body.error_description).toContain("record:read");
+    // M3 の見送り指摘 (i): WWW-Authenticate は ASCII しか運べないので、ヘッダには英文の説明を載せる
+    expect(challenge).toContain('error_description="This token lacks record:read.');
   });
 
   it("OAuth のスコープ不足は再認可(step-up)を案内する。tools/list と未知のツール名は対象外", async () => {

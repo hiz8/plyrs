@@ -28,6 +28,7 @@ const grant = {
   scopes: ["record:read"],
   createdAt: "2026-10-15T00:00:00Z",
   expiresAt: null,
+  pending: false,
 };
 
 const noGrants = () => jsonResponse(200, { grants: [] });
