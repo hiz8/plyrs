@@ -53,7 +53,11 @@ export function checkImportUrl(raw: string, base?: URL): URL | string {
   if (url.username !== "" || url.password !== "") {
     return "URLs with credentials are not allowed";
   }
-  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  // 末尾のドットはすべて外す(WHATWG URL は localhost.. や 127.0.0.1.. をドメインとして通す)
+  const host = url.hostname.toLowerCase().replace(/\.+$/, "");
+  if (host === "") {
+    return "not a valid URL";
+  }
   if (host.startsWith("[") || IPV4_PATTERN.test(host)) {
     return "IP address hosts are not allowed; use a host name";
   }
