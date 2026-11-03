@@ -87,7 +87,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 
 ゲート G2(全書き込み操作がカタログ経由になり、同期・REST・publish・delete のいずれでも履歴が記録され、管理画面から復元できること)は M2-4 / M2-5 / M2-7b で満たした。書き込み操作の MCP 公開(tools/list への掲出)は M4-1。
 
-### M3 OAuth の認証基盤(決定 47〜49 を前提にした分割)— 実装完了(2026-11-03)、詳細計画 `2026-11-03-m3-oauth.md`
+### M3 OAuth の認証基盤(決定 47〜49 を前提にした分割)— 完了(2026-11-03)、詳細計画 `2026-11-03-m3-oauth.md`
 
 | PR | 内容 | 論点 | 規模 | 状態 |
 | --- | --- | --- | --- | --- |
@@ -98,7 +98,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | M3-5 | 管理画面の「接続中のアプリ」画面(OAuth の付与と PAT を 1 つの一覧に) | C1・C4 | M | 実装済み(2026-11-03、PR #69) |
 | 仕上げ | E2E `oauth.spec.ts`、`docs/deploy.md` 3.5 の OAuth の手順、ブランチ全体のレビュー、本書の更新 | — | S | 実装済み(2026-11-03、PR #70) |
 
-ゲート G3: preview で、CIMD で接続するクライアントと DCR fallback で接続するクライアントをそれぞれ 1 つ以上確認し、スコープ不足から step-up できること(確認項目は `docs/deploy.md` 3.5。所有者が確認して 10 章に記録する)。
+ゲート G3: preview で、CIMD で接続するクライアントと DCR fallback で接続するクライアントをそれぞれ 1 つ以上確認し、スコープ不足から step-up できること(確認項目は `docs/deploy.md` 3.5)。**通過(2026-11-03)**: CIMD(claude.ai のコネクタ)・step-up・失効を所有者が preview で確認(10 章)。DCR は E2E(dev)で固定済みで、preview での MCP Inspector 接続は任意として残す。
 
 ### M4 書き込み MCP の公開
 
@@ -183,7 +183,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | M0 | `2026-11-01-m0-2-richtext-spike-result.md`、`2026-11-01-m0-3-oauth-spike-result.md` | 完了(2026-11-01) |
 | M1 | `2026-11-01-m1-readonly-mcp.md` | 完了(2026-11-02) |
 | M2 | `2026-11-02-m2-data-and-operations.md` | 完了(2026-11-02) |
-| M3 | `2026-11-03-m3-oauth.md` | 実装完了(2026-11-03)。ゲート G3 の preview 確認は所有者が行う |
+| M3 | `2026-11-03-m3-oauth.md` | 完了(2026-11-03)。ゲート G3 通過 |
 | M4〜M5 | 着手時に作る | — |
 
 ## 7. M1 完了時の申し送り(2026-11-01)
@@ -226,7 +226,9 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 
 - PR は #64 → #65 → #66 → #67 → #68 → #69 → #70 のスタック(base が前の PR)。順にマージする。#70 はブランチ全体レビュー(Critical 0・Important 3・Minor 13)の Important 3 件 + Minor 4 件の修正と E2E・手順書・本書。各 PR 単体では該当の指摘が未修正のまま見える
 - **レビューで見送った指摘(M4 以降)**: (a) 同意 POST で handle の保存済み要求が URL の tenantId 向けか(`request.resource` / `issuer`)を照合していない(B の会員が A の handle を B に POST すると B の resource のコードが A の iss で出る。権限昇格ではない)。(b) `parseAuthRequest`(CIMD の外向き fetch)をセッション確認より前に呼ぶ(入口の IP 制限で緩和)。(c) refresh 時の D1 / KV の一時障害を `temporarily_unavailable` に包んでいない(500 になる)。`isMembershipBlocked` も refresh では見ない(入口で 403)。(d) `listUserGrants(userId, { limit: 100 })` は利用者の全テナント合計 100 件を取ってから resource で絞るので、他テナントで付与の多い利用者ではこのテナントの付与が落ちうる。(e) 会員解除・BAN で OAuth の付与を失効させない(access token は BLOCKLIST、refresh は invalid_grant で止まるが、KV に最長 30 日残り所有者の画面には出ない)。(f) AS metadata と PRM の `app.get` が OPTIONS を受けない(ブラウザ内クライアントの preflight)。(g) セッション cookie が `SameSite=Strict` なので、ホスト型クライアントからの `/authorize` 遷移はログイン済みでも毎回 `/login` を経由する(流れ自体は通る)。(h) 認可コード未交換(TTL 600 秒)の付与も「接続中」に並ぶ。(i) `insufficientScope` の日本語の description は `WWW-Authenticate` ヘッダからは落ちる(本文 JSON には残る)
-- **ゲート G3 の preview 確認は未了**: CIMD のクライアント(claude.ai のコネクタ)と DCR のクライアント(MCP Inspector)で同意画面を経て `tools/list` を取得し、`record:read` 無しの付与で `403 insufficient_scope` → 再認可で通ることを所有者が確認して本節に追記する(手順は `docs/deploy.md` 3.5)。E2E(`oauth.spec.ts`)は DCR・step-up・失効を dev で固定している。CIMD は `global_fetch_strictly_public` のためローカルでは試せない
+- **ゲート G3 の preview 確認(2026-11-03、所有者)**: claude.ai のカスタムコネクタ(認証「今すぐサインイン」、OAuth クライアント「Claude の公開アイデンティティ」= CIMD、トランスポート Streamable HTTP)でログイン → 同意画面 → 接続が完了し、`tools/list` を取得できた。`record:write` だけで承認した付与で型の一覧を呼ぶとスコープ不足で止まり、`record:read` を含めて再認可すると通った(step-up)。設定 › 接続中のアプリ に claude.ai の付与が並び、失効すると claude.ai の呼び出しが認証エラーになった。DCR のクライアント(MCP Inspector)の preview 接続は未実施(E2E `oauth.spec.ts` が dev で DCR・step-up・失効を固定している。CIMD は `global_fetch_strictly_public` のためローカルでは試せない)
+- **claude.ai はコネクタを削除しても refresh token を残す**: 「マイコネクタ」から削除して再登録すると `/authorize` を通らず `/token` の refresh で繋ぎ直すため、同意画面が出ない。同意画面を出し直すには plyrs 側で付与を失効する(失効すると refresh が `invalid_grant` になり認可からやり直す)。書き込みツールは M4 まで無いので、`record:write` を付けても claude.ai は書き換えを断るだけで、サーバー側の 403 には到達しない
+- **#70 のマージ時に preview のデプロイが失敗していた(PR #72 で修正)**: `consent.ts` がモジュールのトップレベルで `Response` を組み立てており、api のアップロードが検証エラー 10021(global scope での Disallowed operation)で止まり admin もデプロイされなかった。vitest(workerd)も dev サーバーもモジュールを要求の中で読み込むため CI では再現しない。**再発防止の候補(所有者の提案)**: `wrangler deploy --dry-run --env preview --outdir <dir>` でバンドルし、最小構成の設定で `wrangler dev --no-bundle` を起動してトップレベルのエラーが出ないか見る手順を CI の check ジョブに足す(ネットワーク不要、数十秒)。M4 の着手時に入れる
 - **issuer と resource は vars から組む**: issuer `${ADMIN_ORIGIN}/oauth/t/:tenantId`、resource `${API_ORIGIN}/mcp/t/:tenantId`。MCP の入口は要求の URL から resource を作り、`API_ORIGIN` のそれと違えば OAuth の token は 401。dev と E2E は api の `.dev.vars` に `ADMIN_ORIGIN` / `API_ORIGIN` を書く(`apps/api/.dev.vars.example`。E2E は `global-setup.ts` が未作成時に 5199 で書く)
 - **OAuth の tokenId はグラント ID**(access token `userId:grantId:secret` の 2 要素目)。失効の単位と監査ログの targetId はこれ。PAT の tokenId(PAT の行 ID)と同じ `McpAuth.tokenId` に入る
 - **ロールの反映は refresh 単位**: access token は 15 分、グラントの props の `role` は同意時に固定し、refresh で `memberships` から読み直す(無ければ `invalid_grant` で付与ごと失効)。ロール変更・会員解除は最長 15 分、BAN は入口の BLOCKLIST で即時
