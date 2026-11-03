@@ -42,6 +42,7 @@ export {
   type RichTextNode,
   type SplitRecordInput,
 } from "./record-schema";
+export { ALLOWED_LINK_SCHEMES, isSafeLinkHref, unsafeLinkHrefs } from "./link-href";
 export { tolerantReadData, type TolerantReadResult } from "./tolerant-read";
 export {
   ASSET_IMAGE_NODE_TYPE,
