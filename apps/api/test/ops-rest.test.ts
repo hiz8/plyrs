@@ -62,6 +62,8 @@ describe("POST /v1/t/:tenantId/ops/:op", () => {
     };
     expect(body.ok).toBe(true);
     expect(body.output.items.map((i) => [i.kind, i.via])).toEqual([["write", "rest"]]);
+    // 計測(meter)は MCP のログ用で、REST の応答には出さない
+    expect(body).not.toHaveProperty("meter");
   });
 
   it("type_list(via が mcp のみ)は 404", async () => {
@@ -79,6 +81,7 @@ describe("POST /v1/t/:tenantId/ops/:op", () => {
     expect(response.status).toBe(400);
     const body = (await response.json()) as { ok: boolean; code: string; issues: unknown[] };
     expect(body).toMatchObject({ ok: false, code: "invalid_input" });
+    expect(body).not.toHaveProperty("meter");
     expect(body.issues.length).toBeGreaterThan(0);
   });
 

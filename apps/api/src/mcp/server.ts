@@ -309,11 +309,12 @@ export async function callOperation(
   };
 }
 
-// record の名前(型の titleField の値)と型。確認文に使う
+// record の名前(型の titleField の値)・型・版。確認文と承諾後の版の照合に使う。record_get を呼ぶので
+// 確認には record:read も要る(record:publish だけのトークンは確認の段で insufficient_scope になる)
 async function describeRecord(
   deps: McpServerDeps,
   recordId: string,
-): Promise<{ label: string; type: string } | CallToolResult> {
+): Promise<{ label: string; type: string; version: number } | CallToolResult> {
   const result = await invoke(deps, "record_get", { recordId });
   if (!result.ok) {
     return failure(result);
@@ -324,7 +325,8 @@ async function describeRecord(
   const data = isRecord(record["data"]) ? record["data"] : {};
   const titleField = type?.titleField;
   const title = titleField === undefined ? (data["title"] ?? data["name"]) : data[titleField];
-  return { label: labelOf(title, recordId), type: typeKey };
+  const version = typeof record["version"] === "number" ? record["version"] : -1;
+  return { label: labelOf(title, recordId), type: typeKey, version };
 }
 
 // 16.8(M4-2): publish / unpublish は確認を通ってから実行する

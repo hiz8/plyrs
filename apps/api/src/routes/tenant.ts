@@ -8,6 +8,7 @@ import { assetKeyBelongsToTenant } from "../assets/ownership";
 import { can } from "../auth/permissions";
 import { authenticateTenantToken, tenantGate, type GateVariables } from "../middleware/tenant-gate";
 import { findOperation } from "../ops/catalog";
+import type { InvokeResult } from "../ops/invoke";
 import {
   asAssetUsage,
   asContentTypeRow,
@@ -102,6 +103,13 @@ async function mirrorTenantModule(
   } catch (error) {
     console.error("tenant_modules mirror failed", tenantId, moduleId, error);
   }
+}
+
+// M4-6: invoke の結果には計測(meter)が載る。MCP の入口がログに出すためのもので、REST の応答には出さない
+function restInvokeResult(value: unknown): InvokeResult {
+  const result = asInvokeResult(value);
+  delete result.meter;
+  return result;
 }
 
 export const tenantRoutes = new Hono<GateEnv>()
@@ -253,7 +261,7 @@ export const tenantRoutes = new Hono<GateEnv>()
       }
       tenantSlug = slugRow.slug;
     }
-    const result = asInvokeResult(
+    const result = restInvokeResult(
       await stubFor(c).invoke(
         name,
         body,
@@ -270,7 +278,7 @@ export const tenantRoutes = new Hono<GateEnv>()
     const body = c.req.valid("json");
     const recordId = c.req.param("recordId");
     const existing = asRecordSnapshot(await stubFor(c).getRecord(recordId));
-    const result = asInvokeResult(
+    const result = restInvokeResult(
       existing === null
         ? await stubFor(c).invoke(
             "record_create",
@@ -331,7 +339,7 @@ export const tenantRoutes = new Hono<GateEnv>()
   .delete("/:tenantId/records/:recordId", async (c) => {
     const recordId = c.req.param("recordId");
     // M2-7b: 削除は record_delete(冪等。削除済みでも ok)。応答の形は従来の { ok, record } を保つ
-    const result = asInvokeResult(
+    const result = restInvokeResult(
       await stubFor(c).invoke("record_delete", { recordId }, c.get("auth")),
     );
     if (!result.ok) {
@@ -365,7 +373,7 @@ export const tenantRoutes = new Hono<GateEnv>()
       return c.json({ error: "unknown_tenant" }, 404);
     }
     // M2-7b: record_publish(冪等。同じ版の再 publish は何も書かない)
-    const result = asInvokeResult(
+    const result = restInvokeResult(
       await stubFor(c).invoke(
         "record_publish",
         { recordId: c.req.param("recordId") },
@@ -379,7 +387,7 @@ export const tenantRoutes = new Hono<GateEnv>()
   })
   .post("/:tenantId/records/:recordId/unpublish", async (c) => {
     // M2-7b: record_unpublish(未公開なら ok、sourceVersion は null)
-    const result = asInvokeResult(
+    const result = restInvokeResult(
       await stubFor(c).invoke(
         "record_unpublish",
         { recordId: c.req.param("recordId") },

@@ -215,6 +215,33 @@ describe("publish の確認(MRTR の elicitation)", () => {
     expect(await published(b)).toBe(false);
   });
 
+  it("確認の後に record が更新されると record_changed で、公開されない", async () => {
+    const recordId = await newRecord(910);
+    const first = await call("record_publish", { recordId }, { elicitation: true });
+    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    const updated = asWriteResult(
+      await stub.writeRecord(
+        "article",
+        {
+          recordId,
+          input: { ...validArticleInput(), title: "差し替えた記事", slug: "s-910" },
+        },
+        { ...auth("editor", "editor"), userId: "someone-else", tenantId },
+      ),
+    );
+    expect(updated.ok, JSON.stringify(updated)).toBe(true);
+    const json = await call(
+      "record_publish",
+      { recordId },
+      {
+        elicitation: true,
+        retry: { inputResponses: accept, requestState: first.result?.requestState ?? "" },
+      },
+    );
+    expect(json.result?.structuredContent).toMatchObject({ error: { code: "record_changed" } });
+    expect(await published(recordId)).toBe(false);
+  });
+
   it("改ざんした requestState は -32602", async () => {
     const recordId = await newRecord(907);
     const first = await call("record_publish", { recordId }, { elicitation: true });

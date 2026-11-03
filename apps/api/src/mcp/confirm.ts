@@ -34,6 +34,9 @@ const LABEL_LIMIT = 80;
 export interface ConfirmState {
   op: ConfirmOperation;
   recordId: string;
+  // 確認文を見せたときの record の版。承諾までの間に変わっていれば実行しない(見せた内容と違うものを
+  // 公開させない)
+  version: number;
 }
 
 export function bindOf(tenantId: string, auth: McpAuth): string {
@@ -105,7 +108,8 @@ export interface ConfirmArgs {
   op: ConfirmOperation;
   recordId: string;
   // record の名前と型は ask のときだけ要る(呼び出し側が record_get で引く)
-  describe: () => Promise<{ label: string; type: string } | CallToolResult>;
+  // 承諾の後にも版の照合で呼ぶ
+  describe: () => Promise<{ label: string; type: string; version: number } | CallToolResult>;
   clientCanElicit: boolean;
   inputResponses: Record<string, unknown> | undefined;
   // SDK の verify を通った requestState の中身(無ければ undefined)
@@ -127,6 +131,19 @@ export async function confirmOperation(args: ConfirmArgs): Promise<ConfirmOutcom
     }
     const confirmed = acceptedContent(args.inputResponses, "confirm", confirmSchema);
     if (confirmed?.confirm === true) {
+      const now = await args.describe();
+      if ("content" in now) {
+        return { kind: "refused", result: now };
+      }
+      if (now.version !== args.state.version) {
+        return {
+          kind: "refused",
+          result: refused(
+            "record_changed",
+            "確認の後に record が更新された。確認からやり直してください",
+          ),
+        };
+      }
       return { kind: "confirmed" };
     }
     const view = inputResponse(args.inputResponses, "confirm");
@@ -150,7 +167,11 @@ export async function confirmOperation(args: ConfirmArgs): Promise<ConfirmOutcom
   if ("content" in described) {
     return { kind: "refused", result: described };
   }
-  const requestState = await args.mint({ op: args.op, recordId: args.recordId });
+  const requestState = await args.mint({
+    op: args.op,
+    recordId: args.recordId,
+    version: described.version,
+  });
   return {
     kind: "ask",
     result: inputRequired({

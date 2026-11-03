@@ -108,7 +108,7 @@ export const recordPublish = defineOperation({
   name: "record_publish",
   title: "record の公開",
   description:
-    "record の現在の内容を公開する(誰でも読めるようになる)。既定では公開は人が管理画面で行うので、頼まれたときだけ使う。実行前に利用者への確認(elicitation)が出る。確認に対応していないクライアントでは confirmation_unavailable になるので、status を ready にして人に公開を依頼する。トークンに record:publish が無ければ 403(OAuth は再認可、PAT は所有者が record:publish 付きの接続トークンを 設定 › 接続中のアプリ で発行する)。参照している未公開の asset も一緒に公開する。既に現在の版が公開済みなら何もせず成功を返す。",
+    "record の現在の内容を公開する(誰でも読めるようになる)。既定では公開は人が管理画面で行うので、頼まれたときだけ使う。実行前に利用者への確認(elicitation)が出る。確認に対応していないクライアントでは confirmation_unavailable になるので、status を ready にして人に公開を依頼する。確認の後に record が更新されると record_changed になるので、確認からやり直す。トークンに record:publish が無ければ 403(OAuth は再認可、PAT は所有者が record:publish 付きの接続トークンを 設定 › 接続中のアプリ で発行する)。参照している未公開の asset も一緒に公開する。既に現在の版が公開済みなら何もせず成功を返す。",
   input: z.object({ recordId: uuidSchema }),
   output: z.object({
     recordId: uuidSchema,

@@ -93,6 +93,22 @@ describe("resolveRichTextInputs", () => {
     expect(new Set(after.map((b) => b.id)).size).toBe(4);
   });
 
+  it("先頭に同じ内容のブロックを入れても、既存のブロックの ID は動かない", () => {
+    // Markdown から作った文書(attrs のある見出しは insert の Markdown と同じ形になり、導出 ID が重なる)
+    const base = resolved(resolveRichTextInputs(type, { body: "## 一\n\n二" }, null));
+    const before = blocksOf(base["body"]);
+    const input = resolved(
+      resolveRichTextInputs(
+        type,
+        { body: { blocks: [{ op: "insert", after: null, markdown: "## 一" }] } },
+        base,
+      ),
+    );
+    const after = blocksOf(input["body"]);
+    expect(after.slice(1).map((b) => b.id)).toEqual(before.map((b) => b.id));
+    expect(new Set(after.map((b) => b.id)).size).toBe(3);
+  });
+
   it("無い ID は block_not_found", () => {
     const result = resolveRichTextInputs(
       type,
