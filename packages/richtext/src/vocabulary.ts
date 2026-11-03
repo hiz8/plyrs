@@ -16,3 +16,21 @@ export const ASSET_IMAGE_HREF_PREFIX = "plyrs://asset/";
 // record 参照の Markdown 表現(Tiptap 公式の inline shortcode):
 //   [@ recordType="author" recordId="<uuid>" label="山田"]
 export const RECORD_MENTION_MARKDOWN_NAME = "@";
+
+// Markdown → AST で受け付けない構文の種類(design-spec 16.10)。拒否は必ず unsupported_markdown の
+// 業務エラーで返し、黙って落とさない。markdown.ts が検出し、extensions.ts の parseMarkdown は
+// 検出をすり抜けた場合の最後の砦としてこのエラーを投げる
+export type UnsupportedMarkdownKind =
+  | "table"
+  | "task_list"
+  | "external_image"
+  | "invalid_structure";
+
+export class UnsupportedMarkdownError extends Error {
+  readonly kind: UnsupportedMarkdownKind;
+  constructor(kind: UnsupportedMarkdownKind, message: string) {
+    super(message);
+    this.name = "UnsupportedMarkdownError";
+    this.kind = kind;
+  }
+}
