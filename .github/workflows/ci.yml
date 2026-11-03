@@ -19,6 +19,9 @@ jobs:
       - run: pnpm format:check
       - run: pnpm typecheck
       - run: pnpm test
+      # 本番と同じバンドルを wrangler dev で起動し、モジュールのトップレベルのエラー(デプロイ時の検証エラー
+      # 10021)を検出する。vitest と dev サーバーでは再現しない(PR #72)
+      - run: pnpm --filter @plyrs/api check:deploy
 
   e2e:
     runs-on: ubuntu-latest
