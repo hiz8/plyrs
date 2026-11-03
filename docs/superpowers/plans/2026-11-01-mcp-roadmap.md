@@ -87,17 +87,18 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 
 ゲート G2(全書き込み操作がカタログ経由になり、同期・REST・publish・delete のいずれでも履歴が記録され、管理画面から復元できること)は M2-4 / M2-5 / M2-7b で満たした。書き込み操作の MCP 公開(tools/list への掲出)は M4-1。
 
-### M3 OAuth の認証基盤(決定 47〜49 を前提にした分割)
+### M3 OAuth の認証基盤(決定 47〜49 を前提にした分割)— 実装完了(2026-11-03)、詳細計画 `2026-11-03-m3-oauth.md`
 
-| PR | 内容 | 論点 | 規模 |
-| --- | --- | --- | --- |
-| M3-1 | 認可サーバー(`@cloudflare/workers-oauth-provider` 分割 API、api Worker)。テナント別 issuer、`OAUTH_KV` と `global_fetch_strictly_public` を 3 環境分、CIMD 優先・DCR fallback、admin の転送接頭辞に `/oauth` と `/.well-known/oauth-authorization-server`、M1-5 の PRM に `authorization_servers` | C1 | L |
-| M3-2 | 同意画面(api が HTML を描画)。`/login` に `return_to`、Turnstile 付きログインを経て `/authorize` に戻る。会員でなければ進ませない。`record:publish` は既定で外し所有者だけ | C3・C5・D1 | M |
-| M3-3 | リソースサーバー側の検証。`validateToken` で OAuth を PAT と同じ判定に合流、`insufficient_scope` の step-up(スコープに階層は設けない。16.3) | C2・C3・E2 | M |
-| M3-4 | access token の TTL 15 分、refresh 時のロール読み直し(`tokenExchangeCallback`)、`purgeExpiredData` を日次 cron に | C3 | S |
-| M3-5 | 管理画面の「接続中のアプリ」画面(OAuth の付与と PAT を 1 つの一覧に) | C1・C4 | M |
+| PR | 内容 | 論点 | 規模 | 状態 |
+| --- | --- | --- | --- | --- |
+| M3-1 | 認可サーバー(`@cloudflare/workers-oauth-provider` 分割 API、api Worker)。テナント別 issuer、`OAUTH_KV` と `global_fetch_strictly_public` を 3 環境分、CIMD 優先・DCR fallback、admin の転送接頭辞に `/oauth` と `/.well-known/oauth-authorization-server`、M1-5 の PRM に `authorization_servers` | C1 | L | 実装済み(2026-11-03、PR #65、スタック PR で順にマージ) |
+| M3-2 | 同意画面(api が HTML を描画)。`/login` に `return_to`、Turnstile 付きログインを経て `/authorize` に戻る。会員でなければ進ませない。`record:publish` は既定で外し所有者だけ | C3・C5・D1 | M | 実装済み(2026-11-03、PR #66) |
+| M3-3 | リソースサーバー側の検証。`validateToken` で OAuth を PAT と同じ判定に合流、`insufficient_scope` の step-up(スコープに階層は設けない。16.3) | C2・C3・E2 | M | 実装済み(2026-11-03、PR #67) |
+| M3-4 | access token の TTL 15 分、refresh 時のロール読み直し(`tokenExchangeCallback`)、`purgeExpiredData` を日次 cron に | C3 | S | 実装済み(2026-11-03、PR #68) |
+| M3-5 | 管理画面の「接続中のアプリ」画面(OAuth の付与と PAT を 1 つの一覧に) | C1・C4 | M | 実装済み(2026-11-03、PR #69) |
+| 仕上げ | E2E `oauth.spec.ts`、`docs/deploy.md` 3.5 の OAuth の手順、ブランチ全体のレビュー、本書の更新 | — | S | 実装済み(2026-11-03、PR #70) |
 
-ゲート G3: preview で、CIMD で接続するクライアントと DCR fallback で接続するクライアントをそれぞれ 1 つ以上確認し、スコープ不足から step-up できること。
+ゲート G3: preview で、CIMD で接続するクライアントと DCR fallback で接続するクライアントをそれぞれ 1 つ以上確認し、スコープ不足から step-up できること(確認項目は `docs/deploy.md` 3.5。所有者が確認して 10 章に記録する)。
 
 ### M4 書き込み MCP の公開
 
@@ -182,7 +183,8 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | M0 | `2026-11-01-m0-2-richtext-spike-result.md`、`2026-11-01-m0-3-oauth-spike-result.md` | 完了(2026-11-01) |
 | M1 | `2026-11-01-m1-readonly-mcp.md` | 完了(2026-11-02) |
 | M2 | `2026-11-02-m2-data-and-operations.md` | 完了(2026-11-02) |
-| M3〜M5 | 着手時に作る | — |
+| M3 | `2026-11-03-m3-oauth.md` | 実装完了(2026-11-03)。ゲート G3 の preview 確認は所有者が行う |
+| M4〜M5 | 着手時に作る | — |
 
 ## 7. M1 完了時の申し送り(2026-11-01)
 
@@ -219,3 +221,17 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 - **エディタ**: v1 の本文を開くと最上位ブロックの ID は導出、入れ子は UniqueID が付ける。差し替え判定は最上位以外の `attrs.id` と末尾の空段落(StarterKit の TrailingNode)を無視する。保存値には TrailingNode の段落は入らない
 - **履歴画面の復元**は応答後に同期で版が届くのを最長 3 秒待って編集画面へ戻る。応答の snapshot で collection を直接 upsert すれば待ちが要らない(見送り)
 - **M1 の未了**(往復時間の実測、Cursor / VS Code / MCP Inspector からの接続確認)は引き続き未了。デプロイ環境が要る(往復時間は 2026-11-03 に preview で実測した。7 章)
+
+## 10. M3 完了時の申し送り(2026-11-03)
+
+- PR は #64 → #65 → #66 → #67 → #68 → #69 → #70 のスタック(base が前の PR)。順にマージする。#70 はブランチ全体レビューの修正と E2E・手順書・本書
+- **ゲート G3 の preview 確認は未了**: CIMD のクライアント(claude.ai のコネクタ)と DCR のクライアント(MCP Inspector)で同意画面を経て `tools/list` を取得し、`record:read` 無しの付与で `403 insufficient_scope` → 再認可で通ることを所有者が確認して本節に追記する(手順は `docs/deploy.md` 3.5)。E2E(`oauth.spec.ts`)は DCR・step-up・失効を dev で固定している。CIMD は `global_fetch_strictly_public` のためローカルでは試せない
+- **issuer と resource は vars から組む**: issuer `${ADMIN_ORIGIN}/oauth/t/:tenantId`、resource `${API_ORIGIN}/mcp/t/:tenantId`。MCP の入口は要求の URL から resource を作り、`API_ORIGIN` のそれと違えば OAuth の token は 401。dev と E2E は api の `.dev.vars` に `ADMIN_ORIGIN` / `API_ORIGIN` を書く(`apps/api/.dev.vars.example`。E2E は `global-setup.ts` が未作成時に 5199 で書く)
+- **OAuth の tokenId はグラント ID**(access token `userId:grantId:secret` の 2 要素目)。失効の単位と監査ログの targetId はこれ。PAT の tokenId(PAT の行 ID)と同じ `McpAuth.tokenId` に入る
+- **ロールの反映は refresh 単位**: access token は 15 分、グラントの props の `role` は同意時に固定し、refresh で `memberships` から読み直す(無ければ `invalid_grant` で付与ごと失効)。ロール変更・会員解除は最長 15 分、BAN は入口の BLOCKLIST で即時
+- **スコープ判定の場所**: `tools/call` の要するスコープ(カタログの `requires`)は MCP の入口(`mcp/route.ts`)で DO を起こす前に 403 にする。DO 内の判定(`authorize.ts`)はそのまま二重に残る。`resources/read` と `prompts/get` は `record:read` 前提で、入口では見ない(DO 内で判定)
+- **付与の一覧はテナントの会員ごとに `listUserGrants`**(会員 50 人 × 100 件まで)。会員が多いテナントでは遅くなる。ライブラリに「resource ごとの一覧」が無いため。M5 で件数が問題になったら、付与時に D1 へ索引行を書く
+- **編集者は自分の付与を失効できない**(一覧・失効とも `member:manage`)。PAT と同じ運用。自分の付与だけ失効できる経路は M5 の候補
+- **同意画面は api の HTML**(`hono/html`、管理画面のスタイルは使わない)。文言は `consent-page.ts` に直書き(admin の `TOKEN_LABELS` と同じ文を写している。片方を変えたらもう片方も)
+- **E2E の E2E 間干渉**: `oauth.spec.ts` は page(未ログイン)と request(API 用)の cookie を分けている。`page.request` を使うと page がログイン済みになり、return_to の経路が通らない
+- **M1 の未了**: Cursor / VS Code / MCP Inspector からの PAT 接続確認(手順は所有者に渡し済み)

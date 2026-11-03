@@ -137,6 +137,36 @@ Cursor / VS Code は `mcp.json` の `"type": "http"` で同じ URL と `headers.
 
 注意: `ADMIN_ORIGIN` 以外の `Origin` を付けた要求は 403、`POST` 以外は 405、2026-07-28 より前の仕様(`initialize` を送る旧クライアント)は拒否する。
 
+### OAuth での接続(M3、design-spec 16.3)
+
+PAT の代わりに、MCP クライアントが OAuth 2.1(認可コード + PKCE)で接続できる。テナントごとに認可サーバーがあり、issuer は admin のオリジン `https://<admin>/oauth/t/<tenantId>`、resource は MCP の入口 `https://<api>/mcp/t/<tenantId>`。クライアントは入口の 401 → PRM(`/.well-known/oauth-protected-resource/mcp/t/<tenantId>`)→ Authorization Server Metadata(`https://<admin>/.well-known/oauth-authorization-server/oauth/t/<tenantId>`)と辿って自動で見つける。利用者が手で控えるのは入口の URL だけ。
+
+- クライアントの登録: CIMD(client_id が `https://` の metadata URL)を優先し、DCR(`<issuer>/oauth/register`、RFC 7591)を fallback として残す。CIMD の取得は wrangler.jsonc の `compatibility_flags: ["global_fetch_strictly_public"]` が要る(ローカルの URL は取れないので、dev と E2E は DCR だけ)
+- 同意画面: api が描画する。未ログインなら admin の `/login?return_to=` に回り、ログイン後に同じ URL へ戻る。テナントの会員でなければ進めない。選べるスコープは利用者のロールが付与できる範囲で、`record:publish` は求められていても既定で外れる(所有者だけが付けられる)
+- トークン: access token は 15 分、refresh のたびに D1 の現在のロールを読み直す。会員でなくなった、または利用停止の利用者の refresh は `invalid_grant` で付与ごと失効する。期限切れの付与は日次 cron(`scheduled`)が `OAUTH_KV` から掃く
+- スコープ不足: `tools/call` が要するスコープ(操作カタログの `requires`)がトークンに無ければ `403` と `WWW-Authenticate: Bearer error="insufficient_scope", scope="…"`。OAuth のクライアントはそのスコープを含めて再認可(step-up)し、PAT は所有者がスコープ付きのトークンを発行し直す
+- 失効: 管理画面の **設定 › 接続中のアプリ** に、テナント全員の OAuth の付与と PAT が 1 つの一覧で並ぶ(所有者だけ)。失効すると、その付与の access token はすぐに 401 になる
+
+必要な設定は `OAUTH_KV`(1 節)と `ADMIN_ORIGIN` / `API_ORIGIN`(2 節)。`API_ORIGIN` は実際にクライアントが接続する api のオリジンと一致していなければならない(違うと token が入口で 401)。
+
+接続の例:
+
+```bash
+# claude.ai のコネクタ(CIMD): 「カスタムコネクタを追加」で URL に https://<api>/mcp/t/<tenantId> を入れる。
+# 認可の設定は不要(401 → PRM → issuer の順に辿り、同意画面へ回る)
+
+# MCP Inspector(DCR fallback): Authorization ヘッダを付けずに接続し、UI の OAuth で同意する
+npx @modelcontextprotocol/inspector --transport http \
+  --server-url https://plyrs-api-preview.hiz.workers.dev/mcp/t/<tenantId>
+```
+
+ゲート G3 の確認項目(preview。結果はロードマップ 10 章に記録する):
+
+1. CIMD で接続するクライアント(claude.ai のコネクタなど)が同意画面を経て `tools/list` を取得できる
+2. DCR で接続するクライアント(MCP Inspector など)が同意画面を経て `tools/list` を取得できる
+3. 同意画面で `record:read` を外して(`record:write` だけで)承認し、`type_list` などを呼ぶと `403 insufficient_scope`(`scope="record:read"`)になる。`record:read` を含めて再認可すると通る
+4. 設定 › 接続中のアプリ に付与が並び、失効するとその token が 401 になる
+
 ## 4. super 管理者の初期化
 
 **デプロイ後は直ちに bootstrap を実行すること** — super_admins が空の間は到達可能な誰でも初期化できる(レート制限のみ)。

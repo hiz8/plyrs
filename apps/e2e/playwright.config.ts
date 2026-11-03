@@ -44,5 +44,7 @@ export default defineConfig({
     { name: "history", testMatch: /history\.spec\.ts/, dependencies: ["core-journey"] },
     // M1-7: MCP のスモーク。テナントは自前で作る(core-journey には bootstrap の順序でだけ依存)
     { name: "mcp-smoke", testMatch: /mcp-smoke\.spec\.ts/, dependencies: ["core-journey"] },
+    // M3: OAuth の一巡(同意画面・step-up・失効)。テナントは自前(oauth)
+    { name: "oauth", testMatch: /oauth\.spec\.ts/, dependencies: ["core-journey"] },
   ],
 });
