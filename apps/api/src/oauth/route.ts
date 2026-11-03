@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { workerContext } from "../mcp/route";
+import { handleAuthorizeGet, handleAuthorizePost } from "./consent";
 import { createTenantAuthServer } from "./server";
 
 // design-spec 16.2(決定 47、M3-1): 認可サーバーの入口。admin オリジンの `/oauth/t/:tenantId/...` と
@@ -21,8 +22,9 @@ function serve(request: Request, env: Env, ctx: ExecutionContext, tenantId: stri
 }
 
 export const oauthRoutes = new Hono<{ Bindings: Env }>()
-  // M3-2 で同意画面に置き換える
-  .all("/t/:tenantId/authorize", (c) => c.json({ error: "not_implemented" }, 501))
+  // 同意画面(M3-2)。ライブラリの fetch は authorize を扱わないので、その前に登録する
+  .get("/t/:tenantId/authorize", handleAuthorizeGet)
+  .post("/t/:tenantId/authorize", handleAuthorizePost)
   .all("/t/:tenantId/*", (c) => serve(c.req.raw, c.env, workerContext(c), c.req.param("tenantId")));
 
 // RFC 8414 の Authorization Server Metadata(issuer にパスがあるので well-known の後ろに issuer のパスが続く)

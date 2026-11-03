@@ -103,17 +103,6 @@ describe("OAuth 認可サーバー(/oauth/t/:tenantId)", () => {
     }
   });
 
-  it("/authorize は M3-2 まで 501", async () => {
-    const tenantId = await insertTenant();
-    const res = await app.request(
-      `${tenantIssuer(ADMIN_ORIGIN, tenantId)}/authorize`,
-      {},
-      oauthEnv(),
-      CTX,
-    );
-    expect(res.status).toBe(501);
-  });
-
   it("wrangler.jsonc のトップレベルに OAUTH_KV がある(vitest の binding)", () => {
     expect(env.OAUTH_KV).toBeDefined();
   });

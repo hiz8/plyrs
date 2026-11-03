@@ -6,6 +6,7 @@ import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { TurnstileWidget } from "../components/turnstile-widget";
 import { ApiError } from "../lib/api-client";
 import { resetClientSession } from "../lib/client-session";
+import { safeReturnTo } from "../lib/return-to";
 
 const styles = stylex.create({
   page: {
@@ -34,6 +35,10 @@ const styles = stylex.create({
 });
 
 export const Route = createFileRoute("/login")({
+  // M3-2: OAuth の同意画面(api が描画する /oauth/t/:tenantId/authorize)が未ログインの利用者を
+  // ここへ回す。ログイン後に戻す先は safeReturnTo で /oauth/t/ 配下だけに絞る
+  validateSearch: (search: Record<string, unknown>): { return_to?: string } =>
+    typeof search["return_to"] === "string" ? { return_to: search["return_to"] } : {},
   // §6: siteKey は公開情報。defaultSsr: false なのでこの loader はクライアント専用(super-login.tsx と同じ形)。
   loader: async ({ context }) => {
     return context.queryClient.fetchQuery({
@@ -61,6 +66,7 @@ function LoginPage() {
   const { api, queryClient, tokens } = Route.useRouteContext();
   const { siteKey } = Route.useLoaderData();
   const navigate = useNavigate();
+  const { return_to: returnTo } = Route.useSearch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState<string | null>(null);
@@ -104,6 +110,12 @@ function LoginPage() {
     try {
       await api.login(email, password, token ?? undefined);
       resetClientSession({ queryClient, tokens });
+      const back = safeReturnTo(returnTo);
+      if (back !== null) {
+        // /oauth は api の経路(SPA のルートではない)なので、ページ遷移で戻す
+        window.location.assign(back);
+        return;
+      }
       await navigate({ to: "/tenants" });
     } catch (cause) {
       setError(messageFor(cause));
