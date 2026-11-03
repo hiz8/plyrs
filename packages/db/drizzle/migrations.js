@@ -9,6 +9,7 @@ import m0006 from "./0006_brown_roland_deschain.sql";
 import m0007 from "./0007_equal_roland_deschain.sql";
 import m0008 from "./0008_records_fts.sql";
 import m0009 from "./0009_majestic_cardiac.sql";
+import m0010 from "./0010_flippant_apocalypse.sql";
 
 export default {
   journal,
@@ -23,5 +24,6 @@ export default {
     m0007,
     m0008,
     m0009,
+    m0010,
   },
 };

@@ -27,14 +27,21 @@ export type InvokeErrorCode =
   | "not_published"
   | (string & {});
 
+// M4-6: DO の invoke が載せる計測値(操作が読み書きした行数)。Worker で実行する操作には無い
+export interface InvokeMeter {
+  rowsRead: number;
+  rowsWritten: number;
+}
+
 export type InvokeResult =
-  | { ok: true; output: unknown }
+  | { ok: true; output: unknown; meter?: InvokeMeter }
   | {
       ok: false;
       code: InvokeErrorCode;
       message: string;
       issues?: unknown;
       details?: unknown;
+      meter?: InvokeMeter;
     };
 
 export type OpHandler = (ctx: OpContext, input: never) => { ok: true; output: unknown } | OpFailure;

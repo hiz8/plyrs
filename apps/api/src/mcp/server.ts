@@ -257,6 +257,23 @@ async function loadType(deps: McpServerDeps, key: string): Promise<ContentTypeDe
   return result.ok ? (result.output as ContentTypeDefinition) : null;
 }
 
+// M4-6(ロードマップ 6 章): ツール呼び出しごとの計測ログ。`wrangler tail` で event: "mcp.op" を拾う。
+// トークン・本文・利用者 ID は出さない。Worker で実行する操作は DO の計測値が無いので null
+function logOperation(deps: McpServerDeps, op: string, result: InvokeResult, ms: number): void {
+  console.log(
+    JSON.stringify({
+      event: "mcp.op",
+      tenantId: deps.tenantId,
+      op,
+      ok: result.ok,
+      ...(result.ok ? {} : { code: result.code }),
+      rowsRead: result.meter?.rowsRead ?? null,
+      rowsWritten: result.meter?.rowsWritten ?? null,
+      ms,
+    }),
+  );
+}
+
 // 1 つの操作を DO で実行し、MCP のツール結果に包む。業務エラー(not_found など)は isError で返し、
 // JSON-RPC のエラーにしない(16.7)。export するのはスコープ判定のテストのため
 export async function callOperation(
@@ -268,10 +285,12 @@ export async function callOperation(
   if (spec === undefined) {
     return failure({ ok: false, code: "unknown_operation", message: `unknown operation: ${name}` });
   }
+  const started = Date.now();
   const result =
     spec.runsIn === "worker"
       ? await runWorkerOperation(deps, spec, input)
       : await invoke(deps, name, input);
+  logOperation(deps, name, result, Date.now() - started);
   if (!result.ok) {
     return failure(result);
   }

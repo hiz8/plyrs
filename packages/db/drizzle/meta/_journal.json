@@ -71,6 +71,13 @@
       "when": 1793697796256,
       "tag": "0009_majestic_cardiac",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793698719684,
+      "tag": "0010_flippant_apocalypse",
+      "breakpoints": true
     }
   ]
 }

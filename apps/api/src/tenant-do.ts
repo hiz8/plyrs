@@ -43,6 +43,7 @@ import {
   type ClaimAssetUploadResult,
 } from "./do/asset-uploads";
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
+import { meterSql } from "./do/sql-meter";
 import { ensureAssetContentType } from "./do/ensure-asset-type";
 import { healthCheckCore, listAssetR2KeysCore, type HealthReport } from "./do/health";
 import {
@@ -650,8 +651,10 @@ export class TenantDO extends DurableObject<Env> {
       tenantId = auth.tenantId;
     }
     const armed: Promise<void>[] = [];
+    // M4-6: 操作が読み書きした行数を数えて結果に載せる(Worker がログ mcp.op に出す)
+    const meter = meterSql(this.ctx.storage.sql);
     const ctx: OpContext = {
-      sql: this.ctx.storage.sql,
+      sql: meter.sql,
       tenantId,
       tenantSlug: options.tenantSlug ?? null,
       via: hasScopes(auth) ? "mcp" : "rest",
@@ -671,7 +674,7 @@ export class TenantDO extends DurableObject<Env> {
     };
     const spec = findOperation(op);
     if (spec === undefined || spec.hints.readOnly) {
-      return invokeOperation(op, ctx, input, auth);
+      return { ...invokeOperation(op, ctx, input, auth), meter: meter.totals() };
     }
     let outboxPending = false;
     let moduleEventsPending = false;
@@ -700,7 +703,7 @@ export class TenantDO extends DurableObject<Env> {
     if (moduleEventsPending) {
       await this.drainModuleEvents();
     }
-    return result;
+    return { ...result, meter: meter.totals() };
   }
 
   // Phase 6b: 公開状態の読み取り（読み取り系は getRecord と同じく role 不問 — authorize.ts 冒頭コメント参照）

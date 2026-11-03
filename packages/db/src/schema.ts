@@ -52,6 +52,9 @@ export const records = sqliteTable(
   (table) => [
     index("idx_records_type").on(table.type),
     index("idx_records_type_status").on(table.type, table.status),
+    // M4-6(ロードマップ 6 章): 一覧の既定の並び(updated_at の降順、同値は seq)を型ごとに
+    // インデックスで辿り、rows read を record 数に比例させない
+    index("idx_records_type_updated").on(table.type, table.updatedAt, table.seq),
     uniqueIndex("idx_records_seq").on(table.seq),
   ],
 );
