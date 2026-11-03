@@ -204,7 +204,7 @@ describe("書き込みツール(M4-1b)", () => {
     expect(created.content[0]?.text?.startsWith(UNTRUSTED_PREFACE)).toBe(true);
     const got = await call("record_get", { recordId }, writePat);
     const outline = (
-      got.structuredContent?.["outline"] as Record<string, { id: string; text: string }[]>
+      got.structuredContent!["outline"] as Record<string, { id: string; text: string }[]>
     )["body"]!;
     expect(outline.map((b) => b.text)).toEqual(["見出し", "一", "二"]);
     const updated = await call(
@@ -218,7 +218,7 @@ describe("書き込みツール(M4-1b)", () => {
     );
     expect(updated.isError, JSON.stringify(updated)).toBeUndefined();
     const after = await call("record_get", { recordId }, writePat);
-    expect((after.structuredContent?.["markdown"] as Record<string, string>)["body"]).toBe(
+    expect((after.structuredContent!["markdown"] as Record<string, string>)["body"]).toBe(
       "## 見出し\n\n差し替え\n\n二",
     );
     const history = await call("record_history", { recordId }, writePat);
@@ -259,7 +259,7 @@ describe("書き込みツール(M4-1b)", () => {
       writePat,
     );
     expect(
-      (third.structuredContent?.["error"] as { details: { giveUp: boolean } }).details.giveUp,
+      (third.structuredContent!["error"] as { details: { giveUp: boolean } }).details.giveUp,
     ).toBe(true);
   });
 
