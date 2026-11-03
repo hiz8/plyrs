@@ -32,9 +32,10 @@ pnpm exec wrangler d1 create plyrs-projection[-preview]
 # R2(assets)
 pnpm exec wrangler r2 bucket create plyrs-assets[-preview]
 
-# KV(BLOCKLIST と TENANT_SLUGS の 2 個)
+# KV(BLOCKLIST・TENANT_SLUGS・OAUTH_KV の 3 個)
 pnpm exec wrangler kv namespace create BLOCKLIST[-preview]
 pnpm exec wrangler kv namespace create TENANT_SLUGS[-preview]
+pnpm exec wrangler kv namespace create OAUTH_KV[-preview]
 ```
 
 実際のコマンドでは `[-preview]` を外すかそのまま `-preview` サフィックスを付けて置換する。例: preview の control-plane D1 は `pnpm exec wrangler d1 create plyrs-control-plane-preview`、production は `pnpm exec wrangler d1 create plyrs-control-plane`。
@@ -50,6 +51,7 @@ pnpm exec wrangler kv namespace create TENANT_SLUGS[-preview]
 | `plyrs-assets[-preview]` R2 | (名前のみ、ID 不要) | `r2_buckets[0].bucket_name` |
 | `BLOCKLIST[-preview]` KV | `id` | `kv_namespaces[0].id` |
 | `TENANT_SLUGS[-preview]` KV | `id` | `kv_namespaces[1].id` |
+| `OAUTH_KV[-preview]` KV | `id` | `kv_namespaces[2].id`(binding `OAUTH_KV`。M3-1: OAuth のグラント・トークン・DCR クライアント。`@cloudflare/workers-oauth-provider` が要求する固定名) |
 
 D1 のマイグレーションは初回作成直後に一度だけ手動適用してもよい(以後は `.github/workflows/deploy.yml` が push のたびに `wrangler d1 migrations apply --remote` を実行する):
 
@@ -76,6 +78,8 @@ wrangler secret put AUTH_TURNSTILE_SECRET_KEY --env <env> -c apps/api/wrangler.j
 `AUTH_TURNSTILE_SITE_KEY` はシークレットではなく公開値なので `vars`(`wrangler.jsonc` またはダッシュボード設定)で設定する(任意 — 未設定なら `/auth/turnstile-config` が `{ siteKey: null }` を返す)。
 
 `ADMIN_ORIGIN` は api Worker の `vars`(`apps/api/wrangler.jsonc`、env ごとに全定義)で設定する公開値で、MCP の入口が `Origin` ヘッダを許可する唯一のオリジン(ブラウザからの CSRF 対策。design-spec 16.2)と、PRM(`/.well-known/oauth-protected-resource/mcp/t/:tenantId`)の `authorization_servers`(`${ADMIN_ORIGIN}/oauth/t/:tenantId`、M3 で実装)の元になる。preview は `https://plyrs-admin-preview.hiz.workers.dev`、production は `https://plyrs-admin.hiz.workers.dev`、dev は `http://localhost:5173`。
+
+`API_ORIGIN` は api Worker の `vars`(env ごとに全定義)で設定する公開値で、OAuth の認可サーバー(M3-1)が token の audience(`${API_ORIGIN}/mcp/t/:tenantId`)を組むのに使う。**MCP クライアントが接続する api のオリジンと一致していなければ、OAuth で得た token は MCP の入口で 401 になる**(入口は要求の URL から resource を作る)。preview は `https://plyrs-api-preview.hiz.workers.dev`、production は `https://plyrs-api.hiz.workers.dev`、dev は `http://localhost:5173`(admin の dev サーバーが `/mcp` を転送する)。未設定なら `/oauth/*` と Authorization Server Metadata が 503 になる。
 
 `PUBLIC_API_ORIGIN` は admin Worker の `vars`(`apps/admin/wrangler.jsonc`)で設定する公開値で、設定画面の「公開 API」の URL の出所になる(admin の `GET /_config` が `{ publicApiOrigin }` で返す)。preview は `https://plyrs-api-preview.hiz.workers.dev`、production は `https://plyrs-api.hiz.workers.dev`、dev は空文字(同一オリジン。`apps/admin/.dev.vars.example` も空)。
 

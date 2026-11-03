@@ -8,6 +8,7 @@ import {
 import { Hono } from "hono";
 import type { McpAuth } from "../do/authorize";
 import { mcpTokenValidator, type McpTokenProps } from "../middleware/mcp-gate";
+import { tenantIssuer, tenantResource } from "../oauth/server";
 import { buildMcpServer } from "./server";
 
 // design-spec 16.2(決定 48、M1-5): MCP の入口 `/mcp/t/:tenantId`。api Worker の直接オリジンで受け、
@@ -22,16 +23,6 @@ export const MCP_REQUIRED_SCOPES = ["record:read"];
 const RETRY_AFTER_SECONDS = "60";
 // 仕様 2026-07-28 の予約コード: ヘッダと本文の不一致
 const HEADER_MISMATCH = -32020;
-
-export function tenantResource(origin: string, tenantId: string): string {
-  return `${origin}/mcp/t/${tenantId}`;
-}
-
-// 認可サーバーの issuer は admin オリジンのテナント別パス(16.2)。M1 では issuer 側の metadata は
-// M3-1 まで 404 で、ホスト型クライアントが接続できないのは想定どおり(PAT だけで接続する)
-export function tenantIssuer(adminOrigin: string, tenantId: string): string {
-  return `${adminOrigin}/oauth/t/${tenantId}`;
-}
 
 function jsonRpcError(status: number, code: number, message: string, id: unknown = null): Response {
   return Response.json({ jsonrpc: "2.0", id, error: { code, message } }, { status });

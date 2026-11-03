@@ -18,6 +18,15 @@ describe("isApiPath", () => {
     expect(isApiPath("/public/v1/blog/records/post")).toBe(false);
   });
 
+  it("forwards the OAuth authorization server (M3-1)", () => {
+    expect(isApiPath("/oauth/t/abc/authorize")).toBe(true);
+    expect(isApiPath("/oauth/t/abc/oauth/token")).toBe(true);
+    expect(isApiPath("/.well-known/oauth-authorization-server/oauth/t/abc")).toBe(true);
+    expect(isApiPath("/oauth-x")).toBe(false);
+    // PRM は api の直接オリジン(決定 48)。dev 限定の転送は server-routing.ts
+    expect(isApiPath("/.well-known/oauth-protected-resource/mcp/t/abc")).toBe(false);
+  });
+
   it("forwards super paths", () => {
     expect(isApiPath("/super-auth/login")).toBe(true);
     expect(isApiPath("/super/v1/tenants")).toBe(true);
