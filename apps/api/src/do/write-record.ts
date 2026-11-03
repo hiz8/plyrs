@@ -1,5 +1,7 @@
 import {
+  ALLOWED_LINK_SCHEMES,
   buildRecordInputSchema,
+  newUnsafeLinks,
   ensureRecordBlockIds,
   extractBodyRelations,
   uuidSchema,
@@ -131,6 +133,22 @@ export function writeRecordCore(
       ok: false,
       code: "validation_failed",
       message: `record ${params.recordId} belongs to type '${prev.type}'`,
+    };
+  }
+
+  // M4 のレビュー: リッチテキストのリンクの scheme(javascript: などを拒否)。今の値に無かった href
+  // だけを見る(既存の値を巻き込むと、本文以外を直す保存まで失敗する)。全経路(同期・REST・MCP)が通る
+  const unsafe = newUnsafeLinks(definition, input, prev?.data ?? null);
+  if (unsafe.length > 0) {
+    return {
+      ok: false,
+      code: "validation_failed",
+      message: unsafe
+        .map(
+          (link) =>
+            `${link.fieldKey}: link href is not allowed (${ALLOWED_LINK_SCHEMES.join(", ")} or a relative URL): ${link.href.slice(0, 80)}`,
+        )
+        .join("; "),
     };
   }
 

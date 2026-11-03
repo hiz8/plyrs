@@ -12,6 +12,7 @@ import { useForm, useStore } from "@tanstack/react-form";
 import {
   ASSET_SYSTEM_MANAGED_FIELD_KEYS,
   ASSET_TYPE_KEY,
+  isSafeLinkHref,
   type ContentTypeDefinition,
   type FieldDefinition,
 } from "@plyrs/metamodel";
@@ -645,6 +646,7 @@ function FieldInput({
             onRequestAssetImage={onRequestAssetImage}
             resolveAssetUrl={assets?.resolveUrl}
             isReadOnly={isReadOnly}
+            isAllowedLink={isSafeLinkHref}
           />
         </WithDescription>
       );
