@@ -1,4 +1,4 @@
-import type { TokenSummary } from "./admin-api";
+import type { GrantSummary, TokenSummary } from "./admin-api";
 import { formatDateTime } from "./datetime";
 import { TOKEN_LABELS } from "./labels";
 import { can, type Operation, type Role } from "./permissions";
@@ -89,6 +89,71 @@ export function tokenRows(tokens: readonly TokenSummary[], now: Date): TokenRow[
       canRevoke: status === "active",
     };
   });
+}
+
+// M3-5(design-spec 16.3): 「接続中のアプリ」の 1 行。PAT と OAuth の付与を同じ表に並べる。
+// OAuth の行の名前はクライアント名(CIMD の metadata または DCR の client_name)、無ければ client_id。
+// 最終利用は OAuth では記録していないので「—」。付与は失効済み・期限切れだと KV から消えるので常に失効できる
+export type ConnectionRow = {
+  id: string;
+  name: string;
+  scopes: readonly string[];
+  // 利用者のメール(OAuth の付与は会員ごと。PAT は発行者自身なので出さない)
+  email: string | null;
+  status: TokenStatus;
+  expiryText: string;
+  lastUsedText: string;
+  canRevoke: boolean;
+} & ({ kind: "pat"; token: TokenSummary } | { kind: "oauth"; grant: GrantSummary });
+
+function grantRow(grant: GrantSummary, now: Date): ConnectionRow {
+  let expiryText: string = TOKEN_LABELS.noExpiry;
+  let status: TokenStatus = "active";
+  if (grant.expiresAt !== null) {
+    const remaining = new Date(grant.expiresAt).getTime() - now.getTime();
+    if (remaining <= 0) {
+      status = "expired";
+      expiryText = TOKEN_LABELS.status.expired;
+    } else {
+      expiryText = TOKEN_LABELS.expiresIn(Math.max(0, Math.ceil(remaining / DAY)));
+    }
+  }
+  return {
+    kind: "oauth",
+    grant,
+    id: `oauth:${grant.id}`,
+    name: grant.clientName ?? grant.clientId,
+    scopes: grant.scopes,
+    email: grant.email,
+    status,
+    expiryText,
+    lastUsedText: TOKEN_LABELS.notApplicable,
+    canRevoke: true,
+  };
+}
+
+// PAT を発行順(API の順)に、続けて OAuth の付与を createdAt 順に並べる
+export function connectionRows(
+  tokens: readonly TokenSummary[],
+  grants: readonly GrantSummary[],
+  now: Date,
+): ConnectionRow[] {
+  const pats: ConnectionRow[] = tokenRows(tokens, now).map((row) => ({
+    kind: "pat",
+    token: row.token,
+    id: `pat:${row.token.id}`,
+    name: row.token.name,
+    scopes: row.token.scopes,
+    email: null,
+    status: row.status,
+    expiryText: row.expiryText,
+    lastUsedText: row.lastUsedText,
+    canRevoke: row.canRevoke,
+  }));
+  const oauth = grants
+    .toSorted((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((grant) => grantRow(grant, now));
+  return [...pats, ...oauth];
 }
 
 // 発行・一覧・失効は管理者だけ(API 側も member:manage で 403)

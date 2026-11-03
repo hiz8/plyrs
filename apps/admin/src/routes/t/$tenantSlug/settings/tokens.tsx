@@ -15,14 +15,23 @@ import { RevokeTokenDialog } from "../../../../components/settings/revoke-token-
 import { SettingsCard } from "../../../../components/settings/settings-card";
 import { SettingsFrame } from "../../../../components/settings/settings-frame";
 import { TokensTable } from "../../../../components/settings/tokens-table";
-import type { IssuedToken, IssueTokenInput, TokenSummary } from "../../../../lib/admin-api";
+import type { IssuedToken, IssueTokenInput } from "../../../../lib/admin-api";
 import { ApiError } from "../../../../lib/api-client";
 import { errorMessage } from "../../../../lib/error-messages";
 import { TOKEN_LABELS } from "../../../../lib/labels";
 import { isRole } from "../../../../lib/permissions";
 import { resolvePublicOrigin } from "../../../../lib/public-api";
-import { configQueryOptions, tokensQueryOptions } from "../../../../lib/queries";
-import { canManageTokens, mcpEndpoint, tokenRows } from "../../../../lib/tokens";
+import {
+  configQueryOptions,
+  grantsQueryOptions,
+  tokensQueryOptions,
+} from "../../../../lib/queries";
+import {
+  canManageTokens,
+  type ConnectionRow,
+  connectionRows,
+  mcpEndpoint,
+} from "../../../../lib/tokens";
 
 const styles = stylex.create({
   stack: { display: "flex", flexDirection: "column", gap: space.md },
@@ -30,8 +39,8 @@ const styles = stylex.create({
   note: { margin: 0, fontSize: font.caption, color: text.muted },
 });
 
-// 接続トークン(PAT)は管理者だけ(design-spec 16.3・16.12)。settings/route.tsx の site:manage より
-// 狭い member:manage で見る。API 側も同じ判定で 403 を返す
+// 接続中のアプリ(PAT と OAuth の付与)は管理者だけ(design-spec 16.3・16.12)。settings/route.tsx の
+// site:manage より狭い member:manage で見る。API 側も同じ判定で 403 を返す
 export const Route = createFileRoute("/t/$tenantSlug/settings/tokens")({
   beforeLoad: ({ context, params }) => {
     if (!canManageTokens(context.tenant.role)) {
@@ -53,15 +62,20 @@ function TokensPage() {
   const { tenantSlug } = Route.useParams();
   const labels = TOKEN_LABELS;
   const tokens = useQuery(tokensQueryOptions(adminApi, tenant.id));
+  const grants = useQuery(grantsQueryOptions(adminApi, tenant.id));
   const config = useQuery(configQueryOptions(api));
   const role = isRole(tenant.role) ? tenant.role : "viewer";
 
   const [isIssueOpen, setIssueOpen] = useState(false);
   const [issued, setIssued] = useState<IssuedToken | null>(null);
   const [issueFailure, setIssueFailure] = useState<IssueTokenFailure>(null);
-  const [revokeTarget, setRevokeTarget] = useState<TokenSummary | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<ConnectionRow | null>(null);
 
-  const invalidateTokens = () => queryClient.invalidateQueries({ queryKey: ["tokens", tenant.id] });
+  const invalidateTokens = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["tokens", tenant.id] }),
+      queryClient.invalidateQueries({ queryKey: ["grants", tenant.id] }),
+    ]);
 
   const issue = useMutation({
     mutationFn: (input: IssueTokenInput) => adminApi.issueToken(tenant.id, input),
@@ -75,10 +89,13 @@ function TokensPage() {
   });
 
   const revoke = useMutation({
-    mutationFn: (token: TokenSummary) => adminApi.revokeToken(tenant.id, token.id),
-    onSuccess: (_result, token) => {
+    mutationFn: (row: ConnectionRow) =>
+      row.kind === "pat"
+        ? adminApi.revokeToken(tenant.id, row.token.id)
+        : adminApi.revokeGrant(tenant.id, row.grant.userId, row.grant.id),
+    onSuccess: (_result, row) => {
       void invalidateTokens();
-      toaster.success(labels.revoked(token.name));
+      toaster.success(labels.revoked(row.name));
     },
     onError: (cause) => {
       void invalidateTokens();
@@ -87,7 +104,12 @@ function TokensPage() {
     onSettled: () => setRevokeTarget(null),
   });
 
-  const rows = tokenRows(tokens.data ?? [], new Date());
+  const rows = connectionRows(tokens.data ?? [], grants.data ?? [], new Date());
+  const listError = tokens.isLoadingError
+    ? tokens.error
+    : grants.isLoadingError
+      ? grants.error
+      : null;
 
   let connect;
   if (config.isLoadingError) {
@@ -122,12 +144,15 @@ function TokensPage() {
           {labels.issue}
         </Button>
       }
-      isLoading={tokens.isPending}
+      isLoading={tokens.isPending || grants.isPending}
       error={
-        tokens.isLoadingError
+        listError !== null
           ? {
-              message: errorMessage(tokens.error, labels.loadFailed),
-              onRetry: () => void tokens.refetch(),
+              message: errorMessage(listError, labels.loadFailed),
+              onRetry: () => {
+                void tokens.refetch();
+                void grants.refetch();
+              },
             }
           : undefined
       }

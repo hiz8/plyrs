@@ -116,7 +116,7 @@ pnpm exec wrangler deploy -c "$(find apps/admin/dist -name wrangler.json -print 
 
 接続の手順(どちらの環境も同じ):
 
-1. 管理画面にそのテナントの管理者でログインし、**設定 › 接続トークン** で「トークンを発行」。スコープは既定の `record:read` だけでよい(M1 の MCP は読み取り専用)。表示されたトークン(`plyrs_pat_...`)は閉じると二度と見られないので、その場でクライアントに保存する。
+1. 管理画面にそのテナントの管理者でログインし、**設定 › 接続中のアプリ** で「トークンを発行」。スコープは既定の `record:read` だけでよい(M1 の MCP は読み取り専用)。表示されたトークン(`plyrs_pat_...`)は閉じると二度と見られないので、その場でクライアントに保存する。
 2. 同じ画面の「接続のしかた」にある接続先 `https://<api>/mcp/t/<tenantId>` を控える(`<api>` は `PUBLIC_API_ORIGIN` と同じ api Worker のオリジン。admin 経由では転送しない。決定 48)。
 3. クライアントから Streamable HTTP(stateless、仕様 2026-07-28)で接続する。例:
 

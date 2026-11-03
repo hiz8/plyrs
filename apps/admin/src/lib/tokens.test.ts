@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { TokenSummary } from "./admin-api";
+import type { GrantSummary, TokenSummary } from "./admin-api";
 import {
   canManageTokens,
+  connectionRows,
   DEFAULT_SCOPES,
   defaultExpiryFor,
   expiryOptionsFor,
@@ -94,6 +95,61 @@ describe("一覧の行", () => {
     expect(rows[2]?.canRevoke).toBe(false);
     expect(rows[0]?.canRevoke).toBe(true);
     expect(rows[1]?.canRevoke).toBe(false);
+  });
+});
+
+describe("接続中のアプリの行(M3-5)", () => {
+  function grant(overrides: Partial<GrantSummary> = {}): GrantSummary {
+    return {
+      id: "g1",
+      userId: "u2",
+      email: "editor@example.com",
+      clientId: "https://claude.ai/.well-known/oauth-client",
+      clientName: "Claude",
+      scopes: ["record:read"],
+      createdAt: "2026-10-15T00:00:00Z",
+      expiresAt: null,
+      ...overrides,
+    };
+  }
+
+  it("PAT の行の後に OAuth の行を createdAt 順に並べ、名前はクライアント名(無ければ client_id)", () => {
+    const rows = connectionRows(
+      [token()],
+      [
+        grant({ id: "g2", createdAt: "2026-10-20T00:00:00Z", clientName: null }),
+        grant({ id: "g1", createdAt: "2026-10-10T00:00:00Z" }),
+      ],
+      NOW,
+    );
+    expect(rows.map((r) => `${r.kind}:${r.id}`)).toEqual([
+      "pat:pat:tok1",
+      "oauth:oauth:g1",
+      "oauth:oauth:g2",
+    ]);
+    expect(rows[0]).toMatchObject({ name: "Claude Code", email: null, canRevoke: true });
+    expect(rows[1]).toMatchObject({
+      name: "Claude",
+      email: "editor@example.com",
+      expiryText: "期限なし",
+      lastUsedText: "—",
+      canRevoke: true,
+      status: "active",
+    });
+    expect(rows[2]?.name).toBe("https://claude.ai/.well-known/oauth-client");
+  });
+
+  it("OAuth の行の期限は残り日数、過ぎていれば期限切れ(それでも失効できる)", () => {
+    const rows = connectionRows(
+      [],
+      [
+        grant({ id: "g1", expiresAt: "2026-11-11T00:00:00Z" }),
+        grant({ id: "g2", expiresAt: "2026-10-01T00:00:00Z" }),
+      ],
+      NOW,
+    );
+    expect(rows[0]?.expiryText).toContain("10");
+    expect(rows[1]).toMatchObject({ status: "expired", expiryText: "期限切れ", canRevoke: true });
   });
 });
 

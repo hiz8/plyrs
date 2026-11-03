@@ -409,6 +409,33 @@ describe("site settings endpoints (案 G 3・4 章)", () => {
     ]);
   });
 
+  it("OAuth の付与(接続中のアプリ)の一覧・失効を期待するパスで呼ぶ(M3-5)", async () => {
+    const calls: string[] = [];
+    const grant = {
+      id: "g1",
+      userId: "u2",
+      email: "e@x.com",
+      clientId: "c1",
+      clientName: "Claude",
+      scopes: ["record:read"],
+      createdAt: "2026-11-01T00:00:00Z",
+      expiresAt: null,
+    };
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const method = init?.method ?? "GET";
+      calls.push(`${method} ${String(input)}`);
+      if (method === "GET") return jsonResponse(200, { grants: [grant] });
+      return jsonResponse(200, { ok: true });
+    };
+    const api = createAdminApi(manager(), fetchImpl);
+    expect(await api.listGrants("t1")).toStrictEqual([grant]);
+    await api.revokeGrant("t1", "u2", "g1");
+    expect(calls).toStrictEqual([
+      "GET /v1/t/t1/oauth-grants",
+      "DELETE /v1/t/t1/oauth-grants/u2/g1",
+    ]);
+  });
+
   it("surfaces the last-owner rejection as an ApiError", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(409, { error: "last_owner" }));
     const api = createAdminApi(manager(), fetchImpl);
