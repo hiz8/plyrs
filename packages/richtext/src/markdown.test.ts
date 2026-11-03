@@ -82,6 +82,37 @@ describe("markdownToRichText", () => {
     });
   });
 
+  it("行頭・行末の | を省いた GFM テーブルも unsupported_markdown(table)で、黙って消えない", () => {
+    for (const table of ["| a | b\n| --- | ---\n| 1 | 2", "a | b\n--|--\n1 | 2"]) {
+      const result = markdownToRichText(`前\n\n${table}\n\n後`);
+      expect(result, table).toMatchObject({
+        ok: false,
+        code: "unsupported_markdown",
+        unsupported: ["table"],
+      });
+    }
+  });
+
+  it("コードブロック内の | a | や - [ ] と、通常のリンクの [x](https://…) は拒否しない", () => {
+    const result = markdownToRichText(
+      "```\n| a | b |\n| --- | --- |\n- [ ] todo\n```\n\n[x](https://example.com/) と `| c |`",
+    );
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+    expect(result.envelope.doc.content?.map((n) => n.type)).toEqual(["codeBlock", "paragraph"]);
+  });
+
+  it("引用やリストの中の外部画像・タスクリストも検出する", () => {
+    expect(markdownToRichText("> ![x](https://example.com/x.png)")).toMatchObject({
+      ok: false,
+      unsupported: ["external_image"],
+    });
+    expect(markdownToRichText("- 親\n  - [ ] 子")).toMatchObject({
+      ok: false,
+      unsupported: ["task_list"],
+    });
+  });
+
   it("タスクリストは unsupported_markdown(task_list)", () => {
     const result = markdownToRichText("- [ ] todo\n- [x] done");
     expect(result).toMatchObject({ ok: false, unsupported: ["task_list"] });
