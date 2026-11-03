@@ -150,7 +150,7 @@
         { "binding": "BLOCKLIST", "id": "d767b0a5273f4ebb844f5fcbdb3a1d2b" },
         { "binding": "TENANT_SLUGS", "id": "fe36d0e9a0e4431e8568b33a6e89d34b" },
         // M3-1: `wrangler kv namespace create OAUTH_KV-preview` の id(docs/deploy.md 1 節)
-        { "binding": "OAUTH_KV", "id": "TODO-OAUTH_KV-preview" },
+        { "binding": "OAUTH_KV", "id": "1ac5ab5d4d2d4f9a85435d9320e4c08d" },
       ],
       "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "plyrs-assets-preview" }],
       "queues": {
@@ -247,7 +247,7 @@
         { "binding": "BLOCKLIST", "id": "de1fdcbc37ca4672aaf6171a718def70" },
         { "binding": "TENANT_SLUGS", "id": "f40051221b6745deb668b1e17208721c" },
         // M3-1: `wrangler kv namespace create OAUTH_KV` の id(docs/deploy.md 1 節)
-        { "binding": "OAUTH_KV", "id": "TODO-OAUTH_KV-production" },
+        { "binding": "OAUTH_KV", "id": "512a7337bfd44899a73f058e7bed2638" },
       ],
       "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "plyrs-assets" }],
       "queues": {
