@@ -26,6 +26,7 @@ import {
   type OpContext,
   type OpFailure,
 } from "./read";
+import { resolveRichTextInputs } from "./richtext-input";
 import { defineOperation, type OpSpec } from "./spec";
 
 // design-spec 16.4 / 16.6 / 16.7(M2-7a): 書き込み操作。tenant-do.ts の writeRecord / deleteRecord /
@@ -158,13 +159,21 @@ function moduleDenialOf(
 
 // 16.7 の「同じ内容」判定: 保存形(validate 後の値、リッチテキストは版 2 とブロック ID 付き)に
 // 揃えてから正規化 JSON で比べる。検証に通らない入力はそのまま比べる(一致しないので already_exists)
+// 空配列は未設定と同じに扱う(空の many-relation は保存で relations 行が無くなり、読み戻すとキーが無い。
+// ロードマップ 9 章)
+export function withoutEmptyArrays(input: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(input).filter(([, value]) => !(Array.isArray(value) && value.length === 0)),
+  );
+}
+
 function normalizeForCompare(
   definition: ContentTypeDefinition,
   input: Record<string, unknown>,
 ): Record<string, unknown> {
   const parsed = buildRecordInputSchema(definition).safeParse(input);
   const value = parsed.success ? (parsed.data as Record<string, unknown>) : input;
-  return ensureRecordBlockIds(definition, value).data;
+  return withoutEmptyArrays(ensureRecordBlockIds(definition, value).data);
 }
 
 function isFailure<T extends object>(value: T | OpFailure): value is OpFailure {
@@ -180,6 +189,12 @@ export const WRITE_HANDLERS = {
     if (isFailure(guarded)) {
       return guarded;
     }
+    const definition = rowToDefinition(guarded.typeRow);
+    // 16.10(M4-1a): richtext の Markdown を AST にしてから、冪等比較と書き込みに使う
+    const richText = resolveRichTextInputs(definition, input.input, null);
+    if (!richText.ok) {
+      return richText;
+    }
     const existing = loadSyncRecord(ctx.sql, input.recordId);
     if (existing !== null) {
       // 16.7: 同じ ID・同じ内容の再送は既存を返す(再試行に安全)。内容が違えば別の ID を使わせる
@@ -193,8 +208,8 @@ export const WRITE_HANDLERS = {
       const same =
         existing.type === input.type &&
         existing.status === (input.status ?? "draft") &&
-        canonicalJson(existing.input) ===
-          canonicalJson(normalizeForCompare(rowToDefinition(guarded.typeRow), input.input));
+        canonicalJson(withoutEmptyArrays(existing.input)) ===
+          canonicalJson(normalizeForCompare(definition, richText.input));
       if (!same) {
         return {
           ok: false,
@@ -206,7 +221,7 @@ export const WRITE_HANDLERS = {
     }
     const result = writeRecordCore(writeDepsOf(ctx), guarded.typeRow, {
       recordId: input.recordId,
-      input: input.input,
+      input: richText.input,
       status: input.status,
       ...historyActorOf(ctx),
     });
@@ -272,9 +287,19 @@ export const WRITE_HANDLERS = {
         },
       };
     }
+    // 16.10(M4-1a): Markdown とブロック操作は strict 判定を通った後に解決する。古い版を見たまま消された
+    // ブロックを指す操作は、block_not_found より先に conflict で返る(Review Focus 1)
+    const richText = resolveRichTextInputs(
+      rowToDefinition(guarded.typeRow),
+      resolution.input,
+      current.input,
+    );
+    if (!richText.ok) {
+      return richText;
+    }
     const result = writeRecordCore(writeDepsOf(ctx), guarded.typeRow, {
       recordId: input.recordId,
-      input: resolution.input,
+      input: richText.input,
       status: input.status,
       ...historyActorOf(ctx),
     });

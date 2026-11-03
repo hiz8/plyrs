@@ -114,6 +114,10 @@ export interface FieldChange {
   after: unknown;
 }
 
+function unsetIfEmpty(value: unknown): unknown {
+  return Array.isArray(value) && value.length === 0 ? undefined : value;
+}
+
 // 2 つの data の差分(値の比較は正規化 JSON)。履歴画面の差分表示と record_compare が使う
 export function compareVersions(
   before: Record<string, unknown>,
@@ -122,7 +126,8 @@ export function compareVersions(
   const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
   const changes: FieldChange[] = [];
   for (const key of keys) {
-    if (canonicalJson(before[key]) !== canonicalJson(after[key])) {
+    // 空配列は未設定と同じ(空の many-relation は読み戻すとキーが無い。ロードマップ 9 章)
+    if (canonicalJson(unsetIfEmpty(before[key])) !== canonicalJson(unsetIfEmpty(after[key]))) {
       changes.push({ key, before: before[key], after: after[key] });
     }
   }
