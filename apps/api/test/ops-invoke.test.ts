@@ -50,7 +50,7 @@ beforeAll(async () => {
 });
 
 describe("操作カタログ", () => {
-  it("読み取り 4・検索 1・履歴 3・書き込み 5 の操作を宣言順に持ち、mcp 経路の操作はすべて読み取り専用(書き込みの MCP 公開は M4-1)", () => {
+  it("読み取り 4・検索 1・履歴 3・書き込み 5 の操作を宣言順に持ち、MCP に出す書き込みは段階的に増やす(M4)", () => {
     expect(OPERATIONS.map((op) => op.name)).toEqual([
       "type_list",
       "type_get",
@@ -66,10 +66,10 @@ describe("操作カタログ", () => {
       "record_publish",
       "record_unpublish",
     ]);
-    for (const op of OPERATIONS.filter((candidate) => candidate.via.includes("mcp"))) {
-      expect(op.hints.readOnly).toBe(true);
-      expect(op.hints.destructive).toBe(false);
-    }
+    // M4-1b: create / update / delete を出した。publish / unpublish(M4-2)と restore(M4-3)はまだ
+    expect(
+      OPERATIONS.filter((op) => op.via.includes("mcp") && !op.hints.readOnly).map((op) => op.name),
+    ).toEqual(["record_create", "record_update", "record_delete"]);
   });
 });
 

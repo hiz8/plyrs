@@ -125,12 +125,18 @@ export const recordGetOutputSchema = recordSnapshotSchema.extend({
     .record(z.string(), z.string())
     .optional()
     .describe("リッチテキストのフィールド key → Markdown(読み取り用の一方向変換)"),
+  outline: z
+    .record(z.string(), z.array(z.object({ id: z.string(), type: z.string(), text: z.string() })))
+    .optional()
+    .describe(
+      "リッチテキストのフィールド key → 最上位ブロックの一覧(record_update の blocks で指す ID と先頭 80 文字)",
+    ),
 });
 
 export const recordGet = defineOperation({
   name: "record_get",
   title: "record の取得",
-  description: `record を ID で 1 件取得する。下書きを含む現在の内容(data)・フィールドごとの版(fieldVersions)・ワークフロー状態(status)を返す。リッチテキストのフィールドは markdown に Markdown 表現を併記する。削除済みは not_found。${UNTRUSTED_NOTE}`,
+  description: `record を ID で 1 件取得する。下書きを含む現在の内容(data)・フィールドごとの版(fieldVersions)・ワークフロー状態(status)を返す。リッチテキストのフィールドは markdown に Markdown 表現を、outline に最上位ブロックの ID と先頭の文を併記する。削除済みは not_found。${UNTRUSTED_NOTE}`,
   input: z.object({ recordId: uuidSchema }),
   output: recordGetOutputSchema,
   requires: "record:read",
