@@ -30,6 +30,8 @@ import {
   labelOf,
   requestStateCodec,
   type ConfirmState,
+  type ConfirmedExpectation,
+  type RecordDescription,
 } from "./confirm";
 import { richTextPlainText, richTextToMarkdown } from "@plyrs/richtext";
 
@@ -92,12 +94,20 @@ async function tenantSlugOf(deps: McpServerDeps): Promise<string | undefined> {
   return row?.slug;
 }
 
-async function invoke(deps: McpServerDeps, op: string, input: unknown): Promise<InvokeResult> {
+async function invoke(
+  deps: McpServerDeps,
+  op: string,
+  input: unknown,
+  expect?: ConfirmedExpectation,
+): Promise<InvokeResult> {
   const stub = deps.env.TENANT_DO.get(deps.env.TENANT_DO.idFromName(deps.tenantId));
   const tenantSlug =
     findOperation(op)?.needsTenantSlug === true ? await tenantSlugOf(deps) : undefined;
   return asInvokeResult(
-    await stub.invoke(op, input, deps.auth, tenantSlug === undefined ? {} : { tenantSlug }),
+    await stub.invoke(op, input, deps.auth, {
+      ...(tenantSlug === undefined ? {} : { tenantSlug }),
+      ...(expect === undefined ? {} : { expect }),
+    }),
   );
 }
 
@@ -280,6 +290,7 @@ export async function callOperation(
   deps: McpServerDeps,
   name: string,
   input: unknown,
+  expect?: ConfirmedExpectation,
 ): Promise<CallToolResult> {
   const spec = MCP_OPERATIONS.find((op) => op.name === name);
   if (spec === undefined) {
@@ -289,7 +300,7 @@ export async function callOperation(
   const result =
     spec.runsIn === "worker"
       ? await runWorkerOperation(deps, spec, input)
-      : await invoke(deps, name, input);
+      : await invoke(deps, name, input, expect);
   logOperation(deps, name, result, Date.now() - started);
   if (!result.ok) {
     return failure(result);
@@ -309,12 +320,13 @@ export async function callOperation(
   };
 }
 
-// record の名前(型の titleField の値)・型・版。確認文と承諾後の版の照合に使う。record_get を呼ぶので
-// 確認には record:read も要る(record:publish だけのトークンは確認の段で insufficient_scope になる)
+// record の名前(型の titleField の値)・型・版・最新の history_seq。確認文と、承諾後に DO が照合する値に使う。
+// record_get を呼ぶので確認には record:read も要る(record:publish だけのトークンは確認の段で
+// insufficient_scope になる)
 async function describeRecord(
   deps: McpServerDeps,
   recordId: string,
-): Promise<{ label: string; type: string; version: number } | CallToolResult> {
+): Promise<RecordDescription | CallToolResult> {
   const result = await invoke(deps, "record_get", { recordId });
   if (!result.ok) {
     return failure(result);
@@ -326,7 +338,16 @@ async function describeRecord(
   const titleField = type?.titleField;
   const title = titleField === undefined ? (data["title"] ?? data["name"]) : data[titleField];
   const version = typeof record["version"] === "number" ? record["version"] : -1;
-  return { label: labelOf(title, recordId), type: typeKey, version };
+  // 最新の history_seq(publish / unpublish でも進む)。record_history の先頭 1 件
+  const history = await invoke(deps, "record_history", { recordId, limit: 1 });
+  const items =
+    history.ok && isRecord(history.output) && Array.isArray(history.output["items"])
+      ? history.output["items"]
+      : [];
+  const head: unknown = items[0];
+  const historySeq =
+    isRecord(head) && typeof head["historySeq"] === "number" ? head["historySeq"] : 0;
+  return { label: labelOf(title, recordId), type: typeKey, version, historySeq };
 }
 
 // 16.8(M4-2): publish / unpublish は確認を通ってから実行する
@@ -359,7 +380,7 @@ async function callConfirmed(
     mint,
   });
   if (outcome.kind === "confirmed") {
-    return callOperation(deps, spec.name, args);
+    return callOperation(deps, spec.name, args, outcome.expect);
   }
   return outcome.result;
 }

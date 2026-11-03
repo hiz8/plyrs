@@ -34,9 +34,20 @@ const LABEL_LIMIT = 80;
 export interface ConfirmState {
   op: ConfirmOperation;
   recordId: string;
-  // 確認文を見せたときの record の版。承諾までの間に変わっていれば実行しない(見せた内容と違うものを
-  // 公開させない)
+  // 確認文を見せたときの record の版と最新の history_seq。承諾後の実行で DO が同じトランザクションの中で
+  // 照合し、変わっていれば record_changed にする(見せた内容と違うものを公開させない。公開 → 取り下げの
+  // 往復で版が変わらなくても、history_seq は進むので同じ確認を使い回させない)
   version: number;
+  historySeq: number;
+}
+
+export type ConfirmedExpectation = Pick<ConfirmState, "version" | "historySeq">;
+
+export interface RecordDescription {
+  label: string;
+  type: string;
+  version: number;
+  historySeq: number;
 }
 
 export function bindOf(tenantId: string, auth: McpAuth): string {
@@ -100,7 +111,7 @@ function refused(code: string, message: string): CallToolResult {
 }
 
 export type ConfirmOutcome =
-  | { kind: "confirmed" }
+  | { kind: "confirmed"; expect: ConfirmedExpectation }
   | { kind: "ask"; result: InputRequiredResult }
   | { kind: "refused"; result: CallToolResult };
 
@@ -108,8 +119,7 @@ export interface ConfirmArgs {
   op: ConfirmOperation;
   recordId: string;
   // record の名前と型は ask のときだけ要る(呼び出し側が record_get で引く)
-  // 承諾の後にも版の照合で呼ぶ
-  describe: () => Promise<{ label: string; type: string; version: number } | CallToolResult>;
+  describe: () => Promise<RecordDescription | CallToolResult>;
   clientCanElicit: boolean;
   inputResponses: Record<string, unknown> | undefined;
   // SDK の verify を通った requestState の中身(無ければ undefined)
@@ -131,20 +141,8 @@ export async function confirmOperation(args: ConfirmArgs): Promise<ConfirmOutcom
     }
     const confirmed = acceptedContent(args.inputResponses, "confirm", confirmSchema);
     if (confirmed?.confirm === true) {
-      const now = await args.describe();
-      if ("content" in now) {
-        return { kind: "refused", result: now };
-      }
-      if (now.version !== args.state.version) {
-        return {
-          kind: "refused",
-          result: refused(
-            "record_changed",
-            "確認の後に record が更新された。確認からやり直してください",
-          ),
-        };
-      }
-      return { kind: "confirmed" };
+      const { version, historySeq } = args.state;
+      return { kind: "confirmed", expect: { version, historySeq } };
     }
     const view = inputResponse(args.inputResponses, "confirm");
     if (view.kind === "elicit" || confirmed !== undefined) {
@@ -171,6 +169,7 @@ export async function confirmOperation(args: ConfirmArgs): Promise<ConfirmOutcom
     op: args.op,
     recordId: args.recordId,
     version: described.version,
+    historySeq: described.historySeq,
   });
   return {
     kind: "ask",

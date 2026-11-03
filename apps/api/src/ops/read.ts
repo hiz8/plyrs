@@ -30,12 +30,22 @@ export interface OpDeps {
   scheduleModuleAlarm: (moduleId: string, dueAtMs: number) => void;
 }
 
+export interface PublishExpectation {
+  version: number;
+  // record の最新の history_seq。公開 → 取り下げのように版が変わらない往復でも進む
+  historySeq: number;
+}
+
 export interface OpContext {
   sql: SqlStorage;
   // DO が自分の名前として知っているテナント(do_config.tenant_id)。まだ刻まれていなければ null
   tenantId: string | null;
   // 公開 URL に要る slug。needsTenantSlug の操作を REST から呼ぶときだけ入口が渡す
   tenantSlug: string | null;
+  // 16.8(M4 のレビュー): MCP の確認を通った publish / unpublish が、確認文を見せたときの record の版と
+  // 公開状態を渡す。DO の中(同じトランザクション)で照合し、違えば record_changed にする。
+  // REST と管理画面は渡さない
+  expect?: PublishExpectation | null;
   // 経路(16.5)。invoke は同期経路からは呼ばれないので mcp か rest
   via: Via;
   auth: AuthContext | McpAuth;

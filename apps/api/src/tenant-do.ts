@@ -75,7 +75,7 @@ import {
 import { countUnsent, markOutboxSent, purgeSent, unsentOutbox } from "./do/outbox";
 import { findOperation } from "./ops/catalog";
 import { hasScopes, invokeOperation, type InvokeResult } from "./ops/invoke";
-import type { OpContext } from "./ops/read";
+import type { OpContext, PublishExpectation } from "./ops/read";
 import {
   loadProjectionPayload,
   loadPublications,
@@ -643,7 +643,7 @@ export class TenantDO extends DurableObject<Env> {
     op: string,
     input: unknown,
     auth: AuthContext | McpAuth,
-    options: { tenantSlug?: string } = {},
+    options: { tenantSlug?: string; expect?: PublishExpectation } = {},
   ): Promise<InvokeResult> {
     let tenantId = this.tenantId();
     if (tenantId === null && auth.tenantId !== undefined) {
@@ -657,6 +657,7 @@ export class TenantDO extends DurableObject<Env> {
       sql: meter.sql,
       tenantId,
       tenantSlug: options.tenantSlug ?? null,
+      expect: options.expect ?? null,
       via: hasScopes(auth) ? "mcp" : "rest",
       auth,
       deps: {

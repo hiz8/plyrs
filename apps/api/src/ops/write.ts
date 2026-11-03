@@ -16,6 +16,7 @@ import {
   unpublishRecordCore,
   type PublishDeps,
 } from "../do/publish";
+import { latestHistorySeq } from "../do/history";
 import { loadRecord, writeRecordCore } from "../do/write-record";
 import { moduleWriteDenial } from "../modules/enablement";
 import { loadSyncRecord } from "../sync/records";
@@ -134,6 +135,25 @@ export const recordUnpublish = defineOperation({
   hints: { readOnly: false, destructive: true, idempotent: true, openWorld: false },
   cache: null,
 });
+
+// 16.8(M4 のレビュー): 確認を通った publish / unpublish は、確認文を見せたときの版と公開状態を
+// 同じトランザクションの中で照合する(照合と公開の間に書き込みが割り込む窓を作らない)。history_seq も
+// 見るので、公開 → 取り下げのように版が変わらない往復の後に同じ確認を使い回させない)
+function expectationMismatch(ctx: OpContext, recordId: string): OpFailure | null {
+  const expect = ctx.expect;
+  if (expect == null) {
+    return null;
+  }
+  const version = loadRecord(ctx.sql, recordId)?.version ?? null;
+  if (version !== expect.version || latestHistorySeq(ctx.sql, recordId) !== expect.historySeq) {
+    return {
+      ok: false,
+      code: "record_changed",
+      message: "record or its publication changed after the confirmation; ask again",
+    };
+  }
+  return null;
+}
 
 export const WRITE_OPERATIONS: readonly OpSpec[] = [
   recordCreate,
@@ -382,6 +402,10 @@ export const WRITE_HANDLERS = {
     if (record.deletedAt !== null) {
       return { ok: false, code: "record_deleted", message: `record is deleted: ${input.recordId}` };
     }
+    const changed = expectationMismatch(ctx, input.recordId);
+    if (changed !== null) {
+      return changed;
+    }
     // 16.7: 現在の版が既に公開済みなら何も書かない
     const state = loadPublicationState(ctx.sql, input.recordId);
     if (state.published && state.sourceVersion === record.version) {
@@ -411,6 +435,10 @@ export const WRITE_HANDLERS = {
     ctx: OpContext,
     input: z.infer<typeof recordUnpublish.input>,
   ): Ok<unknown> | OpFailure => {
+    const changed = expectationMismatch(ctx, input.recordId);
+    if (changed !== null) {
+      return changed;
+    }
     const result = unpublishRecordCore(publishDepsOf(ctx), input.recordId);
     if (!result.ok) {
       if (result.code === "not_published") {

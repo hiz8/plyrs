@@ -172,6 +172,12 @@ function applyReverseDiff(
   return result;
 }
 
+// 16.8: record の最新の history_seq(履歴が無ければ 0)。publish / unpublish は畳み込まずに必ず版を
+// 足し、刈り込みも最新は残すので、公開状態の変化を含めて単調に増える
+export function latestHistorySeq(sql: SqlStorage, recordId: string): number {
+  return latestRow(sql, recordId)?.history_seq ?? 0;
+}
+
 function latestRow(sql: SqlStorage, recordId: string): RawHistoryRow | null {
   return (
     sql

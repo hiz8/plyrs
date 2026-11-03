@@ -6,7 +6,7 @@ import { issuePat } from "../src/auth/pat";
 import { app } from "../src/index";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import { fakeLimiter } from "./rate-limit-helper";
-import { asPublicationState, asWriteResult } from "./rpc-unwrap";
+import { asInvokeResult, asPublicationState, asWriteResult } from "./rpc-unwrap";
 
 // M4-2(design-spec 16.8、決定 50): publish / unpublish の確認。elicitation を宣言するクライアントには
 // MRTR の input_required で確認を求め、宣言しないクライアントは拒否して人に回す。requestState は HMAC で
@@ -238,6 +238,26 @@ describe("publish の確認(MRTR の elicitation)", () => {
         retry: { inputResponses: accept, requestState: first.result?.requestState ?? "" },
       },
     );
+    expect(json.result?.structuredContent).toMatchObject({ error: { code: "record_changed" } });
+    expect(await published(recordId)).toBe(false);
+  });
+
+  it("公開した後に人が取り下げると、同じ確認の送り直しは record_changed で再公開されない", async () => {
+    const recordId = await newRecord(911);
+    const first = await call("record_publish", { recordId }, { elicitation: true });
+    const retry = {
+      elicitation: true,
+      retry: { inputResponses: accept, requestState: first.result?.requestState ?? "" },
+    };
+    await call("record_publish", { recordId }, retry);
+    expect(await published(recordId)).toBe(true);
+    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    const unpublished = asInvokeResult(
+      await stub.invoke("record_unpublish", { recordId }, { ...auth("owner", "owner"), tenantId }),
+    );
+    expect(unpublished.ok).toBe(true);
+    expect(await published(recordId)).toBe(false);
+    const json = await call("record_publish", { recordId }, retry);
     expect(json.result?.structuredContent).toMatchObject({ error: { code: "record_changed" } });
     expect(await published(recordId)).toBe(false);
   });
