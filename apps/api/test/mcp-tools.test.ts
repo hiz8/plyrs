@@ -263,6 +263,41 @@ describe("書き込みツール(M4-1b)", () => {
     ).toBe(true);
   });
 
+  it("削除した record を record_restore で戻せ、復元の版は kind restore・via mcp(M4-3)", async () => {
+    const recordId = uuid(822);
+    const created = await call(
+      "record_create",
+      { type: "article", recordId, input: { ...validArticleInput(), slug: "mcp-restore" } },
+      writePat,
+    );
+    expect(created.isError).toBeUndefined();
+    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    await stub.deleteRecord(recordId, { ...auth("owner", "owner"), tenantId });
+    expect((await call("record_get", { recordId }, writePat)).isError).toBe(true);
+    const history = await call("record_history", { recordId }, writePat);
+    const items = history.structuredContent!["items"] as { historySeq: number; kind: string }[];
+    const written = items.find((i) => i.kind === "write")!;
+    const restored = await call(
+      "record_restore",
+      { recordId, historySeq: written.historySeq },
+      writePat,
+    );
+    expect(restored.isError, JSON.stringify(restored)).toBeUndefined();
+    expect(restored.content[0]?.text).toContain("戻した");
+    expect((await call("record_get", { recordId }, writePat)).isError).toBeUndefined();
+    const after = await call("record_history", { recordId }, writePat);
+    const latest = (after.structuredContent!["items"] as { kind: string; via: string }[])[0];
+    expect(latest).toMatchObject({ kind: "restore", via: "mcp" });
+  });
+
+  it("record:write の無いトークンの record_restore は入口で 403", async () => {
+    const res = await rpcRaw("tools/call", {
+      name: "record_restore",
+      arguments: { recordId: uuid(822), historySeq: 1 },
+    });
+    expect(res.status).toBe(403);
+  });
+
   it("record:delete の無いトークンの record_delete は入口で 403 insufficient_scope", async () => {
     const res = await rpcRaw(
       "tools/call",

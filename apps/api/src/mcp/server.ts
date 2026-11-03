@@ -192,6 +192,10 @@ function summarize(spec: OpSpec, output: unknown): string {
     lines.push(
       `record ${str(output["id"])} を保存した(版 ${String(output["version"])}、状態 ${str(output["status"])})。次の更新では structuredContent.fieldVersions を baseFieldVersions に渡す。`,
     );
+  } else if (spec.name === "record_restore" && isRecord(output)) {
+    lines.push(
+      `record ${str(output["id"])} を履歴の版に戻した(版 ${String(output["version"])}、状態 ${str(output["status"])})。`,
+    );
   } else if (spec.name === "record_delete" && isRecord(output)) {
     lines.push(
       `record ${str(output["recordId"])} を削除した(${str(output["deletedAt"])})。record_restore で戻せる。`,
