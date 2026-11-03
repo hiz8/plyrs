@@ -104,12 +104,12 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 
 | PR | 内容 | 論点 | 規模 |
 | --- | --- | --- | --- |
-| M4-1 | record の書き込みツール(create / update / delete)。update はブロック単位の部分編集、outputSchema は成功形と競合形の oneOf、`attempt` の自己申告 | B3 ②③・D3・E3 | L |
-| M4-2 | publish / unpublish / compare ツール。同じ利用者への確認は MRTR の elicitation。PAT 接続向けには `error_description` とツール説明に所有者が `record:publish` 付き PAT を発行する導線 | B2・C5 | M |
-| M4-3 | 履歴ツール(history / restore)の公開 | A2・D3 | S |
-| M4-4 | アセット登録(使い切りのアップロードトークン) | D3 | M |
-| M4-5 | URL からのアセット取り込み(SSRF 対策) | D3 | M |
-| M4-6 | 公開前の仕上げ(E2E、/security-review、DO の rows written / read の計測(書き込み 1 回の rows read が record 数に比例しないことを含む)、接続ガイド) | E1〜E4 | M |
+| M4-1 | record の書き込みツール(create / update / delete)。update はブロック単位の部分編集、outputSchema は成功形と競合形の oneOf、`attempt` の自己申告(#77 M4-1a、#78 M4-1b) | B3 ②③・D3・E3 | L |
+| M4-2 | publish / unpublish / compare ツール。同じ利用者への確認は MRTR の elicitation。PAT 接続向けには `error_description` とツール説明に所有者が `record:publish` 付き PAT を発行する導線(#80、決定 50) | B2・C5 | M |
+| M4-3 | 履歴ツール(history / restore)の公開(#79) | A2・D3 | S |
+| M4-4 | アセット登録(使い切りのアップロードトークン)(#81、決定 51) | D3 | M |
+| M4-5 | URL からのアセット取り込み(SSRF 対策)(#82、決定 52) | D3 | M |
+| M4-6 | 公開前の仕上げ(E2E、/security-review、DO の rows written / read の計測(書き込み 1 回の rows read が record 数に比例しないことを含む)、接続ガイド)(#83。M4-0a の CI 検査は #75、M3 の見送り指摘は #76) | E1〜E4 | M |
 
 ゲート G4: 書き込み・競合・スコープ不足の E2E、/security-review の指摘の解消、ツールごとの DO 計測が基準内。
 
@@ -184,7 +184,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | M1 | `2026-11-01-m1-readonly-mcp.md` | 完了(2026-11-02) |
 | M2 | `2026-11-02-m2-data-and-operations.md` | 完了(2026-11-02) |
 | M3 | `2026-11-03-m3-oauth.md` | 完了(2026-11-03)。ゲート G3 通過 |
-| M4 | `2026-11-03-m4-write-mcp.md` | 着手(2026-11-03) |
+| M4 | `2026-11-03-m4-write-mcp.md` | 実装完了(2026-11-03)。ゲート G4 は preview での所有者の確認待ち |
 | M5 | 着手時に作る | — |
 
 ## 7. M1 完了時の申し送り(2026-11-01)
@@ -239,3 +239,14 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 - **同意画面は api の HTML**(`hono/html`、管理画面のスタイルは使わない)。文言は `consent-page.ts` に直書き(admin の `TOKEN_LABELS` と同じ文を写している。片方を変えたらもう片方も)
 - **E2E の E2E 間干渉**: `oauth.spec.ts` は page(未ログイン)と request(API 用)の cookie を分けている。`page.request` を使うと page がログイン済みになり、return_to の経路が通らない
 - **M1 の未了**: Cursor / VS Code / MCP Inspector からの PAT 接続確認(手順は所有者に渡し済み)
+
+## 11. M4 完了時の申し送り(2026-11-03)
+
+- **書き込みツールの一式**: `record_create` / `record_update` / `record_delete` / `record_restore` / `record_publish` / `record_unpublish` / `asset_upload` / `asset_import_url`。接続ガイドは `docs/deploy.md` 3.6。`tools/list` はスコープで絞らない(E2E の mcp-smoke も先頭の読み取りツールだけを固定する形にした)
+- **publish の確認(決定 50)**: elicitation を宣言しないクライアントは `confirmation_unavailable`。緩めるのは `apps/api/src/mcp/confirm.ts` の 1 か所。M5 の提案(change set)ができたら、確認できないクライアントの publish を提案に回す案がある
+- **Worker で実行する操作(`runsIn: "worker"`)**: SHA-256・外部 fetch・R2 が要る操作は DO の同期ハンドラを持たず、`apps/api/src/mcp/worker-ops.ts` で実行する。判定の順序(スコープ → ロール → 入力)は DO の `runOperation` と同じ。REST には出していない
+- **DO の計測(M4-6)**: `invoke` の結果に `meter = { rowsRead, rowsWritten }`、Worker はログ `mcp.op` を出す。実測で 2 件の比例を見つけて直した。(1) 一意性検査が `json_extract` で型の record を全件走査していた(300 件で create の rows read 311)。indexed のフィールドは生成カラムの部分インデックスで引くようにした。**indexed でない unique は今も全件走査**なので、unique を付けるフィールドは indexed も付けるのが望ましい(管理画面で強制するかは未決)。(2) 一覧の既定の並びにインデックス `idx_records_type_updated` を足した(マイグレーション 0010)。数字は報告書 `m4-report.md`
+- **履歴の保持(決定 41)は変えない**: 5000 文字の記事を 15 分超の間隔で 300 回編集し 20 回 publish した実測で、版は 113(write 93 + publish 20)、履歴の容量は約 1.3 MB(DO の増分 1.4 MB)。逆差分はフィールド単位なので、リッチテキストの本文を 1 段落だけ直しても本文全体が差分に入り、圧縮はほぼ効かない(差分 1 版あたり約 11.7 KB、全文 1 版あたり約 12.8 KB)。容量を減らすならブロック単位の逆差分が次の手(M5 以降の候補)
+- **アップロードトークンの残る隙**: 受け取り時に BLOCKLIST の 2 キーは見るが、発行に使ったトークン(PAT / OAuth)の失効とロールの降格は見ない(最長 10 分・1 回・画像だけ)。/security-review では悪用可能性なしと判断した
+- **ゲート G4**: `docs/deploy.md` 3.6 の手順で所有者が preview で確かめる。結果はここに追記する
+
