@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { ContentTypeDefinition } from "./content-type";
 import type { FieldDefinition, RelationFieldDefinition } from "./field-types";
 import { uuidSchema } from "./ids";
+import { unsafeLinkHrefs } from "./link-href";
 
 export type JsonValue =
   | string
@@ -117,12 +118,28 @@ function buildBareFieldValueSchema(field: FieldDefinition): z.ZodType<unknown> {
   }
 }
 
+function rejectUnsafeLinks(value: unknown, ctx: z.RefinementCtx): void {
+  const parsed = richTextEnvelopeSchema.safeParse(value);
+  if (!parsed.success) {
+    return;
+  }
+  for (const href of unsafeLinkHrefs(parsed.data.doc)) {
+    ctx.addIssue({
+      code: "custom",
+      message: `link href is not allowed (http / https / mailto / tel or a relative URL only): ${href.slice(0, 80)}`,
+    });
+  }
+}
+
 // validate-on-write の実体。looseObject により型定義に無いキーは検証せず素通しで保持する
 // （design-spec §4.2 の遅延マイグレーション: 旧型定義時代のフィールドを破棄も拒否もしない）。
 export function buildRecordInputSchema(contentType: ContentTypeDefinition) {
   const shape: Record<string, z.ZodType<unknown>> = {};
   for (const field of contentType.fields) {
-    const valueSchema = buildFieldValueSchema(field);
+    const base = buildFieldValueSchema(field);
+    // リンクの scheme は書き込み時だけ検査する(tolerant read は buildFieldValueSchema を使うので、
+    // 既に保存された値を読めなくはしない)
+    const valueSchema = field.type === "richtext" ? base.superRefine(rejectUnsafeLinks) : base;
     shape[field.key] = field.required ? valueSchema : valueSchema.optional();
   }
   return z.looseObject(shape);
