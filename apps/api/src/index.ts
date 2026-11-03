@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { purgeExpiredSessions } from "./auth/session";
+import { purgeOAuthData } from "./oauth/purge";
 import { mcpRoutes, serveProtectedResourceMetadata, workerContext } from "./mcp/route";
 import { requireSaneSecret } from "./middleware/sane-secret";
 import { handleModuleJob, type ModuleQueueJob } from "./modules/events";
@@ -57,12 +58,20 @@ export { app };
 export default {
   fetch: app.fetch,
   // §6: 期限切れ・失効済みセッションの日次掃除(wrangler.jsonc の triggers.crons が起動する)。
+  // 16.3(M3-4): 続けて OAUTH_KV の期限切れ・孤児のグラントとトークンも掃く。失敗はログに留め、
+  // セッションの掃除を道連れにしない
   async scheduled(
     _controller: ScheduledController,
     env: Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
     await purgeExpiredSessions(env.DB, new Date());
+    try {
+      const result = await purgeOAuthData(env);
+      console.log("oauth purge", result);
+    } catch (error) {
+      console.error("oauth purge failed", error);
+    }
   },
   // design-spec §12.3 / Phase 9 §9.4: projection と module events、それぞれの DLQ を合わせた
   // 4 つの queue consumer を 1 ハンドラで受ける（wrangler.jsonc の consumers は全てこの

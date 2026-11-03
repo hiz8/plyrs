@@ -1,6 +1,15 @@
-import { OAuthAuthorizationServer } from "@cloudflare/workers-oauth-provider";
+import {
+  OAuthAuthorizationServer,
+  OAuthError,
+  type TokenExchangeCallbackOptions,
+  type TokenExchangeCallbackResult,
+} from "@cloudflare/workers-oauth-provider";
+import { and, eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/d1";
+import { memberships } from "@plyrs/db/control-plane";
+import { isBlocked } from "../auth/blocklist";
 import { PAT_SCOPES } from "../auth/pat";
-import type { Role } from "../auth/permissions";
+import { isRole, type Role } from "../auth/permissions";
 
 // design-spec 16.2・16.3(決定 47、M3-1): OAuth 2.1 の認可サーバー。@cloudflare/workers-oauth-provider v1 の
 // 分割 API(OAuthAuthorizationServer)を api Worker に置く。issuer は admin オリジンのテナント別パス
@@ -46,6 +55,48 @@ export function oauthOrigins(env: Env): OAuthOrigins | null {
   return { adminOrigin: env.ADMIN_ORIGIN, apiOrigin: env.API_ORIGIN };
 }
 
+function isGrantProps(value: unknown): value is McpGrantProps {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record["userId"] === "string" &&
+    typeof record["tenantId"] === "string" &&
+    isRole(record["role"])
+  );
+}
+
+// M3-4(16.3、Review Focus 3): refresh のたびに memberships から現在のロールを読み直す。会員でなくなった、
+// または BAN された利用者は invalid_grant(ライブラリがグラントとトークンを失効させる)。認可コードの交換では
+// 同意の直後なので読み直さない
+export async function refreshGrantProps(
+  options: TokenExchangeCallbackOptions<Env>,
+): Promise<TokenExchangeCallbackResult | undefined> {
+  if (options.grantType !== "refresh_token") {
+    return undefined;
+  }
+  const props: unknown = options.props;
+  if (!isGrantProps(props)) {
+    throw new OAuthError("invalid_grant", { description: "grant props are malformed" });
+  }
+  if (await isBlocked(options.env.BLOCKLIST, props.userId)) {
+    throw new OAuthError("invalid_grant", { description: "user is blocked" });
+  }
+  const row = (
+    await drizzle(options.env.DB)
+      .select({ role: memberships.role })
+      .from(memberships)
+      .where(and(eq(memberships.userId, props.userId), eq(memberships.tenantId, props.tenantId)))
+      .limit(1)
+  )[0];
+  if (row === undefined || !isRole(row.role)) {
+    throw new OAuthError("invalid_grant", { description: "membership revoked" });
+  }
+  const next: McpGrantProps = { ...props, role: row.role };
+  return { newProps: next, accessTokenProps: next };
+}
+
 export function createTenantAuthServer(
   env: Env,
   tenantId: string,
@@ -65,6 +116,7 @@ export function createTenantAuthServer(
     // wrangler.jsonc の compatibility_flags `global_fetch_strictly_public` が要る
     clientIdMetadataDocumentEnabled: true,
     clientRegistrationEndpoint: `${issuer}/oauth/register`,
+    tokenExchangeCallback: refreshGrantProps,
     // 失敗した検査(internal)は wire には出ない。トークンや本文はログに出さない
     onError({ code, status, internal }) {
       console.warn("oauth", tenantId, code, status, internal.category, internal.reason);

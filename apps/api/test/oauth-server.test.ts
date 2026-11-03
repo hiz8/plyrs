@@ -1,5 +1,9 @@
 import { env } from "cloudflare:test";
+import { and, eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/d1";
 import { describe, expect, it } from "vitest";
+import { memberships } from "@plyrs/db/control-plane";
+import { blockUser, unblockUser } from "../src/auth/blocklist";
 import { app } from "../src/index";
 import {
   ACCESS_TOKEN_TTL,
@@ -13,10 +17,31 @@ import {
   API_ORIGIN,
   authorize,
   CTX,
+  type Issued,
   insertTenant,
   oauthEnv,
   registerClient,
+  tokenRequest,
 } from "./oauth-helpers";
+
+// refresh_token で access token を取り直す(公開クライアントなので client_id だけ)
+async function refresh(tenantId: string, issued: Issued): Promise<Response> {
+  return tokenRequest(tenantId, {
+    grant_type: "refresh_token",
+    refresh_token: issued.refresh_token ?? "",
+    client_id: issued.clientId,
+  });
+}
+
+async function validateProps(tenantId: string, accessToken: string): Promise<unknown> {
+  const server = createTenantAuthServer(oauthEnv(), tenantId);
+  const validated = await server!.validateToken(
+    tenantResource(API_ORIGIN, tenantId),
+    accessToken,
+    oauthEnv(),
+  );
+  return validated?.props;
+}
 
 // M3-1(design-spec 16.2・16.3、決定 47): テナント別の OAuth 認可サーバー。issuer は admin オリジンの
 // `/oauth/t/:tenantId`、resource は api オリジンの `/mcp/t/:tenantId`。metadata・DCR・認可コード + PKCE・
@@ -105,5 +130,56 @@ describe("OAuth 認可サーバー(/oauth/t/:tenantId)", () => {
 
   it("wrangler.jsonc のトップレベルに OAUTH_KV がある(vitest の binding)", () => {
     expect(env.OAUTH_KV).toBeDefined();
+  });
+
+  // M3-4(16.3、Review Focus 3): ロールは access token の 15 分の間は固定で、refresh のたびに memberships から
+  // 読み直す。会員でなくなった利用者のグラントは refresh で invalid_grant になり、ライブラリが失効させる
+  describe("refresh 時のロール読み直し", () => {
+    it("同意後にロールを editor → viewer に変えると、refresh した access token の role は viewer", async () => {
+      const tenantId = await insertTenant();
+      const issued = await authorize(tenantId, ["record:read"], { role: "editor" });
+      expect(await validateProps(tenantId, issued.access_token)).toMatchObject({ role: "editor" });
+      await drizzle(env.DB)
+        .update(memberships)
+        .set({ role: "viewer" })
+        .where(and(eq(memberships.userId, issued.userId), eq(memberships.tenantId, tenantId)));
+      const res = await refresh(tenantId, issued);
+      expect(res.status).toBe(200);
+      const next = await res.json<{ access_token: string }>();
+      expect(await validateProps(tenantId, next.access_token)).toEqual({
+        userId: issued.userId,
+        tenantId,
+        role: "viewer",
+      });
+    });
+
+    it("会員でなくなった利用者の refresh は 400 invalid_grant で、同じ refresh token の再送も invalid_grant", async () => {
+      const tenantId = await insertTenant();
+      const issued = await authorize(tenantId, ["record:read"], { role: "editor" });
+      await drizzle(env.DB)
+        .delete(memberships)
+        .where(and(eq(memberships.userId, issued.userId), eq(memberships.tenantId, tenantId)));
+      const res = await refresh(tenantId, issued);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ error: "invalid_grant" });
+      // グラントは失効している: 既存の access token も、refresh token の再送も通らない
+      expect(await validateProps(tenantId, issued.access_token)).toBeUndefined();
+      const again = await refresh(tenantId, issued);
+      expect(again.status).toBe(400);
+      expect(await again.json()).toMatchObject({ error: "invalid_grant" });
+    });
+
+    it("BAN(blocked:user)中の refresh も invalid_grant(入口の 403 とは別に、グラントを残さない)", async () => {
+      const tenantId = await insertTenant();
+      const issued = await authorize(tenantId, ["record:read"], { role: "editor" });
+      await blockUser(env.BLOCKLIST, issued.userId);
+      try {
+        const res = await refresh(tenantId, issued);
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ error: "invalid_grant" });
+      } finally {
+        await unblockUser(env.BLOCKLIST, issued.userId);
+      }
+    });
   });
 });
