@@ -8,22 +8,21 @@ import { sniffImageSize } from "../assets/image-size";
 import { assetKeyBelongsToTenant } from "../assets/ownership";
 import { can } from "../auth/permissions";
 import { authenticateTenantToken, tenantGate, type GateVariables } from "../middleware/tenant-gate";
+import { findOperation } from "../ops/catalog";
 import {
   asAssetUsage,
   asContentTypeRow,
   asContentTypeRows,
   asDeleteContentTypeResult,
-  asDeleteResult,
   asEnableModuleResult,
+  asInvokeResult,
   asModuleSummaries,
   asOrphanIds,
   asPublicationState,
   asPublicationsPage,
-  asPublishResult,
   asRecordSnapshot,
   asRegisterResult,
   asReprojectResult,
-  asUnpublishResult,
   asWriteResult,
 } from "../rpc-unwrap";
 import { tenantSettingsRoutes } from "./tenant-settings";
@@ -43,6 +42,13 @@ const ERROR_STATUS: Record<string, ContentfulStatusCode> = {
   record_deleted: 410,
   already_deleted: 410,
   not_published: 409,
+  // M2-4: 操作カタログ(invoke)の失敗コード(16.7)
+  conflict: 409,
+  already_exists: 409,
+  insufficient_scope: 403,
+  unknown_operation: 404,
+  invalid_input: 400,
+  unsupported_markdown: 400,
 };
 
 function statusFor(code: string): ContentfulStatusCode {
@@ -64,6 +70,9 @@ function statusFor(code: string): ContentfulStatusCode {
 const writeBodySchema = z.object({
   input: z.record(z.string(), z.unknown()),
   status: z.enum(WORKFLOW_STATUSES).optional(),
+  // M2-7b: 更新(record がある)ときは必須。欠けは invoke(record_update)の入力検証が 400 にする
+  changedFields: z.array(z.string().min(1)).optional(),
+  baseFieldVersions: z.record(z.string(), z.number().int().nonnegative()).optional(),
 });
 
 // Phase 8 決定 1: Worker 経由 PUT。CMS の画像用途に十分な上限(動画等の大容量は非目標)。
@@ -244,16 +253,79 @@ export const tenantRoutes = new Hono<GateEnv>()
     const row = asContentTypeRow(await stubFor(c).getContentType(c.req.param("key")));
     return row === null ? c.json({ error: "not_found" }, 404) : c.json(row);
   })
-  .put("/:tenantId/records/:typeKey/:recordId", zValidator("json", writeBodySchema), async (c) => {
-    const { input, status } = c.req.valid("json");
-    const result = asWriteResult(
-      await stubFor(c).writeRecord(
-        c.req.param("typeKey"),
-        { recordId: c.req.param("recordId"), input, ...(status ? { status } : {}) },
+  // 16.4(M2-4): 操作カタログの REST の生成面。body は操作の input そのまま。via に rest を含む操作だけ
+  // 受ける(MCP 専用の操作は 404)。needsTenantSlug の操作だけ D1 から slug を引く(publish ルートと同じ 1 照会)
+  .post("/:tenantId/ops/:op", async (c) => {
+    const name = c.req.param("op");
+    const spec = findOperation(name);
+    if (spec === undefined || !spec.via.includes("rest")) {
+      return c.json(
+        { ok: false, code: "unknown_operation", message: `unknown operation: ${name}` },
+        404,
+      );
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ ok: false, code: "invalid_input", message: "body must be JSON" }, 400);
+    }
+    let tenantSlug: string | undefined;
+    if (spec.needsTenantSlug === true) {
+      const slugRow = await c.env.DB.prepare("SELECT slug FROM tenants WHERE id = ?")
+        .bind(c.req.param("tenantId"))
+        .first<{ slug: string }>();
+      if (slugRow === null) {
+        return c.json({ ok: false, code: "not_found", message: "tenant not found" }, 404);
+      }
+      tenantSlug = slugRow.slug;
+    }
+    const result = asInvokeResult(
+      await stubFor(c).invoke(
+        name,
+        body,
         c.get("auth"),
+        tenantSlug === undefined ? {} : { tenantSlug },
       ),
     );
     return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
+  })
+  // 16.4 / 16.6(M2-7b): record の書き込みは操作カタログへ流す。record が無ければ record_create、
+  // あれば record_update(baseFieldVersions 必須。無ければ invoke が invalid_input = 400 を返す)。
+  // 応答の形は従来の { ok, record } を保つ
+  .put("/:tenantId/records/:typeKey/:recordId", zValidator("json", writeBodySchema), async (c) => {
+    const body = c.req.valid("json");
+    const recordId = c.req.param("recordId");
+    const existing = asRecordSnapshot(await stubFor(c).getRecord(recordId));
+    const result = asInvokeResult(
+      existing === null
+        ? await stubFor(c).invoke(
+            "record_create",
+            {
+              type: c.req.param("typeKey"),
+              recordId,
+              input: body.input,
+              ...(body.status ? { status: body.status } : {}),
+            },
+            c.get("auth"),
+          )
+        : await stubFor(c).invoke(
+            "record_update",
+            {
+              recordId,
+              input: body.input,
+              ...(body.changedFields === undefined ? {} : { changedFields: body.changedFields }),
+              ...(body.baseFieldVersions === undefined
+                ? {}
+                : { baseFieldVersions: body.baseFieldVersions }),
+              ...(body.status ? { status: body.status } : {}),
+            },
+            c.get("auth"),
+          ),
+    );
+    return result.ok
+      ? c.json({ ok: true, record: result.output })
+      : c.json(result, statusFor(result.code));
   })
   // 案 D 9 章: 一覧・ホームが公開状態をレコード 1 件ずつ取らずに済むよう、型ごと(省略で全型)にまとめて返す。
   // 1 応答の大きさと DO の占有時間を抑えるため record_id カーソルでページングする
@@ -284,24 +356,30 @@ export const tenantRoutes = new Hono<GateEnv>()
     return record === null ? c.json({ error: "not_found" }, 404) : c.json(record);
   })
   .delete("/:tenantId/records/:recordId", async (c) => {
-    const result = asDeleteResult(
-      await stubFor(c).deleteRecord(c.req.param("recordId"), c.get("auth")),
+    const recordId = c.req.param("recordId");
+    // M2-7b: 削除は record_delete(冪等。削除済みでも ok)。応答の形は従来の { ok, record } を保つ
+    const result = asInvokeResult(
+      await stubFor(c).invoke("record_delete", { recordId }, c.get("auth")),
     );
+    if (!result.ok) {
+      return c.json(result, statusFor(result.code));
+    }
+    const record = asRecordSnapshot(await stubFor(c).getRecord(recordId));
     // Phase 8: asset の削除はバイナリも片付ける(best-effort — 失敗した孤児は Phase 10 の
     // GC 候補。同期 push 経由の削除はここを通らないため孤児が残る — 引き継ぎ事項に記録済み)。
-    if (result.ok && result.record.type === ASSET_TYPE_KEY) {
-      const r2Key = result.record.data["r2_key"];
+    if (record !== null && record.type === ASSET_TYPE_KEY) {
+      const r2Key = record.data["r2_key"];
       // 最終レビュー指摘: 他テナント接頭辞の r2_key は削除しない(ownership.ts 冒頭コメント参照)。
       // 該当しない場合はレコード削除自体はそのまま成立させ、R2 側の片付けだけをスキップする。
       if (typeof r2Key === "string" && assetKeyBelongsToTenant(r2Key, c.req.param("tenantId"))) {
         try {
           await c.env.ASSETS.delete(r2Key);
         } catch {
-          console.error("failed to delete R2 object for asset", result.record.id);
+          console.error("failed to delete R2 object for asset", recordId);
         }
       }
     }
-    return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
+    return c.json({ ok: true, record });
   })
   .post("/:tenantId/records/:recordId/publish", async (c) => {
     // Phase 8 決定 4: アセットの埋め込み URL は公開パス(/public/v1/:tenantSlug/...)を指す。
@@ -313,25 +391,31 @@ export const tenantRoutes = new Hono<GateEnv>()
     if (slugRow === null) {
       return c.json({ error: "unknown_tenant" }, 404);
     }
-    const result = asPublishResult(
-      await stubFor(c).publishRecord(
-        tenantId,
-        slugRow.slug,
-        c.req.param("recordId"),
+    // M2-7b: record_publish(冪等。同じ版の再 publish は何も書かない)
+    const result = asInvokeResult(
+      await stubFor(c).invoke(
+        "record_publish",
+        { recordId: c.req.param("recordId") },
         c.get("auth"),
+        { tenantSlug: slugRow.slug },
       ),
     );
-    return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
+    return result.ok
+      ? c.json({ ok: true, snapshot: result.output })
+      : c.json(result, statusFor(result.code));
   })
   .post("/:tenantId/records/:recordId/unpublish", async (c) => {
-    const result = asUnpublishResult(
-      await stubFor(c).unpublishRecord(
-        c.req.param("tenantId"),
-        c.req.param("recordId"),
+    // M2-7b: record_unpublish(未公開なら ok、sourceVersion は null)
+    const result = asInvokeResult(
+      await stubFor(c).invoke(
+        "record_unpublish",
+        { recordId: c.req.param("recordId") },
         c.get("auth"),
       ),
     );
-    return result.ok ? c.json(result) : c.json(result, statusFor(result.code));
+    return result.ok
+      ? c.json({ ok: true, ...(result.output as Record<string, unknown>) })
+      : c.json(result, statusFor(result.code));
   })
   .post("/:tenantId/reproject", async (c) => {
     const result = asReprojectResult(

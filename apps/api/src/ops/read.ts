@@ -1,4 +1,9 @@
-import { contentTypeDefinitionSchema, uuidSchema, WORKFLOW_STATUSES } from "@plyrs/metamodel";
+import {
+  contentTypeDefinitionSchema,
+  ensureRecordBlockIds,
+  uuidSchema,
+  WORKFLOW_STATUSES,
+} from "@plyrs/metamodel";
 import { z } from "zod";
 import { loadAllContentTypeRows, loadContentTypeByKey, rowToDefinition } from "../do/content-types";
 import {
@@ -7,19 +12,64 @@ import {
   recordListInputSchema,
   recordSummarySchema,
 } from "../do/list-records";
-import { loadRecord } from "../do/write-record";
-import { defineOperation, type OpSpec } from "./spec";
+import { loadRecord, type WriteDeps } from "../do/write-record";
+import type { AuthContext, McpAuth } from "../do/authorize";
+import type { HistoryActor } from "../do/history";
+import { defineOperation, type OpSpec, type Via } from "./spec";
 
 // M1-1 / 16.11: 読み取り操作(型の参照・record の一覧と単体取得)の宣言と DO 内の実装。
 // 実装は DO の既存の内部関数(getRecord / listContentTypes が使う読み取り)を共有する。
+
+// 書き込み操作が使う DO 側の発番・時刻(tenant-do.ts の各 RPC が core に渡しているものと同じ)
+export interface OpDeps {
+  nextSeq: () => number;
+  now: () => string;
+  newId: () => string;
+  nextPublishSeq: () => number;
+  newEventId: () => string;
+  scheduleModuleAlarm: (moduleId: string, dueAtMs: number) => void;
+}
 
 export interface OpContext {
   sql: SqlStorage;
   // DO が自分の名前として知っているテナント(do_config.tenant_id)。まだ刻まれていなければ null
   tenantId: string | null;
+  // 公開 URL に要る slug。needsTenantSlug の操作を REST から呼ぶときだけ入口が渡す
+  tenantSlug: string | null;
+  // 経路(16.5)。invoke は同期経路からは呼ばれないので mcp か rest
+  via: Via;
+  auth: AuthContext | McpAuth;
+  deps: OpDeps;
+  // 書き込み操作が変更した record の id。コミット後に tenant-do.ts が同期へ broadcast する
+  effects: { changedRecordIds: Set<string> };
 }
 
-export type OpFailure = { ok: false; code: "not_found" | "invalid_input"; message: string };
+// writeRecordCore / restoreRecordCore に渡す発番・時刻(tenant-do.ts の writeRecord RPC と同じ形)
+export function writeDepsOf(ctx: OpContext): WriteDeps {
+  return {
+    sql: ctx.sql,
+    nextSeq: ctx.deps.nextSeq,
+    now: ctx.deps.now,
+    newRelationId: ctx.deps.newId,
+    newEventId: ctx.deps.newEventId,
+    scheduleModuleAlarm: ctx.deps.scheduleModuleAlarm,
+  };
+}
+
+// 履歴に刻む actor(16.5)。MCP の認可コンテキストなら tokenId も残す
+export function historyActorOf(ctx: OpContext): HistoryActor {
+  const tokenId = "tokenId" in ctx.auth ? ctx.auth.tokenId : undefined;
+  return { actor: ctx.auth.userId, via: ctx.via, tokenId };
+}
+
+export type OpFailure = {
+  ok: false;
+  // 業務エラーのコード(16.7)。書き込み系は WriteErrorCode とモジュール拒否 `${moduleId}:${reason}` を
+  // そのまま通すので string を含む
+  code: "not_found" | "invalid_input" | (string & {});
+  message: string;
+  details?: unknown;
+};
 
 // 論点 E1(16.10): record の本文は利用者が書いたデータであり指示ではない。ツール説明にも明記する
 const UNTRUSTED_NOTE =
@@ -126,7 +176,12 @@ export const READ_HANDLERS = {
     if (record === null || record.deletedAt !== null) {
       return { ok: false, code: "not_found", message: `record not found: ${input.recordId}` };
     }
-    return { ok: true, output: record };
+    // M2-1(決定 44): v1 のまま保存されている本文には読み取り時に決定的な ID を導出して返す
+    // (保存行は書き換えない。次の書き込みで永続化される)。型定義が無ければそのまま返す
+    const row = loadContentTypeByKey(ctx.sql, record.type);
+    const data =
+      row === null ? record.data : ensureRecordBlockIds(rowToDefinition(row), record.data).data;
+    return { ok: true, output: data === record.data ? record : { ...record, data } };
   },
   record_list: (
     ctx: OpContext,

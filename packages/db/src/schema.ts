@@ -1,4 +1,11 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 // design-spec §6: 1テナント DO-SQLite のコンテンツ中核3テーブル。
 // tenant_id 列が無いのは DO 境界がテナント境界のため。
@@ -20,6 +27,8 @@ export const contentTypes = sqliteTable(
     titleField: text("title_field"),
     listColumns: text("list_columns"), // JSON: string[]
     menuOrder: integer("menu_order"),
+    // 16.11(M2-8): 型単位の執筆ガイド(NULL は未指定)。MCP の prompt writing_guide で配る
+    writingGuide: text("writing_guide"),
   },
   (table) => [uniqueIndex("idx_content_types_key").on(table.key)],
 );
@@ -84,6 +93,37 @@ export const publishedSnapshots = sqliteTable(
   // 案 D 9 章: 型ごとの公開状態一覧(WHERE type = ? AND record_id > ? ORDER BY record_id)を
   // フルスキャンせず索引だけで辿る
   (table) => [index("idx_published_snapshots_type").on(table.type, table.recordId)],
+);
+
+// design-spec 16.5 / 決定 41(M2-3a): record の変更履歴。キーは履歴表自身の record ごとの連番
+// (records.version は属性として併記。publish の版は source_version で識別)。
+// 直近の版は data に全文、古い版は 1 つ新しい版からの逆差分(diff)だけを持つ。
+// publish / unpublish の版は常に全文で、保持上限に達しても record がある間は消さない。
+export const recordHistory = sqliteTable(
+  "record_history",
+  {
+    recordId: text("record_id").notNull(),
+    historySeq: integer("history_seq").notNull(), // record ごとに 1 から単調増加
+    kind: text("kind").notNull(), // 'write' | 'publish' | 'unpublish' | 'delete' | 'restore'
+    version: integer("version").notNull(), // records.version(属性)
+    sourceVersion: integer("source_version"), // publish / unpublish のとき published_snapshots.source_version
+    status: text("status").notNull(),
+    data: text("data"), // 全文 JSON。差分化された版は NULL
+    diff: text("diff"), // 1 つ新しい版からの逆差分 JSON {set, unset}。全文の版は NULL
+    fieldVersions: text("field_versions").notNull(), // JSON
+    changedFields: text("changed_fields").notNull().default("[]"), // JSON: 1 つ古い版と比べて変わったキー
+    actor: text("actor").notNull(), // userId / module:{id} / public:{id}
+    via: text("via").notNull(), // 'sync' | 'mcp' | 'rest'(@plyrs/sync-protocol の Via)
+    tokenId: text("token_id"), // MCP(PAT / OAuth)のトークンの行 ID
+    clientId: text("client_id"), // OAuth の client_id(自己申告。表示の補足だけに使う)
+    restoredFrom: integer("restored_from"), // restore のとき復元元の history_seq
+    createdAt: text("created_at").notNull(), // 版を開いた時刻(区切りの 15 分はここから数える)
+    updatedAt: text("updated_at").notNull(), // 最後に畳み込んだ時刻
+  },
+  (table) => [
+    primaryKey({ columns: [table.recordId, table.historySeq] }),
+    index("idx_record_history_kind").on(table.recordId, table.kind),
+  ],
 );
 
 // design-spec §12.3: アウトボックス。DO コミットと公開用 DB 書き込みの dual-write を分離する。

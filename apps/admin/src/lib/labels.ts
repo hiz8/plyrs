@@ -268,6 +268,56 @@ export const DIALOGS = {
   cancel: "キャンセル",
 } as const;
 
+// 16.5(M2-5): record の履歴画面
+export const HISTORY_LABELS = {
+  title: "履歴",
+  crumb: "履歴",
+  link: "履歴",
+  listLabel: "版の一覧",
+  via: { sync: "管理画面", mcp: "MCP", rest: "API" },
+  kind: {
+    write: "編集",
+    publish: "公開",
+    unpublish: "公開の取り下げ",
+    delete: "削除",
+    restore: "復元",
+  },
+  summary: {
+    write: (who: string, via: string, count: number) =>
+      count === 0 ? `${who} が${via}から編集` : `${who} が${via}から ${count} フィールドを変更`,
+    publish: (who: string, via: string) => `${who} が${via}から公開`,
+    unpublish: (who: string, via: string) => `${who} が${via}から公開を取り下げ`,
+    delete: (who: string, via: string) => `${who} が${via}から削除`,
+    restore: (who: string, via: string, from: number | null) =>
+      from === null ? `${who} が${via}から復元` : `${who} が${via}から版 ${from} に復元`,
+  },
+  published: "公開版",
+  publishedAt: (absolute: string) => `${absolute} に公開`,
+  version: (n: number) => `版 ${n}`,
+  compareTitle: "現在との差分",
+  noSelection: "左の一覧から版を選ぶと、現在との差分が表示されます",
+  noChanges: "現在と同じ内容です",
+  before: "この版",
+  after: "現在",
+  unset: "(未設定)",
+  emptyText: "(空)",
+  restore: "この版に戻す",
+  restoreDialog: {
+    title: "この版に戻しますか？",
+    body: (summary: string) =>
+      `「${summary}」の内容と状態を現在に書き戻します。今の内容も履歴に残るので、あとから戻せます。`,
+    confirm: "この版に戻す",
+  },
+  restored: "この版に戻しました",
+  restoreFailed: "戻せませんでした。接続を確認して、もう一度お試しください",
+  loadFailed: "履歴を読み込めませんでした",
+  compareFailed: "差分を読み込めませんでした",
+  retry: "再試行",
+  loadMore: "さらに表示",
+  empty: "まだ履歴がありません",
+  notFound: "見つかりませんでした",
+} as const;
+
 export const RECORD_FORM_LABELS = {
   unset: "(未設定)",
   empty: "（空）",
@@ -676,6 +726,10 @@ export const CONTENT_TYPE_LABELS = {
     descriptionPlaceholder: "この種類の内容を一言で",
     descriptionHelp: "設定の一覧と、はじめての利用の案内に表示します",
     descriptionTooLong: "説明は 1000 文字以内で入力してください",
+    writingGuideLabel: "執筆ガイド",
+    writingGuideHelp:
+      "この種類の内容をどう書くかの案内(構成・文体・長さなど)。AI エージェントが MCP 経由で書くときの手がかりになります",
+    writingGuideTooLong: "執筆ガイドは 4000 文字以内で入力してください",
     fields: "フィールド",
     fieldsHelp: "上から順に入力フォームに並びます",
     emptyTitle: "フィールドはまだありません",

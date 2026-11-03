@@ -1,5 +1,6 @@
 import {
   buildRecordInputSchema,
+  ensureTopLevelBlockIds,
   richTextEnvelopeSchema,
   type ContentTypeDefinition,
   type RichTextEnvelope,
@@ -33,6 +34,15 @@ export function parseRelationDraftKey(key: string): { type: string; id: string }
 export function asRichTextValue(value: unknown): RichTextEnvelope | undefined {
   const parsed = richTextEnvelopeSchema.safeParse(value);
   return parsed.success ? parsed.data : undefined;
+}
+
+// M2-1(決定 44): エディタへ渡す値。必ず最上位ブロックの ID 導出を通す。通さないと DO 側の
+// 導出 ID とエディタ(UniqueID)の UUID が食い違い、保存時に全ブロックの ID が入れ替わる
+// (内容が同じでも版が上がり、エージェント側で競合になる)。保存経路(fromDraftValues)は
+// 触らない — 永続化は DO の writeRecordCore が行う
+export function asEditorRichTextValue(value: unknown): RichTextEnvelope | undefined {
+  const envelope = asRichTextValue(value);
+  return envelope === undefined ? undefined : ensureTopLevelBlockIds(envelope).envelope;
 }
 
 // 「空」= ブロックが無い、または唯一のブロックが中身の無い段落。ユーザーが本文を全部

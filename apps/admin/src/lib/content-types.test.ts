@@ -22,6 +22,7 @@ function row(overrides: Partial<ContentTypeSummary> & { key: string }): ContentT
     titleField: null,
     listColumns: null,
     menuOrder: null,
+    writingGuide: null,
     ...overrides,
   };
 }

@@ -2,6 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Editor, JSONContent } from "@tiptap/core";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
+import UniqueID from "@tiptap/extension-unique-id";
 import StarterKit from "@tiptap/starter-kit";
 import {
   ToggleButton as RacToggleButton,
@@ -152,12 +153,64 @@ export interface RichTextValue {
   doc: unknown;
 }
 
-export const RICH_TEXT_SCHEMA_VERSION = 1;
+// M2-1(決定 44): 版 2 = 最上位ブロックの attrs.id に安定 ID を持つ。正本は @plyrs/metamodel の
+// RICH_TEXT_SCHEMA_VERSION / BLOCK_ID_ATTR で、ui は metamodel に依存しない方針のため値を写し、
+// 一致は apps/admin/src/lib/mention-contract.test.ts が固定する。
+export const RICH_TEXT_SCHEMA_VERSION = 2;
+export const BLOCK_ID_ATTR_NAME = "id";
+// 見出しのレベル。@plyrs/richtext の HEADING_LEVELS(Worker 側の語彙)と一致する(mention-contract.test.ts)
+export const RICH_TEXT_HEADING_LEVELS = [1, 2, 3] as const;
+
+// UniqueID が ID を振るノード種。契約は最上位ブロックだけだが、types は「ノード種」の指定なので
+// 箇条書きの中の段落にも付く(害は無い。M0-2 結果 2 節)。
+const BLOCK_ID_NODE_TYPES = [
+  "paragraph",
+  "heading",
+  "bulletList",
+  "orderedList",
+  "blockquote",
+  "codeBlock",
+  "horizontalRule",
+  ASSET_IMAGE_NODE_NAME,
+];
 
 const EMPTY_DOC: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
 
 // doc は unknown(metamodel 検証済みの AST)。Tiptap の JSONContent への境界 cast は
 // 「data JSON の脱出ハッチを 1 箇所に閉じ込める」規約(tech-selection 2.1)の editor 側対応物。
+// 比較専用の JSON(保存する値には触らない)。最上位以外のノードから attrs.id を外し、末尾の空段落
+// (StarterKit の TrailingNode が最上位の最後が段落でないときに足すもの。保存値には無い)も外す
+function comparableDoc(doc: unknown): string {
+  const strip = (node: unknown, depth: number): unknown => {
+    if (typeof node !== "object" || node === null || Array.isArray(node)) {
+      return node;
+    }
+    const record = node as Record<string, unknown>;
+    const attrs = record["attrs"];
+    const nextAttrs =
+      depth > 1 && typeof attrs === "object" && attrs !== null && "id" in attrs
+        ? Object.fromEntries(Object.entries(attrs).filter(([key]) => key !== "id"))
+        : attrs;
+    const content = Array.isArray(record["content"])
+      ? record["content"].map((child) => strip(child, depth + 1))
+      : record["content"];
+    return {
+      ...record,
+      ...(nextAttrs === undefined || Object.keys(nextAttrs as object).length === 0
+        ? { attrs: undefined }
+        : { attrs: nextAttrs }),
+      ...(content === undefined ? {} : { content }),
+    };
+  };
+  const stripped = strip(doc, 0) as { content?: unknown[] };
+  const blocks = Array.isArray(stripped.content) ? stripped.content : undefined;
+  const last = blocks?.at(-1) as { type?: string; content?: unknown[] } | undefined;
+  if (blocks !== undefined && last?.type === "paragraph" && (last.content ?? []).length === 0) {
+    return JSON.stringify({ ...stripped, content: blocks.slice(0, -1) });
+  }
+  return JSON.stringify(stripped);
+}
+
 function docContent(value: RichTextValue | undefined): JSONContent {
   return value === undefined ? EMPTY_DOC : (value.doc as JSONContent);
 }
@@ -287,11 +340,15 @@ export function RichTextEditor({
     {
       extensions: [
         StarterKit.configure({
-          heading: { levels: [1, 2, 3] },
+          heading: { levels: [...RICH_TEXT_HEADING_LEVELS] },
           link: { openOnClick: false },
         }),
         createRecordMention(glue),
         createAssetImage(() => resolveAssetUrlRef.current),
+        // 新規ブロックの採番だけに使う。既存の文書は呼び出し側が ensureTopLevelBlockIds を通して
+        // 渡す契約(通さないと DO 側の導出 ID とここで振る UUID が食い違い、保存時に全ブロックの
+        // ID が入れ替わる — M0-2 結果の引き継ぎ 1)
+        UniqueID.configure({ attributeName: BLOCK_ID_ATTR_NAME, types: BLOCK_ID_NODE_TYPES }),
       ],
       content: docContent(value),
       editable: isReadOnly !== true,
@@ -299,7 +356,13 @@ export function RichTextEditor({
       // ツールバーの活性状態は useEditorState が購読する。
       shouldRerenderOnTransaction: false,
       editorProps: { attributes: editorAttributes(label, isReadOnly === true) },
-      onUpdate: ({ editor: current }) => {
+      onUpdate: ({ editor: current, transaction }) => {
+        // UniqueID の onCreate(ID の無い入れ子ノードへの付与)は addToHistory: false の transaction
+        // で dispatch される(@tiptap/extension-unique-id 3.31.4 の dist を確認)。これは内容の変更
+        // ではないので onChange に流さない — 流すと開いただけの record が push され版が上がる
+        if (transaction.getMeta("addToHistory") === false) {
+          return;
+        }
         onChangeRef.current({
           schemaVersion: RICH_TEXT_SCHEMA_VERSION,
           doc: current.getJSON(),
@@ -330,11 +393,15 @@ export function RichTextEditor({
 
   // 競合解決の「サーバー版を採用」等、外部からの値差し替えを反映する。編集者自身の
   // 変更(onUpdate 由来)は getJSON と一致するため setContent は走らない。
+  // 比較では最上位以外の attrs.id を無視する: 契約(決定 44)は最上位ブロックの ID だけで、
+  // UniqueID は入れ子の段落にも ID を振るため、v1 を導出で開いた直後は value と getJSON が
+  // 入れ子の ID だけで食い違う。そこで setContent すると親の再描画ごとに文書が置き換わり、
+  // カーソル位置と undo 履歴が飛ぶ
   useEffect(() => {
     if (editor === null || value === undefined) {
       return;
     }
-    if (JSON.stringify(value.doc) !== JSON.stringify(editor.getJSON())) {
+    if (comparableDoc(value.doc) !== comparableDoc(editor.getJSON())) {
       editor.commands.setContent(docContent(value), { emitUpdate: false });
     }
   }, [editor, value]);

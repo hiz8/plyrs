@@ -187,3 +187,21 @@ describe("titleFieldKey", () => {
     expect(titleFieldKey({ fields: [{ key: "code", type: "number" }] })).toBeUndefined();
   });
 });
+
+describe("writingGuide(16.11 / M2-8)", () => {
+  it("trim して受け、4000 文字を超えると拒否する", () => {
+    const parsed = contentTypeDefinitionSchema.parse({
+      ...baseType,
+      writingGuide: "  見出しは 1 つ。本文は 3 段落。  ",
+    });
+    expect(parsed.writingGuide).toBe("見出しは 1 つ。本文は 3 段落。");
+    expect(
+      contentTypeDefinitionSchema.safeParse({ ...baseType, writingGuide: "x".repeat(4001) })
+        .success,
+    ).toBe(false);
+    expect(
+      contentTypeDefinitionSchema.safeParse({ ...baseType, writingGuide: "x".repeat(4000) })
+        .success,
+    ).toBe(true);
+  });
+});

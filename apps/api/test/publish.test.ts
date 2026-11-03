@@ -451,12 +451,14 @@ describe("publish routes", () => {
     );
     expect(unpublished.status).toBe(200);
 
+    // 16.7(M2-7b): 未公開の unpublish は冪等に成功し、sourceVersion は null
     const again = await app.request(
       `/v1/t/${tenantId}/records/${uuid(120)}/unpublish`,
       json({}, authHeader),
       env,
     );
-    expect(again.status).toBe(409);
+    expect(again.status).toBe(200);
+    expect(await again.json()).toMatchObject({ ok: true, sourceVersion: null });
   });
 });
 

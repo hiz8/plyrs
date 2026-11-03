@@ -17,6 +17,7 @@ export {
 } from "./field-types";
 export {
   CONTENT_TYPE_DESCRIPTION_MAX_LENGTH,
+  CONTENT_TYPE_WRITING_GUIDE_MAX_LENGTH,
   LIST_COLUMNS_MAX,
   PLUGIN_ID_PATTERN,
   PLUGIN_TYPE_KEY_PATTERN,
@@ -28,10 +29,12 @@ export {
   buildFieldValueSchema,
   buildRecordInputSchema,
   jsonValueSchema,
+  recordInputJsonSchema,
   relationRefSchema,
   richTextEnvelopeSchema,
   richTextNodeSchema,
   splitRecordInput,
+  type JsonSchema,
   type JsonValue,
   type RelationRef,
   type RichTextEnvelope,
@@ -52,3 +55,14 @@ export {
   ASSET_TYPE_ID,
   ASSET_TYPE_KEY,
 } from "./asset-type";
+export {
+  BLOCK_ID_ATTR,
+  DERIVED_ID_PREFIX,
+  RICH_TEXT_SCHEMA_VERSION,
+  canonicalJson,
+  ensureRecordBlockIds,
+  ensureTopLevelBlockIds,
+  hashBlock,
+  type BlockIdsResult,
+  type RecordBlockIdsResult,
+} from "./block-ids";

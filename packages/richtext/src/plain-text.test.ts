@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RichTextEnvelope } from "@plyrs/metamodel";
-import { richTextPlainText } from "./richtext-text";
+import { richTextPlainText } from "./plain-text";
 
 function envelope(doc: RichTextEnvelope["doc"]): RichTextEnvelope {
   return { schemaVersion: 1, doc };

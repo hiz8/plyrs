@@ -1,4 +1,5 @@
 import {
+  conflictModeFor,
   PROTOCOL_VERSION,
   resolveSyncWrite,
   type ClientChange,
@@ -142,9 +143,9 @@ export function handlePush(
           now: deps.now,
           newId: deps.newRelationId,
           nextPublishSeq: deps.nextPublishSeq,
+          history: { actor: auth.userId, via: "sync" },
         },
         change.recordId,
-        auth.userId,
       );
       if (!deleted.ok) {
         acks.push({
@@ -167,7 +168,13 @@ export function handlePush(
     }
 
     const current = loadSyncRecord(deps.sql, change.recordId);
-    const resolution = resolveSyncWrite(rowToDefinition(contentTypeRow), change, current);
+    // 16.6: 管理画面の同期は merge(別フィールドはマージ、同一スカラーは LWW)
+    const resolution = resolveSyncWrite(
+      rowToDefinition(contentTypeRow),
+      change,
+      current,
+      conflictModeFor("sync"),
+    );
     if (resolution.kind === "conflict") {
       acks.push({
         type: "ack",
@@ -186,6 +193,7 @@ export function handlePush(
       recordId: change.recordId,
       input: resolution.input,
       actor: auth.userId,
+      via: "sync",
       ...(change.status === undefined ? {} : { status: change.status }),
     });
     if (!written.ok) {

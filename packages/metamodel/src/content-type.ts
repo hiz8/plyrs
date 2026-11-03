@@ -9,6 +9,9 @@ export const PLUGIN_TYPE_KEY_PATTERN = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
 // text フィールド、menuOrder は表示名順)に従う。
 export const CONTENT_TYPE_DESCRIPTION_MAX_LENGTH = 1000;
 export const LIST_COLUMNS_MAX = 3;
+// 16.11(論点 A3、M2-8): 型単位の「執筆ガイド」。エージェントが record を書くときの手がかりで、
+// MCP の prompt writing_guide と type_get で配る。表示用の任意項目と同じく検証・公開には影響しない
+export const CONTENT_TYPE_WRITING_GUIDE_MAX_LENGTH = 4000;
 
 export const contentTypeDefinitionSchema = z
   .strictObject({
@@ -20,6 +23,7 @@ export const contentTypeDefinitionSchema = z
     pluginId: z.string().regex(PLUGIN_ID_PATTERN).optional(),
     version: z.number().int().positive(),
     description: z.string().trim().min(1).max(CONTENT_TYPE_DESCRIPTION_MAX_LENGTH).optional(),
+    writingGuide: z.string().trim().min(1).max(CONTENT_TYPE_WRITING_GUIDE_MAX_LENGTH).optional(),
     titleField: fieldKeySchema.optional(),
     listColumns: z.array(fieldKeySchema).max(LIST_COLUMNS_MAX).optional(),
     menuOrder: z.number().int().optional(),

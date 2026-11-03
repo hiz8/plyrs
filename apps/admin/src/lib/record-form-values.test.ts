@@ -2,6 +2,7 @@ import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { describe, expect, it } from "vitest";
 import {
   isDraftDirty,
+  asEditorRichTextValue,
   asRichTextValue,
   draftValueEquals,
   fromDraftValues,
@@ -291,6 +292,15 @@ describe("asRichTextValue / isEmptyRichTextValue / draftValueEquals", () => {
     expect(asRichTextValue(bodyEnvelope("x"))).toEqual(bodyEnvelope("x"));
     expect(asRichTextValue("nope")).toBeUndefined();
     expect(asRichTextValue({ schemaVersion: 1, doc: 42 })).toBeUndefined();
+  });
+
+  // M2-1(決定 44): エディタへ渡す値は版 2 で最上位ブロックに決定的な ID が付く
+  it("derives top-level block ids for the editor value", () => {
+    const value = asEditorRichTextValue(bodyEnvelope("x"));
+    expect(value?.schemaVersion).toBe(2);
+    const first = value?.doc.content?.[0];
+    expect(first?.attrs?.["id"]).toMatch(/^v1-/);
+    expect(asEditorRichTextValue("nope")).toBeUndefined();
   });
 
   it("detects empty documents", () => {

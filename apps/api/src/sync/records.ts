@@ -1,6 +1,7 @@
 import type { ContentTypeDefinition, RelationRef, WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { loadAllContentTypeRows, loadContentTypeByKey, rowToDefinition } from "../do/content-types";
+import type { RecordSnapshot } from "../do/types";
 import { loadRelationRefs } from "../do/write-record";
 
 export const SYNC_PAGE_SIZE = 100;
@@ -68,6 +69,14 @@ function rowToSyncRecord(sql: SqlStorage, row: RawSyncRow): SyncRecord {
   const relations = loadRelationRefs(sql, row.id);
   const data = JSON.parse(row.data) as Record<string, unknown>;
   return { ...base, input: buildSyncInput(data, relations, definition) };
+}
+
+// 16.5(M2-4): 履歴の data も「writeRecord の input 形式」(relations を統合した形)で持つ。
+// record_restore がそのまま writeRecord に通せ、record_compare が同期の表現と同じ形で比べられる
+export function loadRecordInput(sql: SqlStorage, record: RecordSnapshot): Record<string, unknown> {
+  const contentTypeRow = loadContentTypeByKey(sql, record.type);
+  const definition = contentTypeRow === null ? null : rowToDefinition(contentTypeRow);
+  return buildSyncInput(record.data, loadRelationRefs(sql, record.id), definition);
 }
 
 export function loadSyncRecord(sql: SqlStorage, id: string): SyncRecord | null {

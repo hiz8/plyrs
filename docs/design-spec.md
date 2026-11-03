@@ -788,7 +788,8 @@ record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴�
 
 - **区切り規則**: 書き込みごとに版を作らない（同期の push は入力中の細かな差分で届く）。次のいずれかで新しい版を切る: (1) actor（誰の権限か）または `via` が前の版と違う、(2) 前の版から **15 分**以上経っている、(3) `status` が変わる、(4) publish / unpublish。それ以外の連続した書き込みは直前の版に畳み込む。
 - **記録する属性**: 履歴の連番、`records.version`、publish の版なら `source_version`、`data` と `fieldVersions`、`status`、actor（`userId`）、`via`（管理画面の同期 / MCP / REST）、MCP と OAuth では `tokenId` と `client_id`。`clientInfo` は自己申告で未検証なので表示の補足に限り、認可には使わない。
-- **保持（仮置き。M2-3a で実測して見直す）**: 1 record あたり **最新 100 版**かつ **365 日**。直近 10 版は全文、それより古い版は直前の版との差分で保存する。publish の区切りの版は、保持上限に達しても **record が存在する間は消さない**（公開版の履歴を失わないため）。
+- **保持（仮置き。M4-6 で実測して見直す）**: 1 record あたり **最新 100 版**かつ **365 日**。直近 10 版は全文、それより古い版は **1 つ新しい版からの逆差分**（`{set, unset}`）で保存する。逆差分にするのは、復元を新しい側（常に全文がある）から辿るためで、保持上限で古い版を消しても残った版の鎖が切れない。publish / unpublish の区切りの版は **常に全文**で持ち、保持上限に達しても **record が存在する間は消さない**（公開版の履歴を失わないため。差分の鎖の途中に残っても全文なので復元の起点になる）。
+- **実装の置き場（M2-3a）**: `packages/db/src/schema.ts` の `record_history`（主キー `(record_id, history_seq)`、`changed_fields` に直前の版との差分キーを持つ）と `apps/api/src/do/history.ts`。`writeRecordCore` が INSERT / UPDATE の直後に `recordHistory()` を呼び、`applied: false` の書き込みは記録しない。区切り規則の (2) は「前の版を**開いた**時刻（`created_at`）から 15 分」で、畳み込みで `updated_at` が進んでも起点は動かない。経路の列挙 `Via`（`"sync" | "mcp" | "rest"`）は `@plyrs/sync-protocol` が正本で、モジュールの書き戻し・alarm・アップロードなど同期でも MCP でもない書き込みは `rest` に分類する。
 - deleted_at の付いた record の履歴も残し、削除の取り消し（`record_restore`）に使う。publish と delete は `writeRecord` を通らないので、それぞれに記録点を足す。
 - `restore` は `writeRecord` を通す。validate-on-write の対象なので、型定義が変わっていれば失敗しうる（遅延マイグレーションの帰結として受け入れる）。
 - 履歴と FTS5（16.9）は DO-SQLite の容量と書き込み行数を増やす。区切り規則と保持上限で有界化し、M4 で実測する。
@@ -797,7 +798,7 @@ record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴�
 
 新しい `_rev` は作らない。`record_get` が返す既存の `fieldVersions` を、更新時に `baseFieldVersions` として **必須**にし、`resolveSyncWrite`（第 10.3 章）に通す。
 
-- **判定モード**: `resolveSyncWrite` に判定モードの引数を足す。管理画面の同期は現行どおり（別フィールドはマージ、同一スカラーは LWW、同一リッチテキストは conflict）。**エージェント経路の既定は strict**（`changedFields` のどれか 1 つでも version が違えば、スカラーも含めて conflict）。エージェントが人の直前のタイトルや slug の編集を黙って上書きするのを避けるため。
+- **判定モード**: `resolveSyncWrite` に判定モードの引数を足す。管理画面の同期は現行どおり（別フィールドはマージ、同一スカラーは LWW、同一リッチテキストは conflict）。**エージェント経路の既定は strict**（`changedFields` のどれか 1 つでも version が違えば、スカラーも含めて conflict）。エージェントが人の直前のタイトルや slug の編集を黙って上書きするのを避けるため。ワークフロー状態（`status`）には fieldVersion が無いので、`status` を変える更新は `baseFieldVersions` が現在の `fieldVersions` 全体と一致することを要求する（人が進めた状態を、古い record を見たエージェントが黙って戻さない。M2 レビューで追加）。
 - **競合応答**: `isError: true` で、現在値・現在の `fieldVersions`・競合フィールドを返す。`record_update` の `outputSchema` は成功形と競合形の oneOf にする（`structuredContent` は `outputSchema` に準拠しなければならない）。
 - **再適用の打ち切り**: ツール説明で再適用を 2 回までとし、超えたら提案（16.8）へ回すよう競合応答で導く。stateless なのでサーバーは回数を知らない。回数は `record_update` の `attempt` 引数で自己申告させる（改ざんできるが用途が導線なので足りる）。
 - **ブロック単位の競合判定**は、リッチテキストのブロック ID（16.10）が確定した後に、`fieldVersions` をブロック単位にするか DO 内 3-way merge にするかを決める（M5。未処理論点）。
@@ -830,7 +831,7 @@ record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴�
 
 - **一覧（`record_list`）は初期リリースに必須**。文法は公開 API（第 12.4 章、`filter[...]` / `sort` / `include` / `cursor`）に揃え、文法の解釈は `public/query.ts` を共有する。実行器は `records.data`（JSON）に対して新しく作る（公開側の出力型は公開用 DB の索引列に結び付いているため）。
 - フィルタできるフィールドは公開側と同じく **索引宣言済み + システム列**（`type` / `status` / `updated_at`）に限る（仮置き。無制限に `json_extract` を許すと DO の行読み取りが膨らむ）。`limit` に上限を設ける。`cursor` は同期の `seq`。下書きを含め、削除済みは除く。
-- **下書きを含む全文検索**は DO-SQLite の **FTS5** 仮想テーブルで作り、`writeRecord` で更新する。既存 record を索引に入れるため、公開用 DB の再構築と同じ形の再索引ジョブを持つ。FTS5 への書き込みも rows written に計上される。
+- **下書きを含む全文検索**（`record_search`、M2-9 で実装）は DO-SQLite の **FTS5** 仮想テーブル `records_fts` で作り、`writeRecord`（索引の張り直し）と削除（索引から外す）で更新する。対象は text フィールドの値と richtext のプレーンテキスト（json / relation / 数値 / 日時 / select は含めない）。tokenizer は **trigram**（日本語の分かち書きが不要）で、3 文字以上の語は `MATCH`（語ごとに引用符で囲み AND）、**2 文字以下の語を含む問い合わせは `LIKE` の部分一致**に落とす（trigram は 3 文字未満に一致しないため）。既存 record を索引に入れるため、DO 起動時の一回限りの再索引（`do_config.search_indexed`）と、公開用 DB の再構築と同じ形の super の再索引（`POST /super/v1/tenants/:tenantId/search-reindex`）を持つ。FTS5 への書き込みも rows written に計上される。FTS5 は全文索引を持つ列にしか索引を持たないため、索引行の `rowid` を `records.rowid` に揃え、張り直し・削除は `rowid`（FTS5 の主キー）で引く（UNINDEXED 列で引くと内容表の全走査になり、書き込み 1 回の rows read がテナントの record 数に比例する。第 3 章のコスト構造に反する）。FTS5 の仮想テーブルは drizzle のスキーマで表せないため、このマイグレーションだけ `drizzle-kit generate --custom` で作って手で書く。
 - これは第 13 章の非目標「全文検索」からの部分的な格上げである。**公開側（公開用 DB）の全文検索は引き続き非目標**。意味検索は方式未定（M5）。
 
 ### 16.10 リッチテキスト（論点 A1・E1）
@@ -839,14 +840,14 @@ record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴�
 
 - **形式は (a) ProseMirror JSON のまま各最上位ブロックに `attrs.id` を持たせる（`@tiptap/extension-unique-id`）**。M0-2 の試作（`docs/superpowers/plans/2026-11-01-m0-2-richtext-spike-result.md`）で、Tiptap の全ノード種 19 件の往復が (a) と Markdown では全て可逆、(b) Portable Text では入れ子ブロックが無いため 5 件が不可逆（番号リストの start、項目内の複数段落、引用内の複数段落・リスト、空白）と出たため。(b) は影響する PR も 4〜5 本の L に膨らむ。論点 A（JSON AST 採用、tech-selection 2.7）は維持する（決定 46）。
 - `RICH_TEXT_SCHEMA_VERSION` を 2 に上げ、v1 のエンベロープを読むときに最上位ブロックへ ID を振り、次の書き込みで永続化する（一括変換しない。第 4.2 章の遅延マイグレーション）。**読むときの ID はランダムにせず、ブロックの位置と内容のハッシュから決定的に導く**。未更新の record でも `record_get` で見た ID が `record_update` で通り、その間に内容が変われば `baseFieldVersions` の不一致で競合になる。永続化後は保存された ID を優先する。
-- **Markdown ⇄ AST の双方向変換**は `@tiptap/markdown` の `MarkdownManager` を Editor 無し・DOM 無しで Worker に置く（試作で動作を確認）。変換後は必ず ProseMirror のスキーマ検証を通し、語彙に無い構造（表・タスクリスト・外部 URL の画像など）は業務エラーで返す。エージェントは Markdown で読み書きし、複雑なブロックだけ AST を直接送る。独自ノード（record 参照・本文中画像）の Markdown 文法は M2-2 で確定する。変換の忠実度はテストで固定する。
+- **Markdown ⇄ AST の双方向変換**は `@tiptap/markdown` の `MarkdownManager` を Editor 無し・DOM 無しで Worker に置く（試作で動作を確認）。変換後は必ず ProseMirror のスキーマ検証を通し、語彙に無い構造（表・タスクリスト・外部 URL の画像など）は業務エラーで返す。エージェントは Markdown で読み書きし、複雑なブロックだけ AST を直接送る。独自ノードの Markdown 文法（M2-2 で確定）: record 参照は Tiptap の inline shortcode `[@ recordType="author" recordId="<uuid>" label="山田"]`、本文中画像は標準の画像構文で href を独自スキームにした `![label](plyrs://asset/<uuid>)`。外部 URL の画像・表・タスクリストは語彙に無いので `unsupported_markdown` の業務エラーで返し、見出し 4〜6 は 3 に丸める。変換と語彙は React 非依存の `@plyrs/richtext` に置き、エディタ（ui）・Worker・DO が共有する。変換の忠実度はテストで固定する（19 件の往復）。
 - **信頼されないコンテンツ（論点 E1）**: record の本文は他の利用者が書いたデータなので、エージェントに指示として扱わせない。本文は `structuredContent` のデータ領域に置き、ツール説明でも明示する。本文中の指示に従った誤編集・誤公開は、この包み方・publish の既定オフ（16.8）・履歴からの復元（16.5）の 3 重で受ける。
 
 ### 16.11 初期リリースのツールとアセット（論点 D3）
 
 初期リリースのツールは、型の参照（`type_list` / `type_get`、型スキーマは MCP の resources `plyrs://types/{key}` でも配る）、record の `list` / `search` / `get` / `create` / `update`（ブロック操作を含む）/ `delete`、`history` / `restore`、`publish` / `unpublish` / `compare`、アセット登録。型の変更・メンバー管理・モジュール有効化は後回し。
 
-型とフィールドの `description` と、型単位の「執筆ガイド」欄（論点 A3）をメタモデルに足し、`type_get`・JSON Schema・resources・prompts に載せる。型をデータで持つ本システムでは、記事の構造と書き方を知る手がかりが型定義しかないため。
+型とフィールドの `description` と、型単位の「執筆ガイド」欄（論点 A3、`writingGuide`、4000 文字以内）をメタモデルに足し、`type_get`・JSON Schema・resources・prompts に載せる（M2-8 で実装）。型をデータで持つ本システムでは、記事の構造と書き方を知る手がかりが型定義しかないため。配り方は 3 つ: `type_get` と resource `plyrs://types/{key}` の定義に `writingGuide` が載る。resource `plyrs://types/{key}/schema` は record の input の JSON Schema（`z.toJSONSchema`、フィールドの `description` と必須を含む。`application/schema+json`）。prompt `writing_guide`（引数 `type`）は型の説明・執筆ガイド・フィールドごとの型と必須と説明を 1 通にまとめる。執筆ガイドと型の説明は利用者が書いた設定なので、prompt の本文にも record と同じ前置き（16.10）を付ける。
 
 アセットは、使い切りのアップロードトークンを返すツール + 既存の `POST /assets`（20MB 上限、assetGuard の beforeWrite）と、URL からの取り込みの 2 経路。R2 の Workers binding では署名付き URL を作れない。URL 取り込みは Worker から任意 URL を fetch するので、公開アドレスのみ許可・リダイレクト先の再検証・サイズ上限で SSRF を防ぐ。
 

@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { Lock, RotateCw } from "lucide-react";
+import { History, Lock, RotateCw } from "lucide-react";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
@@ -7,13 +7,13 @@ import type { Collection } from "@tanstack/db";
 import { v7 as uuidv7 } from "uuid";
 import type { ContentTypeDefinition, WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import { Banner, ConfirmDialog, ICON_SIZE, RelativeTime, toaster } from "@plyrs/ui";
+import { Banner, Button, ConfirmDialog, ICON_SIZE, RelativeTime, toaster } from "@plyrs/ui";
 import { bg, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "../lib/asset-services";
 import { contentTypeCrumb, currentCrumb, homeCrumb } from "../lib/breadcrumbs";
 import { formatDateTime } from "../lib/datetime";
 import { errorMessage } from "../lib/error-messages";
-import { DIALOGS, EDITOR_LABELS, PUBLISH_BOX, TOASTS } from "../lib/labels";
+import { DIALOGS, EDITOR_LABELS, HISTORY_LABELS, PUBLISH_BOX, TOASTS } from "../lib/labels";
 import { labelForRecord } from "../lib/record-label";
 import { publishBoxView } from "../lib/publish-box";
 import { publicationQueryOptions, publicationsQueryKey } from "../lib/queries";
@@ -387,7 +387,28 @@ export function RecordEditor({
 
   return (
     <>
-      <TenantPageHeader title={title} breadcrumbs={breadcrumbs} meta={meta} />
+      <TenantPageHeader
+        title={title}
+        breadcrumbs={breadcrumbs}
+        meta={meta}
+        // 16.5(M2-5): 履歴画面へ。未保存の変更があれば離脱の確認を通る
+        secondaryActions={
+          record === null ? undefined : (
+            <Button
+              variant="secondary"
+              icon={History}
+              onPress={() =>
+                void navigate({
+                  to: "/t/$tenantSlug/content/$typeKey/$recordId/history",
+                  params: { tenantSlug, typeKey, recordId: record.id },
+                })
+              }
+            >
+              {HISTORY_LABELS.link}
+            </Button>
+          )
+        }
+      />
       <PageBody>
         <div {...stylex.props(styles.body)}>
           {toolbar.length > 0 && record !== null && (

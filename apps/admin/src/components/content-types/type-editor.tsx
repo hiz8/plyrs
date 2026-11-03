@@ -1,9 +1,13 @@
 import * as stylex from "@stylexjs/stylex";
 import { LayoutGrid, Plus } from "lucide-react";
 import { useRef, useState } from "react";
-import { CONTENT_TYPE_DESCRIPTION_MAX_LENGTH, type FieldDefinition } from "@plyrs/metamodel";
+import {
+  CONTENT_TYPE_DESCRIPTION_MAX_LENGTH,
+  CONTENT_TYPE_WRITING_GUIDE_MAX_LENGTH,
+  type FieldDefinition,
+} from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import { Button, EmptyState, TextField } from "@plyrs/ui";
+import { Button, EmptyState, TextArea, TextField } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import type { ContentTypeSummary } from "../../lib/admin-api";
 import {
@@ -136,6 +140,8 @@ export function TypeEditor({
       ? keyErrorMessage(keyError, draft.key)
       : undefined;
   const descriptionTooLong = draft.description.trim().length > CONTENT_TYPE_DESCRIPTION_MAX_LENGTH;
+  const writingGuideTooLong =
+    draft.writingGuide.trim().length > CONTENT_TYPE_WRITING_GUIDE_MAX_LENGTH;
 
   const isPanelOpen = editingKey !== null;
   const isValid =
@@ -144,6 +150,7 @@ export function TypeEditor({
     draft.fields.length >= 1 &&
     draft.fields.every((field) => fieldDraftErrors(field).length === 0) &&
     !descriptionTooLong &&
+    !writingGuideTooLong &&
     !isPanelOpen;
   const canSubmit = isValid && (isNewType || isTypeDraftDirty(draft, initial)) && !isPending;
 
@@ -303,6 +310,16 @@ export function TypeEditor({
             isReadOnly={isReadOnly}
             isInvalid={descriptionTooLong}
             errorMessage={descriptionTooLong ? editor.descriptionTooLong : undefined}
+          />
+          <TextArea
+            label={editor.writingGuideLabel}
+            description={editor.writingGuideHelp}
+            value={draft.writingGuide}
+            onChange={(writingGuide) => patch({ writingGuide })}
+            rows={4}
+            isReadOnly={isReadOnly}
+            isInvalid={writingGuideTooLong}
+            errorMessage={writingGuideTooLong ? editor.writingGuideTooLong : undefined}
           />
           <section>
             <div {...stylex.props(styles.fieldsHeading)}>

@@ -186,3 +186,75 @@ describe("resolveSyncWrite", () => {
     }
   });
 });
+
+// 16.6(M2-6): strict モード(エージェント経路の既定)
+describe("resolveSyncWrite strict", () => {
+  const type: ContentTypeDefinition = {
+    id: "018f2b6a-7a0a-7000-8000-000000000001",
+    key: "article",
+    name: "記事",
+    source: "user",
+    version: 1,
+    fields: [
+      { key: "title", type: "text", required: true },
+      { key: "body", type: "richtext" },
+    ],
+  };
+  const server: SyncRecord = {
+    id: "018f2b6a-7a0a-7000-8000-000000000010",
+    type: "article",
+    input: { title: "人が直した題", body: { schemaVersion: 2, doc: { type: "doc" } } },
+    fieldVersions: { title: 2, body: 1 },
+    status: "draft",
+    seq: 5,
+    version: 3,
+    deletedAt: null,
+    updatedAt: "2026-11-02T00:00:00.000Z",
+    updatedBy: "u1",
+  };
+  const agentChange = (overrides: Partial<ClientChange>): ClientChange => ({
+    changeId: "c1",
+    recordId: server.id,
+    typeKey: "article",
+    op: "upsert",
+    input: { title: "エージェントの題" },
+    changedFields: ["title"],
+    baseFieldVersions: { title: 2, body: 1 },
+    ...overrides,
+  });
+
+  it("スカラーの版が違えば strict では conflict(merge なら LWW で apply)", () => {
+    const stale = agentChange({ baseFieldVersions: { title: 1, body: 1 } });
+    expect(resolveSyncWrite(type, stale, server, "strict")).toEqual({
+      kind: "conflict",
+      conflicts: [{ fieldKey: "title", baseVersion: 1, currentVersion: 2 }],
+    });
+    expect(resolveSyncWrite(type, stale, server, "merge").kind).toBe("apply");
+    expect(resolveSyncWrite(type, stale, server).kind).toBe("apply");
+  });
+
+  it("baseFieldVersions にキーが無く current が 1 以上なら conflict(省略は 0 と見る)", () => {
+    const missing = agentChange({ baseFieldVersions: {} });
+    expect(resolveSyncWrite(type, missing, server, "strict")).toEqual({
+      kind: "conflict",
+      conflicts: [{ fieldKey: "title", baseVersion: 0, currentVersion: 2 }],
+    });
+  });
+
+  it("全フィールドの版が一致すれば apply で、結果は merge と同じ(現在値に変更キーだけ重ねる)", () => {
+    const fresh = agentChange({});
+    const strict = resolveSyncWrite(type, fresh, server, "strict");
+    expect(strict).toEqual(resolveSyncWrite(type, fresh, server, "merge"));
+    expect(strict).toEqual({
+      kind: "apply",
+      input: { title: "エージェントの題", body: server.input["body"] },
+    });
+  });
+
+  it("新規(current が無い)は strict でも apply", () => {
+    expect(resolveSyncWrite(type, agentChange({}), null, "strict")).toEqual({
+      kind: "apply",
+      input: { title: "エージェントの題" },
+    });
+  });
+});

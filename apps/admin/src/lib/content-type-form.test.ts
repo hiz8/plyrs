@@ -48,6 +48,7 @@ function summary(overrides: Partial<ContentTypeSummary> = {}): ContentTypeSummar
     titleField: null,
     listColumns: null,
     menuOrder: null,
+    writingGuide: null,
     ...overrides,
   };
 }
@@ -218,6 +219,26 @@ describe("toTypeDraft / buildDefinition round-trip", () => {
       draft: { ...draft, titleField: "title" },
     });
     expect(kept.ok && kept.definition.titleField).toBe("title");
+  });
+
+  it("執筆ガイドは trim して運び、空なら定義から省く(M2-8)", () => {
+    const draft: TypeDraft = {
+      ...emptyTypeDraft(),
+      name: "T",
+      key: "t",
+      fields: [emptyFieldDraft("text", "title", "")],
+      writingGuide: "  見出しは 1 つ。  ",
+    };
+    const result = buildDefinition({ id: uuid, version: 1, draft });
+    expect(result.ok && result.definition.writingGuide).toBe("見出しは 1 つ。");
+    const blank = buildDefinition({
+      id: uuid,
+      version: 1,
+      draft: { ...draft, writingGuide: "  " },
+    });
+    expect(blank.ok && blank.definition).not.toHaveProperty("writingGuide");
+    expect(toTypeDraft(summary({ writingGuide: "g" })).writingGuide).toBe("g");
+    expect(toTypeDraft(summary({})).writingGuide).toBe("");
   });
 });
 
@@ -427,6 +448,7 @@ describe("summaryToDefinition", () => {
       listColumns: ["a"],
       menuOrder: 2,
     });
+    expect(summaryToDefinition(summary({ writingGuide: "g" })).writingGuide).toBe("g");
   });
 });
 

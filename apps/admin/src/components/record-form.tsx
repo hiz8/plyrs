@@ -1,5 +1,13 @@
 import * as stylex from "@stylexjs/stylex";
-import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from "react";
 import { useForm, useStore } from "@tanstack/react-form";
 import {
   ASSET_SYSTEM_MANAGED_FIELD_KEYS,
@@ -24,6 +32,7 @@ import type { AssetServices } from "../lib/asset-services";
 import { MEDIA_PICKER_LABELS, RECORD_FORM_LABELS } from "../lib/labels";
 import { labelForRecord } from "../lib/record-label";
 import {
+  asEditorRichTextValue,
   asRichTextValue,
   draftValueEquals,
   fromDraftValues,
@@ -32,7 +41,7 @@ import {
   toDraftValues,
   type DraftValues,
 } from "../lib/record-form-values";
-import { richTextPlainText } from "../lib/richtext-text";
+import { richTextPlainText } from "@plyrs/richtext";
 import { useRecordsOfTypes } from "../lib/use-collection";
 import { AssetRelationPicker } from "./asset-picker";
 import { MediaPickerDialog, type PickedMedia } from "./media/media-picker-dialog";
@@ -105,7 +114,7 @@ function syncConflictFields(cause: unknown): string[] {
 function conflictExcerpt(value: unknown): string {
   const envelope = asRichTextValue(value);
   if (envelope !== undefined) {
-    return richTextPlainText(envelope);
+    return richTextPlainText(envelope, 120);
   }
   if (value === undefined) {
     return RECORD_FORM_LABELS.empty;
@@ -510,6 +519,12 @@ function FieldInput({
 }) {
   const label = field.label ?? field.key;
   const description = field.description;
+  // M2-1: 導出(ensureTopLevelBlockIds)は v1 の値に対して描画ごとに新しい参照を返すので、
+  // draft の値が変わらない限り同じ参照を渡す(エディタ側の差し替え effect を無駄に走らせない)
+  const editorRichTextValue = useMemo(
+    () => (field.type === "richtext" ? asEditorRichTextValue(value) : undefined),
+    [field.type, value],
+  );
   switch (field.type) {
     case "text":
       return (
@@ -623,7 +638,7 @@ function FieldInput({
         <WithDescription description={description}>
           <RichTextEditor
             label={label}
-            value={asRichTextValue(value)}
+            value={editorRichTextValue}
             onChange={onChange}
             mentionCandidates={mentionCandidates}
             errorMessage={error}

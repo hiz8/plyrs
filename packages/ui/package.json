@@ -16,6 +16,7 @@
     "@stylexjs/stylex": "catalog:",
     "@tiptap/core": "catalog:",
     "@tiptap/extension-mention": "catalog:",
+    "@tiptap/extension-unique-id": "catalog:",
     "@tiptap/pm": "catalog:",
     "@tiptap/react": "catalog:",
     "@tiptap/starter-kit": "catalog:",

@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@plyrs/metamodel": "workspace:*",
+    "@plyrs/richtext": "workspace:*",
     "@plyrs/sync-client": "workspace:*",
     "@plyrs/sync-protocol": "workspace:*",
     "@plyrs/ui": "workspace:*",

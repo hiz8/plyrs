@@ -67,23 +67,25 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 ゲート G1: preview と production で、外部の MCP クライアントから PAT で接続し、型の参照・一覧・単体取得ができること。
 `Mcp-Name` 単位の Rate Limiting が入っていること。
 
-### M2 データと操作の土台
+### M2 データと操作の土台 — 完了(2026-11-02)、詳細計画 `2026-11-02-m2-data-and-operations.md`
 
-| PR | 内容 | 論点 | 規模 |
-| --- | --- | --- | --- |
-| M2-1 | 最上位ブロックへの安定 ID 付与(`RICH_TEXT_SCHEMA_VERSION` を metamodel へ移して 2 に、決定的な導出、エディタの ID 拡張)。エディタへ渡す前に必ず導出を通し、`onCreate` の付与が push を起こさないことを確認する。決定 46 | A1 | M |
-| M2-2 | Markdown ⇄ AST の双方向変換と忠実度テスト(`@tiptap/markdown`)。最初に `marked` と `@tiptap/pm` が workerd 上で動くことを確かめる。M1-6 の片方向変換を置き換える | A1・A4 | M |
-| M2-3a | 変更履歴の表と `writeRecord` での記録(区切り規則、actor / via、保持と差分圧縮)。決定 41 | A2・C4 | L |
-| M2-3b | publish と delete の履歴の記録点 | A2 | M |
-| M2-4 | 履歴の操作(`record_history` / `record_compare` / `record_restore`)をカタログに追加 | A2・D3 | M |
-| M2-5 | 管理画面の履歴画面 | A2・C4 | M |
-| M2-6 | 競合判定のモード(`resolveSyncWrite` に判定モード、エージェント経路は strict)。決定 42 | B3 ① | S |
-| M2-7a | 書き込み操作のカタログ移設(create / update / delete / publish / unpublish)。create はクライアント指定 UUIDv7 で冪等 | B1・E3 | L |
-| M2-7b | REST の `PUT /records/...` を `baseFieldVersions` 必須にする | B1・B3 | S |
-| M2-8 | 型とフィールドの description、型単位の執筆ガイド欄 | A3 | M |
-| M2-9 | 下書きを含む全文検索(DO-SQLite FTS5)と `record_search`。決定 43 | A4 | M |
+| PR | 内容 | 論点 | 規模 | 状態 |
+| --- | --- | --- | --- | --- |
+| (計画) | 本書の M2 詳細計画と claude-code-review ワークフローの整形 | — | S | #50 |
+| M2-1 | 最上位ブロックへの安定 ID 付与(`RICH_TEXT_SCHEMA_VERSION` を metamodel へ移して 2 に、決定的な導出、エディタの ID 拡張)。エディタへ渡す前に必ず導出を通し、`onCreate` の付与が push を起こさないことを確認する。決定 46 | A1 | M | #51 |
+| M2-2 | Markdown ⇄ AST の双方向変換と忠実度テスト(`@tiptap/markdown`)。最初に `marked` と `@tiptap/pm` が workerd 上で動くことを確かめる。M1-6 の片方向変換を置き換える | A1・A4 | M | #52 |
+| M2-3a | 変更履歴の表と `writeRecord` での記録(区切り規則、actor / via、保持と差分圧縮)。決定 41 | A2・C4 | L | #53 |
+| M2-3b | publish と delete の履歴の記録点 | A2 | M | #54 |
+| M2-4 | 履歴の操作(`record_history` / `record_compare` / `record_restore`)をカタログに追加 | A2・D3 | M | #55 |
+| M2-5 | 管理画面の履歴画面 | A2・C4 | M | #56 |
+| M2-6 | 競合判定のモード(`resolveSyncWrite` に判定モード、エージェント経路は strict)。決定 42 | B3 ① | S | #57 |
+| M2-7a | 書き込み操作のカタログ移設(create / update / delete / publish / unpublish)。create はクライアント指定 UUIDv7 で冪等 | B1・E3 | L | #58 |
+| M2-7b | REST の `PUT /records/...` を `baseFieldVersions` 必須にする | B1・B3 | S | #59 |
+| M2-8 | 型とフィールドの description、型単位の執筆ガイド欄 | A3 | M | #60 |
+| M2-9 | 下書きを含む全文検索(DO-SQLite FTS5)と `record_search`。決定 43 | A4 | M | #61 |
+| (仕上げ) | ブランチ全体レビューの Important 4 件の修正と本書の更新 | — | M | #62 |
 
-ゲート G2: 全書き込み操作がカタログ経由になり、同期・REST・publish・delete のいずれでも履歴が記録され、管理画面から復元できること。
+ゲート G2(全書き込み操作がカタログ経由になり、同期・REST・publish・delete のいずれでも履歴が記録され、管理画面から復元できること)は M2-4 / M2-5 / M2-7b で満たした。書き込み操作の MCP 公開(tools/list への掲出)は M4-1。
 
 ### M3 OAuth の認証基盤(決定 47〜49 を前提にした分割)
 
@@ -106,7 +108,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | M4-3 | 履歴ツール(history / restore)の公開 | A2・D3 | S |
 | M4-4 | アセット登録(使い切りのアップロードトークン) | D3 | M |
 | M4-5 | URL からのアセット取り込み(SSRF 対策) | D3 | M |
-| M4-6 | 公開前の仕上げ(E2E、/security-review、DO の rows written / read の計測、接続ガイド) | E1〜E4 | M |
+| M4-6 | 公開前の仕上げ(E2E、/security-review、DO の rows written / read の計測(書き込み 1 回の rows read が record 数に比例しないことを含む)、接続ガイド) | E1〜E4 | M |
 
 ゲート G4: 書き込み・競合・スコープ不足の E2E、/security-review の指摘の解消、ツールごとの DO 計測が基準内。
 
@@ -146,7 +148,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | 認可サーバーの方式と置き場(C1) | — | M0-3 | **決定 47** |
 | PAT の検証経路(C1 ④) | — | M0-3 | **決定 49** |
 | MCP エンドポイントのオリジン(D2) | — | M0-3 | **決定 48** |
-| 変更履歴の保持本数・期間、区切り | — | M0-1 | **決定 41**(仮置き、M2-3a で実測) |
+| 変更履歴の保持本数・期間、区切り | — | M0-1 | **決定 41**(M2-3a で実装。本数・期間の妥当性は M4-6 で実測) |
 | DO 側の一覧でフィルタできるフィールドの範囲 | 索引宣言済み + システム列 | M1-2 | 未決 |
 | PAT の有効期限の上限 | 書き込みスコープ付きは短くする | M1-3a | 未決(M1 計画の仮置き: 読み取りのみ 365 日、書き込み付き 90 日) |
 | 旧版プロトコルのクライアントへの対応(廃止済みの `initialize` / `notifications/initialized` を送るクライアントに何を返すか) | 2026-07-28 のみ | M1-5 | 未決 |
@@ -178,15 +180,16 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | フェーズ | 計画 / 結果ファイル | 状態 |
 | --- | --- | --- |
 | M0 | `2026-11-01-m0-2-richtext-spike-result.md`、`2026-11-01-m0-3-oauth-spike-result.md` | 完了(2026-11-01) |
-| M1 | `2026-11-01-m1-readonly-mcp.md` | 計画済み |
-| M2〜M5 | 着手時に作る | — |
+| M1 | `2026-11-01-m1-readonly-mcp.md` | 完了(2026-11-02) |
+| M2 | `2026-11-02-m2-data-and-operations.md` | 完了(2026-11-02) |
+| M3〜M5 | 着手時に作る | — |
 
 ## 7. M1 完了時の申し送り(2026-11-01)
 
 - PR は #39 → #40 → #41 → #42 → #43 → #44 → #45 → #46 のスタック(base が前の PR)。順にマージする
 - **実クライアント確認(2026-11-02)**: #46 までを `main` にマージした後、所有者がローカルの Claude Code から PAT で接続し、型の参照・一覧・単体取得まで一通りのデータを取得できることを確認した(ゲート G1 の接続条件は満たした)。接続先の環境(preview / production)と往復時間は記録していない
 - **未了**: `tools/list` と `record_get` の往復時間(PAT 検証の D1 1 照会を含む)の実測と、Cursor / VS Code / MCP Inspector からの接続確認。`docs/deploy.md` 3.5 節の手順で測って本節に追記する。production は `workflow_dispatch` 後に MCP Inspector でスモーク。`MCP_IP_LIMITER`(600 回 / 60 秒)の上限も同じ実測で見直す
-- M1-6 の Markdown 変換(`apps/api/src/mcp/richtext-markdown.ts`)は ui のエディタの拡張集合(StarterKit + recordMention + assetImage)を api 側に最小複製している。M2-2 で metamodel 側へ寄せて共有し、逆方向(Markdown → JSON)とスキーマ検証を足す。独自ノードの Markdown は M0-2 の仮置き(`[@ recordType=".." recordId=".." label=".."]`、`![label](plyrs://asset/<id>)`)のまま
+- M1-6 の Markdown 変換(`apps/api/src/mcp/richtext-markdown.ts`)は ui のエディタの拡張集合を api 側に最小複製していた。**M2-2 で `@plyrs/richtext` に移し**、逆方向(Markdown → JSON)とスキーマ検証を足した。独自ノードの Markdown は M0-2 の仮置きをそのまま確定(design-spec 16.10)
 - `@tiptap/markdown` は peer を完全一致で要求するため catalog で `3.31.4` に固定。tiptap を上げるときは同時に上げる
 - `tools/list` の `ttlMs` / `cacheScope` は SDK(`@modelcontextprotocol/server` 2.4.0)が一覧全体に 1 つしか持てないため、各操作の `cache` のうち最も保守的な値(現状 0 / private)。`resources/read`(`plyrs://types/{key}`)は `type_get` の 60 秒
 - MCP の入口の Rate Limiting は 2 段: トークン検証の前に接続元 IP 単位(`MCP_IP_LIMITER`、600 回 / 60 秒。未認証の連打で D1 の PAT 照会を起こさないため)、検証の後にテナント・利用者・ツール名単位(`MCP_LIMITER`、60 回 / 60 秒。DO を起こす経路の保護)。IP 単位の上限は NAT 配下の複数利用者を想定して緩めにしてあり、実測で見直す
@@ -200,3 +203,18 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 - M1-5 の MCP サーバーの SDK は `@modelcontextprotocol/server` 2.x(仕様 2026-07-28 対応、stateless Streamable HTTP)+ `@modelcontextprotocol/hono` を第一候補にする。Cloudflare の `agents` は Durable Object にセッションを置く作りで、stateless の方針(16.2)に合わない。版は M1-5 の着手時に `minimumReleaseAge`(7 日)を満たすものを catalog に置く
 - 認可サーバーのオブジェクトは要求ごとに組み立てる(構築コストは無視できる)。`resources` が構築時固定であることが設計の根拠なので、ライブラリの更新でこの制約が外れても issuer のパスでテナントを運ぶ形は変えない(URL だけから決まる単純さを優先)
 - admin の `/login` に `return_to` が無い。M3-2 で足す(同一オリジンの `/oauth/t/` 配下のみ)
+
+## 9. M2 完了時の申し送り(2026-11-02)
+
+- PR は #50 → #51 → … → #61 → #62 のスタック(base が前の PR)。順にマージする。#62 はブランチ全体レビュー(別の視点)の Important 4 件の修正で、対象は M2-1(エディタの再描画)・M2-7a(status の strict 判定)・M2-9(起動時再索引の分割)にまたがる。各 PR 単体では該当の指摘が未修正のまま見える
+- **履歴の data は input 形式**(relations を統合した、同期の `input` と同じ形)。`record_restore` がそのまま書き戻せ、`record_compare` が同期の表現と一致するため。公開版の疑似行は `published_snapshots` から `buildSyncInput` で組み立てる
+- **履歴の畳み込みの起点は版の `created_at`**(直前の書き込みからではなく、版が始まってから 15 分)。publish / unpublish の版は常に区切れ、全文で残り、prune されない。保持本数(100)・期間(365 日)・全文で持つ本数(10)の妥当性は M4-6 で実測する
+- **`record_update` の strict 判定**: `changedFields` の各フィールドで `baseFieldVersions` が現在と違えば conflict(欠けは 0)。加えて `status` を変える更新は `baseFieldVersions` が現在の `fieldVersions` 全体と一致することを要求する(16.6 に追記)。`changedFields: []` で判定を抜けても何も書かれない
+- **REST の応答形の変更(破壊的、16.4)**: `PUT /records/:type/:id` は既存 record の更新で `baseFieldVersions` 必須(新規作成は不要)。応答は `{ ok, record }`(`changedFields` / `applied` は無くなった)。publish は `{ ok, snapshot: { recordId, sourceVersion, publishedAt } }`。未公開の unpublish は 409 ではなく 200(`sourceVersion: null`)。リポジトリ内の消費者は無い。PUT は `getRecord` → `invoke` の 2 RPC で、間に同期 push が割り込むと `already_exists`(安全側)
+- **書き込み操作は `via: ["rest"]`**のまま(tools/list に出ない)。M4-1 で `"mcp"` を足すとき、MCP 入口(`apps/api/src/mcp/server.ts` の `invoke`)は `options.tenantSlug` を渡していないので `record_publish` が「tenant slug is required」で失敗する。M4-1 の最初に直す。`record_update` の `attempt` 引数と conflict 形の `outputSchema` oneOf も M4-1
+- **Markdown → AST の事前検出**(`packages/richtext/src/markdown.ts`)は marked の lexer のトークン走査(table / task 付き list_item / `plyrs://asset/` 以外の image、入れ子も再帰)で `unsupported_markdown` にする(#52 のレビューで正規表現から置き換え。省略形の GFM 表も拾い、コードフェンス内では発火しない)。`AssetImage.parseMarkdown` に届いた外部 URL は `UnsupportedMarkdownError` で業務エラーになる
+- **空の many-relation `[]`** は保存で relations 行が無くなり `buildSyncInput` がキーを出さないため、`record_create` の冪等比較で `already_exists`、`record_compare` で「`[]` → 未設定」と揺れる。正規化で空配列を落とすか `buildSyncInput` が `[]` を返すかを M4-1 で決める
+- **全文検索**: tokenizer は trigram。3 文字以上の語は MATCH、2 文字以下の語を含む問い合わせは LIKE(全走査、limit 付き)。LIKE 経路の snippet は最初の語だけを括る。既存テナントの索引は DO 起動時に 1 歩(200 件)だけ入れ、続きは alarm `search_reindex` で回す。super の `POST /super/v1/tenants/:tenantId/search-reindex` も同じ分割(応答の `done` が false なら続きは alarm)。FTS5 の仮想テーブルは drizzle のスキーマで表せないため `0008_records_fts.sql` だけ手書き(CLAUDE.md に明記)。**FTS の行は `rowid` を `records.rowid` に揃え、張り直し・削除は `rowid` で引く**(UNINDEXED 列の `record_id` で DELETE すると内容表の全走査になり、書き込み 1 回の rows read が record 数に比例する。#61 のレビューで修正)。書き込みごとの行コスト(履歴の UPDATE + FTS の DELETE/INSERT)は **rows written と rows read の両方**を M4-6 で実測する(同種の全走査は rows read 側にしか現れない)。`recordHistory` の prune は毎 INSERT で全履歴行を SELECT しており、COUNT + `updated_at <` に絞れる
+- **エディタ**: v1 の本文を開くと最上位ブロックの ID は導出、入れ子は UniqueID が付ける。差し替え判定は最上位以外の `attrs.id` と末尾の空段落(StarterKit の TrailingNode)を無視する。保存値には TrailingNode の段落は入らない
+- **履歴画面の復元**は応答後に同期で版が届くのを最長 3 秒待って編集画面へ戻る。応答の snapshot で collection を直接 upsert すれば待ちが要らない(見送り)
+- **M1 の未了**(往復時間の実測、Cursor / VS Code / MCP Inspector からの接続確認)は引き続き未了。デプロイ環境が要る

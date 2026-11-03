@@ -40,6 +40,8 @@ export default defineConfig({
     { name: "core-journey", testMatch: /core-journey\.spec\.ts/, dependencies: ["super-console"] },
     { name: "two-tab-sync", testMatch: /two-tab-sync\.spec\.ts/, dependencies: ["core-journey"] },
     { name: "media", testMatch: /media\.spec\.ts/, dependencies: ["core-journey"] },
+    // M2-5: record の履歴画面。テナントは自前(history)
+    { name: "history", testMatch: /history\.spec\.ts/, dependencies: ["core-journey"] },
     // M1-7: MCP のスモーク。テナントは自前で作る(core-journey には bootstrap の順序でだけ依存)
     { name: "mcp-smoke", testMatch: /mcp-smoke\.spec\.ts/, dependencies: ["core-journey"] },
   ],

@@ -1,4 +1,7 @@
+import { HISTORY_OPERATIONS } from "./history";
 import { READ_OPERATIONS } from "./read";
+import { SEARCH_OPERATIONS } from "./search";
+import { WRITE_OPERATIONS } from "./write";
 import type { OpSpec } from "./spec";
 
 export { defineOperation, type OpSpec, type Via } from "./spec";
@@ -10,7 +13,12 @@ export { defineOperation, type OpSpec, type Via } from "./spec";
 // 型と defineOperation は spec.ts にある(操作モジュールはそちらだけを import する)。
 
 // 宣言順 = tools/list の順序(決定的。Review Focus 6)。M2 以降は書き込み・履歴の操作をここに足す
-export const OPERATIONS: readonly OpSpec[] = [...READ_OPERATIONS];
+export const OPERATIONS: readonly OpSpec[] = [
+  ...READ_OPERATIONS,
+  ...SEARCH_OPERATIONS,
+  ...HISTORY_OPERATIONS,
+  ...WRITE_OPERATIONS,
+];
 
 export function findOperation(name: string): OpSpec | undefined {
   return OPERATIONS.find((op) => op.name === name);

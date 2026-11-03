@@ -100,6 +100,16 @@ describe("設定 › コンテンツタイプ(編集)", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("執筆ガイドを書いて保存すると writingGuide が PUT に入る(M2-8)", async () => {
+    const { puts, putBody } = setup();
+    const user = userEvent.setup();
+    await screen.findByRole("row", { name: /タイトル/ });
+    await user.type(screen.getByRole("textbox", { name: "執筆ガイド" }), "見出しは 1 つ。");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(puts()).toHaveLength(1));
+    expect(putBody()).toMatchObject({ writingGuide: "見出しは 1 つ。" });
+  });
+
   it("保存が 409 なら利用者向けの文のトーストを出して画面に留まる", async () => {
     const { puts, router } = setup({ put: () => jsonResponse(409, { error: "key_mismatch" }) });
     const user = userEvent.setup();

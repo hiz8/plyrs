@@ -26,6 +26,8 @@ export {
   type SlotRegistry,
 } from "./slots";
 export {
+  BLOCK_ID_ATTR_NAME,
+  RICH_TEXT_HEADING_LEVELS,
   RICH_TEXT_SCHEMA_VERSION,
   RichTextEditor,
   type RichTextEditorProps,

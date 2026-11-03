@@ -438,7 +438,8 @@ describe("RecordForm dirty-only 保存(§12 必須②)", () => {
       schemaVersion: number;
       doc: { content: Array<{ type: string }> };
     };
-    expect(body.schemaVersion).toBe(1);
+    // M2-1: エディタは版 2(最上位ブロックに ID)で返す
+    expect(body.schemaVersion).toBe(2);
     expect(body.doc.content[0]?.type).toBe("heading");
   });
 });

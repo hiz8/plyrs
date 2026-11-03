@@ -1,5 +1,6 @@
 import {
   buildRecordInputSchema,
+  ensureRecordBlockIds,
   extractBodyRelations,
   uuidSchema,
   WORKFLOW_STATUSES,
@@ -9,7 +10,9 @@ import {
 import { assetGuardHook } from "./asset-guard";
 import { issuesToMessage, rowToDefinition, type ContentTypeRow } from "./content-types";
 import { computeChangeSet } from "./diff";
+import { recordHistory } from "./history";
 import { runBeforeWriteHooks, type BeforeWriteHook } from "./hooks";
+import { indexRecord, searchText } from "./search";
 import { moduleBeforeWriteHooks } from "../modules/hooks";
 import { emitModuleEvents } from "../modules/events";
 import { uniqueCheckHook } from "./unique-check";
@@ -83,6 +86,9 @@ const systemBeforeWriteHooks: readonly BeforeWriteHook[] = [assetGuardHook, uniq
 
 export interface WriteOptions {
   systemWrite?: boolean;
+  // record_restore(M2-4): 削除済み record の復元は data が同じでも書き込みとして扱う
+  // (deleted_at を戻した変更を seq に乗せて同期へ流すため)
+  force?: boolean;
 }
 
 export function writeRecordCore(
@@ -111,6 +117,10 @@ export function writeRecordCore(
   if (!parsed.success) {
     return { ok: false, code: "validation_failed", message: issuesToMessage(parsed.error.issues) };
   }
+  // M2-1(決定 44): リッチテキストの最上位ブロックに安定 ID を永続化する(v1 は版 2 に上がる)。
+  // 一括変換はせず、書き込まれた record からこの形になる。重複 ID の振り直しもここで行う
+  // (エディタの insertContent 経路や MCP の record_update は重複を解消しないため)。
+  const input = ensureRecordBlockIds(definition, parsed.data as Record<string, unknown>).data;
 
   const prev = loadRecord(deps.sql, params.recordId);
   if (prev !== null && prev.deletedAt !== null) {
@@ -126,12 +136,7 @@ export function writeRecordCore(
 
   const prevRelations =
     prev === null ? new Map<string, RelationRef[]>() : loadRelationRefs(deps.sql, params.recordId);
-  const change = computeChangeSet(
-    definition,
-    parsed.data as Record<string, unknown>,
-    prev?.data ?? null,
-    prevRelations,
-  );
+  const change = computeChangeSet(definition, input, prev?.data ?? null, prevRelations);
 
   const nextStatus: WorkflowStatus = params.status ?? prev?.status ?? "draft";
   const statusChanged = prev !== null && nextStatus !== prev.status;
@@ -147,7 +152,8 @@ export function writeRecordCore(
     change.dataChanged ||
     change.changedFields.length > 0 ||
     statusChanged ||
-    staleRelationFieldRemoved;
+    staleRelationFieldRemoved ||
+    options.force === true;
   if (!applied && prev !== null) {
     return { ok: true, record: prev, changedFields: [], applied: false };
   }
@@ -211,6 +217,22 @@ export function writeRecordCore(
     );
   }
 
+  // 16.5(M2-3a): 変更履歴。区切り・畳み込み・差分圧縮・保持は history.ts が担う。
+  // data は relations を統合した input 形式(record_restore がそのまま書き戻せる形)
+  recordHistory(deps.sql, now, {
+    recordId: params.recordId,
+    kind: params.restoredFrom === undefined ? "write" : "restore",
+    version,
+    status: nextStatus,
+    data: input,
+    fieldVersions,
+    actor: params.actor,
+    via: params.via,
+    tokenId: params.tokenId,
+    clientId: params.clientId,
+    restoredFrom: params.restoredFrom,
+  });
+
   // relations は派生データ: この record の field 由来行を全消しして張り直す（design-spec §6）。
   // 型定義から外れた旧フィールドの残骸もここで一掃される。
   deps.sql.exec("DELETE FROM relations WHERE source_id = ? AND origin = 'field'", params.recordId);
@@ -246,6 +268,9 @@ export function writeRecordCore(
       );
     });
   }
+
+  // 16.9(M2-9): 全文検索の索引は records の派生データとして同じトランザクションで張り直す
+  indexRecord(deps.sql, params.recordId, contentType.key, searchText(definition, change.data));
 
   // §9.4 ステップ5: afterWrite はコミットと同一トランザクションで積む(送出は呼び出し元)。
   if (deps.newEventId !== undefined) {

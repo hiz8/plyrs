@@ -160,12 +160,25 @@ describe("特権テナント運用 一気通貫 (Phase 10)", () => {
 
     // 5. record を archive(status 変更)→ GET health に現れる
     // (publish 済みスナップショットは status 変更の影響を受けない — design-spec §7)
+    // M2-7b: 既存 record の更新は baseFieldVersions 必須(16.6)。現在値を GET で取る
+    const currentRes = await app.request(
+      `/v1/t/${tenantId}/records/${recordId}`,
+      { headers: ownerAuth },
+      e,
+    );
+    const { fieldVersions } = (await currentRes.json()) as {
+      fieldVersions: Record<string, number>;
+    };
     const archiveRes = await app.request(
       `/v1/t/${tenantId}/records/article/${recordId}`,
       {
         method: "PUT",
         headers: { "content-type": "application/json", ...ownerAuth },
-        body: JSON.stringify({ input: validArticleInput(), status: "archived" }),
+        body: JSON.stringify({
+          input: validArticleInput(),
+          status: "archived",
+          baseFieldVersions: fieldVersions,
+        }),
       },
       e,
     );

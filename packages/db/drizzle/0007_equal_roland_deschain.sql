@@ -1,0 +1,1 @@
+ALTER TABLE `content_types` ADD `writing_guide` text;

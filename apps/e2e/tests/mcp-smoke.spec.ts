@@ -99,6 +99,9 @@ test("PAT を発行して MCP から型と record を読む", async ({ page }) =
     "type_get",
     "record_list",
     "record_get",
+    "record_search",
+    "record_history",
+    "record_compare",
   ]);
 
   const records = await result(
@@ -123,6 +126,17 @@ test("PAT を発行して MCP から型と record を読む", async ({ page }) =
     true,
   );
   expect(record["structuredContent"]).toMatchObject({ type: "article", data: { title } });
+
+  // 16.9(M2-9): 全文検索はタイトルの語で見つかり、該当箇所を snippet で返す
+  const found = await result(
+    await rpc(page.request, endpoint, token, "tools/call", {
+      name: "record_search",
+      arguments: { query: "MCP" },
+    }),
+  );
+  const hits = (found["structuredContent"] as { items: { id: string; snippet: string }[] }).items;
+  expect(hits.map((hit) => hit.id)).toEqual([items[0]?.id]);
+  expect(hits[0]?.snippet).toContain("[MCP]");
 
   // 形だけ合っていて存在しないトークンは 401(WWW-Authenticate に PRM の URL)
   const bogus = await rpc(page.request, endpoint, `plyrs_pat_${"x".repeat(43)}`, "tools/list");

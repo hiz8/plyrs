@@ -47,6 +47,7 @@ export function authedRoutes(overrides: Record<string, Handler> = {}): Record<st
             titleField: null,
             listColumns: null,
             menuOrder: null,
+            writingGuide: null,
           },
         ],
       }),

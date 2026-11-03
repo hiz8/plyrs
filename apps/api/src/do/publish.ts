@@ -7,6 +7,8 @@ import {
   type PublishedSnapshot,
 } from "../projection/payload";
 import { loadContentTypeByKey } from "./content-types";
+import { recordHistory, type HistoryActor } from "./history";
+import { loadRecordInput } from "../sync/records";
 import { emitModuleEvents } from "../modules/events";
 import { enqueueOutbox } from "./outbox";
 import type { RecordSnapshot } from "./types";
@@ -20,6 +22,9 @@ export interface PublishDeps {
   // 順序トークンになれない（unpublish→無編集republish が同じ version の upsert/delete を生む）。
   // publish・unpublish は必ずこれで新しい publish_seq を採る。
   nextPublishSeq: () => number;
+  // 16.5(M2-3b): 誰がどの経路で publish / unpublish したか。省くと履歴を書かない(delete からの
+  // cascadeUnpublish は delete の版と重複するので省く)
+  history?: HistoryActor;
 }
 
 export type PublishResult =
@@ -82,8 +87,8 @@ function writeSnapshot(
   deps: PublishDeps,
   record: RecordSnapshot,
   relations: ProjectionRelationRow[],
-  actor: string,
 ): PublishedSnapshot {
+  const actor = deps.history?.actor ?? "system";
   const now = deps.now();
   const publishSeq = deps.nextPublishSeq();
   const snapshot: PublishedSnapshot = {
@@ -116,6 +121,19 @@ function writeSnapshot(
     snapshot.publishSeq,
     now,
   );
+  // 16.5: publish の版。records.version は進まないので source_version で公開版を識別する
+  if (deps.history !== undefined) {
+    recordHistory(deps.sql, now, {
+      ...deps.history,
+      recordId: record.id,
+      kind: "publish",
+      version: record.version,
+      sourceVersion: record.version,
+      status: record.status,
+      data: loadRecordInput(deps.sql, record),
+      fieldVersions: record.fieldVersions,
+    });
+  }
   return snapshot;
 }
 
@@ -145,12 +163,13 @@ function buildAssetEmbed(sql: SqlStorage, tenantSlug: string, assetId: string): 
   };
 }
 
+// actor は deps.history.actor(M2-3b で引数から統合)
 export function publishRecordCore(
-  deps: PublishDeps,
+  deps: PublishDeps & { history: HistoryActor },
   recordId: string,
-  actor: string,
   tenantSlug: string,
 ): PublishResult {
+  const actor = deps.history.actor;
   const record = loadRecord(deps.sql, recordId);
   if (record === null) {
     return { ok: false, code: "not_found", message: `record not found: ${recordId}` };
@@ -186,7 +205,7 @@ export function publishRecordCore(
     if (asset === null || asset.deletedAt !== null || asset.type !== ASSET_TYPE_KEY) {
       continue; // dangling は正常系(ソフト参照)
     }
-    writeSnapshot(deps, asset, loadRelationRows(deps.sql, assetId), actor);
+    writeSnapshot(deps, asset, loadRelationRows(deps.sql, assetId));
   }
 
   // 決定 4: snapshotEmbed "value" のフィールド由来行へ publish 時点の値を埋め込む。body 由来の asset
@@ -204,7 +223,7 @@ export function publishRecordCore(
       ? { ...row, embed: buildAssetEmbed(deps.sql, tenantSlug, row.targetId) }
       : row,
   );
-  const snapshot = writeSnapshot(deps, record, frozen, actor);
+  const snapshot = writeSnapshot(deps, record, frozen);
   // §9.4 ステップ5: afterPublish はコミットと同一トランザクションで積む(送出は呼び出し元)。
   // unpublish には emit しない(スコープは afterWrite / afterPublish の 2 種)。
   emitModuleEvents(deps.sql, deps.newId, deps.now(), "afterPublish", record.type, recordId, actor);
@@ -221,6 +240,20 @@ export function unpublishRecordCore(deps: PublishDeps, recordId: string): Unpubl
     return { ok: false, code: "not_published", message: `record is not published: ${recordId}` };
   }
   deps.sql.exec("DELETE FROM published_snapshots WHERE record_id = ?", recordId);
+  // 16.5: unpublish の版(現在の record の本文を全文で持つ。保持上限でも消えない)
+  const record = deps.history === undefined ? null : loadRecord(deps.sql, recordId);
+  if (deps.history !== undefined && record !== null) {
+    recordHistory(deps.sql, deps.now(), {
+      ...deps.history,
+      recordId,
+      kind: "unpublish",
+      version: record.version,
+      sourceVersion: row.source_version,
+      status: record.status,
+      data: loadRecordInput(deps.sql, record),
+      fieldVersions: record.fieldVersions,
+    });
+  }
   // CRITICAL fix: delete ジョブには snapshot の publish_seq を使い回さず、必ず新しい publish_seq を採る。
   // これにより「後から republish された upsert」は常にこの delete より新しい番号を持ち、
   // 遅れて届いた delete が republish 後の公開用 DB の行を消せなくなる（§12.3）。

@@ -5,8 +5,9 @@ import type { Operation } from "../auth/permissions";
 // 操作モジュール(宣言 + 実装)の両方から参照されるので、どちらにも依存しないこのファイルに置く
 // (read.ts → catalog.ts → read.ts の循環 import は評価順によって TDZ エラーになる)。
 
-// 経路(用語集「経路(via)」): 書き込み・読み取りがどこから来たか。トークンの種別(tokenKind)とは別
-export type Via = "sync" | "mcp" | "rest";
+// 経路(用語集「経路(via)」)の列挙は @plyrs/sync-protocol が正本(履歴・判定モードと共通。M2-3a)
+import type { Via } from "@plyrs/sync-protocol";
+export type { Via };
 
 // 名前は `Operation`(権限の語)と衝突するため OpSpec
 export interface OpSpec<I extends z.ZodType = z.ZodType, O extends z.ZodType = z.ZodType> {
@@ -20,6 +21,9 @@ export interface OpSpec<I extends z.ZodType = z.ZodType, O extends z.ZodType = z
   hints: { readOnly: boolean; destructive: boolean; idempotent: boolean; openWorld: false };
   // tools/list の ttlMs / cacheScope(仕様 2026-07-28)。null は付けない
   cache: { ttlMs: number; cacheScope: "public" | "private" } | null;
+  // 公開 URL の組み立てにテナントの slug が要る操作(record_publish)。REST の入口はこのときだけ
+  // D1 から slug を引く(M2-4)
+  needsTenantSlug?: true;
 }
 
 export function defineOperation<I extends z.ZodType, O extends z.ZodType>(
