@@ -41,21 +41,52 @@ export function searchText(
   return parts.join(" ");
 }
 
-export function indexRecord(sql: SqlStorage, recordId: string, type: string, text: string): void {
-  sql.exec("DELETE FROM records_fts WHERE record_id = ?", recordId);
+// FTS5 は全文索引を持つ列(text)にしか索引を持たず、UNINDEXED 列(record_id)での DELETE は
+// 内容表の全走査になる(書き込み 1 回の rows read がテナントの record 数に比例してしまう。第 3 章)。
+// そこで FTS の rowid を records の rowid に揃え、張り直しと削除は rowid(FTS5 の主キー、O(log N))で行う。
+// records.rowid は id(PRIMARY KEY)から O(log N) で引ける
+function recordRowid(sql: SqlStorage, recordId: string): number | null {
+  const row = sql
+    .exec<{ rowid: number }>("SELECT rowid FROM records WHERE id = ?", recordId)
+    .toArray()[0];
+  return row === undefined ? null : row.rowid;
+}
+
+function writeIndexRow(
+  sql: SqlStorage,
+  rowid: number,
+  recordId: string,
+  type: string,
+  text: string,
+): void {
+  sql.exec("DELETE FROM records_fts WHERE rowid = ?", rowid);
   sql.exec(
-    "INSERT INTO records_fts (record_id, type, text) VALUES (?, ?, ?)",
+    "INSERT INTO records_fts (rowid, record_id, type, text) VALUES (?, ?, ?, ?)",
+    rowid,
     recordId,
     type,
     text,
   );
 }
 
+export function indexRecord(sql: SqlStorage, recordId: string, type: string, text: string): void {
+  const rowid = recordRowid(sql, recordId);
+  if (rowid === null) {
+    return;
+  }
+  writeIndexRow(sql, rowid, recordId, type, text);
+}
+
 export function removeFromIndex(sql: SqlStorage, recordId: string): void {
-  sql.exec("DELETE FROM records_fts WHERE record_id = ?", recordId);
+  const rowid = recordRowid(sql, recordId);
+  if (rowid === null) {
+    return;
+  }
+  sql.exec("DELETE FROM records_fts WHERE rowid = ?", rowid);
 }
 
 interface IndexRow extends Record<string, SqlStorageValue> {
+  rowid: number;
   id: string;
   type: string;
   data: string;
@@ -102,7 +133,7 @@ export function startReindex(sql: SqlStorage): void {
 
 // カーソル(seq)から batch 件を現在の型定義で抽出し直す。型が無い record は索引から外す。
 // 途中で書かれた record は seq が進んでカーソルより後ろに来るので、次の歩で改めて索引される
-// (indexRecord は DELETE → INSERT なので二重にならない)。完了したら '1' を書く。
+// (索引の行は rowid で張り直すので二重にならない)。完了したら '1' を書く。
 // 戻り値: 完了済みなら null、それ以外は今回入れた件数と完了したか
 export function reindexStep(
   sql: SqlStorage,
@@ -118,7 +149,7 @@ export function reindexStep(
   );
   const rows = sql
     .exec<IndexRow>(
-      "SELECT id, type, data, seq FROM records WHERE deleted_at IS NULL AND seq > ? ORDER BY seq LIMIT ?",
+      "SELECT rowid, id, type, data, seq FROM records WHERE deleted_at IS NULL AND seq > ? ORDER BY seq LIMIT ?",
       from,
       batch,
     )
@@ -130,7 +161,7 @@ export function reindexStep(
       continue;
     }
     const data = JSON.parse(row.data) as Record<string, unknown>;
-    indexRecord(sql, row.id, row.type, searchText(definition, data));
+    writeIndexRow(sql, row.rowid, row.id, row.type, searchText(definition, data));
     indexed += 1;
   }
   const done = rows.length < batch;
@@ -211,7 +242,8 @@ export function searchRecords(sql: SqlStorage, query: SearchQuery): { items: Sea
   if (terms.length === 0) {
     return { items: [] };
   }
-  const useMatch = terms.every((term) => term.length >= SEARCH_MATCH_MIN_LENGTH);
+  // 文字数はコードポイントで数える(サロゲートペアを含む 2 文字の語を MATCH に回すと 0 件になる)
+  const useMatch = terms.every((term) => [...term].length >= SEARCH_MATCH_MIN_LENGTH);
   const typeFilter = query.type === undefined ? "" : " AND f.type = ?";
   const typeBinds = query.type === undefined ? [] : [query.type];
   const columns = "r.id, r.type, r.status, r.seq, r.version, r.updated_at, r.data, f.text";
@@ -219,7 +251,7 @@ export function searchRecords(sql: SqlStorage, query: SearchQuery): { items: Sea
   if (useMatch) {
     rows = sql
       .exec<SearchRow>(
-        `SELECT ${columns}, snippet(records_fts, 2, '[', ']', '…', 12) AS snippet FROM records_fts f JOIN records r ON r.id = f.record_id WHERE records_fts MATCH ?${typeFilter} AND r.deleted_at IS NULL ORDER BY rank, r.updated_at DESC LIMIT ?`,
+        `SELECT ${columns}, snippet(records_fts, 2, '[', ']', '…', 12) AS snippet FROM records_fts f JOIN records r ON r.rowid = f.rowid WHERE records_fts MATCH ?${typeFilter} AND r.deleted_at IS NULL ORDER BY rank, r.updated_at DESC LIMIT ?`,
         matchExpression(terms),
         ...typeBinds,
         query.limit,
@@ -229,7 +261,7 @@ export function searchRecords(sql: SqlStorage, query: SearchQuery): { items: Sea
     const likes = terms.map(() => "f.text LIKE ? ESCAPE '\\'").join(" AND ");
     rows = sql
       .exec<SearchRow>(
-        `SELECT ${columns}, NULL AS snippet FROM records_fts f JOIN records r ON r.id = f.record_id WHERE ${likes}${typeFilter} AND r.deleted_at IS NULL ORDER BY r.updated_at DESC LIMIT ?`,
+        `SELECT ${columns}, NULL AS snippet FROM records_fts f JOIN records r ON r.rowid = f.rowid WHERE ${likes}${typeFilter} AND r.deleted_at IS NULL ORDER BY r.updated_at DESC LIMIT ?`,
         ...terms.map((term) => `%${escapeLike(term)}%`),
         ...typeBinds,
         query.limit,

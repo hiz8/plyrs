@@ -139,12 +139,58 @@ describe("record_search", () => {
     expect((await search({ query: "散歩" })).items.map((i) => i.id)).toEqual([FIRST]);
   });
 
+  it("サロゲートペアを含む 2 文字の語(𠮷野)は LIKE に落ちて見つかる(コードポイントで数える)", async () => {
+    const THIRD = uuid(763);
+    await write(THIRD, {
+      ...validArticleInput(),
+      title: "𠮷野の記録",
+      slug: "yoshino",
+      body: { schemaVersion: 1, doc: paragraph("別の本文。") },
+    });
+    expect((await search({ query: "𠮷野" })).items.map((i) => i.id)).toEqual([THIRD]);
+    expect(asDeleteResult(await stub.deleteRecord(THIRD, owner)).ok).toBe(true);
+  });
+
   it("record:read が無ければ insufficient_scope", async () => {
     const result = asInvokeResult(
       await stub.invoke("record_search", { query: "本文" }, mcpAuth({ scopes: [] })),
     );
     expect(result.ok).toBe(false);
     expect(!result.ok && result.code).toBe("insufficient_scope");
+  });
+});
+
+describe("索引の行", () => {
+  it("records_fts の rowid は records の rowid に揃い、張り直し・削除は rowid で引く(全走査しない)", async () => {
+    await runInDurableObject(stub, (_instance, state) => {
+      const sql = state.storage.sql;
+      const rows = sql
+        .exec<{ fts_rowid: number; record_rowid: number }>(
+          "SELECT f.rowid AS fts_rowid, r.rowid AS record_rowid FROM records_fts f JOIN records r ON r.id = f.record_id",
+        )
+        .toArray();
+      const live = sql
+        .exec<{ n: number }>("SELECT COUNT(*) AS n FROM records WHERE deleted_at IS NULL")
+        .one().n;
+      expect(rows).toHaveLength(live);
+      for (const row of rows) {
+        expect(row.fts_rowid).toBe(row.record_rowid);
+      }
+      // UNINDEXED 列での DELETE は内容表の全走査になるが、rowid なら主キー検索。FTS5 の計画は
+      // どちらも SCAN と表示されるため、idxStr(INDEX 0:<制約>)で見分ける。'=' は rowid の等値制約、
+      // 空は制約なし(全走査)
+      const plan = (column: string) =>
+        sql
+          .exec<{ detail: string }>(
+            `EXPLAIN QUERY PLAN DELETE FROM records_fts WHERE ${column} = ?`,
+            column === "rowid" ? 1 : "x",
+          )
+          .toArray()
+          .map((r) => r.detail)
+          .join(" ");
+      expect(plan("record_id")).toMatch(/INDEX 0:$/);
+      expect(plan("rowid")).toContain("INDEX 0:=");
+    });
   });
 });
 

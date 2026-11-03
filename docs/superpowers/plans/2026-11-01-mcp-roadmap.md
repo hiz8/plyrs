@@ -108,7 +108,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | M4-3 | 履歴ツール(history / restore)の公開 | A2・D3 | S |
 | M4-4 | アセット登録(使い切りのアップロードトークン) | D3 | M |
 | M4-5 | URL からのアセット取り込み(SSRF 対策) | D3 | M |
-| M4-6 | 公開前の仕上げ(E2E、/security-review、DO の rows written / read の計測、接続ガイド) | E1〜E4 | M |
+| M4-6 | 公開前の仕上げ(E2E、/security-review、DO の rows written / read の計測(書き込み 1 回の rows read が record 数に比例しないことを含む)、接続ガイド) | E1〜E4 | M |
 
 ゲート G4: 書き込み・競合・スコープ不足の E2E、/security-review の指摘の解消、ツールごとの DO 計測が基準内。
 
@@ -212,9 +212,9 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 - **`record_update` の strict 判定**: `changedFields` の各フィールドで `baseFieldVersions` が現在と違えば conflict(欠けは 0)。加えて `status` を変える更新は `baseFieldVersions` が現在の `fieldVersions` 全体と一致することを要求する(16.6 に追記)。`changedFields: []` で判定を抜けても何も書かれない
 - **REST の応答形の変更(破壊的、16.4)**: `PUT /records/:type/:id` は既存 record の更新で `baseFieldVersions` 必須(新規作成は不要)。応答は `{ ok, record }`(`changedFields` / `applied` は無くなった)。publish は `{ ok, snapshot: { recordId, sourceVersion, publishedAt } }`。未公開の unpublish は 409 ではなく 200(`sourceVersion: null`)。リポジトリ内の消費者は無い。PUT は `getRecord` → `invoke` の 2 RPC で、間に同期 push が割り込むと `already_exists`(安全側)
 - **書き込み操作は `via: ["rest"]`**のまま(tools/list に出ない)。M4-1 で `"mcp"` を足すとき、MCP 入口(`apps/api/src/mcp/server.ts` の `invoke`)は `options.tenantSlug` を渡していないので `record_publish` が「tenant slug is required」で失敗する。M4-1 の最初に直す。`record_update` の `attempt` 引数と conflict 形の `outputSchema` oneOf も M4-1
-- **Markdown → AST の事前検出**(`packages/richtext/src/markdown.ts`)は正規表現で table / task list などの非対応構文を `unsupported_markdown` にするが、コードフェンス内でも発火し、外側パイプ無しの GFM 表は見逃す。M4 で書き込みに繋ぐ前にフェンス区間を読み飛ばす
+- **Markdown → AST の事前検出**(`packages/richtext/src/markdown.ts`)は marked の lexer のトークン走査(table / task 付き list_item / `plyrs://asset/` 以外の image、入れ子も再帰)で `unsupported_markdown` にする(#52 のレビューで正規表現から置き換え。省略形の GFM 表も拾い、コードフェンス内では発火しない)。`AssetImage.parseMarkdown` に届いた外部 URL は `UnsupportedMarkdownError` で業務エラーになる
 - **空の many-relation `[]`** は保存で relations 行が無くなり `buildSyncInput` がキーを出さないため、`record_create` の冪等比較で `already_exists`、`record_compare` で「`[]` → 未設定」と揺れる。正規化で空配列を落とすか `buildSyncInput` が `[]` を返すかを M4-1 で決める
-- **全文検索**: tokenizer は trigram。3 文字以上の語は MATCH、2 文字以下の語を含む問い合わせは LIKE(全走査、limit 付き)。LIKE 経路の snippet は最初の語だけを括る。既存テナントの索引は DO 起動時に 1 歩(200 件)だけ入れ、続きは alarm `search_reindex` で回す。super の `POST /super/v1/tenants/:tenantId/search-reindex` も同じ分割(応答の `done` が false なら続きは alarm)。FTS5 の仮想テーブルは drizzle のスキーマで表せないため `0008_records_fts.sql` だけ手書き(CLAUDE.md に明記)。書き込みごとの行コスト(履歴の UPDATE + FTS の DELETE/INSERT)は M4-6 で実測。`recordHistory` の prune は毎 INSERT で全履歴行を SELECT しており、COUNT + `updated_at <` に絞れる
+- **全文検索**: tokenizer は trigram。3 文字以上の語は MATCH、2 文字以下の語を含む問い合わせは LIKE(全走査、limit 付き)。LIKE 経路の snippet は最初の語だけを括る。既存テナントの索引は DO 起動時に 1 歩(200 件)だけ入れ、続きは alarm `search_reindex` で回す。super の `POST /super/v1/tenants/:tenantId/search-reindex` も同じ分割(応答の `done` が false なら続きは alarm)。FTS5 の仮想テーブルは drizzle のスキーマで表せないため `0008_records_fts.sql` だけ手書き(CLAUDE.md に明記)。**FTS の行は `rowid` を `records.rowid` に揃え、張り直し・削除は `rowid` で引く**(UNINDEXED 列の `record_id` で DELETE すると内容表の全走査になり、書き込み 1 回の rows read が record 数に比例する。#61 のレビューで修正)。書き込みごとの行コスト(履歴の UPDATE + FTS の DELETE/INSERT)は **rows written と rows read の両方**を M4-6 で実測する(同種の全走査は rows read 側にしか現れない)。`recordHistory` の prune は毎 INSERT で全履歴行を SELECT しており、COUNT + `updated_at <` に絞れる
 - **エディタ**: v1 の本文を開くと最上位ブロックの ID は導出、入れ子は UniqueID が付ける。差し替え判定は最上位以外の `attrs.id` と末尾の空段落(StarterKit の TrailingNode)を無視する。保存値には TrailingNode の段落は入らない
 - **履歴画面の復元**は応答後に同期で版が届くのを最長 3 秒待って編集画面へ戻る。応答の snapshot で collection を直接 upsert すれば待ちが要らない(見送り)
 - **M1 の未了**(往復時間の実測、Cursor / VS Code / MCP Inspector からの接続確認)は引き続き未了。デプロイ環境が要る
