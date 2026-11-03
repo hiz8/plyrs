@@ -211,6 +211,15 @@ describe("asset_upload とアップロード URL", () => {
     expect(res.status).toBe(413);
   });
 
+  it("存在しないテナントのパスは DO を起こさずに 404", async () => {
+    const url = await issueUpload(a);
+    const ghost = crypto.randomUUID();
+    const moved = url.replace(`/mcp/t/${a.tenantId}/`, `/mcp/t/${ghost}/`);
+    expect((await post(moved, PNG)).status).toBe(404);
+    // 元のテナントのトークンは使われていない
+    expect((await post(url, PNG)).status).toBe(201);
+  });
+
   it("Origin 付きの POST と、形の違うトークンは拒否する", async () => {
     const url = await issueUpload(a);
     expect((await post(url, PNG, { origin: "https://evil.example" })).status).toBe(403);

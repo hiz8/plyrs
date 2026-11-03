@@ -1,3 +1,6 @@
+import { tenants } from "@plyrs/db/control-plane";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
 import { isBlocked, isMembershipBlocked } from "../auth/blocklist";
 import { sha256Hex } from "../auth/session";
@@ -7,7 +10,7 @@ import { asClaimAssetUploadResult } from "../rpc-unwrap";
 // design-spec 16.11(M4-4、決定 51): asset_upload が発行した URL への本文の受け取り。
 // Authorization は見ない(URL のトークンが使い切りの資格)。入口の順序:
 // Origin が付いていれば拒否(ブラウザからの直接 POST を想定しない)→ 接続元 IP の Rate Limiting →
-// トークンの形 → Content-Length の前検査(413)→ DO で使い切りの印を立てる(無い 404、期限切れ・使用済み 410)
+// トークンの形 → Content-Length の前検査(413)→ D1 でテナントの存在(404)→ DO で使い切りの印を立てる(無い 404、期限切れ・使用済み 410)
 // → BLOCKLIST の 2 キー(発行後に BAN された利用者は 403)→ 本文を上限付きで読む → storeAsset → 201
 
 const RETRY_AFTER_SECONDS = "60";
@@ -42,6 +45,18 @@ export const uploadRoutes = new Hono<{ Bindings: Env }>().all(
       return c.json({ error: "too_large" }, 413);
     }
     const tenantId = c.req.param("tenantId");
+    // 未認証の入口なので、D1 にあるテナントだけ DO を起こす(任意の tenantId で DO を作らせない。
+    // DO は起こすだけで migrations を走らせ、ストレージを残す)
+    const tenant = (
+      await drizzle(c.env.DB)
+        .select({ id: tenants.id })
+        .from(tenants)
+        .where(eq(tenants.id, tenantId))
+        .limit(1)
+    )[0];
+    if (tenant === undefined) {
+      return c.json({ error: "not_found" }, 404);
+    }
     const stub = c.env.TENANT_DO.get(c.env.TENANT_DO.idFromName(tenantId));
     const claimed = asClaimAssetUploadResult(await stub.claimAssetUpload(await sha256Hex(token)));
     if (!claimed.ok) {
