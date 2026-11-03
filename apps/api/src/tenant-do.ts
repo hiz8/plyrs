@@ -37,6 +37,11 @@ import {
   SEARCH_REINDEX_STEP_DELAY_MS,
   startReindex,
 } from "./do/search";
+import {
+  claimAssetUploadCore,
+  createAssetUploadCore,
+  type ClaimAssetUploadResult,
+} from "./do/asset-uploads";
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
 import { ensureAssetContentType } from "./do/ensure-asset-type";
 import { healthCheckCore, listAssetR2KeysCore, type HealthReport } from "./do/health";
@@ -404,6 +409,47 @@ export class TenantDO extends DurableObject<Env> {
       }
     }
     return result;
+  }
+
+  // design-spec 16.11(M4-4): MCP の asset_upload が発行したアップロードトークンの行を置く。トークンの
+  // 原文とハッシュは Worker が作る(invoke の操作は同期なので SHA-256 を計算できない)。判定の順序は
+  // invoke と同じ: テナント境界 → スコープ → ロール
+  async createAssetUpload(
+    params: { tokenHash: string; filename: string; contentType: string; expiresAt: string },
+    auth: McpAuth,
+  ): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+    let tenantId = this.tenantId();
+    if (tenantId === null) {
+      this.rememberTenant(auth.tenantId);
+      tenantId = auth.tenantId;
+    }
+    if (auth.tenantId !== tenantId) {
+      return { ok: false, code: "forbidden", message: "auth context belongs to another tenant" };
+    }
+    if (!auth.scopes.includes("record:write")) {
+      return {
+        ok: false,
+        code: "insufficient_scope",
+        message: "token scope does not include record:write",
+      };
+    }
+    const denial = requireOperation(auth, "record:write");
+    if (denial !== null) {
+      return denial;
+    }
+    createAssetUploadCore(
+      this.ctx.storage.sql,
+      { ...params, userId: auth.userId, role: auth.role, tokenId: auth.tokenId },
+      new Date().toISOString(),
+    );
+    return { ok: true };
+  }
+
+  // 受け取り(POST /mcp/t/:tenantId/uploads/:token)。使い切りの印を立ててから発行者を返す
+  async claimAssetUpload(tokenHash: string): Promise<ClaimAssetUploadResult> {
+    return this.ctx.storage.transactionSync(() =>
+      claimAssetUploadCore(this.ctx.storage.sql, tokenHash, new Date().toISOString()),
+    );
   }
 
   // Phase 8 決定 1: asset record の作成・システム管理フィールドの書き込みはアップロード API

@@ -2,9 +2,8 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
-import { v7 as uuidv7 } from "uuid";
 import { ASSET_TYPE_KEY, WORKFLOW_STATUSES } from "@plyrs/metamodel";
-import { sniffImageSize } from "../assets/image-size";
+import { MAX_ASSET_FILENAME_LENGTH, MAX_ASSET_SIZE_BYTES, storeAsset } from "../assets/store";
 import { assetKeyBelongsToTenant } from "../assets/ownership";
 import { can } from "../auth/permissions";
 import { authenticateTenantToken, tenantGate, type GateVariables } from "../middleware/tenant-gate";
@@ -23,7 +22,6 @@ import {
   asRecordSnapshot,
   asRegisterResult,
   asReprojectResult,
-  asWriteResult,
 } from "../rpc-unwrap";
 import { tenantSettingsRoutes } from "./tenant-settings";
 import { tenantGrantsRoutes } from "./tenant-grants";
@@ -76,10 +74,6 @@ const writeBodySchema = z.object({
   baseFieldVersions: z.record(z.string(), z.number().int().nonnegative()).optional(),
 });
 
-// Phase 8 決定 1: Worker 経由 PUT。CMS の画像用途に十分な上限(動画等の大容量は非目標)。
-const MAX_ASSET_SIZE_BYTES = 20 * 1024 * 1024;
-const MAX_ASSET_FILENAME_LENGTH = 256;
-const MAX_ASSET_CONTENT_TYPE_LENGTH = 256; // asset 型の content_type フィールド maxLength と一致
 // 公開状態一覧の 1 ページの上限(既定値も兼ねる)。1 行は 100 バイト前後なので 1 ページ 100KB 程度
 const MAX_PUBLICATIONS_LIMIT = 1000;
 
@@ -159,36 +153,12 @@ export const tenantRoutes = new Hono<GateEnv>()
     if (!can(c.get("auth").role, "record:write")) {
       return c.json({ ok: false, code: "forbidden", message: "role cannot upload assets" }, 403);
     }
-    const tenantId = c.req.param("tenantId");
-    // ID はサーバー生成(uuidv7)。r2_key は `${tenantId}/${assetId}` 規約 — バイナリは不変
-    // (差し替えは新しい asset)。寸法はサーバー側スニファで導出(クライアント申告を信用しない)。
-    const assetId = uuidv7();
-    const r2Key = `${tenantId}/${assetId}`;
-    const dimensions = sniffImageSize(new Uint8Array(body));
-    await c.env.ASSETS.put(r2Key, body);
-    const result = asWriteResult(
-      await stubFor(c).createAssetRecord(
-        {
-          recordId: assetId,
-          input: {
-            filename,
-            content_type: contentType.slice(0, MAX_ASSET_CONTENT_TYPE_LENGTH),
-            size: body.byteLength,
-            r2_key: r2Key,
-            ...(dimensions === null ? {} : { width: dimensions.width, height: dimensions.height }),
-          },
-        },
-        c.get("auth"),
-      ),
-    );
+    const result = await storeAsset(c.env, c.req.param("tenantId"), c.get("auth"), {
+      body,
+      filename,
+      contentType,
+    });
     if (!result.ok) {
-      // メタデータ作成に失敗したバイナリは孤児になるため片付ける(best-effort —
-      // 失敗した孤児は Phase 10 の R2 GC 候補)。
-      try {
-        await c.env.ASSETS.delete(r2Key);
-      } catch {
-        console.error("orphan R2 object left behind", r2Key);
-      }
       return c.json(result, statusFor(result.code));
     }
     return c.json(result, 201);

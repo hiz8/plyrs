@@ -24,6 +24,9 @@ export interface OpSpec<I extends z.ZodType = z.ZodType, O extends z.ZodType = z
   // 公開 URL の組み立てにテナントの slug が要る操作(record_publish)。REST の入口はこのときだけ
   // D1 から slug を引く(M2-4)
   needsTenantSlug?: true;
+  // DO の invoke ではなく Worker で実行する操作(M4-4 / M4-5)。非同期の処理(SHA-256・外部 fetch・R2)が
+  // 要る操作で、DO の同期ハンドラを持たない。実装は mcp/worker-ops.ts
+  runsIn?: "worker";
 }
 
 export function defineOperation<I extends z.ZodType, O extends z.ZodType>(

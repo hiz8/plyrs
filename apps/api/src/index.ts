@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { purgeExpiredSessions } from "./auth/session";
 import { purgeOAuthData } from "./oauth/purge";
 import { mcpRoutes, serveProtectedResourceMetadata, workerContext } from "./mcp/route";
+import { uploadRoutes } from "./mcp/uploads";
 import { requireSaneSecret } from "./middleware/sane-secret";
 import { handleModuleJob, type ModuleQueueJob } from "./modules/events";
 import { oauthRoutes, serveAuthorizationServerMetadata } from "./oauth/route";
@@ -37,6 +38,8 @@ app.route("/v1/t", tenantRoutes);
 app.route("/super-auth", superAuthRoutes);
 app.route("/super/v1", superRoutes);
 app.route("/mcp", mcpRoutes);
+// M4-4(design-spec 16.11): asset_upload が発行した URL への本文の受け取り
+app.route("/mcp", uploadRoutes);
 app.route("/oauth", oauthRoutes);
 // M3 の見送り指摘 (f): ブラウザ内で動くクライアントの preflight。metadata は公開情報なので誰にでも返す
 // (Bearer を伴う /mcp の Origin 検証とは別。ここは GET の metadata だけ)

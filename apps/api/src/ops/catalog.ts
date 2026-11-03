@@ -1,3 +1,4 @@
+import { ASSET_OPERATIONS } from "./assets";
 import { HISTORY_OPERATIONS } from "./history";
 import { READ_OPERATIONS } from "./read";
 import { SEARCH_OPERATIONS } from "./search";
@@ -18,6 +19,7 @@ export const OPERATIONS: readonly OpSpec[] = [
   ...SEARCH_OPERATIONS,
   ...HISTORY_OPERATIONS,
   ...WRITE_OPERATIONS,
+  ...ASSET_OPERATIONS,
 ];
 
 export function findOperation(name: string): OpSpec | undefined {

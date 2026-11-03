@@ -48,8 +48,9 @@ export const HANDLERS: Readonly<Record<string, OpHandler>> = {
   ...WRITE_HANDLERS,
 };
 
+// Worker で実行する操作(runsIn: "worker")は DO のハンドラを持たない。DO で呼ばれたら unknown_operation
 for (const spec of OPERATIONS) {
-  if (HANDLERS[spec.name] === undefined) {
+  if (spec.runsIn !== "worker" && HANDLERS[spec.name] === undefined) {
     throw new Error(`operation ${spec.name} is declared in the catalog but has no handler`);
   }
 }

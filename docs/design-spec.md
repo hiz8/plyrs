@@ -724,6 +724,7 @@ single-writer の DO が競合を判定する。分散マージの難問が「DO
 | 48 | **MCP エンドポイントは api Worker の直接オリジン** `https://<api>/mcp/t/:tenantId`（論点 D2）。api → admin の逆向き Service Binding は dev（auxiliary worker）で成立するが採らない | Bearer 専用で cookie を使わず、admin 経由は 1 ホップ増えるだけ。逆向き binding は vitest にスタブが要り 3 環境分の定義も増える |
 | 49 | **PAT と OAuth の検証経路を `OAuthResourceServer` の `validateToken` で合流させる**。PAT は接頭辞で振り分け D1 を `memberships` と join した 1 照会、OAuth は同 Worker 内の `validateToken`（KV 1 回 + 復号）。両方に BLOCKLIST 2 キーを適用し `{userId, role, tenantId, exp, scopes, tokenId, tokenKind}` にする（`tokenKind` は `"pat" | "oauth"`。経路 `via` とは別の概念） | workerd ローカルで検証 1 回あたり OAuth 約 2 ms・PAT 約 2〜3 ms（BLOCKLIST 込み）。401 / 403 の challenge をライブラリに任せ、スコープ判定は入口に残す |
 | 50 | **elicitation に対応しないクライアントからの publish / unpublish は拒否して人に回す**（M4-2、2026-11-03、所有者の判断）。対応するクライアントは MRTR の elicitation で確認し、`requestState` は HMAC で保護してテナント・利用者・トークンに束縛する。publish ツールは常に出し、スコープ不足は 403 で step-up | 既定は人が公開する（16.8）。`record:publish` の付与だけを確認とみなすと、本文中の指示に従った誤公開を止める手段が無い。提案（M5）ができるまでの扱いで、緩めるのは `confirm.ts` の 1 か所 |
+| 51 | **アセットのアップロードトークンは DO（テナントの SQLite）に SHA-256 で置く**（M4-4、2026-11-03）。TTL 600 秒・使い切り・20 MiB。受け取りは `Authorization` を見ず URL のトークンを資格にし、BLOCKLIST の 2 キーを照会する | KV は書き込み直後の読みが一致せず使い切りを保証できない。DO は single-writer なので `used_at` を立てる処理が二重使用を構造的に防ぐ。原文を置かないので DO の SQLite が漏れても横取りできない。R2 の Workers binding は署名付き URL を作れない |
 
 ---
 
@@ -854,6 +855,8 @@ record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴�
 型とフィールドの `description` と、型単位の「執筆ガイド」欄（論点 A3、`writingGuide`、4000 文字以内）をメタモデルに足し、`type_get`・JSON Schema・resources・prompts に載せる（M2-8 で実装）。型をデータで持つ本システムでは、記事の構造と書き方を知る手がかりが型定義しかないため。配り方は 3 つ: `type_get` と resource `plyrs://types/{key}` の定義に `writingGuide` が載る。resource `plyrs://types/{key}/schema` は record の input の JSON Schema（`z.toJSONSchema`、フィールドの `description` と必須を含む。`application/schema+json`）。prompt `writing_guide`（引数 `type`）は型の説明・執筆ガイド・フィールドごとの型と必須と説明を 1 通にまとめる。執筆ガイドと型の説明は利用者が書いた設定なので、prompt の本文にも record と同じ前置き（16.10）を付ける。
 
 アセットは、使い切りのアップロードトークンを返すツール + 既存の `POST /assets`（20MB 上限、assetGuard の beforeWrite）と、URL からの取り込みの 2 経路。R2 の Workers binding では署名付き URL を作れない。URL 取り込みは Worker から任意 URL を fetch するので、公開アドレスのみ許可・リダイレクト先の再検証・サイズ上限で SSRF を防ぐ。
+
+アップロードトークンの経路（M4-4、決定 51）: ツール `asset_upload`（`record:write`、入力は `filename` と `contentType`。`contentType` は PNG / JPEG / GIF / WebP / AVIF のみで SVG は不可）は Worker で実行する（操作カタログの `runsIn: "worker"`。DO の `invoke` は同期なので SHA-256 を計算できない）。Worker が 32 バイトの乱数（base64url）を作り、DO の `asset_upload_tokens` にはその SHA-256 と発行者（利用者・ロール・tokenId）・ファイル名・Content-Type・期限（600 秒）だけを置く。発行のついでに期限切れの行を 50 件まで掃除する。ツールは `uploadUrl = <api のオリジン>/mcp/t/:tenantId/uploads/:token` を返す。受け取り `POST /mcp/t/:tenantId/uploads/:token` は `Authorization` を見ず、順に Origin が付いていれば 403 → 接続元 IP の Rate Limiting → トークンの形 → `Content-Length` の前検査（20 MiB 超は 413）→ DO で `used_at` を立てる（無ければ 404、期限切れ・使用済みは 410）→ BLOCKLIST の 2 キー（発行後の BAN は 403）→ 本文を読みながら 20 MiB で打ち切る → 既存の `POST /assets` と同じ `storeAsset`（R2 put → `createAssetRecord` → 失敗時の片付け）→ 201 `{ assetId }`。Content-Type は発行時の宣言を使い、要求のヘッダは信用しない。使い切りの印は R2 に書く前に立てるので、保存に失敗したトークンも再利用できない（`asset_upload` からやり直す）。別テナントのパスに付け替えたトークンは、その DO に行が無いので 404。asset の record は `createAssetRecord` を通るので経路（via）は `rest` のまま記録される。
 
 ### 16.12 公開の段階と限定公開
 

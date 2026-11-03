@@ -22,6 +22,7 @@ import type { McpAuth } from "../do/authorize";
 import { findOperation, OPERATIONS, type OpSpec } from "../ops/catalog";
 import type { InvokeResult } from "../ops/invoke";
 import { asInvokeResult } from "../rpc-unwrap";
+import { runWorkerOperation } from "./worker-ops";
 import {
   canElicit,
   confirmOperation,
@@ -52,6 +53,8 @@ export interface McpServerDeps {
   env: Env;
   tenantId: string;
   auth: McpAuth;
+  // api Worker のオリジン(asset_upload の uploadUrl を組む。DO は自分のオリジンを知らない)
+  origin: string;
 }
 
 const MCP_OPERATIONS: readonly OpSpec[] = OPERATIONS.filter((op) => op.via.includes("mcp"));
@@ -233,6 +236,10 @@ function summarize(spec: OpSpec, output: unknown): string {
         ? `record ${str(output["recordId"])} は公開されていなかった(何もしていない)。`
         : `record ${str(output["recordId"])} の公開を取り下げた。内容は下書きとして残る。`,
     );
+  } else if (spec.name === "asset_upload" && isRecord(output)) {
+    lines.push(
+      `アップロード先を発行した(期限 ${str(output["expiresAt"])}、1 回だけ)。structuredContent.uploadUrl に画像の本文を POST し、応答の assetId を ![label](plyrs://asset/<assetId>) で使う。`,
+    );
   } else if (spec.name === "record_delete" && isRecord(output)) {
     lines.push(
       `record ${str(output["recordId"])} を削除した(${str(output["deletedAt"])})。record_restore で戻せる。`,
@@ -257,7 +264,10 @@ export async function callOperation(
   if (spec === undefined) {
     return failure({ ok: false, code: "unknown_operation", message: `unknown operation: ${name}` });
   }
-  const result = await invoke(deps, name, input);
+  const result =
+    spec.runsIn === "worker"
+      ? await runWorkerOperation(deps, spec, input)
+      : await invoke(deps, name, input);
   if (!result.ok) {
     return failure(result);
   }

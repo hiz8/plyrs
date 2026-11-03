@@ -1,3 +1,4 @@
+import type { ClaimAssetUploadResult } from "./do/asset-uploads";
 import type { AssetUsageRow } from "./do/asset-usage";
 import type {
   ContentTypeRow,
@@ -125,4 +126,14 @@ export function asStringArray(value: unknown): string[] {
 // M1-1: 操作カタログの invoke RPC(design-spec 16.4)
 export function asInvokeResult(value: unknown): InvokeResult {
   return value as InvokeResult;
+}
+
+export function asCreateAssetUploadResult(
+  value: unknown,
+): { ok: true } | { ok: false; code: string; message: string } {
+  return value as { ok: true } | { ok: false; code: string; message: string };
+}
+
+export function asClaimAssetUploadResult(value: unknown): ClaimAssetUploadResult {
+  return value as ClaimAssetUploadResult;
 }

@@ -367,9 +367,13 @@ describe("tools/call", () => {
       tokenId: uuid(810),
       tokenKind: "pat",
     };
-    const result = await callOperation({ env, tenantId, auth: scopeless }, "record_list", {
-      type: "article",
-    });
+    const result = await callOperation(
+      { env, tenantId, auth: scopeless, origin: "https://api.example" },
+      "record_list",
+      {
+        type: "article",
+      },
+    );
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toMatchObject({ error: { code: "insufficient_scope" } });
   });

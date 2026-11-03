@@ -131,6 +131,7 @@ function requiredScopeOf(rpc: ParsedRpc): Operation | undefined {
 
 async function serveMcp(
   request: Request,
+  origin: string,
   env: Env,
   tenantId: string,
   auth: McpAuth,
@@ -185,7 +186,7 @@ async function serveMcp(
   }
   // 仕様 2026-07-28 のみ(未決事項「旧版プロトコルのクライアントへの対応」の仮置き)。
   // 廃止済みの initialize や GET/DELETE のセッション運用は受けない
-  const handler = createMcpHandler(() => buildMcpServer({ env, tenantId, auth }), {
+  const handler = createMcpHandler(() => buildMcpServer({ env, tenantId, auth, origin }), {
     legacy: "reject",
     onerror: (error) => console.warn("mcp", tenantId, error.message),
   });
@@ -220,6 +221,7 @@ export function createTenantResourceServer(
       fetch: (request, env, ctx) =>
         serveMcp(
           request,
+          origin,
           env,
           tenantId,
           authFromProps(ctx.props, ctx.auth.scope, ctx.auth.expiresAt),
