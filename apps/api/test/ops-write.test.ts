@@ -162,6 +162,20 @@ describe("書き込み操作", () => {
     expect(JSON.stringify(blocks[2])).toContain("二段落目");
   });
 
+  it("Markdown の javascript: / data: のリンクは書き込めない(validate-on-write で拒否)", async () => {
+    for (const href of ["javascript:alert(1)", "JaVaScRiPt:alert(1)", "data:text/html,x"]) {
+      const result = asInvokeResult(
+        await stub.invoke(
+          "record_create",
+          { ...createInput(), input: { ...validArticleInput(), body: `[x](${href})` } },
+          mcpAuth(),
+        ),
+      );
+      expect(result.ok, href).toBe(false);
+      expect(result.ok ? "" : result.code).toBe("validation_failed");
+    }
+  });
+
   it("古い baseFieldVersions のブロック操作は、消されたブロックを指していても block_not_found ではなく conflict(Review Focus 1)", async () => {
     const created = output<RecordSnapshot>(
       await stub.invoke(
