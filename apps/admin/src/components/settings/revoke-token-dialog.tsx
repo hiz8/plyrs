@@ -1,21 +1,21 @@
 import * as stylex from "@stylexjs/stylex";
 import { ConfirmDialog } from "@plyrs/ui";
 import { font, text } from "@plyrs/ui/semantic.stylex";
-import type { TokenSummary } from "../../lib/admin-api";
 import { TOKEN_LABELS } from "../../lib/labels";
+import type { ConnectionRow } from "../../lib/tokens";
 
 const styles = stylex.create({
   text: { margin: 0, fontSize: font.body, color: text.default },
 });
 
-// 失効の確認(M1-4)。失効は戻せない(新しく発行し直す)
+// 失効の確認(M1-4、M3-5)。失効は戻せない(PAT は新しく発行し直す。OAuth はアプリから再認可する)
 export function RevokeTokenDialog({
   target,
   onConfirm,
   onCancel,
   isPending,
 }: {
-  target: TokenSummary | null;
+  target: ConnectionRow | null;
   onConfirm: () => void;
   onCancel: () => void;
   isPending: boolean;
@@ -34,7 +34,9 @@ export function RevokeTokenDialog({
       onConfirm={onConfirm}
       isPending={isPending}
     >
-      <p {...stylex.props(styles.text)}>{labels.body}</p>
+      <p {...stylex.props(styles.text)}>
+        {target?.kind === "oauth" ? labels.bodyOauth : labels.body}
+      </p>
     </ConfirmDialog>
   );
 }

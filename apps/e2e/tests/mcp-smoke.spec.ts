@@ -71,9 +71,9 @@ test("PAT を発行して MCP から型と record を読む", async ({ page }) =
   const title = "MCP の記事";
   await createArticleRecord(page, title);
 
-  // 設定 › 接続トークン で PAT を発行(発行直後に 1 回だけ表示される)
+  // 設定 › 接続中のアプリ で PAT を発行(発行直後に 1 回だけ表示される)
   await page.getByRole("complementary").getByRole("link", { name: "設定", exact: true }).click();
-  await page.getByRole("tab", { name: "接続トークン" }).click();
+  await page.getByRole("tab", { name: "接続中のアプリ" }).click();
   await page.getByRole("button", { name: "トークンを発行" }).click();
   const dialog = page.getByRole("dialog", { name: "接続トークンを発行" });
   await dialog.getByRole("textbox", { name: "名前" }).fill("e2e");

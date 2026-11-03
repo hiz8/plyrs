@@ -72,6 +72,58 @@ describe("ログインフロー", () => {
     expect(body).toStrictEqual({ email: "a@example.com", password: "hunter2hunter2" });
   });
 
+  // M3-2: OAuth の同意画面からの往復。/oauth は api の経路なので window.location.assign で戻す
+  it("returns to the OAuth consent page named by return_to after login", async () => {
+    const login: Handler = vi.fn(() => jsonResponse(200, { userId: "u1" }));
+    const assign = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...original, assign },
+    });
+    try {
+      renderAt("/login?return_to=%2Foauth%2Ft%2Fabc%2Fauthorize%3Fclient_id%3Dx", {
+        "/auth/login": login,
+        "/auth/turnstile-config": turnstileDisabled(),
+      });
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText("メールアドレス"), "a@example.com");
+      await user.type(screen.getByLabelText("パスワード"), "hunter2hunter2");
+      await user.click(screen.getByRole("button", { name: "ログイン" }));
+      await waitFor(() =>
+        expect(assign).toHaveBeenCalledWith("/oauth/t/abc/authorize?client_id=x"),
+      );
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: original });
+    }
+  });
+
+  it("ignores a return_to outside /oauth/t/ and lands on the tenant chooser", async () => {
+    const login: Handler = vi.fn(() => jsonResponse(200, { userId: "u1" }));
+    const assign = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...original, assign },
+    });
+    try {
+      renderAt("/login?return_to=https%3A%2F%2Fevil.example%2F", {
+        "/auth/login": login,
+        "/auth/tenants": vi.fn(() => jsonResponse(200, { tenants: [] })),
+        "/auth/me": meOk(),
+        "/auth/turnstile-config": turnstileDisabled(),
+      });
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText("メールアドレス"), "a@example.com");
+      await user.type(screen.getByLabelText("パスワード"), "hunter2hunter2");
+      await user.click(screen.getByRole("button", { name: "ログイン" }));
+      expect(await screen.findByRole("heading", { name: "サイトを選択" })).toBeInTheDocument();
+      expect(assign).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: original });
+    }
+  });
+
   it("shows a field-level error for invalid credentials", async () => {
     const login = vi.fn(() => jsonResponse(401, { error: "invalid_credentials" }));
     renderAt("/login", { "/auth/login": login, "/auth/turnstile-config": turnstileDisabled() });

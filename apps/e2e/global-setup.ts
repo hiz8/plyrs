@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,9 +48,28 @@ export default function globalSetup(): void {
   // キャッシュ。.wrangler を消した以上、前回実行の secret は無効なので合わせて消す。
   rmSync(path.join(repoRoot, "apps/e2e/.state"), { recursive: true, force: true });
 
+  // M3: OAuth の issuer / resource は要求の URL と一致していなければならないので、dev サーバーのオリジン
+  // (5199)を書く。既存ファイルは触らない(手元の .dev.vars に同じ 2 行が要る。apps/api/.dev.vars.example)
   const apiVars = path.join(repoRoot, "apps/api/.dev.vars");
   if (!existsSync(apiVars)) {
-    writeFileSync(apiVars, "JWT_SECRET=e2e-secret-do-not-use-in-prod-0123456789\n");
+    writeFileSync(
+      apiVars,
+      [
+        "JWT_SECRET=e2e-secret-do-not-use-in-prod-0123456789",
+        "ADMIN_ORIGIN=http://localhost:5199",
+        "API_ORIGIN=http://localhost:5199",
+        "",
+      ].join("\n"),
+    );
+  } else {
+    const existing = readFileSync(apiVars, "utf8");
+    for (const key of ["ADMIN_ORIGIN", "API_ORIGIN"]) {
+      if (!existing.includes(`${key}=`)) {
+        console.warn(
+          `apps/api/.dev.vars に ${key} が無い。oauth.spec.ts は ${key}=http://localhost:5199 を前提にする(apps/api/.dev.vars.example)`,
+        );
+      }
+    }
   }
   const adminVars = path.join(repoRoot, "apps/admin/.dev.vars");
   if (!existsSync(adminVars)) {

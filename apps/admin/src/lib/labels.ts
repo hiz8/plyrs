@@ -443,7 +443,7 @@ export const SETTINGS_LABELS = {
     "content-types": TERMS.contentType,
     members: "メンバー",
     modules: TERMS.module,
-    tokens: "接続トークン",
+    tokens: "接続中のアプリ",
   },
   loadFailed: "設定を読み込めませんでした",
   retry: "再試行",
@@ -528,31 +528,40 @@ export const MEMBER_LABELS = {
   ownersJoin: "、",
 } as const;
 
-// M1-4(design-spec 16.3・16.12): 接続トークン(PAT)。発行できるのは管理者だけ
+// M1-4(design-spec 16.3・16.12): 接続トークン(PAT)。発行できるのは管理者だけ。
+// M3-5: 同じ画面「接続中のアプリ」に OAuth の付与(MCP クライアントが同意画面を経て得た接続)も並べる
 export const TOKEN_LABELS = {
-  tab: "接続トークン",
+  tab: "接続中のアプリ",
   issue: "トークンを発行",
-  tableLabel: "接続トークンの一覧",
+  tableLabel: "接続中のアプリの一覧",
   columns: {
+    kind: "種別",
     name: "名前",
     scopes: "スコープ",
     expires: "有効期限",
     lastUsed: "最終利用",
     actions: "操作",
   },
+  kinds: { pat: "トークン", oauth: "OAuth" },
   empty:
-    "接続トークンはまだありません。発行すると、エージェント(Claude Code など)からこのサイトに接続できます",
-  loadFailed: "接続トークンの一覧を取得できませんでした",
+    "接続中のアプリはまだありません。トークンを発行するか、MCP クライアントから OAuth で接続すると、ここに並びます",
+  loadFailed: "接続中のアプリの一覧を取得できませんでした",
+  grantsLoadFailed:
+    "OAuth で接続したアプリの一覧を取得できませんでした(トークンの一覧は表示しています)",
   status: { active: "有効", expired: "期限切れ", revoked: "失効済み" },
   neverUsed: "未使用",
+  notApplicable: "—",
+  noExpiry: "期限なし",
   expiresIn: (days: number) => `残り ${days} 日`,
   revoke: "失効",
   revokeOf: (name: string) => `${name}を失効`,
   revoked: (name: string) => `${name} を失効しました`,
-  revokeFailed: "トークンを失効できませんでした",
+  revokeFailed: "失効できませんでした",
   revokeDialog: {
     title: (name: string) => `「${name}」を失効しますか？`,
     body: "このトークンで接続しているクライアントは、すぐに使えなくなります。元に戻せないので、必要なら新しく発行し直してください。",
+    bodyOauth:
+      "このアプリの接続は、すぐに使えなくなります。もう一度使うには、アプリから接続をやり直して同意してください。",
     confirm: "失効する",
   },
   scopes: {

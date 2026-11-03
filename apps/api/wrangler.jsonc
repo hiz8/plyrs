@@ -2,8 +2,13 @@
   "name": "plyrs-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-12",
-  // M1-5(design-spec 16.2): MCP の入口の Origin 許可リスト兼 PRM の issuer のオリジン(dev/vitest 用)
-  "vars": { "ADMIN_ORIGIN": "http://localhost:5173" },
+  // M3-1(決定 47): OAuth の CIMD(Client ID Metadata Document)の取得に必要(workers-oauth-provider の文書)。
+  // compatibility_flags はトップレベルから env に継承される
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  // M1-5(design-spec 16.2): ADMIN_ORIGIN は MCP の入口の Origin 許可リスト兼 OAuth の issuer のオリジン。
+  // M3-1: API_ORIGIN は認可サーバーが resource(token の audience)を組む api 自身の公開オリジン。
+  // MCP の入口が要求の URL から作る resource と一致していなければ OAuth の token は 401 になる(dev/vitest 用)
+  "vars": { "ADMIN_ORIGIN": "http://localhost:5173", "API_ORIGIN": "http://localhost:5173" },
   "durable_objects": {
     "bindings": [{ "name": "TENANT_DO", "class_name": "TenantDO" }],
   },
@@ -26,6 +31,9 @@
     { "binding": "BLOCKLIST", "id": "00000000000000000000000000000000" },
     // Phase 5b (G3): 公開 read の tenantSlug→tenantId 解決キャッシュ。BLOCKLIST は認証用なので流用しない
     { "binding": "TENANT_SLUGS", "id": "00000000000000000000000000000001" },
+    // M3-1(決定 47): @cloudflare/workers-oauth-provider が要求する固定名の KV。OAuth のグラント・
+    // トークン・DCR クライアントの状態はここにだけある(認可サーバーのオブジェクトは要求ごとに作る)
+    { "binding": "OAUTH_KV", "id": "00000000000000000000000000000002" },
   ],
   "r2_buckets": [
     // Phase 8 決定 1: アセットのバイナリ。キーは `${tenantId}/${assetId}`(バイナリは不変 —
@@ -119,6 +127,7 @@
       "vars": {
         "AUTH_TURNSTILE_SITE_KEY": "0x4AAAAAAD80uG0GCAIRGlqo",
         "ADMIN_ORIGIN": "https://plyrs-admin-preview.hiz.workers.dev",
+        "API_ORIGIN": "https://plyrs-api-preview.hiz.workers.dev",
       },
       "durable_objects": {
         "bindings": [{ "name": "TENANT_DO", "class_name": "TenantDO" }],
@@ -140,6 +149,8 @@
       "kv_namespaces": [
         { "binding": "BLOCKLIST", "id": "d767b0a5273f4ebb844f5fcbdb3a1d2b" },
         { "binding": "TENANT_SLUGS", "id": "fe36d0e9a0e4431e8568b33a6e89d34b" },
+        // M3-1: `wrangler kv namespace create OAUTH_KV-preview` の id(docs/deploy.md 1 節)
+        { "binding": "OAUTH_KV", "id": "1ac5ab5d4d2d4f9a85435d9320e4c08d" },
       ],
       "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "plyrs-assets-preview" }],
       "queues": {
@@ -213,6 +224,7 @@
       "vars": {
         "AUTH_TURNSTILE_SITE_KEY": "0x4AAAAAAD9i8S_Y_vk6e5rw",
         "ADMIN_ORIGIN": "https://plyrs-admin.hiz.workers.dev",
+        "API_ORIGIN": "https://plyrs-api.hiz.workers.dev",
       },
       "durable_objects": {
         "bindings": [{ "name": "TENANT_DO", "class_name": "TenantDO" }],
@@ -234,6 +246,8 @@
       "kv_namespaces": [
         { "binding": "BLOCKLIST", "id": "de1fdcbc37ca4672aaf6171a718def70" },
         { "binding": "TENANT_SLUGS", "id": "f40051221b6745deb668b1e17208721c" },
+        // M3-1: `wrangler kv namespace create OAUTH_KV` の id(docs/deploy.md 1 節)
+        { "binding": "OAUTH_KV", "id": "512a7337bfd44899a73f058e7bed2638" },
       ],
       "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "plyrs-assets" }],
       "queues": {

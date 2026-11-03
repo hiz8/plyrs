@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { purgeExpiredSessions } from "./auth/session";
+import { purgeOAuthData } from "./oauth/purge";
 import { mcpRoutes, serveProtectedResourceMetadata, workerContext } from "./mcp/route";
 import { requireSaneSecret } from "./middleware/sane-secret";
 import { handleModuleJob, type ModuleQueueJob } from "./modules/events";
+import { oauthRoutes, serveAuthorizationServerMetadata } from "./oauth/route";
 import { parkDeadLetter } from "./ops/dead-letters";
 import { handleProjectionJob } from "./projection/consumer";
 import type { ProjectionJob } from "./projection/jobs";
@@ -26,12 +28,20 @@ app.use("/super/v1/*", requireSaneSecret);
 // design-spec 16.2(決定 48、M1-5): MCP の入口。JWT は使わないが設定事故時は道連れで閉じる方針に合わせる
 app.use("/mcp/*", requireSaneSecret);
 app.use("/.well-known/oauth-protected-resource/*", requireSaneSecret);
+// M3-1(決定 47): OAuth の認可サーバー(admin オリジンから転送されて来る)。同じく設定事故時は道連れで閉じる
+app.use("/oauth/*", requireSaneSecret);
+app.use("/.well-known/oauth-authorization-server/*", requireSaneSecret);
 app.route("/auth", authRoutes);
 // 決定 9: self-serve テナント作成(旧 POST /v1/tenants)は撤去。作成は /super/v1/tenants 専用。
 app.route("/v1/t", tenantRoutes);
 app.route("/super-auth", superAuthRoutes);
 app.route("/super/v1", superRoutes);
 app.route("/mcp", mcpRoutes);
+app.route("/oauth", oauthRoutes);
+// RFC 8414: テナント別 issuer の Authorization Server Metadata(16.2)
+app.get("/.well-known/oauth-authorization-server/oauth/t/:tenantId", (c) =>
+  serveAuthorizationServerMetadata(c.req.raw, c.env, workerContext(c), c.req.param("tenantId")),
+);
 // RFC 9728: MCP の Protected Resource Metadata(テナント別パス付き。16.2)
 app.get("/.well-known/oauth-protected-resource/mcp/t/:tenantId", (c) =>
   serveProtectedResourceMetadata(c.req.raw, c.env, workerContext(c), c.req.param("tenantId")),
@@ -48,12 +58,20 @@ export { app };
 export default {
   fetch: app.fetch,
   // §6: 期限切れ・失効済みセッションの日次掃除(wrangler.jsonc の triggers.crons が起動する)。
+  // 16.3(M3-4): 続けて OAUTH_KV の期限切れ・孤児のグラントとトークンも掃く。失敗はログに留め、
+  // セッションの掃除を道連れにしない
   async scheduled(
     _controller: ScheduledController,
     env: Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
     await purgeExpiredSessions(env.DB, new Date());
+    try {
+      const result = await purgeOAuthData(env);
+      console.log("oauth purge", result);
+    } catch (error) {
+      console.error("oauth purge failed", error);
+    }
   },
   // design-spec §12.3 / Phase 9 §9.4: projection と module events、それぞれの DLQ を合わせた
   // 4 つの queue consumer を 1 ハンドラで受ける（wrangler.jsonc の consumers は全てこの

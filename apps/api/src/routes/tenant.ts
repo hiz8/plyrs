@@ -26,6 +26,7 @@ import {
   asWriteResult,
 } from "../rpc-unwrap";
 import { tenantSettingsRoutes } from "./tenant-settings";
+import { tenantGrantsRoutes } from "./tenant-grants";
 import { tenantTokensRoutes } from "./tenant-tokens";
 import { AUTH_HEADER, extractTokenProtocol } from "../sync/session";
 
@@ -132,6 +133,8 @@ export const tenantRoutes = new Hono<GateEnv>()
   .route("/", tenantSettingsRoutes)
   // M1-3a: PAT の発行・一覧・失効(design-spec 16.3)
   .route("/", tenantTokensRoutes)
+  // M3-5: OAuth の付与(接続中のアプリ)の一覧・失効(design-spec 16.3)
+  .route("/", tenantGrantsRoutes)
   .post("/:tenantId/assets", async (c) => {
     const filename = c.req.query("filename") ?? "";
     if (filename.length === 0 || filename.length > MAX_ASSET_FILENAME_LENGTH) {

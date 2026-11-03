@@ -1,4 +1,8 @@
-import { OAuthResourceServer } from "@cloudflare/workers-oauth-provider";
+import {
+  insufficientScope,
+  type OAuthResourceAuth,
+  OAuthResourceServer,
+} from "@cloudflare/workers-oauth-provider";
 import {
   createMcpHandler,
   DEFAULT_MAX_REQUEST_BODY_SIZE,
@@ -7,14 +11,19 @@ import {
 } from "@modelcontextprotocol/server";
 import { Hono } from "hono";
 import type { McpAuth } from "../do/authorize";
+import type { Operation } from "../auth/permissions";
 import { mcpTokenValidator, type McpTokenProps } from "../middleware/mcp-gate";
+import { tenantIssuer, tenantResource } from "../oauth/server";
+import { findOperation } from "../ops/catalog";
 import { buildMcpServer } from "./server";
 
 // design-spec 16.2(決定 48、M1-5): MCP の入口 `/mcp/t/:tenantId`。api Worker の直接オリジンで受け、
-// OAuthResourceServer(決定 49)をホストにして PAT を検証する(401 の challenge・PRM・403 はライブラリが出す)。
+// OAuthResourceServer(決定 49)をホストにして PAT / OAuth の token を検証する(401 の challenge・PRM・
+// 403 はライブラリが出す)。
 // 入口の順序: POST のみ(405) → Origin の許可リスト → 接続元 IP の Rate Limiting(未認証の連打で
 // D1 の PAT 照会を無制限に起こさないため。/auth と同じ考え方)→ トークン検証 → ヘッダと本文の照合
-// (-32020)→ ツール名単位の Rate Limiting → SDK(server/discover・tools/list・tools/call)。
+// (-32020)→ tools/call のスコープ判定(403 insufficient_scope、M3-3)→ ツール名単位の Rate Limiting
+// → SDK(server/discover・tools/list・tools/call)。
 
 export const MCP_REQUIRED_SCOPES = ["record:read"];
 
@@ -22,16 +31,6 @@ export const MCP_REQUIRED_SCOPES = ["record:read"];
 const RETRY_AFTER_SECONDS = "60";
 // 仕様 2026-07-28 の予約コード: ヘッダと本文の不一致
 const HEADER_MISMATCH = -32020;
-
-export function tenantResource(origin: string, tenantId: string): string {
-  return `${origin}/mcp/t/${tenantId}`;
-}
-
-// 認可サーバーの issuer は admin オリジンのテナント別パス(16.2)。M1 では issuer 側の metadata は
-// M3-1 まで 404 で、ホスト型クライアントが接続できないのは想定どおり(PAT だけで接続する)
-export function tenantIssuer(adminOrigin: string, tenantId: string): string {
-  return `${adminOrigin}/oauth/t/${tenantId}`;
-}
 
 function jsonRpcError(status: number, code: number, message: string, id: unknown = null): Response {
   return Response.json({ jsonrpc: "2.0", id, error: { code, message } }, { status });
@@ -94,11 +93,37 @@ function authFromProps(
   };
 }
 
+// 16.3(M3-3、決定 49): スコープ不足は DO を起こす前に 403 insufficient_scope で返し、クライアントが
+// 一往復で step-up できるようにする(challenge の scope と resource_metadata はライブラリが組む)。
+// PAT は再認可できないので、所有者がスコープ付きのトークンを発行し直す導線を文で示す
+export function insufficientScopeFor(
+  auth: OAuthResourceAuth,
+  tokenKind: McpAuth["tokenKind"],
+  scope: Operation,
+): Response {
+  const description =
+    tokenKind === "pat"
+      ? `この接続トークンには ${scope} がありません。管理画面の 設定 › 接続中のアプリ で ${scope} を含むトークンを発行してください`
+      : `${scope} を含めて再認可してください`;
+  return insufficientScope(auth, [scope], description);
+}
+
+// tools/call が MCP に出ている操作なら、その操作の要するスコープ(無ければ undefined。未知の名前は
+// SDK の unknown tool に任せる)
+function requiredScopeOf(rpc: ParsedRpc): Operation | undefined {
+  if (rpc.method !== "tools/call" || rpc.tool === undefined) {
+    return undefined;
+  }
+  const spec = findOperation(rpc.tool);
+  return spec !== undefined && spec.via.includes("mcp") ? spec.requires : undefined;
+}
+
 async function serveMcp(
   request: Request,
   env: Env,
   tenantId: string,
   auth: McpAuth,
+  resourceAuth: OAuthResourceAuth,
 ): Promise<Response> {
   // 本文は入口で読んで SDK に parsedBody で渡す(ヘッダとの照合と Rate Limiting を SDK より前に行うため)。
   // parsedBody は SDK の本文サイズ上限を通らないので、SDK と同じ readRequestBody で上限(4 MiB)を守る
@@ -128,6 +153,10 @@ async function serveMcp(
       `Bad Request: the request headers and body disagree: ${mismatch}`,
       rpc.id,
     );
+  }
+  const required = requiredScopeOf(rpc);
+  if (required !== undefined && !auth.scopes.includes(required)) {
+    return insufficientScopeFor(resourceAuth, auth.tokenKind, required);
   }
   // 16.1 / 16.2: 読み取りも DO を起こすのでツール名単位で制限する。未構成は fail-closed
   // (公開 write と同じ方針)。キーは テナント:利用者:ツール名(tools/call 以外はメソッド名。
@@ -183,6 +212,7 @@ export function createTenantResourceServer(
           env,
           tenantId,
           authFromProps(ctx.props, ctx.auth.scope, ctx.auth.expiresAt),
+          ctx.auth,
         ),
     },
   });

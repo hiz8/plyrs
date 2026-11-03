@@ -49,6 +49,16 @@ export function tokensQueryOptions(adminApi: AdminApi, tenantId: string) {
   });
 }
 
+// M3-5: OAuth の付与は失効の直後に必ず取り直す(tokens と同じ)
+export function grantsQueryOptions(adminApi: AdminApi, tenantId: string) {
+  return queryOptions({
+    queryKey: ["grants", tenantId],
+    queryFn: () => adminApi.listGrants(tenantId),
+    staleTime: 0,
+    retry: 1,
+  });
+}
+
 export function membersQueryOptions(adminApi: AdminApi, tenantId: string) {
   return queryOptions({
     queryKey: ["members", tenantId],

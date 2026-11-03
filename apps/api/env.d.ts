@@ -36,6 +36,11 @@ interface EnvBindings {
   // M1-5(16.2): MCP の入口の Origin 許可リスト(admin のオリジン)と、PRM の authorization_servers の
   // 元になる admin オリジン(テナント別 issuer `${ADMIN_ORIGIN}/oauth/t/:tenantId`)。wrangler.jsonc の vars
   ADMIN_ORIGIN?: string;
+  // M3-1(決定 47): 認可サーバーが resource(token の audience)を組む api の公開オリジン
+  // (`${API_ORIGIN}/mcp/t/:tenantId`)。wrangler.jsonc の vars。未設定なら OAuth の入口は 503
+  API_ORIGIN?: string;
+  // M3-1(決定 47): @cloudflare/workers-oauth-provider が要求する固定名の KV(グラント・トークン・DCR クライアント)
+  OAUTH_KV: KVNamespace;
   // §6: 認証系エンドポイント専用の Turnstile。未設定なら Turnstile 不要(optional 設計)。
   // secret/site key とも TURNSTILE_SECRET_KEY と同じ管理(テスト = vitest.config、dev = .dev.vars、
   // 本番 = wrangler secret / vars)。

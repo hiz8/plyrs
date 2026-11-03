@@ -86,6 +86,18 @@ export interface TokenSummary {
   revokedAt: string | null;
 }
 
+// M3-5(design-spec 16.3): OAuth の付与(接続中のアプリ)。api の oauth/grants.ts の TenantGrant と同じ形
+export interface GrantSummary {
+  id: string;
+  userId: string;
+  email: string;
+  clientId: string;
+  clientName: string | null;
+  scopes: string[];
+  createdAt: string;
+  expiresAt: string | null;
+}
+
 export interface IssueTokenInput {
   name: string;
   scopes: string[];
@@ -357,6 +369,15 @@ export function createAdminApi(
     },
     async revokeToken(tenantId: string, tokenId: string): Promise<void> {
       await requestJson<{ ok: true }>(tenantId, `/tokens/${tokenId}`, { method: "DELETE" });
+    },
+    async listGrants(tenantId: string): Promise<GrantSummary[]> {
+      const result = await requestJson<{ grants: GrantSummary[] }>(tenantId, "/oauth-grants");
+      return result.grants;
+    },
+    async revokeGrant(tenantId: string, userId: string, grantId: string): Promise<void> {
+      await requestJson<{ ok: true }>(tenantId, `/oauth-grants/${userId}/${grantId}`, {
+        method: "DELETE",
+      });
     },
     invokeOperation,
     listHistory(

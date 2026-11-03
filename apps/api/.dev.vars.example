@@ -1,0 +1,8 @@
+# ローカル開発専用の上書き。実ファイル(.dev.vars)はコミットしない。
+# JWT_SECRET は 32 字以上必須(短いと requireSaneSecret が /auth /v1 /mcp /oauth などを 500 で閉じる)
+JWT_SECRET=dev-secret-do-not-use-in-prod-0123456789
+# M3: OAuth の issuer(ADMIN_ORIGIN/oauth/t/:tenantId)と resource(API_ORIGIN/mcp/t/:tenantId)の元。
+# どちらも要求の URL のオリジンと一致していないと、metadata は出ても token が MCP の入口で 401 になる。
+# `pnpm --filter @plyrs/admin dev` は 5173、E2E の dev サーバーは 5199(global-setup.ts が未作成時に書く)
+ADMIN_ORIGIN=http://localhost:5173
+API_ORIGIN=http://localhost:5173

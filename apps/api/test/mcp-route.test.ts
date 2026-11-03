@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { memberships, tenants, users } from "@plyrs/db/control-plane";
 import { issuePat } from "../src/auth/pat";
 import { app } from "../src/index";
+import { ADMIN_ORIGIN, authorize } from "./oauth-helpers";
 import { fakeLimiter } from "./rate-limit-helper";
 
 // M1-5(design-spec 16.2): MCP の入口 /mcp/t/:tenantId。POST のみ・Origin 検証・OAuthResourceServer の
@@ -18,8 +19,11 @@ const NOW = new Date();
 
 let tenantId: string;
 let otherTenantId: string;
+let userId: string;
 let pat: string;
 let foreignPat: string;
+// record:read を持たない PAT(M3 の時点で MCP に出ている操作は全部 record:read を要するので、外して試す)
+let writeOnlyPat: string;
 
 async function setupTenant(): Promise<{ tenantId: string; userId: string }> {
   const id = crypto.randomUUID();
@@ -38,7 +42,11 @@ beforeAll(async () => {
   const a = await setupTenant();
   const b = await setupTenant();
   tenantId = a.tenantId;
+  userId = a.userId;
   otherTenantId = b.tenantId;
+  writeOnlyPat = (
+    await issuePat(env.DB, { ...a, name: "w", scopes: ["record:write"], expiresInDays: 1 }, NOW)
+  ).token;
   pat = (
     await issuePat(env.DB, { ...a, name: "t", scopes: ["record:read"], expiresInDays: 1 }, NOW)
   ).token;
@@ -295,5 +303,55 @@ describe("/mcp/t/:tenantId の入口", () => {
       },
     );
     expect(res.status).toBe(400);
+  });
+
+  // M3-3(決定 49): OAuth の access token は PAT と同じ入口・同じ認可コンテキストに合流する。
+  // 認可サーバーの resource は API_ORIGIN(= この入口のオリジン)で組むので、env を上書きして渡す
+  const OAUTH_ENV = { ADMIN_ORIGIN, API_ORIGIN: ORIGIN };
+
+  it("OAuth の access token で tools/list が 200。別テナントで発行した token は 401", async () => {
+    const issued = await authorize(tenantId, ["record:read"], { userId, role: "owner" });
+    const res = await post("tools/list", {}, { token: issued.access_token, env: OAUTH_ENV });
+    expect(res.status).toBe(200);
+    const foreign = await authorize(otherTenantId, ["record:read"]);
+    const denied = await post("tools/list", {}, { token: foreign.access_token, env: OAUTH_ENV });
+    expect(denied.status).toBe(401);
+  });
+
+  it("スコープ不足の tools/call は 403 insufficient_scope(必要なスコープと PRM を challenge に出す)", async () => {
+    const res = await post(
+      "tools/call",
+      { name: "record_get", arguments: { id: crypto.randomUUID() } },
+      { token: writeOnlyPat },
+    );
+    expect(res.status).toBe(403);
+    const challenge = res.headers.get("www-authenticate") ?? "";
+    expect(challenge).toContain('error="insufficient_scope"');
+    expect(challenge).toContain('scope="record:read"');
+    expect(challenge).toContain(
+      `resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp/t/${tenantId}"`,
+    );
+    const body = await res.json<{ error: string; error_description?: string }>();
+    expect(body.error).toBe("insufficient_scope");
+    // PAT は再認可できないので、所有者がスコープ付きのトークンを発行し直す導線を示す
+    expect(body.error_description).toContain("接続トークン");
+    expect(body.error_description).toContain("record:read");
+  });
+
+  it("OAuth のスコープ不足は再認可(step-up)を案内する。tools/list と未知のツール名は対象外", async () => {
+    const issued = await authorize(tenantId, ["record:write"], { userId, role: "owner" });
+    const options = { token: issued.access_token, env: OAUTH_ENV };
+    const res = await post(
+      "tools/call",
+      { name: "record_get", arguments: { id: crypto.randomUUID() } },
+      options,
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json<{ error: string; error_description?: string }>();
+    expect(body.error_description).toContain("再認可");
+    expect((await post("tools/list", {}, options)).status).toBe(200);
+    // MCP に出ていない名前は SDK の unknown tool(JSON-RPC のエラー)に任せる
+    const unknown = await post("tools/call", { name: "nope", arguments: {} }, options);
+    expect(unknown.status).not.toBe(403);
   });
 });
