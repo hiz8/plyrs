@@ -723,6 +723,7 @@ single-writer の DO が競合を判定する。分散マージの難問が「DO
 | 47 | **認可サーバーは `@cloudflare/workers-oauth-provider` v1 の分割 API を api Worker に置く**（M0-3、2026-11-01）。issuer は admin オリジンのテナント別パス `/oauth/t/:tenantId`（admin が api へ同一オリジン転送）、`resources` はテナントの MCP URL 1 つ。要求ごとに組み立てる。状態は api の `OAUTH_KV`。CIMD は `global_fetch_strictly_public` を有効化して使い、DCR は `clientRegistrationEndpoint` を設定して fallback に残す | 認可コード + PKCE・同意ヘルパー・PRM・`insufficient_scope` まで揃い、試作で一巡した。`resources` は構築時固定なので、テナントを URL（issuer のパス）で運べば metadata・authorize・token のどの入口でもテナントが決まる。セッションと D1 は api にしかなく、admin に置くと api への往復が増える |
 | 48 | **MCP エンドポイントは api Worker の直接オリジン** `https://<api>/mcp/t/:tenantId`（論点 D2）。api → admin の逆向き Service Binding は dev（auxiliary worker）で成立するが採らない | Bearer 専用で cookie を使わず、admin 経由は 1 ホップ増えるだけ。逆向き binding は vitest にスタブが要り 3 環境分の定義も増える |
 | 49 | **PAT と OAuth の検証経路を `OAuthResourceServer` の `validateToken` で合流させる**。PAT は接頭辞で振り分け D1 を `memberships` と join した 1 照会、OAuth は同 Worker 内の `validateToken`（KV 1 回 + 復号）。両方に BLOCKLIST 2 キーを適用し `{userId, role, tenantId, exp, scopes, tokenId, tokenKind}` にする（`tokenKind` は `"pat" | "oauth"`。経路 `via` とは別の概念） | workerd ローカルで検証 1 回あたり OAuth 約 2 ms・PAT 約 2〜3 ms（BLOCKLIST 込み）。401 / 403 の challenge をライブラリに任せ、スコープ判定は入口に残す |
+| 50 | **elicitation に対応しないクライアントからの publish / unpublish は拒否して人に回す**（M4-2、2026-11-03、所有者の判断）。対応するクライアントは MRTR の elicitation で確認し、`requestState` は HMAC で保護してテナント・利用者・トークンに束縛する。publish ツールは常に出し、スコープ不足は 403 で step-up | 既定は人が公開する（16.8）。`record:publish` の付与だけを確認とみなすと、本文中の指示に従った誤公開を止める手段が無い。提案（M5）ができるまでの扱いで、緩めるのは `confirm.ts` の 1 か所 |
 
 ---
 
@@ -825,8 +826,9 @@ record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴�
 **既定は人が公開する**。エージェントには `status` を `in_review` / `ready` まで進めさせ、公開は人が管理画面で行う運用を基本にする（第 7 章の「公開軸とワークフロー軸の直交」が、この分担を自然に表す）。
 
 - `record:publish` は既定の付与から外す（16.3）。所有者が付与した場合に限り、エージェントが publish ツールを呼べる。
-- **publish ツールの出し方**: `tools/list` は接続ごとに変えてはならないが、要求に示された認可で変わるのは許される。付与スコープで出し分ける（`cacheScope: "private"`）か、常に出して `403 + insufficient_scope` で step-up させるかは M4-2 で決める。仮置きは後者（publish 権限を後から付与する運用に合う）。
-- **確認は 2 系統**: ① 同じ利用者への確認は MRTR の elicitation で行う（クライアントが能力を宣言していなければ送れない。`requestState` は攻撃者が操作できる入力として扱い、HMAC / AEAD で保護し、principal・TTL・元要求のダイジェストを照合する）。② 別の人（所有者）の承認と、elicitation に対応しないクライアントは **提案（change set）**へ回す。提案ができるまでは拒否して人に回す。
+- **publish ツールの出し方（M4-2 で確定）**: 常に `tools/list` に出し、スコープ不足は `403 + insufficient_scope` で step-up させる（publish 権限を後から付与する運用に合う）。ツール説明に PAT 接続の導線（所有者が `record:publish` 付きの PAT を発行する）を書く。
+- **確認は 2 系統**: ① 同じ利用者への確認は MRTR の elicitation で行う（クライアントが能力を宣言していなければ送れない。`requestState` は攻撃者が操作できる入力として扱い、HMAC / AEAD で保護し、principal・TTL・元要求のダイジェストを照合する）。② 別の人（所有者）の承認と、elicitation に対応しないクライアントは **提案（change set）**へ回す。提案ができるまでは拒否して人に回す（決定 50）。
+- **実装（M4-2、`apps/api/src/mcp/confirm.ts`）**: `record_publish` / `record_unpublish` は、要求の `_meta` の `clientCapabilities.elicitation` があれば `input_required`（form の elicitation で「公開しますか」、`requestState`）を返し、承諾を付けた再送で実行する。`requestState` は SDK の `createRequestStateCodec`（HMAC-SHA256、鍵は `JWT_SECRET` から用途の接頭辞で分ける、TTL 300 秒）で保護し、`テナント:利用者:tokenId` に束縛する（改ざん・流用・期限切れは `-32602`）。中身の操作名と `recordId` は元の要求と照合する（`state_mismatch`）。宣言が無ければ業務エラー `confirmation_unavailable` で、status を ready にして人に回すよう案内する。断れば `declined`。
 - **提案（change set、論点 B4）**: 直接書き込みに加え、変更を「提案」として保存し、管理画面で差分を見て採用・却下する経路を M5 で置く。`record:propose` だけを持つトークンの変更は提案になる。公開状態・ワークフロー状態（第 7 章）に加える 3 本目の軸であり、再適用の打ち切り先（16.6）の受け皿にもなる。
 
 ### 16.9 一覧と検索（論点 A4）

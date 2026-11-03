@@ -66,10 +66,17 @@ describe("操作カタログ", () => {
       "record_publish",
       "record_unpublish",
     ]);
-    // M4-1b: create / update / delete、M4-3: restore を出した。publish / unpublish(M4-2)はまだ
+    // M4-1b: create / update / delete、M4-3: restore、M4-2: publish / unpublish
     expect(
       OPERATIONS.filter((op) => op.via.includes("mcp") && !op.hints.readOnly).map((op) => op.name),
-    ).toEqual(["record_restore", "record_create", "record_update", "record_delete"]);
+    ).toEqual([
+      "record_restore",
+      "record_create",
+      "record_update",
+      "record_delete",
+      "record_publish",
+      "record_unpublish",
+    ]);
   });
 });
 
