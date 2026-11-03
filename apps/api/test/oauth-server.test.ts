@@ -23,6 +23,7 @@ import {
   registerClient,
   tokenRequest,
 } from "./oauth-helpers";
+import { fakeLimiter } from "./rate-limit-helper";
 
 // refresh_token で access token を取り直す(公開クライアントなので client_id だけ)
 async function refresh(tenantId: string, issued: Issued): Promise<Response> {
@@ -126,6 +127,31 @@ describe("OAuth 認可サーバー(/oauth/t/:tenantId)", () => {
       expect(token.status).toBe(503);
       expect(createTenantAuthServer(testEnv, tenantId)).toBeNull();
     }
+  });
+
+  // レビュー修正(Important 1): DCR と token endpoint は未認証で OAUTH_KV に書く / 読むので、/mcp と同じく
+  // 接続元 IP 単位の Rate Limiting をトークン検証や KV 到達の前に置き、未構成は fail-closed
+  it("/oauth/* は接続元 IP の Rate Limiting の後ろにある。超過は 429、未構成は 503、無いテナントは 404", async () => {
+    const tenantId = await insertTenant();
+    const register = (testEnv: Env, id = tenantId) =>
+      app.request(
+        `${tenantIssuer(ADMIN_ORIGIN, id)}/oauth/register`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ redirect_uris: ["http://localhost:3333/cb"] }),
+        },
+        testEnv,
+        CTX,
+      );
+    const limited = await register(oauthEnv({ MCP_IP_LIMITER: fakeLimiter(false) }));
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("60");
+    expect((await register(oauthEnv({ MCP_IP_LIMITER: undefined }))).status).toBe(503);
+    expect((await register(oauthEnv(), crypto.randomUUID())).status).toBe(404);
+    const meta = await app.request(metadataUrl(crypto.randomUUID()), {}, oauthEnv(), CTX);
+    expect(meta.status).toBe(404);
+    expect((await register(oauthEnv())).status).toBe(201);
   });
 
   it("wrangler.jsonc のトップレベルに OAUTH_KV がある(vitest の binding)", () => {

@@ -121,6 +121,16 @@ describe("設定 › 接続中のアプリ", () => {
     ).toBeInTheDocument();
   });
 
+  it("OAuth の付与の取得だけ失敗しても PAT の一覧は出し、別に知らせる", async () => {
+    const routes = authedRoutes({
+      "/v1/t/t1/tokens": vi.fn(() => jsonResponse(200, { tokens: [token] })),
+      "/v1/t/t1/oauth-grants": vi.fn(() => jsonResponse(500, { error: "boom" })),
+    });
+    renderAt("/t/blog/settings/tokens", socketHarness(), routes);
+    expect(await screen.findByText("Claude Code")).toBeInTheDocument();
+    expect(await screen.findByText(TOKEN_LABELS.grantsLoadFailed)).toBeInTheDocument();
+  });
+
   it("編集者は画面に入れずホームへ戻る", async () => {
     const router = renderAt("/t/blog/settings/tokens", socketHarness(), authedRoutes({}, "editor"));
     await waitFor(() => expect(router.state.location.pathname).toBe("/t/blog"));

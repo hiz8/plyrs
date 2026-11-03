@@ -58,6 +58,14 @@ describe("purgeOAuthData", () => {
     expect(await env.OAUTH_KV.get(PURGE_CURSOR_KEY)).toBeNull();
   });
 
+  // レビュー修正(Important 3): 保存した cursor が無効になっても翌日以降も同じ cursor で失敗し続けない
+  it("purge が失敗したら purge-cursor を消して、次回は先頭から始める", async () => {
+    await env.OAUTH_KV.put(PURGE_CURSOR_KEY, "bogus");
+    await expect(purgeOAuthData(oauthEnv())).rejects.toThrow();
+    expect(await env.OAUTH_KV.get(PURGE_CURSOR_KEY)).toBeNull();
+    expect((await purgeOAuthData(oauthEnv())).grantsChecked).toBeGreaterThanOrEqual(0);
+  });
+
   it("ADMIN_ORIGIN / API_ORIGIN が未設定なら何もしない(done のまま)", async () => {
     const result = await purgeOAuthData(oauthEnv({ API_ORIGIN: undefined }));
     expect(result).toMatchObject({ done: true, grantsChecked: 0, tokensChecked: 0 });

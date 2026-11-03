@@ -147,7 +147,12 @@ export async function handleAuthorizePost(c: Ctx): Promise<Response> {
     return c.json({ error: "not_configured", what: "ADMIN_ORIGIN / API_ORIGIN" }, 503);
   }
   const oauth = server.getOAuthApi(c.env);
-  const form = await c.req.formData();
+  let form: FormData;
+  try {
+    form = await c.req.formData();
+  } catch {
+    return errorPage(400, "接続の要求が不正です", "同意画面からやり直してください。");
+  }
   const handle = form.get("handle");
   if (typeof handle !== "string" || handle.length === 0) {
     return errorPage(400, "接続の要求が不正です", "同意画面からやり直してください。");
@@ -178,13 +183,17 @@ export async function handleAuthorizePost(c: Ctx): Promise<Response> {
       scope: approved.request.scope,
       props,
     });
+    // 監査の targetId は失効(oauth.revoke)と同じグラント ID(認可コード `userId:grantId:secret` の 2 要素目)。
+    // 同じ付与を idx_audit_logs_target で追えるようにする
+    const code = new URL(redirectTo).searchParams.get("code") ?? "";
     await writeAudit(c.env.DB, {
       actorId: member.userId,
       action: "oauth.grant",
       targetType: "oauth_grant",
-      targetId: approved.request.clientId,
+      targetId: code.split(":")[1] ?? approved.request.clientId,
       detail: {
         tenantId,
+        clientId: approved.request.clientId,
         scopes: approved.request.scope,
         redirectHost: new URL(approved.request.redirectUri).host,
       },

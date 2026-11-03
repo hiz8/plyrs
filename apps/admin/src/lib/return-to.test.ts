@@ -9,12 +9,21 @@ describe("safeReturnTo", () => {
     );
   });
 
+  it("クエリの中の // や .. や : は検査しない(redirect_uri や client_id を素のまま送るクライアントがある)", () => {
+    const value =
+      "/oauth/t/abc/authorize?client_id=https://claude.ai/.well-known/x&redirect_uri=http://localhost:3999/callback&state=a..b";
+    expect(safeReturnTo(value)).toBe(value);
+  });
+
   it("別オリジンや他のパスは捨てる(オープンリダイレクト対策)", () => {
     expect(safeReturnTo("https://evil.example/")).toBeNull();
     expect(safeReturnTo("//evil.example")).toBeNull();
     expect(safeReturnTo("/tenants")).toBeNull();
     expect(safeReturnTo("/oauth/t/abc/oauth/token")).toBeNull();
     expect(safeReturnTo("/oauth/t/abc/authorize/../x")).toBeNull();
+    expect(safeReturnTo("/oauth/t/../authorize")).toBeNull();
+    expect(safeReturnTo("/\\evil.example/oauth/t/abc/authorize")).toBeNull();
+    expect(safeReturnTo("/oauth/t/abc/authorize?x=1\\")).toBe("/oauth/t/abc/authorize?x=1\\");
     expect(safeReturnTo("/oauth/t/abc/authorize?x=1\r\nSet-Cookie:a")).toBeNull();
     expect(safeReturnTo("/oauth/t/abc/authorize#frag")).toBeNull();
     expect(safeReturnTo(42)).toBeNull();

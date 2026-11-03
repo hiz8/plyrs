@@ -215,6 +215,9 @@ describe("POST /oauth/t/:tenantId/authorize", () => {
       .from(auditLogs)
       .where(eq(auditLogs.actorId, userId));
     expect(audits.map((a) => a.action)).toEqual(["oauth.grant"]);
+    // targetId は失効(oauth.revoke)と同じグラント ID
+    const code = location.searchParams.get("code") ?? "";
+    expect(audits[0]?.targetId).toBe(code.split(":")[1]);
   });
 
   it("編集者がフォームに record:publish と type:manage を足しても付与されない(Review Focus 2)", async () => {

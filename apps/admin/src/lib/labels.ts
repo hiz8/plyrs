@@ -546,6 +546,8 @@ export const TOKEN_LABELS = {
   empty:
     "接続中のアプリはまだありません。トークンを発行するか、MCP クライアントから OAuth で接続すると、ここに並びます",
   loadFailed: "接続中のアプリの一覧を取得できませんでした",
+  grantsLoadFailed:
+    "OAuth で接続したアプリの一覧を取得できませんでした(トークンの一覧は表示しています)",
   status: { active: "有効", expired: "期限切れ", revoked: "失効済み" },
   neverUsed: "未使用",
   notApplicable: "—",

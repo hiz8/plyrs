@@ -35,10 +35,18 @@ export async function purgeOAuthData(
     resources: [`${origins.apiOrigin}/mcp`],
   });
   const cursor = (await env.OAUTH_KV.get(PURGE_CURSOR_KEY)) ?? undefined;
-  const result = await server.purgeExpiredData(env, {
-    batchSize: options.batchSize ?? BATCH_SIZE,
-    cursor,
-  });
+  let result: PurgeResult;
+  try {
+    result = await server.purgeExpiredData(env, {
+      batchSize: options.batchSize ?? BATCH_SIZE,
+      cursor,
+    });
+  } catch (error) {
+    // レビュー修正(Important 3): 保存した cursor が無効(KV の list cursor の失効など)でも翌日以降も同じ
+    // cursor で失敗し続けないよう、失敗したら cursor を捨てて次回は先頭から始める
+    await env.OAUTH_KV.delete(PURGE_CURSOR_KEY);
+    throw error;
+  }
   if (result.cursor !== undefined) {
     await env.OAUTH_KV.put(PURGE_CURSOR_KEY, result.cursor);
   } else {

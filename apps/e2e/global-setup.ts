@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -61,6 +61,15 @@ export default function globalSetup(): void {
         "",
       ].join("\n"),
     );
+  } else {
+    const existing = readFileSync(apiVars, "utf8");
+    for (const key of ["ADMIN_ORIGIN", "API_ORIGIN"]) {
+      if (!existing.includes(`${key}=`)) {
+        console.warn(
+          `apps/api/.dev.vars に ${key} が無い。oauth.spec.ts は ${key}=http://localhost:5199 を前提にする(apps/api/.dev.vars.example)`,
+        );
+      }
+    }
   }
   const adminVars = path.join(repoRoot, "apps/admin/.dev.vars");
   if (!existsSync(adminVars)) {

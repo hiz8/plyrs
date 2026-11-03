@@ -4,6 +4,7 @@ import { memberships, tenants, users } from "@plyrs/db/control-plane";
 import type { Role } from "../src/auth/permissions";
 import { app } from "../src/index";
 import { createTenantAuthServer, tenantIssuer, tenantResource } from "../src/oauth/server";
+import { fakeLimiter } from "./rate-limit-helper";
 
 // M3(決定 47〜49)のテストで共有する: テナントと会員の用意、PKCE、認可コード + PKCE の一巡。
 // 認可サーバーの issuer は admin のオリジン(ADMIN_ORIGIN)、resource は api のオリジン(API_ORIGIN)で、
@@ -15,8 +16,9 @@ export const REDIRECT_URI = "http://localhost:3333/callback";
 // app.request は ExecutionContext を渡さないとライブラリが 500 になる
 export const CTX = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
 
+// MCP_IP_LIMITER は /oauth/* の入口でも使う(接続元 IP 単位)。--no-isolate では実バケットを共有するので fake にする
 export function oauthEnv(overrides: Partial<Env> = {}): Env {
-  return { ...env, ADMIN_ORIGIN, API_ORIGIN, ...overrides };
+  return { ...env, ADMIN_ORIGIN, API_ORIGIN, MCP_IP_LIMITER: fakeLimiter(true), ...overrides };
 }
 
 export async function insertMember(

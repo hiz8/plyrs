@@ -105,11 +105,6 @@ function TokensPage() {
   });
 
   const rows = connectionRows(tokens.data ?? [], grants.data ?? [], new Date());
-  const listError = tokens.isLoadingError
-    ? tokens.error
-    : grants.isLoadingError
-      ? grants.error
-      : null;
 
   let connect;
   if (config.isLoadingError) {
@@ -145,14 +140,12 @@ function TokensPage() {
         </Button>
       }
       isLoading={tokens.isPending || grants.isPending}
+      // OAuth の付与の取得だけ失敗しても PAT の一覧は隠さない(表の下に別で知らせる)
       error={
-        listError !== null
+        tokens.isLoadingError
           ? {
-              message: errorMessage(listError, labels.loadFailed),
-              onRetry: () => {
-                void tokens.refetch();
-                void grants.refetch();
-              },
+              message: errorMessage(tokens.error, labels.loadFailed),
+              onRetry: () => void tokens.refetch(),
             }
           : undefined
       }
@@ -162,6 +155,9 @@ function TokensPage() {
       ) : (
         <TokensTable rows={rows} onRevoke={setRevokeTarget} isBusy={revoke.isPending} />
       )}
+      {grants.isLoadingError ? (
+        <CardError message={labels.grantsLoadFailed} onRetry={() => void grants.refetch()} />
+      ) : null}
       <SettingsCard title={labels.connect.title} description={labels.connect.description}>
         {connect}
       </SettingsCard>
