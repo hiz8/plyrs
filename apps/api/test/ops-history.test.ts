@@ -1,6 +1,11 @@
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { McpAuth } from "../src/do/authorize";
+import {
+  BOOKING_RESERVATION_KEY,
+  BOOKING_RESOURCE_KEY,
+  BOOKING_SLOT_KEY,
+} from "../src/modules/booking/manifest";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import { asInvokeResult, asPublishResult, asWriteResult } from "./rpc-unwrap";
 
@@ -153,5 +158,90 @@ describe("record_restore の権限", () => {
       ),
     );
     expect(result).toMatchObject({ ok: false, code: "forbidden" });
+  });
+});
+
+// §11.5: 型×操作ガード。writeRecord / record_create は型を引いた直後に moduleWriteDenial を判定する。
+// record_restore も同じ位置で判定しないと、record:write を持つ editor が「過去の版への復元」という形で
+// 所有者限定の型(booking.reservation = manage は owner のみ)を書き換えられる
+describe("record_restore のモジュール型ガード", () => {
+  const RESOURCE = uuid(750);
+  const SLOT = uuid(751);
+  const RESERVATION = uuid(752);
+  const reservation = (name: string) => ({
+    slot: { type: BOOKING_SLOT_KEY, id: SLOT },
+    name,
+    email: "r@example.com",
+    state: "pending",
+  });
+  const editor = () => mcpAuth({ role: "editor", scopes: ["record:read", "record:write"] });
+
+  beforeAll(async () => {
+    expect((await stub.enableModule(TENANT, "booking", owner)).ok).toBe(true);
+    expect(
+      asWriteResult(
+        await stub.writeRecord(
+          BOOKING_RESOURCE_KEY,
+          { recordId: RESOURCE, input: { name: "会議室" } },
+          owner,
+        ),
+      ).ok,
+    ).toBe(true);
+    expect(
+      asWriteResult(
+        await stub.writeRecord(
+          BOOKING_SLOT_KEY,
+          {
+            recordId: SLOT,
+            input: {
+              resource: { type: BOOKING_RESOURCE_KEY, id: RESOURCE },
+              starts_at: "2026-08-01T10:00:00Z",
+              ends_at: "2026-08-01T11:00:00Z",
+              capacity: 1,
+            },
+          },
+          owner,
+        ),
+      ).ok,
+    ).toBe(true);
+    // 同じ actor の連続した書き込みは 1 版に畳み込まれるので、2 版目は別の owner が書く
+    const writers = [owner, { ...auth("owner-2", "owner"), tenantId: TENANT }];
+    for (const [i, name] of ["予約者", "改名した予約者"].entries()) {
+      expect(
+        asWriteResult(
+          await stub.writeRecord(
+            BOOKING_RESERVATION_KEY,
+            { recordId: RESERVATION, input: reservation(name) },
+            writers[i] ?? owner,
+          ),
+        ).ok,
+      ).toBe(true);
+    }
+  });
+
+  it("editor は record:write があっても booking.reservation を復元できない(forbidden)", async () => {
+    const result = asInvokeResult(
+      await stub.invoke("record_restore", { recordId: RESERVATION, historySeq: 1 }, editor()),
+    );
+    expect(result).toMatchObject({ ok: false, code: "forbidden" });
+    const current = asInvokeResult(
+      await stub.invoke("record_get", { recordId: RESERVATION }, editor()),
+    );
+    expect(current.ok && (current.output as { data: { name: string } }).data.name).toBe(
+      "改名した予約者",
+    );
+  });
+
+  it("owner は復元できる", async () => {
+    const result = asInvokeResult(
+      await stub.invoke(
+        "record_restore",
+        { recordId: RESERVATION, historySeq: 1 },
+        mcpAuth({ role: "owner", scopes: ["record:read", "record:write"] }),
+      ),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect((result.output as { data: { name: string } }).data.name).toBe("予約者");
   });
 });
