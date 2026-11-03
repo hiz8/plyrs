@@ -8,18 +8,19 @@ import { getSchema, type JSONContent } from "@tiptap/core";
 import { MarkdownManager } from "@tiptap/markdown";
 import type { Schema } from "@tiptap/pm/model";
 import { workerExtensions } from "./extensions";
-import { MAX_HEADING_LEVEL } from "./vocabulary";
+import {
+  ASSET_IMAGE_HREF_PREFIX,
+  MAX_HEADING_LEVEL,
+  UnsupportedMarkdownError,
+  type UnsupportedMarkdownKind,
+} from "./vocabulary";
 
 // M2-2(design-spec 16.10、決定 46): Markdown ⇄ AST の双方向変換。@tiptap/markdown の
 // MarkdownManager を Editor 無し・DOM 無しで使う(M0-2 試作で確認、workerd での動作は
 // apps/api/test/richtext-workerd.test.ts が固定)。Markdown → AST は必ず ProseMirror の
 // スキーマ検証を通し、語彙に無い構造(表・タスクリスト・外部 URL の画像)は業務エラーで返す。
 
-export type UnsupportedMarkdownKind =
-  | "table"
-  | "task_list"
-  | "external_image"
-  | "invalid_structure";
+export type { UnsupportedMarkdownKind } from "./vocabulary";
 
 export type MarkdownToRichTextResult =
   | { ok: true; envelope: RichTextEnvelope }
@@ -50,27 +51,41 @@ export function richTextToMarkdown(envelope: RichTextEnvelope): string {
 
 const EMPTY_DOC: RichTextNode = { type: "doc", content: [{ type: "paragraph" }] };
 
-// parse の前に正規表現で検出する構文。marked は表やタスクリストを黙って落とす・不正な AST にする
-// (M0-2 結果 4 節)ので、何が使えなかったかを人とエージェントに伝えるためにここで名前を付ける
-const TABLE_ROW = /^\s*\|.*\|\s*$/u;
-const TASK_ITEM = /^\s*(?:[-*+]|\d+\.)\s+\[(?: |x|X)\]\s/u;
-const IMAGE = /!\[[^\]]*\]\(\s*([^)\s]+)/gu;
+// parse の前に marked のトークンを走査して検出する構文。marked は表やタスクリストを黙って落とす・
+// 不正な AST にする(M0-2 結果 4 節)ので、何が使えなかったかを人とエージェントに伝えるためにここで
+// 名前を付ける。正規表現で行を見ると、行頭・行末の `|` を省いた GFM テーブルを見逃し、コードブロック内の
+// `| a |` や `- [ ]` を誤検出するので、marked 自身の字句解析に揃える
+interface MarkedToken {
+  type?: string;
+  href?: unknown;
+  task?: boolean;
+  tokens?: MarkedToken[];
+  items?: MarkedToken[];
+  header?: MarkedToken[];
+  rows?: MarkedToken[][];
+}
+
+function* walkTokens(tokens: readonly MarkedToken[]): Generator<MarkedToken> {
+  for (const token of tokens) {
+    yield token;
+    if (token.tokens !== undefined) yield* walkTokens(token.tokens);
+    if (token.items !== undefined) yield* walkTokens(token.items);
+  }
+}
 
 function detectUnsupported(markdown: string): UnsupportedMarkdownKind[] {
   const found = new Set<UnsupportedMarkdownKind>();
-  const lines = markdown.split(/\r?\n/u);
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? "";
-    if (TABLE_ROW.test(line) && TABLE_ROW.test(lines[i + 1] ?? "")) {
+  const tokens = getManager().instance.lexer(markdown) as unknown as MarkedToken[];
+  for (const token of walkTokens(tokens)) {
+    if (token.type === "table") {
       found.add("table");
-    }
-    if (TASK_ITEM.test(line)) {
+    } else if (token.type === "list_item" && token.task === true) {
       found.add("task_list");
-    }
-  }
-  for (const match of markdown.matchAll(IMAGE)) {
-    if (!(match[1] ?? "").startsWith("plyrs://asset/")) {
-      found.add("external_image");
+    } else if (token.type === "image") {
+      const href = typeof token.href === "string" ? token.href : "";
+      if (!href.startsWith(ASSET_IMAGE_HREF_PREFIX)) {
+        found.add("external_image");
+      }
     }
   }
   return [...found];
@@ -119,7 +134,15 @@ export function markdownToRichText(markdown: string): MarkdownToRichTextResult {
   if (detected.length > 0) {
     return unsupported(detected);
   }
-  const parsed = clampHeadings(getManager().parse(markdown));
+  let parsed: JSONContent;
+  try {
+    parsed = clampHeadings(getManager().parse(markdown));
+  } catch (error) {
+    if (error instanceof UnsupportedMarkdownError) {
+      return unsupported([error.kind], error.message);
+    }
+    throw error;
+  }
   const doc = parsed.content === undefined || parsed.content.length === 0 ? EMPTY_DOC : parsed;
   let checked: JSONContent;
   try {

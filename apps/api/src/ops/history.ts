@@ -11,6 +11,7 @@ import {
 } from "../do/history";
 import { restoreRecordCore } from "../do/restore-record";
 import { loadRecord } from "../do/write-record";
+import { moduleWriteDenial } from "../modules/enablement";
 import type { ProjectionRelationRow } from "../projection/payload";
 import { buildSyncInput, loadRecordInput } from "../sync/records";
 import { historyActorOf, recordSnapshotSchema, type OpContext, type OpFailure } from "./read";
@@ -241,6 +242,21 @@ export const HISTORY_HANDLERS = {
     ctx: OpContext,
     input: z.infer<typeof recordRestore.input>,
   ): Ok<unknown> | OpFailure => {
+    // §11.5: 型×操作ガード。writeRecord RPC / record_create と同じ位置(型を引いた直後)で判定する。
+    // ここを抜くと record:write を持つ editor が「過去の版への復元」という形で、所有者限定の
+    // モジュール型(booking.reservation など)や削除済みの record を書き換えられる
+    const prev = loadRecord(ctx.sql, input.recordId);
+    if (prev === null) {
+      return { ok: false, code: "not_found", message: `record not found: ${input.recordId}` };
+    }
+    const typeRow = loadContentTypeByKey(ctx.sql, prev.type);
+    if (typeRow === null) {
+      return { ok: false, code: "unknown_type", message: `unknown content type: ${prev.type}` };
+    }
+    const moduleDenial = moduleWriteDenial(ctx.sql, typeRow, ctx.auth.role);
+    if (moduleDenial !== null) {
+      return { ok: false, ...moduleDenial };
+    }
     const result = restoreRecordCore(
       {
         sql: ctx.sql,
