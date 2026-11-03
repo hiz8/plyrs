@@ -1,6 +1,6 @@
 import { env, runInDurableObject } from "cloudflare:test";
 import { drizzle } from "drizzle-orm/d1";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { memberships, tenants, users } from "@plyrs/db/control-plane";
 import { blockUser } from "../src/auth/blocklist";
 import { issuePat } from "../src/auth/pat";
@@ -239,5 +239,62 @@ describe("asset_upload とアップロード URL", () => {
     );
     const json = await res.json<ToolResult>();
     expect(json.result?.isError).toBe(true);
+  });
+});
+
+describe("asset_import_url(M4-5)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("公開 URL の PNG を取り込み、assetId が record_get で読める", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(PNG, { status: 200, headers: { "content-type": "image/png" } }),
+      );
+    const res = await callRaw(
+      a,
+      "asset_import_url",
+      { url: "https://images.example.com/photos/spring.png" },
+      a.writePat,
+    );
+    const json = await res.json<ToolResult>();
+    expect(json.result?.isError, JSON.stringify(json)).toBeUndefined();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const assetId = json.result?.structuredContent?.["assetId"] as string;
+    expect(json.result?.structuredContent).toMatchObject({
+      contentType: "image/png",
+      size: PNG.byteLength,
+    });
+    const got = await callRaw(a, "record_get", { recordId: assetId }, a.readPat);
+    expect((await got.json<ToolResult>()).result?.structuredContent).toMatchObject({
+      type: "asset",
+      data: { filename: "spring.png", content_type: "image/png", width: 16, height: 8 },
+    });
+  });
+
+  it("許されない URL は url_not_allowed の業務エラーで、fetch を呼ばない", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const res = await callRaw(
+      a,
+      "asset_import_url",
+      { url: "https://169.254.169.254/latest/meta-data/" },
+      a.writePat,
+    );
+    const json = await res.json<ToolResult>();
+    expect(json.result?.isError).toBe(true);
+    expect(json.result?.structuredContent).toMatchObject({ error: { code: "url_not_allowed" } });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("record:read だけの PAT は入口で 403", async () => {
+    const res = await callRaw(
+      a,
+      "asset_import_url",
+      { url: "https://images.example.com/a.png" },
+      a.readPat,
+    );
+    expect(res.status).toBe(403);
   });
 });

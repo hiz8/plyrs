@@ -1,5 +1,6 @@
 import { generateSessionToken, sha256Hex } from "../auth/session";
-import { MAX_ASSET_SIZE_BYTES } from "../assets/store";
+import { fetchPublicImage } from "../assets/fetch-url";
+import { MAX_ASSET_SIZE_BYTES, storeAsset } from "../assets/store";
 import { requireOperation } from "../do/authorize";
 import { ASSET_UPLOAD_TTL_SECONDS } from "../ops/assets";
 import type { OpSpec } from "../ops/catalog";
@@ -48,8 +49,36 @@ async function assetUpload(
   };
 }
 
+// 16.11(M4-5): URL から取り込む。SSRF の規則は assets/fetch-url.ts
+async function assetImportUrl(
+  deps: McpServerDeps,
+  input: { url: string; filename?: string },
+): Promise<InvokeResult> {
+  const fetched = await fetchPublicImage(input.url);
+  if (!fetched.ok) {
+    return fetched;
+  }
+  const stored = await storeAsset(deps.env, deps.tenantId, deps.auth, {
+    body: fetched.body,
+    filename: input.filename ?? fetched.filename,
+    contentType: fetched.contentType,
+  });
+  if (!stored.ok) {
+    return stored;
+  }
+  return {
+    ok: true,
+    output: {
+      assetId: stored.record.id,
+      contentType: fetched.contentType,
+      size: fetched.body.byteLength,
+    },
+  };
+}
+
 const WORKER_HANDLERS: Readonly<Record<string, WorkerHandler>> = {
   asset_upload: assetUpload,
+  asset_import_url: assetImportUrl,
 };
 
 export async function runWorkerOperation(

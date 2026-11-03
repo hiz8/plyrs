@@ -18,7 +18,7 @@ export interface OpSpec<I extends z.ZodType = z.ZodType, O extends z.ZodType = z
   output: O;
   requires: Operation; // 必要な Operation。スコープ名と同じ(16.3)
   via: readonly Via[]; // 提供する経路
-  hints: { readOnly: boolean; destructive: boolean; idempotent: boolean; openWorld: false };
+  hints: { readOnly: boolean; destructive: boolean; idempotent: boolean; openWorld: boolean };
   // tools/list の ttlMs / cacheScope(仕様 2026-07-28)。null は付けない
   cache: { ttlMs: number; cacheScope: "public" | "private" } | null;
   // 公開 URL の組み立てにテナントの slug が要る操作(record_publish)。REST の入口はこのときだけ

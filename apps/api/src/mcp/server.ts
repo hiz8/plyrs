@@ -240,6 +240,10 @@ function summarize(spec: OpSpec, output: unknown): string {
     lines.push(
       `アップロード先を発行した(期限 ${str(output["expiresAt"])}、1 回だけ)。structuredContent.uploadUrl に画像の本文を POST し、応答の assetId を ![label](plyrs://asset/<assetId>) で使う。`,
     );
+  } else if (spec.name === "asset_import_url" && isRecord(output)) {
+    lines.push(
+      `画像を取り込んだ(asset ${str(output["assetId"])}、${str(output["contentType"])}、${String(output["size"])} バイト)。本文では ![label](plyrs://asset/${str(output["assetId"])}) で使う。`,
+    );
   } else if (spec.name === "record_delete" && isRecord(output)) {
     lines.push(
       `record ${str(output["recordId"])} を削除した(${str(output["deletedAt"])})。record_restore で戻せる。`,

@@ -50,7 +50,7 @@ beforeAll(async () => {
 });
 
 describe("操作カタログ", () => {
-  it("読み取り 4・検索 1・履歴 3・書き込み 5・アセット 1 の操作を宣言順に持ち、MCP に出す書き込みは段階的に増やす(M4)", () => {
+  it("読み取り 4・検索 1・履歴 3・書き込み 5・アセット 2 の操作を宣言順に持ち、MCP に出す書き込みは段階的に増やす(M4)", () => {
     expect(OPERATIONS.map((op) => op.name)).toEqual([
       "type_list",
       "type_get",
@@ -66,6 +66,7 @@ describe("操作カタログ", () => {
       "record_publish",
       "record_unpublish",
       "asset_upload",
+      "asset_import_url",
     ]);
     // M4-1b: create / update / delete、M4-3: restore、M4-2: publish / unpublish
     expect(
@@ -78,6 +79,7 @@ describe("操作カタログ", () => {
       "record_publish",
       "record_unpublish",
       "asset_upload",
+      "asset_import_url",
     ]);
   });
 });
