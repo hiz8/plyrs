@@ -100,6 +100,15 @@ describe("ensureTopLevelBlockIds(決定 44: v1 を読むときの決定的な ID
     expect(ids(result.envelope)[1]).toMatch(/^v1-[0-9a-f]{24}$/);
   });
 
+  it("導出 ID が後ろの保存済み ID と重なっても奪わず、接尾辞を付ける(先頭に同じ内容を入れた場合)", () => {
+    const taken = hashBlock(0, para("a"));
+    const result = ensureTopLevelBlockIds({
+      schemaVersion: 2,
+      doc: { type: "doc", content: [para("a"), para("a", { id: taken })] },
+    });
+    expect(ids(result.envelope)).toEqual([`${taken}-2`, taken]);
+  });
+
   it("入れ子のノードには触らない(契約は最上位ブロックだけ)", () => {
     const list = {
       type: "bulletList",

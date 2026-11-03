@@ -552,6 +552,7 @@ export const TOKEN_LABELS = {
   neverUsed: "未使用",
   notApplicable: "—",
   noExpiry: "期限なし",
+  pending: "接続待ち",
   expiresIn: (days: number) => `残り ${days} 日`,
   revoke: "失効",
   revokeOf: (name: string) => `${name}を失効`,

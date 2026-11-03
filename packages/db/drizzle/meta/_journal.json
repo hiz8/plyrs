@@ -64,6 +64,20 @@
       "when": 1793612538910,
       "tag": "0008_records_fts",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793697796256,
+      "tag": "0009_majestic_cardiac",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793698719684,
+      "tag": "0010_flippant_apocalypse",
+      "breakpoints": true
     }
   ]
 }

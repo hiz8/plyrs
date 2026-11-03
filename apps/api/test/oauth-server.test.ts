@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { describe, expect, it } from "vitest";
 import { memberships } from "@plyrs/db/control-plane";
-import { blockUser, unblockUser } from "../src/auth/blocklist";
+import { blockMembership, blockUser, unblockMembership, unblockUser } from "../src/auth/blocklist";
 import { app } from "../src/index";
 import {
   ACCESS_TOKEN_TTL,
@@ -193,6 +193,53 @@ describe("OAuth 認可サーバー(/oauth/t/:tenantId)", () => {
       const again = await refresh(tenantId, issued);
       expect(again.status).toBe(400);
       expect(await again.json()).toMatchObject({ error: "invalid_grant" });
+    });
+
+    it("会員資格のブロック(blocked:membership)中の refresh も invalid_grant(M3 の見送り指摘 (c))", async () => {
+      const tenantId = await insertTenant();
+      const issued = await authorize(tenantId, ["record:read"], { role: "editor" });
+      await blockMembership(env.BLOCKLIST, issued.userId, tenantId);
+      try {
+        const res = await refresh(tenantId, issued);
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ error: "invalid_grant" });
+      } finally {
+        await unblockMembership(env.BLOCKLIST, issued.userId, tenantId);
+      }
+    });
+
+    it("D1 の一時障害は 503 temporarily_unavailable で、グラントは残る(M3 の見送り指摘 (c))", async () => {
+      const tenantId = await insertTenant();
+      const issued = await authorize(tenantId, ["record:read"], { role: "editor" });
+      const broken = oauthEnv({
+        // 入口の tenants の照会は通し、refresh の memberships の照会だけ落とす
+        DB: new Proxy(env.DB, {
+          get(target, key) {
+            if (key === "prepare") {
+              return (query: string) => {
+                if (query.includes("memberships")) {
+                  throw new Error("D1 is down");
+                }
+                return target.prepare(query);
+              };
+            }
+            const value: unknown = Reflect.get(target, key);
+            return typeof value === "function" ? value.bind(target) : value;
+          },
+        }),
+      });
+      const res = await tokenRequest(
+        tenantId,
+        {
+          grant_type: "refresh_token",
+          refresh_token: issued.refresh_token ?? "",
+          client_id: issued.clientId,
+        },
+        broken,
+      );
+      expect(res.status).toBe(503);
+      expect(await res.json()).toMatchObject({ error: "temporarily_unavailable" });
+      expect((await refresh(tenantId, issued)).status).toBe(200);
     });
 
     it("BAN(blocked:user)中の refresh も invalid_grant(入口の 403 とは別に、グラントを残さない)", async () => {

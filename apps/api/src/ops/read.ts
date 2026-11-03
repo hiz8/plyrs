@@ -30,12 +30,22 @@ export interface OpDeps {
   scheduleModuleAlarm: (moduleId: string, dueAtMs: number) => void;
 }
 
+export interface PublishExpectation {
+  version: number;
+  // record の最新の history_seq。公開 → 取り下げのように版が変わらない往復でも進む
+  historySeq: number;
+}
+
 export interface OpContext {
   sql: SqlStorage;
   // DO が自分の名前として知っているテナント(do_config.tenant_id)。まだ刻まれていなければ null
   tenantId: string | null;
   // 公開 URL に要る slug。needsTenantSlug の操作を REST から呼ぶときだけ入口が渡す
   tenantSlug: string | null;
+  // 16.8(M4 のレビュー): MCP の確認を通った publish / unpublish が、確認文を見せたときの record の版と
+  // 公開状態を渡す。DO の中(同じトランザクション)で照合し、違えば record_changed にする。
+  // REST と管理画面は渡さない
+  expect?: PublishExpectation | null;
   // 経路(16.5)。invoke は同期経路からは呼ばれないので mcp か rest
   via: Via;
   auth: AuthContext | McpAuth;
@@ -125,12 +135,18 @@ export const recordGetOutputSchema = recordSnapshotSchema.extend({
     .record(z.string(), z.string())
     .optional()
     .describe("リッチテキストのフィールド key → Markdown(読み取り用の一方向変換)"),
+  outline: z
+    .record(z.string(), z.array(z.object({ id: z.string(), type: z.string(), text: z.string() })))
+    .optional()
+    .describe(
+      "リッチテキストのフィールド key → 最上位ブロックの一覧(record_update の blocks で指す ID と先頭 80 文字)",
+    ),
 });
 
 export const recordGet = defineOperation({
   name: "record_get",
   title: "record の取得",
-  description: `record を ID で 1 件取得する。下書きを含む現在の内容(data)・フィールドごとの版(fieldVersions)・ワークフロー状態(status)を返す。リッチテキストのフィールドは markdown に Markdown 表現を併記する。削除済みは not_found。${UNTRUSTED_NOTE}`,
+  description: `record を ID で 1 件取得する。下書きを含む現在の内容(data)・フィールドごとの版(fieldVersions)・ワークフロー状態(status)を返す。リッチテキストのフィールドは markdown に Markdown 表現を、outline に最上位ブロックの ID と先頭の文を併記する。削除済みは not_found。${UNTRUSTED_NOTE}`,
   input: z.object({ recordId: uuidSchema }),
   output: recordGetOutputSchema,
   requires: "record:read",

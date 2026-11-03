@@ -100,6 +100,29 @@ describe("RichTextEditor", () => {
     expect(JSON.stringify((editor as Editor).getJSON())).not.toContain("https://example.com");
   });
 
+  it("isAllowedLink が拒否する URL のリンクは付けない(Tiptap の既定の検査と両方を通す)", async () => {
+    let editor: Editor | null = null;
+    render(
+      <RichTextEditor
+        label="body"
+        value={docWith("リンク先")}
+        onChange={() => {}}
+        onEditorReady={(e) => (editor = e)}
+        isAllowedLink={(url) => url.startsWith("https:")}
+      />,
+    );
+    await screen.findByRole("textbox", { name: "body" });
+    if (editor === null) throw new Error("editor not ready");
+    const current = editor as Editor;
+    current.commands.setTextSelection({ from: 1, to: 4 });
+    current.commands.setLink({ href: "ftp://example.com/a" });
+    expect(JSON.stringify(current.getJSON())).not.toContain("ftp://example.com/a");
+    current.commands.setLink({ href: "javascript:alert(1)" });
+    expect(JSON.stringify(current.getJSON())).not.toContain("javascript:");
+    current.commands.setLink({ href: "https://example.com" });
+    expect(JSON.stringify(current.getJSON())).toContain("https://example.com");
+  });
+
   it("reflects an external value replacement without emitting onChange", async () => {
     const onChange = vi.fn();
     const { rerender } = render(

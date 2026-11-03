@@ -1,0 +1,1 @@
+CREATE INDEX `idx_records_type_updated` ON `records` (`type`,`updated_at`,`seq`);

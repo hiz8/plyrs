@@ -2,19 +2,24 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { memberships } from "@plyrs/db/control-plane";
 import { blockMembership, blockUser } from "./blocklist";
+import { revokeUserGrants } from "../oauth/grants";
 import { revokeUserPats } from "./pat";
 
 export interface CutOffResult {
   disconnected: number;
   // 失効させた PAT の id(監査は呼び出し元が書く)
   revokedTokens: string[];
+  // 失効させた OAuth の付与(グラント ID。監査は呼び出し元が書く)
+  revokedGrants: string[];
 }
 
 // §7 引き継ぎ事項: blockUser(KV)だけでは確立済みソケットが切れない。
-// BAN は必ず該当テナント DO の disconnectUser と併呼する。M1-3a: PAT も全テナント分を失効させる
+// BAN は必ず該当テナント DO の disconnectUser と併呼する。M1-3a: PAT も全テナント分を失効させる。
+// M4-0b: OAuth の付与も全テナント分を失効させる
 export async function banUserEverywhere(env: Env, userId: string): Promise<CutOffResult> {
   await blockUser(env.BLOCKLIST, userId);
   const revokedTokens = await revokeUserPats(env.DB, userId, new Date());
+  const revokedGrants = await revokeUserGrants(env, userId, null);
   const rows = await drizzle(env.DB)
     .select({ tenantId: memberships.tenantId })
     .from(memberships)
@@ -27,7 +32,7 @@ export async function banUserEverywhere(env: Env, userId: string): Promise<CutOf
       return stub.disconnectUser(userId);
     }),
   );
-  return { disconnected: counts.reduce((sum, n) => sum + n, 0), revokedTokens };
+  return { disconnected: counts.reduce((sum, n) => sum + n, 0), revokedTokens, revokedGrants };
 }
 
 export async function revokeMembership(
@@ -50,7 +55,8 @@ export async function cutOffMembership(
 ): Promise<CutOffResult> {
   await blockMembership(env.BLOCKLIST, userId, tenantId);
   const revokedTokens = await revokeUserPats(env.DB, userId, new Date(), tenantId);
+  const revokedGrants = await revokeUserGrants(env, userId, tenantId);
   const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
   const disconnected = await stub.disconnectUser(userId);
-  return { disconnected, revokedTokens };
+  return { disconnected, revokedTokens, revokedGrants };
 }

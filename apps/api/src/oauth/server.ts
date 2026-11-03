@@ -7,7 +7,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { memberships } from "@plyrs/db/control-plane";
-import { isBlocked } from "../auth/blocklist";
+import { isBlocked, isMembershipBlocked } from "../auth/blocklist";
 import { PAT_SCOPES } from "../auth/pat";
 import { isRole, type Role } from "../auth/permissions";
 
@@ -68,7 +68,7 @@ function isGrantProps(value: unknown): value is McpGrantProps {
 }
 
 // M3-4(16.3、Review Focus 3): refresh のたびに memberships から現在のロールを読み直す。会員でなくなった、
-// または BAN された利用者は invalid_grant(ライブラリがグラントとトークンを失効させる)。認可コードの交換では
+// BAN された、または会員資格をブロックされた利用者は invalid_grant(ライブラリがグラントとトークンを失効させる)。認可コードの交換では
 // 同意の直後なので読み直さない
 export async function refreshGrantProps(
   options: TokenExchangeCallbackOptions<Env>,
@@ -80,16 +80,36 @@ export async function refreshGrantProps(
   if (!isGrantProps(props)) {
     throw new OAuthError("invalid_grant", { description: "grant props are malformed" });
   }
-  if (await isBlocked(options.env.BLOCKLIST, props.userId)) {
+  // M3 の見送り指摘 (c): D1 / KV の一時障害は 500 ではなく 503 temporarily_unavailable にする
+  // (クライアントが付与を捨てずに再試行できる。invalid_grant だとライブラリがグラントを失効させる)
+  let blocked: boolean;
+  let row: { role: string } | undefined;
+  try {
+    blocked =
+      (await isBlocked(options.env.BLOCKLIST, props.userId)) ||
+      (await isMembershipBlocked(options.env.BLOCKLIST, props.userId, props.tenantId));
+    row = blocked
+      ? undefined
+      : (
+          await drizzle(options.env.DB)
+            .select({ role: memberships.role })
+            .from(memberships)
+            .where(
+              and(eq(memberships.userId, props.userId), eq(memberships.tenantId, props.tenantId)),
+            )
+            .limit(1)
+        )[0];
+  } catch (error) {
+    console.warn("oauth refresh", props.tenantId, error instanceof Error ? error.message : error);
+    throw new OAuthError("temporarily_unavailable", {
+      description: "try again later",
+      statusCode: 503,
+      headers: { "retry-after": "30" },
+    });
+  }
+  if (blocked) {
     throw new OAuthError("invalid_grant", { description: "user is blocked" });
   }
-  const row = (
-    await drizzle(options.env.DB)
-      .select({ role: memberships.role })
-      .from(memberships)
-      .where(and(eq(memberships.userId, props.userId), eq(memberships.tenantId, props.tenantId)))
-      .limit(1)
-  )[0];
   if (row === undefined || !isRole(row.role)) {
     throw new OAuthError("invalid_grant", { description: "membership revoked" });
   }

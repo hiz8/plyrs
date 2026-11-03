@@ -264,6 +264,11 @@ export interface RichTextEditorProps {
   resolveAssetUrl?: AssetUrlResolver | undefined;
   /** 閲覧者向け。編集不可・ツールバー無し・下罫線だけ(onRequestAssetImage は無視) */
   isReadOnly?: boolean | undefined;
+  /**
+   * リンクの URL の追加の検査(Tiptap の既定の検査と両方を通ったものだけ付ける)。admin はサーバーの
+   * validate-on-write と同じ判定を渡す(ui は metamodel に依存しない方針のため、判定を受け取る)
+   */
+  isAllowedLink?: ((url: string) => boolean) | undefined;
 }
 
 export function RichTextEditor({
@@ -276,6 +281,7 @@ export function RichTextEditor({
   onRequestAssetImage,
   resolveAssetUrl,
   isReadOnly,
+  isAllowedLink,
 }: RichTextEditorProps) {
   // useEditor のオプションは初回マウントで確定する(deps [])。以降に変わりうる
   // コールバックは ref 経由で最新を参照する。
@@ -289,6 +295,8 @@ export function RichTextEditor({
   onRequestAssetImageRef.current = onRequestAssetImage;
   const resolveAssetUrlRef = useRef(resolveAssetUrl);
   resolveAssetUrlRef.current = resolveAssetUrl;
+  const isAllowedLinkRef = useRef(isAllowedLink);
+  isAllowedLinkRef.current = isAllowedLink;
 
   interface SuggestView extends MentionSuggestState {
     index: number;
@@ -341,7 +349,13 @@ export function RichTextEditor({
       extensions: [
         StarterKit.configure({
           heading: { levels: [...RICH_TEXT_HEADING_LEVELS] },
-          link: { openOnClick: false },
+          link: {
+            openOnClick: false,
+            // Tiptap の既定の検査に、呼び出し側の判定(admin はサーバーの validate-on-write と同じ
+            // isSafeLinkHref)を重ねる。サーバーが拒否するリンクはエディタでも付けない
+            isAllowedUri: (url, { defaultValidate }) =>
+              defaultValidate(url) && (isAllowedLinkRef.current?.(url) ?? true),
+          },
         }),
         createRecordMention(glue),
         createAssetImage(() => resolveAssetUrlRef.current),

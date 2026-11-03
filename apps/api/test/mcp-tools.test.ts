@@ -26,6 +26,8 @@ const GUIDE = "見出しは 1 つ。本文は 3 段落で、最後に次の記�
 let tenantId: string;
 let userId: string;
 let pat: string;
+// M4-1b: 書き込み用(record:delete は持たない)
+let writePat: string;
 
 beforeAll(async () => {
   tenantId = crypto.randomUUID();
@@ -43,6 +45,20 @@ beforeAll(async () => {
     await issuePat(
       env.DB,
       { userId, tenantId, name: "t", scopes: ["record:read"], expiresInDays: 1 },
+      NOW,
+    )
+  ).token;
+
+  writePat = (
+    await issuePat(
+      env.DB,
+      {
+        userId,
+        tenantId,
+        name: "w",
+        scopes: ["record:read", "record:write"],
+        expiresInDays: 1,
+      },
       NOW,
     )
   ).token;
@@ -101,7 +117,7 @@ function envelope(method: string, params: Record<string, unknown> = {}) {
   };
 }
 
-async function rpcRaw(method: string, params: Record<string, unknown> = {}) {
+async function rpcRaw(method: string, params: Record<string, unknown> = {}, token = pat) {
   return app.request(
     `${ORIGIN}/mcp/t/${tenantId}`,
     {
@@ -113,7 +129,7 @@ async function rpcRaw(method: string, params: Record<string, unknown> = {}) {
         "mcp-method": method,
         ...(typeof params["name"] === "string" ? { "mcp-name": params["name"] } : {}),
         ...(typeof params["uri"] === "string" ? { "mcp-name": params["uri"] } : {}),
-        authorization: `Bearer ${pat}`,
+        authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(envelope(method, params)),
     },
@@ -122,16 +138,16 @@ async function rpcRaw(method: string, params: Record<string, unknown> = {}) {
   );
 }
 
-async function rpc(method: string, params: Record<string, unknown> = {}) {
-  const res = await rpcRaw(method, params);
+async function rpc(method: string, params: Record<string, unknown> = {}, token = pat) {
+  const res = await rpcRaw(method, params, token);
   expect(res.status, await res.clone().text()).toBe(200);
   const json = await res.json<{ result?: Record<string, unknown>; error?: unknown }>();
   expect(json.error, JSON.stringify(json)).toBeUndefined();
   return json.result ?? {};
 }
 
-async function call(name: string, args: Record<string, unknown> = {}) {
-  return (await rpc("tools/call", { name, arguments: args })) as {
+async function call(name: string, args: Record<string, unknown> = {}, token = pat) {
+  return (await rpc("tools/call", { name, arguments: args }, token)) as {
     content: { type: string; text?: string }[];
     structuredContent?: Record<string, unknown>;
     isError?: boolean;
@@ -148,11 +164,148 @@ describe("tools/list", () => {
     expect(list["ttlMs"]).toBe(0);
     expect(list["cacheScope"]).toBe("private");
     for (const tool of tools) {
-      expect(tool["annotations"]).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+      const spec = OPERATIONS.find((op) => op.name === tool["name"])!;
+      expect(tool["annotations"]).toMatchObject({
+        readOnlyHint: spec.hints.readOnly,
+        destructiveHint: spec.hints.destructive,
+        idempotentHint: spec.hints.idempotent,
+      });
       expect(tool["inputSchema"]).toMatchObject({ type: "object" });
       expect(tool["outputSchema"]).toMatchObject({ type: "object" });
       expect(typeof tool["description"]).toBe("string");
     }
+  });
+});
+
+describe("書き込みツール(M4-1b)", () => {
+  it("tools/list に record_create / record_update / record_delete が並び、record_update は attempt を受ける", async () => {
+    const tools = (await rpc("tools/list"))["tools"] as Record<string, unknown>[];
+    const names = tools.map((t) => t["name"]);
+    expect(names).toEqual(
+      expect.arrayContaining(["record_create", "record_update", "record_delete"]),
+    );
+    const update = tools.find((t) => t["name"] === "record_update")!;
+    expect(update["inputSchema"]).toMatchObject({ properties: { attempt: { type: "integer" } } });
+    expect(String(update["description"])).toContain("blocks");
+  });
+
+  it("Markdown で作り、outline の ID で 1 段落だけ差し替え、履歴の via は mcp", async () => {
+    const recordId = uuid(820);
+    const created = await call(
+      "record_create",
+      {
+        type: "article",
+        recordId,
+        input: { ...validArticleInput(), slug: "mcp-write", body: "## 見出し\n\n一\n\n二" },
+      },
+      writePat,
+    );
+    expect(created.isError, JSON.stringify(created)).toBeUndefined();
+    expect(created.content[0]?.text?.startsWith(UNTRUSTED_PREFACE)).toBe(true);
+    const got = await call("record_get", { recordId }, writePat);
+    const outline = (
+      got.structuredContent!["outline"] as Record<string, { id: string; text: string }[]>
+    )["body"]!;
+    expect(outline.map((b) => b.text)).toEqual(["見出し", "一", "二"]);
+    const updated = await call(
+      "record_update",
+      {
+        recordId,
+        input: { body: { blocks: [{ op: "replace", id: outline[1]!.id, markdown: "差し替え" }] } },
+        baseFieldVersions: got.structuredContent?.["fieldVersions"],
+      },
+      writePat,
+    );
+    expect(updated.isError, JSON.stringify(updated)).toBeUndefined();
+    const after = await call("record_get", { recordId }, writePat);
+    expect((after.structuredContent!["markdown"] as Record<string, string>)["body"]).toBe(
+      "## 見出し\n\n差し替え\n\n二",
+    );
+    const history = await call("record_history", { recordId }, writePat);
+    const items = history.structuredContent?.["items"] as { via: string; tokenId: string | null }[];
+    expect(items.every((i) => i.via === "mcp" && i.tokenId !== null)).toBe(true);
+  });
+
+  it("古い baseFieldVersions は conflict で details.current を返し、attempt 3 で giveUp", async () => {
+    const recordId = uuid(821);
+    const created = await call(
+      "record_create",
+      { type: "article", recordId, input: { ...validArticleInput(), slug: "mcp-conflict" } },
+      writePat,
+    );
+    const base = created.structuredContent?.["fieldVersions"];
+    await call(
+      "record_update",
+      { recordId, input: { title: "先に直した" }, baseFieldVersions: base },
+      writePat,
+    );
+    const stale = await call(
+      "record_update",
+      { recordId, input: { title: "古い版から" }, baseFieldVersions: base },
+      writePat,
+    );
+    expect(stale.isError).toBe(true);
+    expect(stale.content[0]?.text?.startsWith(UNTRUSTED_PREFACE)).toBe(true);
+    const error = stale.structuredContent?.["error"] as {
+      code: string;
+      details: { current: { fieldVersions: Record<string, number> }; giveUp: boolean };
+    };
+    expect(error.code).toBe("conflict");
+    expect(error.details.current.fieldVersions["title"]).toBe(2);
+    expect(error.details.giveUp).toBe(false);
+    const third = await call(
+      "record_update",
+      { recordId, input: { title: "三回目" }, baseFieldVersions: base, attempt: 3 },
+      writePat,
+    );
+    expect(
+      (third.structuredContent!["error"] as { details: { giveUp: boolean } }).details.giveUp,
+    ).toBe(true);
+  });
+
+  it("削除した record を record_restore で戻せ、復元の版は kind restore・via mcp(M4-3)", async () => {
+    const recordId = uuid(822);
+    const created = await call(
+      "record_create",
+      { type: "article", recordId, input: { ...validArticleInput(), slug: "mcp-restore" } },
+      writePat,
+    );
+    expect(created.isError).toBeUndefined();
+    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    await stub.deleteRecord(recordId, { ...auth("owner", "owner"), tenantId });
+    expect((await call("record_get", { recordId }, writePat)).isError).toBe(true);
+    const history = await call("record_history", { recordId }, writePat);
+    const items = history.structuredContent!["items"] as { historySeq: number; kind: string }[];
+    const written = items.find((i) => i.kind === "write")!;
+    const restored = await call(
+      "record_restore",
+      { recordId, historySeq: written.historySeq },
+      writePat,
+    );
+    expect(restored.isError, JSON.stringify(restored)).toBeUndefined();
+    expect(restored.content[0]?.text).toContain("戻した");
+    expect((await call("record_get", { recordId }, writePat)).isError).toBeUndefined();
+    const after = await call("record_history", { recordId }, writePat);
+    const latest = (after.structuredContent!["items"] as { kind: string; via: string }[])[0];
+    expect(latest).toMatchObject({ kind: "restore", via: "mcp" });
+  });
+
+  it("record:write の無いトークンの record_restore は入口で 403", async () => {
+    const res = await rpcRaw("tools/call", {
+      name: "record_restore",
+      arguments: { recordId: uuid(822), historySeq: 1 },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("record:delete の無いトークンの record_delete は入口で 403 insufficient_scope", async () => {
+    const res = await rpcRaw(
+      "tools/call",
+      { name: "record_delete", arguments: { recordId: uuid(821) } },
+      writePat,
+    );
+    expect(res.status).toBe(403);
+    expect(res.headers.get("www-authenticate")).toContain('scope="record:delete"');
   });
 });
 
@@ -184,8 +337,11 @@ describe("tools/call", () => {
     const result = await call("record_list", { type: "article" });
     expect(result.isError).toBeUndefined();
     const items = result.structuredContent?.["items"] as Record<string, unknown>[];
-    expect(items.map((i) => i["id"])).toEqual([RECORD]);
-    expect(items[0]).not.toHaveProperty("data");
+    // 書き込みツールのテストが作った record も並ぶ
+    expect(items.map((i) => i["id"])).toContain(RECORD);
+    for (const item of items) {
+      expect(item).not.toHaveProperty("data");
+    }
   });
 
   it("無い record は isError と error.code=not_found(JSON-RPC エラーにしない)", async () => {
@@ -211,9 +367,13 @@ describe("tools/call", () => {
       tokenId: uuid(810),
       tokenKind: "pat",
     };
-    const result = await callOperation({ env, tenantId, auth: scopeless }, "record_list", {
-      type: "article",
-    });
+    const result = await callOperation(
+      { env, tenantId, auth: scopeless, origin: "https://api.example" },
+      "record_list",
+      {
+        type: "article",
+      },
+    );
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toMatchObject({ error: { code: "insufficient_scope" } });
   });

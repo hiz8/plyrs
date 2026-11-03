@@ -71,19 +71,31 @@ export interface BlockIdsResult {
 }
 
 // 保存された ID(空でない文字列、重複していない)があればそれを優先し、無い・空・重複
-// (コピー&ペースト由来など)のブロックだけ導出する。版が 2 未満なら 2 に上げる。
+// (コピー&ペースト由来など)のブロックだけ導出する。導出 ID が保存済みの ID と重なれば接尾辞 -2, -3… を付ける。版が 2 未満なら 2 に上げる。
 export function ensureTopLevelBlockIds(envelope: RichTextEnvelope): BlockIdsResult {
   const blocks = envelope.doc.content ?? [];
   let changed = envelope.schemaVersion < RICH_TEXT_SCHEMA_VERSION;
+  // 先に保存された ID を全部押さえる(最初の出現が持ち主)。導出 ID がそれと重なっても、後ろにある
+  // 保存済みのブロックから ID を奪わない(先頭に同じ内容のブロックを入れた場合など)
+  const keeps = blocks.map(() => false);
   const seen = new Set<string>();
-  const content = blocks.map((block, index) => {
+  blocks.forEach((block, index) => {
     const existing = block.attrs?.[BLOCK_ID_ATTR];
     if (typeof existing === "string" && existing.length > 0 && !seen.has(existing)) {
       seen.add(existing);
+      keeps[index] = true;
+    }
+  });
+  const content = blocks.map((block, index) => {
+    if (keeps[index] === true) {
       return block;
     }
     changed = true;
-    const id = hashBlock(index, block);
+    const base = hashBlock(index, block);
+    let id = base;
+    for (let n = 2; seen.has(id); n++) {
+      id = `${base}-${n}`;
+    }
     seen.add(id);
     return { ...block, attrs: { ...block.attrs, [BLOCK_ID_ATTR]: id } };
   });

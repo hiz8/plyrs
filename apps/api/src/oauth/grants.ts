@@ -18,10 +18,15 @@ export interface TenantGrant {
   scopes: string[];
   createdAt: string;
   expiresAt: string | null;
+  // 同意は済んだが認可コードがまだ交換されていない(クライアントが戻って来ていない)。M3 の見送り指摘 (h)
+  pending: boolean;
 }
 
 const MEMBER_LIMIT = 50;
-const GRANT_LIMIT = 100;
+// listUserGrants は利用者の全テナントの付与を返すので、cursor で辿ってから resource で絞る(M3 の見送り
+// 指摘 (d))。1 ページ 100 件 × 10 ページ = 利用者あたり 1000 件で打ち切る
+const GRANT_PAGE_SIZE = 100;
+const GRANT_MAX_PAGES = 10;
 
 function belongsTo(grant: GrantSummary, resource: string): boolean {
   const resources = Array.isArray(grant.resource) ? grant.resource : [grant.resource];
@@ -52,13 +57,37 @@ async function clientNameOf(
   return name;
 }
 
+async function allUserGrants(oauth: OAuthHelpers, userId: string): Promise<GrantSummary[]> {
+  const grants: GrantSummary[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < GRANT_MAX_PAGES; page += 1) {
+    const result = await oauth.listUserGrants(userId, { limit: GRANT_PAGE_SIZE, cursor });
+    grants.push(...result.items);
+    cursor = result.cursor;
+    if (cursor === undefined) {
+      break;
+    }
+  }
+  return grants;
+}
+
 async function userGrants(
   oauth: OAuthHelpers,
   userId: string,
   resource: string,
 ): Promise<GrantSummary[]> {
-  const { items } = await oauth.listUserGrants(userId, { limit: GRANT_LIMIT });
-  return items.filter((grant) => belongsTo(grant, resource));
+  return (await allUserGrants(oauth, userId)).filter((grant) => belongsTo(grant, resource));
+}
+
+// 認可コードが未交換か(M3 の見送り指摘 (h))。GrantSummary には現れないので、ライブラリが OAUTH_KV に置く
+// グラントの行(`grant:<userId>:<grantId>`)を読み、交換時に消される authCodeWrappedKey の有無で見る。
+// ライブラリの保存形に依存する(oauth-grants.test.ts が固定する)
+async function isPending(env: Env, userId: string, grantId: string): Promise<boolean> {
+  const stored = await env.OAUTH_KV.get<Record<string, unknown>>(
+    `grant:${userId}:${grantId}`,
+    "json",
+  );
+  return stored !== null && typeof stored["authCodeWrappedKey"] === "string";
 }
 
 export async function listTenantGrants(env: Env, tenantId: string): Promise<TenantGrant[]> {
@@ -89,6 +118,7 @@ export async function listTenantGrants(env: Env, tenantId: string): Promise<Tena
         scopes: grant.scope,
         createdAt: isoOf(grant.createdAt),
         expiresAt: grant.expiresAt === undefined ? null : isoOf(grant.expiresAt),
+        pending: await isPending(env, member.userId, grant.id),
       });
     }
   }
@@ -114,4 +144,29 @@ export async function revokeTenantGrant(
   }
   await oauth.revokeGrant(grantId, userId);
   return true;
+}
+
+// 会員資格を失った利用者の付与を失効させる(M3 の見送り指摘 (e))。tenantId が null なら全テナント(BAN)。
+// access token は BLOCKLIST で、refresh は invalid_grant で既に止まるが、付与が OAUTH_KV に最長 30 日残り
+// 所有者の画面にも出続けるので消す。失効させたグラント ID を返し、監査は呼び出し元が書く
+export async function revokeUserGrants(
+  env: Env,
+  userId: string,
+  tenantId: string | null,
+): Promise<string[]> {
+  const origins = oauthOrigins(env);
+  // OAUTH_KV は全テナント共有なので、一覧と失効のヘルパーはどのテナントの認可サーバーから取っても同じ
+  const server = createTenantAuthServer(env, tenantId ?? "_");
+  if (origins === null || server === null) {
+    return [];
+  }
+  const oauth = server.getOAuthApi(env);
+  const grants =
+    tenantId === null
+      ? await allUserGrants(oauth, userId)
+      : await userGrants(oauth, userId, tenantResource(origins.apiOrigin, tenantId));
+  for (const grant of grants) {
+    await oauth.revokeGrant(grant.id, userId);
+  }
+  return grants.map((grant) => grant.id);
 }

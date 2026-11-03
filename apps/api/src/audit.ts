@@ -92,3 +92,24 @@ export async function auditRevokedTokens(
     })),
   );
 }
+
+// 会員資格の喪失に伴って失効させた OAuth の付与を 1 件ずつ記録する(M4-0b)。targetId は手動の失効
+// (tenant-grants.ts)と同じグラント ID
+export async function auditRevokedGrants(
+  d1: D1Database,
+  actorId: string,
+  tenantId: string | null,
+  grantIds: readonly string[],
+  reason: AuditAction,
+): Promise<void> {
+  await writeAudits(
+    d1,
+    grantIds.map((grantId) => ({
+      actorId,
+      action: "oauth.revoke" as const,
+      targetType: "oauth_grant",
+      targetId: grantId,
+      detail: tenantId === null ? { reason } : { tenantId, reason },
+    })),
+  );
+}

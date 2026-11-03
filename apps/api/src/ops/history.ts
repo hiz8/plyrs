@@ -106,12 +106,12 @@ export const recordRestore = defineOperation({
   name: "record_restore",
   title: "record を過去の版に戻す",
   description:
-    "履歴の版(historySeq)の内容と status を現在に書き戻す。削除済みの record は削除を取り消して戻す。新しい書き込みとして履歴に restore の版が増える(履歴は消えない)。型定義が変わっていて版の内容が検証に通らなければ validation_failed。",
+    "履歴の版(historySeq)の内容と status を現在に書き戻す。削除済みの record は削除を取り消して戻す。戻す前に record_compare で差分を確かめる。新しい書き込みとして履歴に restore の版が増える(履歴は消えない。戻した結果も record_restore でさらに戻せる)。公開中の内容は変わらない(公開し直すのは人)。型定義が変わっていて版の内容が検証に通らなければ validation_failed。",
   input: z.object({ recordId: uuidSchema, historySeq: z.number().int().min(1) }),
   output: recordSnapshotSchema,
   requires: "record:write",
-  // 書き込み系の MCP 公開は M4-1(エージェント経路の実測後)。それまで REST だけ
-  via: ["rest"],
+  // M4-3: MCP にも出す(16.11 の初期リリースのツール)
+  via: ["mcp", "rest"],
   hints: { readOnly: false, destructive: false, idempotent: true, openWorld: false },
   cache: null,
 });

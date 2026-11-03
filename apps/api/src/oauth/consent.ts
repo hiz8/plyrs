@@ -10,7 +10,7 @@ import { allowedScopes, type PatScope } from "../auth/pat";
 import { isRole, type Role } from "../auth/permissions";
 import { lookupSessionUser, SESSION_COOKIE } from "../auth/session";
 import { consentScopes, renderConsentPage, renderErrorPage } from "./consent-page";
-import { createTenantAuthServer, type McpGrantProps } from "./server";
+import { createTenantAuthServer, oauthOrigins, tenantResource, type McpGrantProps } from "./server";
 
 // design-spec 16.2・16.3(M3-2): /oauth/t/:tenantId/authorize の同意の手続き。admin から転送されて来るので
 // admin オリジンのセッション cookie がそのまま届く(認可サーバーの入口で cookie を見るのはここだけ)。
@@ -105,9 +105,11 @@ export async function handleAuthorizeGet(c: Ctx): Promise<Response> {
     return c.json({ error: "not_configured", what: "ADMIN_ORIGIN / API_ORIGIN" }, 503);
   }
   const oauth = server.getOAuthApi(c.env);
+  // セッションを parseAuthRequest より先に確かめる(M3 の見送り指摘 (b)): parseAuthRequest は CIMD の
+  // client_id なら外向き fetch を起こすので、未ログイン・非会員の要求ではそこまで進ませない。
+  // 要求の検証はログイン後に同じ URL へ戻ってから行う
+  const member = await currentMember(c, tenantId);
   try {
-    const request = await oauth.parseAuthRequest(c.req.raw);
-    const member = await currentMember(c, tenantId);
     if (!member.ok && member.reason === "unauthenticated") {
       // ログイン後に同じ URL へ戻す(ロードマップ 8 章: /login の return_to は /oauth/t/ 配下だけ)
       const url = new URL(c.req.url);
@@ -118,6 +120,7 @@ export async function handleAuthorizeGet(c: Ctx): Promise<Response> {
     if (!member.ok) {
       return memberFailure(member.reason);
     }
+    const request = await oauth.parseAuthRequest(c.req.raw);
     const tenant = (
       await drizzle(c.env.DB)
         .select({ name: tenants.name })
@@ -178,6 +181,16 @@ export async function handleAuthorizePost(c: Ctx): Promise<Response> {
       return new Response(null, { status: 302, headers: denied.headers });
     }
     const approved = await oauth.approveConsent(c.req.raw, handle, { scope });
+    // M3 の見送り指摘 (a): handle の保存済み要求がこの URL のテナント向けか確かめる(OAUTH_KV は全テナント
+    // 共有なので、別テナントの同意画面で得た handle を持ち込める)。ライブラリも issuer で照合するが、
+    // テナント境界はここでも明示的に閉じる
+    const origins = oauthOrigins(c.env);
+    if (
+      origins === null ||
+      approved.request.resource !== tenantResource(origins.apiOrigin, tenantId)
+    ) {
+      return errorPage(400, "接続の要求が不正です", "同意画面からやり直してください。");
+    }
     const props: McpGrantProps = { userId: member.userId, tenantId, role: member.role };
     const { redirectTo } = await oauth.completeAuthorization({
       // フォームの値ではなく、KV に保存された要求を使う

@@ -109,6 +109,7 @@ describe("接続中のアプリの行(M3-5)", () => {
       scopes: ["record:read"],
       createdAt: "2026-10-15T00:00:00Z",
       expiresAt: null,
+      pending: false,
       ...overrides,
     };
   }
@@ -150,6 +151,11 @@ describe("接続中のアプリの行(M3-5)", () => {
     );
     expect(rows[0]?.expiryText).toContain("10");
     expect(rows[1]).toMatchObject({ status: "expired", expiryText: "期限切れ", canRevoke: true });
+  });
+
+  it("認可コードを交換していない付与は「接続待ち」と出し、失効できる(M3 の見送り指摘 (h))", () => {
+    const rows = connectionRows([], [grant({ id: "g1", pending: true })], NOW);
+    expect(rows[0]).toMatchObject({ expiryText: "接続待ち", canRevoke: true });
   });
 });
 

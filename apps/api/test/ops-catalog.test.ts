@@ -11,6 +11,7 @@ describe("操作カタログの読み込み順", () => {
     const history = await import("../src/ops/history");
     const search = await import("../src/ops/search");
     const write = await import("../src/ops/write");
+    const assets = await import("../src/ops/assets");
     const catalog = await import("../src/ops/catalog");
     expect(read.READ_OPERATIONS.map((op) => op.name)).toEqual([
       "type_list",
@@ -36,15 +37,18 @@ describe("操作カタログの読み込み順", () => {
       ...search.SEARCH_OPERATIONS.map((op) => op.name),
       ...history.HISTORY_OPERATIONS.map((op) => op.name),
       ...write.WRITE_OPERATIONS.map((op) => op.name),
+      ...assets.ASSET_OPERATIONS.map((op) => op.name),
     ]);
   });
 
-  it("宣言した全操作に実装(handler)がある", async () => {
+  it("宣言した全操作に実装(handler)がある(Worker で実行する操作は DO のハンドラを持たない)", async () => {
     vi.resetModules();
     const catalog = await import("../src/ops/catalog");
     const invoke = await import("../src/ops/invoke");
     expect(Object.keys(invoke.HANDLERS).toSorted()).toEqual(
-      catalog.OPERATIONS.map((op) => op.name).toSorted(),
+      catalog.OPERATIONS.filter((op) => op.runsIn !== "worker")
+        .map((op) => op.name)
+        .toSorted(),
     );
   });
 });

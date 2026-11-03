@@ -52,6 +52,9 @@ export const records = sqliteTable(
   (table) => [
     index("idx_records_type").on(table.type),
     index("idx_records_type_status").on(table.type, table.status),
+    // M4-6(ロードマップ 6 章): 一覧の既定の並び(updated_at の降順、同値は seq)を型ごとに
+    // インデックスで辿り、rows read を record 数に比例させない
+    index("idx_records_type_updated").on(table.type, table.updatedAt, table.seq),
     uniqueIndex("idx_records_seq").on(table.seq),
   ],
 );
@@ -179,4 +182,23 @@ export const moduleEvents = sqliteTable(
     sent: integer("sent").notNull().default(0),
   },
   (table) => [index("idx_module_events_unsent").on(table.sent, table.enqueuedAt)],
+);
+
+// design-spec 16.11(M4-4、決定 51): MCP のアセット登録の使い切りアップロードトークン。トークン本体は
+// 持たず SHA-256 だけを置く。発行した利用者・ロール・トークン ID を持ち、受け取り時に used_at を立てる
+// (DO は single-writer なので二重使用は起きない)。期限切れの行は次の発行のついでに消す
+export const assetUploadTokens = sqliteTable(
+  "asset_upload_tokens",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: text("user_id").notNull(),
+    role: text("role").notNull(),
+    tokenId: text("token_id").notNull(),
+    filename: text("filename").notNull(),
+    contentType: text("content_type").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    usedAt: text("used_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("idx_asset_upload_tokens_expires").on(table.expiresAt)],
 );

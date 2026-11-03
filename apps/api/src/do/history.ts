@@ -8,7 +8,7 @@ import type { Via } from "@plyrs/sync-protocol";
 // 新しい版を切る: (1) actor または via が前の版と違う、(2) 前の版を開いてから 15 分以上、(3) status が
 // 変わる、(4) publish / unpublish / delete / restore。それ以外の連続した write は直前の版に畳み込む。
 //
-// 保持(仮置き。M4-6 で実測): record ごとに最新 100 版かつ 365 日。直近 10 版は全文、それより古い版は
+// 保持(M4-6 で実測し据え置き。ロードマップ 11 章): record ごとに最新 100 版かつ 365 日。直近 10 版は全文、それより古い版は
 // 1 つ新しい版からの逆差分だけを持つ(新しい側から辿るので、古い版を消しても鎖が切れない)。
 // publish / unpublish の版は常に全文で、保持上限に達しても record がある間は消さない。
 
@@ -114,6 +114,10 @@ export interface FieldChange {
   after: unknown;
 }
 
+function unsetIfEmpty(value: unknown): unknown {
+  return Array.isArray(value) && value.length === 0 ? undefined : value;
+}
+
 // 2 つの data の差分(値の比較は正規化 JSON)。履歴画面の差分表示と record_compare が使う
 export function compareVersions(
   before: Record<string, unknown>,
@@ -122,7 +126,8 @@ export function compareVersions(
   const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
   const changes: FieldChange[] = [];
   for (const key of keys) {
-    if (canonicalJson(before[key]) !== canonicalJson(after[key])) {
+    // 空配列は未設定と同じ(空の many-relation は読み戻すとキーが無い。ロードマップ 9 章)
+    if (canonicalJson(unsetIfEmpty(before[key])) !== canonicalJson(unsetIfEmpty(after[key]))) {
       changes.push({ key, before: before[key], after: after[key] });
     }
   }
@@ -165,6 +170,12 @@ function applyReverseDiff(
     delete result[key];
   }
   return result;
+}
+
+// 16.8: record の最新の history_seq(履歴が無ければ 0)。publish / unpublish は畳み込まずに必ず版を
+// 足し、刈り込みも最新は残すので、公開状態の変化を含めて単調に増える
+export function latestHistorySeq(sql: SqlStorage, recordId: string): number {
+  return latestRow(sql, recordId)?.history_seq ?? 0;
 }
 
 function latestRow(sql: SqlStorage, recordId: string): RawHistoryRow | null {

@@ -131,6 +131,111 @@ describe("書き込み操作", () => {
     expect(fresh.data["slug"]).toBe(validArticleInput()["slug"]);
   });
 
+  it("Markdown で作った record の同じ内容の再送は既存を返し、ブロック操作で 1 段落だけ差し替えられる(M4-1a)", async () => {
+    const markdownInput = () => ({
+      ...createInput(),
+      input: { ...validArticleInput(), body: "## 見出し\n\n一段落目\n\n二段落目" },
+    });
+    const created = output<RecordSnapshot>(
+      await stub.invoke("record_create", markdownInput(), mcpAuth()),
+    );
+    const again = output<RecordSnapshot>(
+      await stub.invoke("record_create", markdownInput(), mcpAuth()),
+    );
+    expect(again.version).toBe(created.version);
+    const body = created.data["body"] as { doc: { content: { attrs: { id: string } }[] } };
+    const secondId = body.doc.content[1]!.attrs.id;
+    const updated = output<RecordSnapshot>(
+      await stub.invoke(
+        "record_update",
+        {
+          recordId: RECORD,
+          input: { body: { blocks: [{ op: "replace", id: secondId, markdown: "差し替えた" }] } },
+          baseFieldVersions: created.fieldVersions,
+        },
+        mcpAuth(),
+      ),
+    );
+    const blocks = (updated.data["body"] as { doc: { content: unknown[] } }).doc.content;
+    expect(JSON.stringify(blocks[1])).toContain("差し替えた");
+    expect(JSON.stringify(blocks[1])).toContain(secondId);
+    expect(JSON.stringify(blocks[2])).toContain("二段落目");
+  });
+
+  it("Markdown の javascript: / data: のリンクは書き込めない(validate-on-write で拒否)", async () => {
+    for (const href of ["javascript:alert(1)", "JaVaScRiPt:alert(1)", "data:text/html,x"]) {
+      const result = asInvokeResult(
+        await stub.invoke(
+          "record_create",
+          { ...createInput(), input: { ...validArticleInput(), body: `[x](${href})` } },
+          mcpAuth(),
+        ),
+      );
+      expect(result.ok, href).toBe(false);
+      expect(result.ok ? "" : result.code).toBe("validation_failed");
+    }
+  });
+
+  it("古い baseFieldVersions のブロック操作は、消されたブロックを指していても block_not_found ではなく conflict(Review Focus 1)", async () => {
+    const created = output<RecordSnapshot>(
+      await stub.invoke(
+        "record_create",
+        { ...createInput(), input: { ...validArticleInput(), body: "一\n\n二" } },
+        mcpAuth(),
+      ),
+    );
+    const body = created.data["body"] as { doc: { content: { attrs: { id: string } }[] } };
+    const secondId = body.doc.content[1]!.attrs.id;
+    // 人が二段落目を消す
+    await stub.writeRecord(
+      "article",
+      {
+        recordId: RECORD,
+        input: {
+          ...validArticleInput(),
+          body: {
+            ...(created.data["body"] as object),
+            doc: { type: "doc", content: [body.doc.content[0]] },
+          },
+        },
+      },
+      owner,
+    );
+    const stale = asInvokeResult(
+      await stub.invoke(
+        "record_update",
+        {
+          recordId: RECORD,
+          input: { body: { blocks: [{ op: "replace", id: secondId, markdown: "x" }] } },
+          baseFieldVersions: created.fieldVersions,
+        },
+        mcpAuth(),
+      ),
+    );
+    expect(stale).toMatchObject({ ok: false, code: "conflict" });
+  });
+
+  it("空の many-relation [] で作った record の同じ内容の再送は already_exists にならない(ロードマップ 9 章)", async () => {
+    const withRelated = {
+      ...articleType(),
+      id: uuid(760),
+      key: "note",
+      fields: [
+        { key: "title", type: "text" as const, required: true },
+        {
+          key: "related",
+          type: "relation" as const,
+          config: { allowedTypes: ["article"], cardinality: "many" as const },
+        },
+      ],
+    };
+    expect((await stub.registerContentType(withRelated, owner)).ok).toBe(true);
+    const input = { type: "note", recordId: uuid(761), input: { title: "t", related: [] } };
+    output<RecordSnapshot>(await stub.invoke("record_create", input, mcpAuth()));
+    const again = asInvokeResult(await stub.invoke("record_create", input, mcpAuth()));
+    expect(again.ok).toBe(true);
+  });
+
   it("record_update は無い record を not_found、削除済みを record_deleted にする", async () => {
     const missing = asInvokeResult(
       await stub.invoke(
@@ -161,6 +266,44 @@ describe("書き込み操作", () => {
       await stub.invoke("record_delete", { recordId: RECORD }, mcpAuth()),
     );
     expect(second).toEqual(first);
+  });
+
+  it("expect(確認時の版と history_seq)が今と違えば publish / unpublish は record_changed で何もしない(16.8)", async () => {
+    output(await stub.invoke("record_create", createInput(), mcpAuth()));
+    // 作成で history_seq 1
+    const draft = { version: 1, historySeq: 1 };
+    const stale = asInvokeResult(
+      await stub.invoke("record_publish", { recordId: RECORD }, mcpAuth(), {
+        tenantSlug: "t",
+        expect: { ...draft, version: 0 },
+      }),
+    );
+    expect(stale).toMatchObject({ ok: false, code: "record_changed" });
+    expect(asPublicationState(await stub.getPublication(RECORD)).published).toBe(false);
+    output(
+      await stub.invoke("record_publish", { recordId: RECORD }, mcpAuth(), {
+        tenantSlug: "t",
+        expect: draft,
+      }),
+    );
+    // 公開 → 取り下げで版も公開状態も元に戻るが、history_seq は進むので同じ確認は使い回せない
+    output(await stub.invoke("record_unpublish", { recordId: RECORD }, mcpAuth()));
+    const reused = asInvokeResult(
+      await stub.invoke("record_publish", { recordId: RECORD }, mcpAuth(), {
+        tenantSlug: "t",
+        expect: draft,
+      }),
+    );
+    expect(reused).toMatchObject({ ok: false, code: "record_changed" });
+    expect(asPublicationState(await stub.getPublication(RECORD)).published).toBe(false);
+    output(
+      await stub.invoke("record_publish", { recordId: RECORD }, mcpAuth(), { tenantSlug: "t" }),
+    );
+    const unpublishStale = asInvokeResult(
+      await stub.invoke("record_unpublish", { recordId: RECORD }, mcpAuth(), { expect: draft }),
+    );
+    expect(unpublishStale).toMatchObject({ ok: false, code: "record_changed" });
+    expect(asPublicationState(await stub.getPublication(RECORD)).published).toBe(true);
   });
 
   it("record_publish は outbox に積み、同じ版の再 publish は何も書かない。unpublish の未公開は ok", async () => {

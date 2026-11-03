@@ -27,14 +27,21 @@ export type InvokeErrorCode =
   | "not_published"
   | (string & {});
 
+// M4-6: DO の invoke が載せる計測値(操作が読み書きした行数)。Worker で実行する操作には無い
+export interface InvokeMeter {
+  rowsRead: number;
+  rowsWritten: number;
+}
+
 export type InvokeResult =
-  | { ok: true; output: unknown }
+  | { ok: true; output: unknown; meter?: InvokeMeter }
   | {
       ok: false;
       code: InvokeErrorCode;
       message: string;
       issues?: unknown;
       details?: unknown;
+      meter?: InvokeMeter;
     };
 
 export type OpHandler = (ctx: OpContext, input: never) => { ok: true; output: unknown } | OpFailure;
@@ -48,8 +55,9 @@ export const HANDLERS: Readonly<Record<string, OpHandler>> = {
   ...WRITE_HANDLERS,
 };
 
+// Worker で実行する操作(runsIn: "worker")は DO のハンドラを持たない。DO で呼ばれたら unknown_operation
 for (const spec of OPERATIONS) {
-  if (HANDLERS[spec.name] === undefined) {
+  if (spec.runsIn !== "worker" && HANDLERS[spec.name] === undefined) {
     throw new Error(`operation ${spec.name} is declared in the catalog but has no handler`);
   }
 }

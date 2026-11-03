@@ -96,16 +96,27 @@ function authFromProps(
 // 16.3(M3-3、決定 49): スコープ不足は DO を起こす前に 403 insufficient_scope で返し、クライアントが
 // 一往復で step-up できるようにする(challenge の scope と resource_metadata はライブラリが組む)。
 // PAT は再認可できないので、所有者がスコープ付きのトークンを発行し直す導線を文で示す
-export function insufficientScopeFor(
+export async function insufficientScopeFor(
   auth: OAuthResourceAuth,
   tokenKind: McpAuth["tokenKind"],
   scope: Operation,
-): Response {
+): Promise<Response> {
+  // M3 の見送り指摘 (i): WWW-Authenticate は ASCII しか運べず、日本語の説明はヘッダから落ちる。
+  // ヘッダには英文を載せ、本文 JSON の error_description は日本語に差し替える
+  const header =
+    tokenKind === "pat"
+      ? `This token lacks ${scope}. Ask the site owner to issue a token with ${scope} in Settings > Connected apps.`
+      : `Re-authorize with ${scope}.`;
   const description =
     tokenKind === "pat"
       ? `この接続トークンには ${scope} がありません。管理画面の 設定 › 接続中のアプリ で ${scope} を含むトークンを発行してください`
       : `${scope} を含めて再認可してください`;
-  return insufficientScope(auth, [scope], description);
+  const res = insufficientScope(auth, [scope], header);
+  const body = await res.json<Record<string, unknown>>();
+  return Response.json(
+    { ...body, error_description: description },
+    { status: res.status, headers: res.headers },
+  );
 }
 
 // tools/call が MCP に出ている操作なら、その操作の要するスコープ(無ければ undefined。未知の名前は
@@ -120,6 +131,7 @@ function requiredScopeOf(rpc: ParsedRpc): Operation | undefined {
 
 async function serveMcp(
   request: Request,
+  origin: string,
   env: Env,
   tenantId: string,
   auth: McpAuth,
@@ -156,7 +168,7 @@ async function serveMcp(
   }
   const required = requiredScopeOf(rpc);
   if (required !== undefined && !auth.scopes.includes(required)) {
-    return insufficientScopeFor(resourceAuth, auth.tokenKind, required);
+    return await insufficientScopeFor(resourceAuth, auth.tokenKind, required);
   }
   // 16.1 / 16.2: 読み取りも DO を起こすのでツール名単位で制限する。未構成は fail-closed
   // (公開 write と同じ方針)。キーは テナント:利用者:ツール名(tools/call 以外はメソッド名。
@@ -174,7 +186,7 @@ async function serveMcp(
   }
   // 仕様 2026-07-28 のみ(未決事項「旧版プロトコルのクライアントへの対応」の仮置き)。
   // 廃止済みの initialize や GET/DELETE のセッション運用は受けない
-  const handler = createMcpHandler(() => buildMcpServer({ env, tenantId, auth }), {
+  const handler = createMcpHandler(() => buildMcpServer({ env, tenantId, auth, origin }), {
     legacy: "reject",
     onerror: (error) => console.warn("mcp", tenantId, error.message),
   });
@@ -209,6 +221,7 @@ export function createTenantResourceServer(
       fetch: (request, env, ctx) =>
         serveMcp(
           request,
+          origin,
           env,
           tenantId,
           authFromProps(ctx.props, ctx.auth.scope, ctx.auth.expiresAt),

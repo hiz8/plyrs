@@ -46,5 +46,7 @@ export default defineConfig({
     { name: "mcp-smoke", testMatch: /mcp-smoke\.spec\.ts/, dependencies: ["core-journey"] },
     // M3: OAuth の一巡(同意画面・step-up・失効)。テナントは自前(oauth)
     { name: "oauth", testMatch: /oauth\.spec\.ts/, dependencies: ["core-journey"] },
+    // M4-6: 書き込み MCP(作成・競合・ブロック編集・スコープ不足・確認不能・復元)。テナントは自前(mcpw)
+    { name: "mcp-write", testMatch: /mcp-write\.spec\.ts/, dependencies: ["core-journey"] },
   ],
 });

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { purgeExpiredSessions } from "./auth/session";
 import { purgeOAuthData } from "./oauth/purge";
 import { mcpRoutes, serveProtectedResourceMetadata, workerContext } from "./mcp/route";
+import { uploadRoutes } from "./mcp/uploads";
 import { requireSaneSecret } from "./middleware/sane-secret";
 import { handleModuleJob, type ModuleQueueJob } from "./modules/events";
 import { oauthRoutes, serveAuthorizationServerMetadata } from "./oauth/route";
@@ -37,7 +38,23 @@ app.route("/v1/t", tenantRoutes);
 app.route("/super-auth", superAuthRoutes);
 app.route("/super/v1", superRoutes);
 app.route("/mcp", mcpRoutes);
+// M4-4(design-spec 16.11): asset_upload が発行した URL への本文の受け取り
+app.route("/mcp", uploadRoutes);
 app.route("/oauth", oauthRoutes);
+// M3 の見送り指摘 (f): ブラウザ内で動くクライアントの preflight。metadata は公開情報なので誰にでも返す
+// (Bearer を伴う /mcp の Origin 検証とは別。ここは GET の metadata だけ)
+const metadataPreflight = () =>
+  new Response(null, {
+    status: 204,
+    headers: {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, OPTIONS",
+      "access-control-allow-headers": "mcp-protocol-version, authorization",
+      "access-control-max-age": "86400",
+    },
+  });
+app.options("/.well-known/oauth-authorization-server/oauth/t/:tenantId", metadataPreflight);
+app.options("/.well-known/oauth-protected-resource/mcp/t/:tenantId", metadataPreflight);
 // RFC 8414: テナント別 issuer の Authorization Server Metadata(16.2)
 app.get("/.well-known/oauth-authorization-server/oauth/t/:tenantId", (c) =>
   serveAuthorizationServerMetadata(c.req.raw, c.env, workerContext(c), c.req.param("tenantId")),

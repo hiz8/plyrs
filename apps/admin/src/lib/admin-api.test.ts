@@ -420,6 +420,7 @@ describe("site settings endpoints (案 G 3・4 章)", () => {
       scopes: ["record:read"],
       createdAt: "2026-11-01T00:00:00Z",
       expiresAt: null,
+      pending: false,
     };
     const fetchImpl: typeof fetch = async (input, init) => {
       const method = init?.method ?? "GET";

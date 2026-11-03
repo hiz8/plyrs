@@ -167,6 +167,58 @@ npx @modelcontextprotocol/inspector --transport http \
 3. 同意画面で `record:read` を外して(`record:write` だけで)承認し、`type_list` などを呼ぶと `403 insufficient_scope`(`scope="record:read"`)になる。`record:read` を含めて再認可すると通る
 4. 設定 › 接続中のアプリ に付与が並び、失効するとその token が 401 になる
 
+### 3.6 書き込みツール(M4、design-spec 16.6・16.8・16.10・16.11)
+
+M4 で MCP から record を書けるようになった。`tools/list` はトークンのスコープで絞らず、全ツールをカタログの宣言順に出す(スコープ不足は `tools/call` の 403 で step-up する)。3.5 のスモークは「先頭に読み取りの 7 ツールが並ぶ」に読み替える。
+
+| ツール | スコープ | 内容 |
+| --- | --- | --- |
+| `record_create` / `record_update` | `record:write` | 作成・更新。リッチテキストは Markdown 文字列でも渡せる。更新は `record_get` の `fieldVersions` を `baseFieldVersions` に渡し、`conflict` なら読み直して `attempt` を 1 増やして再送(2 回まで。`attempt: 3` の conflict は `details.giveUp`) |
+| `record_delete` | `record:delete` | ソフト削除。`record_restore` で戻せる |
+| `record_restore` | `record:write` | 履歴の版(`historySeq`)に戻す。公開中の内容は変わらない |
+| `record_publish` / `record_unpublish` | `record:publish` | 公開・取り下げ。利用者の確認(elicitation)を経てから実行する。確認に対応しないクライアントは `confirmation_unavailable` で止まる(決定 50) |
+| `asset_upload` | `record:write` | 画像のアップロード先(使い切り、10 分、20 MiB、PNG / JPEG / GIF / WebP / AVIF)を発行する |
+| `asset_import_url` | `record:write` | 公開 URL の画像を取り込む(https のみ、IP アドレスと localhost は不可、リダイレクト 3 回まで) |
+
+PAT の発行(設定 › 接続中のアプリ): 書き込むなら `record:write`(と必要なら `record:delete`)を付ける。書き込みスコープ付きの PAT は期限が短い。`record:publish` は既定で外れていて、付けられるのは所有者だけ。人が公開する運用なら付けない(エージェントは書き終えたら `status` を `in_review` か `ready` にする)。
+
+本文の一部だけを直す(ブロック操作)。ブロック ID は `record_get` の `outline` にある:
+
+```json
+{
+  "recordId": "<id>",
+  "input": {
+    "body": {
+      "blocks": [
+        { "op": "replace", "id": "<ブロック ID>", "markdown": "新しい段落" },
+        { "op": "insert", "after": "<ブロック ID>", "markdown": "## 追加の見出し" },
+        { "op": "delete", "id": "<ブロック ID>" }
+      ]
+    }
+  },
+  "baseFieldVersions": { "body": 3 }
+}
+```
+
+画像の 2 経路: (1) `asset_upload` で `uploadUrl` を得て、本文をそのまま `POST`(Authorization 不要、1 回だけ)。応答の `assetId` を使う。(2) `asset_import_url` に画像の URL を渡す。どちらも本文では `![説明](plyrs://asset/<assetId>)` と書く。Markdown に外部 URL の画像を直接書くと `unsupported_markdown` になる。
+
+計測ログ: ツール呼び出しごとに api Worker が 1 行の JSON を出す(トークン・本文・利用者 ID は含まない)。
+
+```bash
+pnpm --filter @plyrs/api exec wrangler tail plyrs-api-preview --format json | grep mcp.op
+# {"event":"mcp.op","tenantId":"…","op":"record_update","ok":true,"rowsRead":31,"rowsWritten":27,"ms":42}
+```
+
+`rowsRead` / `rowsWritten` は DO の SQLite がその操作で読み書きした行数(課金の単位)。Worker で実行するツール(`asset_upload` / `asset_import_url`)は `null`。書き込み 1 回の `rowsRead` は record 数に比例しない(M4-6 の実測で 10 件と 300 件のテナントで一致)。一覧(`record_list`)はページの大きさに比例する。
+
+ゲート G4 の確認(preview、所有者。結果はロードマップ 11 章に記録する):
+
+1. `record:read record:write record:delete` の PAT と、`record:publish` も付けた PAT の 2 本を発行する
+2. Claude Code(と、あれば elicitation に対応する別のクライアント)で接続し、記事を Markdown で作成 → 1 段落だけ差し替え → 管理画面で同じ記事のタイトルを直してから、もう一度エージェントに更新させて conflict → 読み直して再適用、を一通り行う
+3. 公開を頼む。elicitation に対応するクライアントなら確認が出て、承諾すると公開される。対応しないクライアントは `confirmation_unavailable` で止まる。`record:publish` の無い PAT では 403 で止まる
+4. 画像の URL 取り込みとアップロード(uploadUrl への POST)を 1 回ずつ行い、本文に `plyrs://asset/…` で入れて管理画面で表示されることを見る
+5. 並行して手元で上の `wrangler tail … | grep mcp.op` を流し、ツールごとの `rowsRead` / `rowsWritten` を控える
+
 ## 4. super 管理者の初期化
 
 **デプロイ後は直ちに bootstrap を実行すること** — super_admins が空の間は到達可能な誰でも初期化できる(レート制限のみ)。

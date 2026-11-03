@@ -109,7 +109,9 @@ export type ConnectionRow = {
 function grantRow(grant: GrantSummary, now: Date): ConnectionRow {
   let expiryText: string = TOKEN_LABELS.noExpiry;
   let status: TokenStatus = "active";
-  if (grant.expiresAt !== null) {
+  if (grant.pending) {
+    expiryText = TOKEN_LABELS.pending;
+  } else if (grant.expiresAt !== null) {
     const remaining = new Date(grant.expiresAt).getTime() - now.getTime();
     if (remaining <= 0) {
       status = "expired";

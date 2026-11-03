@@ -24,9 +24,10 @@ pnpm lint            # oxlint
 pnpm format          # oxfmt(書き込み)/ pnpm format:check
 pnpm typecheck       # 全パッケージ tsc --noEmit(TypeScript 7 / strict + noUncheckedIndexedAccess)
 pnpm test            # e2e 以外の全 vitest
+pnpm --filter @plyrs/api check:deploy  # 本番と同じバンドルを wrangler dev で起動し、トップレベルのエラーを検出
 ```
 
-CI(`.github/workflows/ci.yml`)は lint → format:check → typecheck → test と e2e を実行する。
+CI(`.github/workflows/ci.yml`)は lint → format:check → typecheck → test → check:deploy と e2e を実行する。
 
 単体実行:
 
