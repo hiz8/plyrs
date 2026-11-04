@@ -252,4 +252,32 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 - **リンク検査の残り**: JSON 入力は ProseMirror のスキーマ検証を通らないので、語彙に無いノードの `attrs` に入れた URL は見ていない(既知の語彙に URL を持つノードは無い)。JSON 入力にも `checkRichText` を通すと閉じる
 - **全体レビューで見送ったもの**: (1) 一意性検査を生成カラムで引くようにしたので、比較が列の型の affinity に従う(`json_extract` のときより厳しくなる場合がある。たとえば数値と数字の文字列)。実害の報告は無いので記録だけ。(2) アップロードの受け取りは `tokenId` を使っておらず、アセットの履歴の経路は常に `rest` になる。M5 の監査の整理で揃える
 - **ゲート G4**: `docs/deploy.md` 3.6 の手順で所有者が preview で確かめる。結果はここに追記する
+- **G4 の確認結果(2026-11-04、preview、Claude Code)**: 手順 1〜5 を一通り行った。公開し直し(下の 3)だけクライアントの不具合で保留
+  1. PAT は `record:publish` なし → ありの順に差し替えた(差し替えは `/mcp` の再接続で反映)
+  2. `record_create` で Markdown から作成 → 段落 1 つをブロック操作で replace → 管理画面でタイトルを直す → 古い `baseFieldVersions` で更新して `conflict`(`title` だけ)→ `record_get` で読み直して `attempt: 2` で通った。管理画面でタイトルだけを保存しても `body` の版は上がらない
+  3. `record:publish` の無い PAT は `Insufficient scope: required "record:publish"`。ある PAT では確認が出て、承諾すると公開された。拒否は `declined`。2 回目の公開し直しでは、Claude Code のフォームで boolean の `confirm` 欄が Space で切り替わらず、Accept しても `declined` になった(Claude Code 側の不具合とみる)。`confirmation_unavailable` は Claude Code が elicitation に対応しているので未確認
+  4. `asset_import_url`(Google のロゴ、PNG 13,504 バイト)と `asset_upload` → POST(64×64 の PNG、HTTP 201)を行い、本文に `plyrs://asset/…` で入れて管理画面で表示されることを確かめた
+  5. `mcp.op` の計測(新規の record、本文は 4〜8 ブロック):
+
+     | op | ok | rowsRead | rowsWritten | ms |
+     |---|---|---|---|---|
+     | `record_create` | true | 8 | 10 | 344 |
+     | `record_update`(ブロック replace) | true | 14 | 7 | 53 |
+     | `record_update` | `conflict` | 5 | 0 | 30 |
+     | `record_get` | true | 2 | 0 | 23 |
+     | `record_update`(タイトル) | true | 19 | 9 | 46 |
+     | `record_publish` | true | 20 | 9 | 1971 |
+     | `asset_import_url` | `fetch_failed` | null | null | 234 |
+     | `asset_import_url` | true | null | null | 1031 |
+     | `asset_upload` | true | null | null | 30 |
+     | `record_update`(画像 2 つを insert) | true | 23 | 19 | 102 |
+
+     スコープ不足と `declined` の publish は `mcp.op` の行が出ない(操作の実行前に止まるため)。基準(M4-6: rows read が record 数に比例しない)は 1 テナントの測定では比例を見られないが、書き込み 1 回の rowsRead は 5〜23 に収まり、M4-6 の実測(10 件と 300 件で一致)と矛盾しない
+- **G4 で見つかったこと(未対応)**:
+  - 旧形式(ブロック ID 無し)の本文の record に初めて書き込むと、本文を変えていなくても `body` の fieldVersion が上がる。`writeRecordCore` が入力にだけ `ensureRecordBlockIds` を当て、保存済みの ID 無しの値と比べるため。修正の計画は別途
+  - 管理画面のエディタの TrailingNode が足す末尾の空の段落が、本文の保存で一緒に保存される(`via: sync` の版で確認。管理画面での再現は未確認)。修正の計画は別途
+  - スコープ不足のエラーのメッセージに対処の方法が無い(ツールの説明文にはある)
+  - `asset_import_url` が Wikimedia(upload.wikimedia.org)で 403 になる。Worker の fetch に User-Agent が無いためとみられる(未確認)
+  - Claude Code の elicitation フォームで boolean の欄を切り替えられないことがある。サーバー側の対策案は `confirmSchema` の `confirm` に `default: true` を付けること(Accept / Decline の選択だけで確認になる。仕様と SDK の扱いは未確認)
+  - MCP のブロック操作の replace は、入れ子の段落(箇条書きの項目の中)の `attrs.id` を落とす。契約(決定 44)の外で参照も無いので直さない
 
