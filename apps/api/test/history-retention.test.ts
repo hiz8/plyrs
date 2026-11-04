@@ -10,6 +10,7 @@ import {
 // M4-6(決定 41 の実測): 5000 文字の記事を 15 分超の間隔で 300 回編集し、20 回の publish を挟む。
 // 版の数が保持上限(100 + publish 版)を超えないことと、履歴の容量を出力する(報告書の表に写す)。
 // 編集は現実の執筆に寄せて、10 段落(各 500 文字)のうち 1 段落だけを書き換える。
+// M5a-1(決定 53)で逆差分をブロック単位にし、逆差分の合計の上限を足した。
 
 const EDITS = 300;
 const PUBLISH_EVERY = 15; // 300 / 15 = 20 回
@@ -110,6 +111,8 @@ describe("履歴の保持(決定 41 の実測)", () => {
       expect(rows.length).toBeLessThanOrEqual(HISTORY_MAX_VERSIONS + publishes);
       // 直近 10 版は全文。publish 版を除く write の全文は HISTORY_FULL_VERSIONS 以下
       expect(report.fullWriteVersions).toBeLessThanOrEqual(HISTORY_FULL_VERSIONS);
+      // 決定 53(M5a-1): 逆差分はブロック単位。M4 の 976 KB から 250 KB 未満に下がる
+      expect(report.diffBytes).toBeLessThan(250 * 1024);
     });
   });
 });

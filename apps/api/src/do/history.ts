@@ -11,6 +11,11 @@ import type { Via } from "@plyrs/sync-protocol";
 // 保持(M4-6 で実測し据え置き。ロードマップ 11 章): record ごとに最新 100 版かつ 365 日。直近 10 版は全文、それより古い版は
 // 1 つ新しい版からの逆差分だけを持つ(新しい側から辿るので、古い版を消しても鎖が切れない)。
 // publish / unpublish の版は常に全文で、保持上限に達しても record がある間は消さない。
+//
+// 逆差分の形(決定 53、M5a-1): リッチテキストの値は、古い版の本文を「新しい版の同じ ID の最上位
+// ブロックの参照」と「変わったブロックの実体」の列で持つ(blocks)。作るときに当て直して元に戻ることを
+// 確かめ、戻らない・短くならないなら従来どおり値全体(set)。M4 までの {set, unset} だけの行は書き換えず
+// そのまま読む。
 
 export const HISTORY_FOLD_WINDOW_MS = 15 * 60_000;
 export const HISTORY_FULL_VERSIONS = 10;
@@ -61,10 +66,19 @@ export interface HistoryVersion extends HistoryEntry {
   fieldVersions: Record<string, number>;
 }
 
-// 逆差分: 版 k を 1 つ新しい版 k+1 から復元するための {set, unset}
+// 古い版のリッチテキストの値 = base(doc.content を除いた部分)+ content(新しい版の同じ ID の最上位
+// ブロックの参照か、ブロックの実体)
+export interface BlockPatch {
+  base: Record<string, unknown>;
+  content: Array<{ ref: string } | { node: unknown }>;
+}
+
+// 逆差分: 版 k を 1 つ新しい版 k+1 から復元するための {set, unset, blocks?}。blocks は M5a 以降の行
+// だけが持ち、キーは set と重ならない
 interface ReverseDiff {
   set: Record<string, unknown>;
   unset: string[];
+  blocks?: Record<string, BlockPatch>;
 }
 
 interface RawHistoryRow extends Record<string, SqlStorageValue> {
@@ -144,13 +158,111 @@ function changedKeys(
   return compareVersions(before, after).map((change) => change.key);
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+// リッチテキストのエンベロープの形(doc.content が配列)なら、doc と content を返す。richtext かどうかは
+// 型定義を引かずに値の形で判定する(履歴は型定義の変更をまたぐ)
+function envelopeParts(
+  value: unknown,
+): { doc: Record<string, unknown>; content: unknown[] } | null {
+  if (!isPlainObject(value) || !isPlainObject(value.doc) || !Array.isArray(value.doc.content)) {
+    return null;
+  }
+  return { doc: value.doc, content: value.doc.content };
+}
+
+function blockIdOf(block: unknown): string | null {
+  if (!isPlainObject(block) || !isPlainObject(block.attrs)) {
+    return null;
+  }
+  const id = block.attrs.id;
+  return typeof id === "string" && id !== "" ? id : null;
+}
+
+// 新しい側の最上位ブロックを ID で引く表。ID の無いブロックか重複した ID があれば null
+function blocksById(content: unknown[]): Map<string, unknown> | null {
+  const byId = new Map<string, unknown>();
+  for (const block of content) {
+    const id = blockIdOf(block);
+    if (id === null || byId.has(id)) {
+      return null;
+    }
+    byId.set(id, block);
+  }
+  return byId;
+}
+
+// 新しい版の値にパッチを当てて古い版の値を作る。参照先のブロックが無ければ null(鎖が正しければ起きない)
+export function applyBlockPatch(newer: unknown, patch: BlockPatch): unknown {
+  const parts = envelopeParts(newer);
+  if (parts === null || !isPlainObject(patch.base) || !isPlainObject(patch.base.doc)) {
+    return null;
+  }
+  const byId = blocksById(parts.content);
+  if (byId === null) {
+    return null;
+  }
+  const content: unknown[] = [];
+  for (const item of patch.content) {
+    if ("ref" in item) {
+      if (!byId.has(item.ref)) {
+        return null;
+      }
+      content.push(byId.get(item.ref));
+    } else {
+      content.push(item.node);
+    }
+  }
+  return { ...patch.base, doc: { ...patch.base.doc, content } };
+}
+
+// 古い版の値を、新しい版の最上位ブロックの参照で表す。表せない・元に戻らない・短くならないなら null
+export function blockPatchOf(older: unknown, newer: unknown): BlockPatch | null {
+  const olderParts = envelopeParts(older);
+  const newerParts = envelopeParts(newer);
+  if (olderParts === null || newerParts === null || !isPlainObject(older)) {
+    return null;
+  }
+  const byId = blocksById(newerParts.content);
+  if (byId === null) {
+    return null;
+  }
+  const { content: _content, ...docRest } = olderParts.doc;
+  const patch: BlockPatch = {
+    base: { ...older, doc: docRest },
+    content: olderParts.content.map((block) => {
+      const id = blockIdOf(block);
+      return id !== null && byId.has(id) && canonicalJson(byId.get(id)) === canonicalJson(block)
+        ? { ref: id }
+        : { node: block };
+    }),
+  };
+  // 当て直して元に戻ることを確かめる(JSON を一度通した値で比べる。保存されるのは JSON なので)
+  const restored = applyBlockPatch(newer, JSON.parse(JSON.stringify(patch)) as BlockPatch);
+  if (restored === null || canonicalJson(restored) !== canonicalJson(older)) {
+    return null;
+  }
+  if (JSON.stringify(patch).length >= JSON.stringify(older).length) {
+    return null;
+  }
+  return patch;
+}
+
 // 版 older を、1 つ新しい版 newer からの逆差分にする
 function reverseDiff(older: Record<string, unknown>, newer: Record<string, unknown>): ReverseDiff {
   const set: Record<string, unknown> = {};
   const unset: string[] = [];
+  const blocks: Record<string, BlockPatch> = {};
   for (const key of Object.keys(older)) {
     if (canonicalJson(older[key]) !== canonicalJson(newer[key])) {
-      set[key] = older[key];
+      const patch = key in newer ? blockPatchOf(older[key], newer[key]) : null;
+      if (patch !== null) {
+        blocks[key] = patch;
+      } else {
+        set[key] = older[key];
+      }
     }
   }
   for (const key of Object.keys(newer)) {
@@ -158,14 +270,22 @@ function reverseDiff(older: Record<string, unknown>, newer: Record<string, unkno
       unset.push(key);
     }
   }
-  return { set, unset };
+  return Object.keys(blocks).length === 0 ? { set, unset } : { set, unset, blocks };
 }
 
+// 当てられないブロックの参照があれば null(壊れた版を復元に使わない)
 function applyReverseDiff(
   newer: Record<string, unknown>,
   diff: ReverseDiff,
-): Record<string, unknown> {
+): Record<string, unknown> | null {
   const result: Record<string, unknown> = { ...newer, ...diff.set };
+  for (const [key, patch] of Object.entries(diff.blocks ?? {})) {
+    const value = applyBlockPatch(newer[key], patch);
+    if (value === null) {
+      return null;
+    }
+    result[key] = value;
+  }
   for (const key of diff.unset) {
     delete result[key];
   }
@@ -381,13 +501,16 @@ export function loadVersion(
   if (full === undefined || full.data === null) {
     return null;
   }
-  let data = JSON.parse(full.data) as Record<string, unknown>;
+  let data: Record<string, unknown> | null = JSON.parse(full.data) as Record<string, unknown>;
   for (let i = fullIndex - 1; i >= 0; i--) {
     const row = rows[i];
     if (row === undefined || row.diff === null) {
       return null;
     }
     data = applyReverseDiff(data, JSON.parse(row.diff) as ReverseDiff);
+    if (data === null) {
+      return null;
+    }
   }
   return {
     ...rowToEntry(target),
