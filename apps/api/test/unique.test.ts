@@ -120,6 +120,14 @@ describe("unique だけのフィールド(決定 54)", () => {
     ).toMatchObject({ ok: false, code: "unique_violation" });
   });
 
+  it("unique だけのフィールドは record_list の絞り込みに使えない(従来どおり)", () => {
+    const parsed = parseRecordListInput(counterType(), {
+      type: "counter",
+      filter: { code: ["c"] },
+    });
+    expect(parsed.ok).toBe(false);
+  });
+
   it('比較は生成カラムの affinity に従う: 型を変える前の文字列 "10" があると数値 10 は unique_violation', async () => {
     const stub = freshStub();
     await stub.registerContentType(counterType(), auth("admin"));
