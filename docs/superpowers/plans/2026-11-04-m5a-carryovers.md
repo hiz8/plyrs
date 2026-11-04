@@ -56,7 +56,7 @@ M5 は、ロードマップ 2 章のとおり各項目が別の詳細計画に�
 | `packages/db/src/schema.ts`、`packages/db/drizzle/` | 変更。`asset_upload_tokens.token_kind` |
 | `apps/api/src/tenant-do.ts`(`createAssetRecord`)、`apps/api/src/assets/store.ts`、`apps/api/src/mcp/worker-ops.ts`、`apps/api/src/mcp/uploads.ts`、`apps/api/src/do/asset-uploads.ts` | 変更。アセットの via と tokenId |
 | `apps/api/src/mcp/issuing-token.ts` | 新規。発行に使ったトークンが今も有効かと、今のロールを引く |
-| `apps/api/src/oauth/grants.ts` | 変更。`hasTenantGrant` を export |
+| `apps/api/src/oauth/grants.ts` | 変更。`hasGrant` を export |
 | `apps/api/src/mcp/route.ts`、`apps/api/src/ops/invoke.ts`、`apps/api/src/mcp/worker-ops.ts` | 変更。PAT のスコープ不足を業務エラーに、スコープ判定のヘルパー |
 | `apps/api/src/assets/fetch-url.ts`、`apps/api/src/mcp/confirm.ts`、`apps/api/src/do/write-record.ts` | 変更。G4 の小さな不具合 |
 | `apps/e2e/tests/mcp-write.spec.ts` | 変更。PAT のスコープ不足の期待値 |
@@ -149,14 +149,14 @@ M4-6 の実測では、本文を 1 段落直しただけでも逆差分に本文
 
 今は受け取りで BLOCKLIST の 2 キーだけを見ており、発行に使ったトークンの失効とロールの降格は見ていない(最長 10 分・1 回・画像だけの隙)。claim の後、本文を読む前に引き直す。
 
-**Files:** Create `apps/api/src/mcp/issuing-token.ts`。Modify `apps/api/src/oauth/grants.ts`(`hasTenantGrant` を export)、`apps/api/src/mcp/uploads.ts`。Test: `apps/api/test/mcp-uploads.test.ts`
+**Files:** Create `apps/api/src/mcp/issuing-token.ts`。Modify `apps/api/src/oauth/grants.ts`(`hasGrant` を export)、`apps/api/src/mcp/uploads.ts`。Test: `apps/api/test/mcp-uploads.test.ts`
 
 **Interfaces:**
 - Produces:
   ```ts
   // grants.ts: 付与が今もあるか。OAUTH_KV の `grant:${userId}:${grantId}` を 1 回 get する(isPending と同じ方式。
   // 一覧の list はしない)。テナントとの結び付きは発行時に検証済み(tokenId は検証した token から取った)
-  export async function hasTenantGrant(env: Env, tenantId: string, userId: string, grantId: string): Promise<boolean>;
+  export async function hasGrant(env: Env, userId: string, grantId: string): Promise<boolean>;
   // issuing-token.ts: 発行に使ったトークンが今も有効なら、今の memberships のロールを返す。無効・会員でなければ null
   export async function currentRoleOfIssuer(
     env: Env,
@@ -165,11 +165,11 @@ M4-6 の実測では、本文を 1 段落直しただけでも逆差分に本文
     now: Date,
   ): Promise<Role | null>;
   ```
-- PAT は D1 の 1 照会(`personal_access_tokens` の `id = tokenId AND tenant_id AND user_id AND revoked_at IS NULL AND expires_at > now` を `memberships` と join。`verifyPat` と同じ条件をハッシュではなく行 ID で引く)。OAuth は `hasTenantGrant` が真で、`memberships` の行があること(D1 の 1 照会)
+- PAT は D1 の 1 照会(`personal_access_tokens` の `id = tokenId AND tenant_id AND user_id AND revoked_at IS NULL AND expires_at > now` を `memberships` と join。`verifyPat` と同じ条件をハッシュではなく行 ID で引く)。OAuth は `hasGrant` が真で、`memberships` の行があること(D1 の 1 照会)。`mcp-gate.ts` は token から grantId を取り出せないとき `tokenId` に `clientId` を入れるが、そのトークンで発行した受け取りは KV に `grant:${userId}:${clientId}` が無いので 403 `token_revoked` になる(安全側。意図した動きとしてテストと申し送りに書く)
 - `uploads.ts` の順序: claim(使い切りの印)→ BLOCKLIST の 2 キー → `currentRoleOfIssuer`(null なら 403 `{ error: "token_revoked" }`)→ `can(role, "record:write")`(偽なら 403 `{ error: "forbidden" }`。viewer に下げられた場合)→ 本文を読む → `storeAsset`(role は引き直した値)。ロールの判定を本文を読む前に置くので、降格された利用者の本文は読まず R2 にも書かない(`createAssetRecord` の `requireOperation` は二重の防御として残る)。印は先に立つので、403 のトークンも再利用できない
 - 応答の 403 は R2 に何も書かない(本文を読む前に返す)
 
-- [ ] **Step 1: 失敗するテストを書く**(`mcp-uploads.test.ts`、Review Focus 4): 発行後に PAT を `revokePat` すると 403 `token_revoked` で R2 の一覧が増えない / 発行後に PAT の `expires_at` を過去にすると 403 / 発行後にロールを viewer に下げると 403 `forbidden` で、本文を読まず(`ASSETS.put` の spy が呼ばれない)/ 発行後に会員から外すと 403 / OAuth で発行(`McpAuth` を `tokenKind: "oauth"` で組む)した後に `revokeTenantGrant` すると 403 で、`hasTenantGrant` は KV の get を 1 回だけ呼ぶ(list は呼ばない)/ どれも 2 回目の POST は 410
+- [ ] **Step 1: 失敗するテストを書く**(`mcp-uploads.test.ts`、Review Focus 4): 発行後に PAT を `revokePat` すると 403 `token_revoked` で R2 の一覧が増えない / 発行後に PAT の `expires_at` を過去にすると 403 / 発行後にロールを viewer に下げると 403 `forbidden` で、本文を読まず(`ASSETS.put` の spy が呼ばれない)/ 発行後に会員から外すと 403 / OAuth で発行(`McpAuth` を `tokenKind: "oauth"` で組む)した後に `revokeTenantGrant` すると 403 で、`hasGrant` は KV の get を 1 回だけ呼ぶ(list は呼ばない)/ `tokenId` が clientId(grantId を取り出せなかった形)の OAuth で発行した受け取りは 403 `token_revoked` / どれも 2 回目の POST は 410
 - [ ] **Step 2: FAIL → 実装 → PASS**(コマンドは Task 3 と同じ)
 - [ ] **Step 3: design-spec 16.11 の受け取りの順序に「発行に使ったトークンの有効性と今のロール(無効なら 403)」を足す。ロードマップ 11 章の「アップロードトークンの残る隙」に解消を追記する**
 - [ ] **Step 4: Commit** `fix(api): アップロードの受け取りで発行に使ったトークンの失効とロールの降格を見る`
@@ -198,10 +198,10 @@ G4 で、Claude Code は HTTP 403 の `insufficient_scope` を「Insufficient sc
 **Interfaces:**
 - `fetchPublicImage(url: string, options: { userAgent: string; fetcher?: typeof fetch })`: 各ホップの要求に `user-agent` を付ける。値は `plyrs-asset-import/1 (+<API_ORIGIN>)`、`API_ORIGIN` が無ければ `plyrs-asset-import/1`(`worker-ops.ts` が組む)。Wikimedia の 403 は User-Agent が無いためとみている(未確認)ので、preview で確かめる(所有者にお願いすること)
 - `requestedSchema` の `confirm` に `default: true` を付ける(フォームが初期値を true にして描くので、欄を切り替えなくても Accept で `confirm: true` が送られる)。**照合は変えない**: `confirm: true` を明示した Accept だけを確認とし、`confirm` が欠けた Accept(フォームを描かずに自動で返すクライアント)と `false` は従来どおり `declined`(16.8 の人の確認を弱めない)。照合用の `confirmSchema` は `z.boolean()` のまま、`requestedSchema` 用に default 付きの別のスキーマを持つ。SDK が `default` を `requestedSchema` に出すかを型(`node_modules/@modelcontextprotocol/server/dist/index.d.mts`)で確かめ、出なければ `requestedSchema` を手で組む
-- **構造の検査は全経路に置く**: 語彙に無いノードの `attrs` に URL を入れる隙は validate-on-write の問題なので、MCP の入力変換(`resolveRichTextInputs`)ではなく、同期・REST・MCP が通る `write-record.ts` の `newUnsafeLinks` の隣で `checkRichText`(`@plyrs/richtext`)を当てる。対象は前の値から変わった richtext のフィールドだけ(リンク検査と同じく、本文以外を直す保存を既存の値で失敗させない)。通らなければ `validation_failed`(message に `<fieldKey>: invalid rich text structure: <理由>`)。ロードマップ 11 章「リンク検査の残り」を閉じる
+- **構造の検査は全経路に置く**: 語彙に無いノードの `attrs` に URL を入れる隙は validate-on-write の問題なので、MCP の入力変換(`resolveRichTextInputs`)ではなく、同期・REST・MCP が通る `write-record.ts` の `newUnsafeLinks` の隣で `checkRichText`(`@plyrs/richtext`)を当てる。対象は前の値から変わった richtext のフィールドだけ(リンク検査と同じく、本文以外を直す保存を既存の値で失敗させない)。通らなければ `validation_failed`(message に `<fieldKey>: invalid rich text structure: <理由>`)。**未知の属性も拒否する**: ProseMirror の `Node.fromJSON` は `computeAttrs` でスキーマに定義された属性だけを取り出し、未知の属性は `check()` に届く前に捨てる(prosemirror-model 1.25.12)。保存されるのは入力の JSON なので、`checkRichText` に入力の JSON を走査して各ノード・マークの `attrs` のキーが `type.spec.attrs` に含まれるかを見る処理を足す(含まれなければ理由に `unknown attribute <node or mark>.<key>`)。ロードマップ 11 章「リンク検査の残り」を閉じる
 - 管理画面のエディタが作る本文を拒否しないこと: `@plyrs/richtext` のスキーマのノード・マークの集合が、`packages/ui` のエディタの拡張の集合を含むことをテストで固定する(足りなければスキーマに足す。M2-2 で揃えた集合が以後ずれていないかの確認)
 
-- [ ] **Step 1: 失敗するテストを書く**: fetch の spy が受けた要求の `user-agent` が `plyrs-asset-import/1` で始まる(リダイレクト先のホップでも)/ elicitation の `requestedSchema.properties.confirm.default === true`、`content: { confirm: false }` の Accept は `declined` / `content: {}` の Accept は `declined`、`content: { confirm: true }` の Accept で公開される / `{ type: "iframe", attrs: { src: "javascript:alert(1)" } }` を含む本文が、同期の push・REST の `PUT`・MCP の `record_update` のどれでも `validation_failed` で書かれない / 既存の不正な本文を持つ record のタイトルだけを直す保存は通る / エディタの拡張の集合がスキーマに含まれる
+- [ ] **Step 1: 失敗するテストを書く**: fetch の spy が受けた要求の `user-agent` が `plyrs-asset-import/1` で始まる(リダイレクト先のホップでも)/ elicitation の `requestedSchema.properties.confirm.default === true`、`content: { confirm: false }` の Accept は `declined` / `content: {}` の Accept は `declined`、`content: { confirm: true }` の Accept で公開される / `{ type: "iframe", attrs: { src: "javascript:alert(1)" } }` を含む本文と、既知のノードに余分な属性を付けた本文(`{ type: "paragraph", attrs: { src: "javascript:..." } }`、`assetImage` に `onerror`、link マークに `onclick`)が、同期の push・REST の `PUT`・MCP の `record_update` のどれでも `validation_failed` で書かれない / 既存の不正な本文を持つ record のタイトルだけを直す保存は通る / エディタの拡張の集合がスキーマに含まれる
 - [ ] **Step 2: FAIL → 実装 → PASS** `pnpm --filter @plyrs/api exec vitest run --no-isolate --max-workers=1 test/asset-fetch-url.test.ts test/mcp-confirm.test.ts test/write-record.test.ts` と `pnpm --filter @plyrs/richtext test`
 - [ ] **Step 3: `/security-review` を走らせ、指摘を直す**(直さないものは理由を報告に)
 - [ ] **Step 4: ブランチ全体を別の視点でレビューし、Important 以上を直す**(M2〜M4 と同じ)
