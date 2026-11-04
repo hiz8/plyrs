@@ -79,10 +79,17 @@ function filenameOf(url: URL): string {
   return name === "" ? "image" : name.slice(0, MAX_ASSET_FILENAME_LENGTH);
 }
 
+// M5a-6: 各ホップの要求に User-Agent を付ける(User-Agent の無い要求を 403 にするサイトがある。G4 で
+// upload.wikimedia.org が 403 だった。原因は未確認で preview で確かめる)
+export function importUserAgent(apiOrigin: string | undefined): string {
+  return apiOrigin === undefined ? "plyrs-asset-import/1" : `plyrs-asset-import/1 (+${apiOrigin})`;
+}
+
 export async function fetchPublicImage(
   raw: string,
-  fetcher: typeof fetch = fetch,
+  options: { userAgent: string; fetcher?: typeof fetch },
 ): Promise<FetchImageResult> {
+  const fetcher = options.fetcher ?? fetch;
   let checked = checkImportUrl(raw);
   const signal = AbortSignal.timeout(IMPORT_TIMEOUT_MS);
   for (let hop = 0; ; hop += 1) {
@@ -92,7 +99,11 @@ export async function fetchPublicImage(
     const url = checked;
     let res: Response;
     try {
-      res = await fetcher(url.href, { redirect: "manual", signal });
+      res = await fetcher(url.href, {
+        redirect: "manual",
+        signal,
+        headers: { "user-agent": options.userAgent },
+      });
     } catch (error) {
       return fail("fetch_failed", `could not fetch the URL: ${(error as Error).message}`);
     }

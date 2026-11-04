@@ -1,6 +1,9 @@
 import {
   ALLOWED_LINK_SCHEMES,
   buildRecordInputSchema,
+  canonicalJson,
+  richTextEnvelopeSchema,
+  type ContentTypeDefinition,
   newUnsafeLinks,
   ensureRecordBlockIds,
   extractBodyRelations,
@@ -9,6 +12,7 @@ import {
   type RelationRef,
   type WorkflowStatus,
 } from "@plyrs/metamodel";
+import { checkRichTextVocabulary } from "@plyrs/richtext";
 import { assetGuardHook } from "./asset-guard";
 import { issuesToMessage, rowToDefinition, type ContentTypeRow } from "./content-types";
 import { computeChangeSet } from "./diff";
@@ -84,6 +88,30 @@ export interface WriteDeps {
   scheduleModuleAlarm?: (moduleId: string, dueAtMs: number) => void;
   // 決定 54(M5a-2): unique の引き当て用カラムを足し終えているか。省略は偽(走査。安全側)
   lookupReady?: boolean;
+}
+
+function invalidRichText(
+  definition: ContentTypeDefinition,
+  input: Record<string, unknown>,
+  prev: Record<string, unknown> | null,
+): string | null {
+  for (const field of definition.fields) {
+    if (field.type !== "richtext" || input[field.key] === undefined) {
+      continue;
+    }
+    if (prev !== null && canonicalJson(input[field.key]) === canonicalJson(prev[field.key])) {
+      continue;
+    }
+    const envelope = richTextEnvelopeSchema.safeParse(input[field.key]);
+    if (!envelope.success) {
+      continue; // 形は buildRecordInputSchema が見ている
+    }
+    const checked = checkRichTextVocabulary(envelope.data);
+    if (!checked.ok) {
+      return `${field.key}: ${checked.message}`;
+    }
+  }
+  return null;
 }
 
 const systemBeforeWriteHooks: readonly BeforeWriteHook[] = [assetGuardHook, uniqueCheckHook];
@@ -163,6 +191,14 @@ export function writeRecordCore(
   // 一緒に保存されるか、本文の次の書き込みで行われる(§4.2 の遅延マイグレーション)
   const prevComparable = prev === null ? null : ensureRecordBlockIds(definition, prev.data).data;
   const change = computeChangeSet(definition, input, prevComparable, prevRelations);
+
+  // M5a-6(16.10): リッチテキストの構造の検査(語彙に無いノード・マーク、既知のノードの余分な属性を拒否)。
+  // validate-on-write の Zod はエンベロープの形しか見ないので、全経路(同期・REST・MCP)が通るここで行う。
+  // 変わった値だけを見る(既存の不正な本文を巻き込むと、タイトルだけを直す保存まで失敗する)
+  const structural = invalidRichText(definition, input, prevComparable);
+  if (structural !== null) {
+    return { ok: false, code: "validation_failed", message: structural };
+  }
 
   const nextStatus: WorkflowStatus = params.status ?? prev?.status ?? "draft";
   const statusChanged = prev !== null && nextStatus !== prev.status;

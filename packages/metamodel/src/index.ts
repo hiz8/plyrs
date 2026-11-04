@@ -64,6 +64,7 @@ export {
 } from "./asset-type";
 export {
   BLOCK_ID_ATTR,
+  BLOCK_ID_NODE_TYPES,
   DERIVED_ID_PREFIX,
   RICH_TEXT_SCHEMA_VERSION,
   canonicalJson,

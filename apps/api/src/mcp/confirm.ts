@@ -4,6 +4,7 @@ import {
   inputRequired,
   inputResponse,
   type CallToolResult,
+  type ElicitRequestFormParams,
   type InputRequiredResult,
   type RequestStateCodec,
 } from "@modelcontextprotocol/server";
@@ -67,9 +68,21 @@ export function requestStateCodec(
   });
 }
 
+// 承諾の照合に使うスキーマ。既定値を持たせない(`confirm` が欠けた Accept を確認とみなさない。16.8)
 export const confirmSchema = z.object({
   confirm: z.boolean().describe("実行してよければ true"),
 });
+
+// M5a-6: クライアントに送るフォームのスキーマ。`confirm` に `default: true` を付け、フォームが初期値を true に
+// して描くようにする(G4 で、Claude Code のフォームが boolean の欄を切り替えられず、Accept が declined に
+// なった)。照合は confirmSchema のまま、`confirm: true` を明示した Accept だけを確認とする
+export const confirmRequestedSchema: ElicitRequestFormParams["requestedSchema"] = {
+  type: "object",
+  properties: {
+    confirm: { type: "boolean", description: "実行してよければ true", default: true },
+  },
+  required: ["confirm"],
+};
 
 // クライアントが要求の _meta で elicitation の能力を宣言しているか(仕様 2026-07-28 は要求ごとに能力を運ぶ)
 export function canElicit(envelope: unknown): boolean {
@@ -177,7 +190,7 @@ export async function confirmOperation(args: ConfirmArgs): Promise<ConfirmOutcom
       inputRequests: {
         confirm: inputRequired.elicit({
           message: messageOf(args.op, described.label, described.type, args.recordId),
-          requestedSchema: confirmSchema,
+          requestedSchema: confirmRequestedSchema,
         }),
       },
       requestState,

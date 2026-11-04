@@ -1,4 +1,6 @@
 import {
+  BLOCK_ID_ATTR,
+  BLOCK_ID_NODE_TYPES,
   ensureTopLevelBlockIds,
   richTextEnvelopeSchema,
   type RichTextEnvelope,
@@ -42,6 +44,11 @@ function getManager(): MarkdownManager {
 function getPmSchema(): Schema {
   schema ??= getSchema(workerExtensions());
   return schema;
+}
+
+// Worker 側のスキーマ(管理画面のエディタとの語彙の一致を apps/admin の mention-contract.test.ts が固定する)
+export function richTextSchema(): Schema {
+  return getPmSchema();
 }
 
 export function richTextToMarkdown(envelope: RichTextEnvelope): string {
@@ -162,7 +169,85 @@ export function markdownToRichText(markdown: string): MarkdownToRichTextResult {
   return { ok: true, envelope: ensureTopLevelBlockIds(envelope.data).envelope };
 }
 
-// 変換結果の比較や保存前の確認に使う: ProseMirror のスキーマで検証し、通らなければ理由を返す
+const BLOCK_ID_TYPES: ReadonlySet<string> = new Set(BLOCK_ID_NODE_TYPES);
+
+interface JsonNode {
+  type?: unknown;
+  attrs?: unknown;
+  marks?: unknown;
+  content?: unknown;
+}
+
+function allowedAttrs(spec: { attrs?: Record<string, unknown> | null } | undefined): Set<string> {
+  return new Set(Object.keys(spec?.attrs ?? {}));
+}
+
+// M5a-6: 語彙の検査。語彙に無いノード・マークと、既知のノード・マークの余分な属性を見る(ProseMirror の
+// nodeFromJSON は余分な属性を黙って捨てるので、ここで見る)。許す属性はスキーマの属性と、ブロック ID の
+// 付くノード種の attrs.id だけ。内容の規則(doc は 1 つ以上のブロック、など)はここでは見ない
+function vocabularyErrorIn(schema: Schema, node: JsonNode, path: string): string | null {
+  const type = typeof node.type === "string" ? node.type : "";
+  const nodeType = schema.nodes[type];
+  if (nodeType === undefined) {
+    return `${path}: unknown node type ${JSON.stringify(type).slice(0, 40)}`;
+  }
+  if (node.attrs !== undefined && node.attrs !== null) {
+    if (typeof node.attrs !== "object" || Array.isArray(node.attrs)) {
+      return `${path}: attrs of ${type} must be an object`;
+    }
+    const allowed = allowedAttrs(nodeType.spec);
+    if (BLOCK_ID_TYPES.has(type)) {
+      allowed.add(BLOCK_ID_ATTR);
+    }
+    const extra = Object.keys(node.attrs).filter((key) => !allowed.has(key));
+    if (extra.length > 0) {
+      return `${path}: unknown attribute ${extra.join(", ")} on ${type}`;
+    }
+  }
+  if (Array.isArray(node.marks)) {
+    for (const mark of node.marks as JsonNode[]) {
+      const markType = typeof mark?.type === "string" ? schema.marks[mark.type] : undefined;
+      if (markType === undefined) {
+        return `${path}: unknown mark type ${JSON.stringify(mark?.type ?? null).slice(0, 40)}`;
+      }
+      if (mark.attrs === undefined || mark.attrs === null) {
+        continue;
+      }
+      if (typeof mark.attrs !== "object" || Array.isArray(mark.attrs)) {
+        return `${path}: attrs of mark ${String(mark.type)} must be an object`;
+      }
+      const allowed = allowedAttrs(markType.spec);
+      const extra = Object.keys(mark.attrs).filter((key) => !allowed.has(key));
+      if (extra.length > 0) {
+        return `${path}: unknown attribute ${extra.join(", ")} on mark ${String(mark.type)}`;
+      }
+    }
+  }
+  if (Array.isArray(node.content)) {
+    for (const [index, child] of (node.content as JsonNode[]).entries()) {
+      if (child === null || typeof child !== "object" || Array.isArray(child)) {
+        return `${path}.content[${index}]: a node must be an object`;
+      }
+      const found = vocabularyErrorIn(schema, child, `${path}.content[${index}]`);
+      if (found !== null) {
+        return found;
+      }
+    }
+  }
+  return null;
+}
+
+// M5a-6(16.10): 書き込み時の構造の検査(validate-on-write)。語彙と属性だけを見て、内容の規則は見ない
+// (空の doc など、管理画面や既存の値が作る形を拒否しない)
+export function checkRichTextVocabulary(
+  envelope: RichTextEnvelope,
+): { ok: true } | { ok: false; message: string } {
+  const error = vocabularyErrorIn(getPmSchema(), envelope.doc as JsonNode, "doc");
+  return error === null ? { ok: true } : { ok: false, message: error };
+}
+
+// 変換結果の比較や保存前の確認に使う: ProseMirror のスキーマで検証し(内容の規則を含む)、語彙と属性も
+// 見る。通らなければ理由を返す
 export function checkRichText(
   envelope: RichTextEnvelope,
 ): { ok: true } | { ok: false; message: string } {
@@ -170,8 +255,8 @@ export function checkRichText(
     getPmSchema()
       .nodeFromJSON(envelope.doc as JSONContent)
       .check();
-    return { ok: true };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : String(error) };
   }
+  return checkRichTextVocabulary(envelope);
 }

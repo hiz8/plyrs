@@ -1,5 +1,5 @@
 import { generateSessionToken, sha256Hex } from "../auth/session";
-import { fetchPublicImage } from "../assets/fetch-url";
+import { fetchPublicImage, importUserAgent } from "../assets/fetch-url";
 import { MAX_ASSET_SIZE_BYTES, storeAsset } from "../assets/store";
 import { requireOperation } from "../do/authorize";
 import { ASSET_UPLOAD_TTL_SECONDS } from "../ops/assets";
@@ -54,7 +54,9 @@ async function assetImportUrl(
   deps: McpServerDeps,
   input: { url: string; filename?: string },
 ): Promise<InvokeResult> {
-  const fetched = await fetchPublicImage(input.url);
+  const fetched = await fetchPublicImage(input.url, {
+    userAgent: importUserAgent(deps.env.API_ORIGIN),
+  });
   if (!fetched.ok) {
     return fetched;
   }

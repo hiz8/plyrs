@@ -219,6 +219,13 @@ pnpm --filter @plyrs/api exec wrangler tail plyrs-api-preview --format json | gr
 4. 画像の URL 取り込みとアップロード(uploadUrl への POST)を 1 回ずつ行い、本文に `plyrs://asset/…` で入れて管理画面で表示されることを見る
 5. 並行して手元で上の `wrangler tail … | grep mcp.op` を流し、ツールごとの `rowsRead` / `rowsWritten` を控える
 
+M5a の確認(preview、所有者。マージ・デプロイ後。結果はロードマップ 12 章に記録する):
+
+1. `asset_import_url` で upload.wikimedia.org の画像を取り込めること(各ホップに User-Agent を付けた)
+2. Claude Code で publish の確認が出たとき、`confirm` 欄が初期値で true になっていて、欄を触らずに Accept するだけで公開されること。Claude Code が初期値を使わずに `confirm` を欠いて送る場合は `declined` になるので、その結果を記録する
+3. `record:publish` の無い PAT で公開を頼むと、エージェントが「所有者に PAT を発行してもらう」旨を伝えること(業務エラー `insufficient_scope`)
+4. M1 から残っている Cursor / VS Code(と、あれば MCP Inspector)からの PAT 接続(手順は 3.5)
+
 ## 4. super 管理者の初期化
 
 **デプロイ後は直ちに bootstrap を実行すること** — super_admins が空の間は到達可能な誰でも初期化できる(レート制限のみ)。

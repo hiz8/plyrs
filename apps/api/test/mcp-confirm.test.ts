@@ -164,6 +164,42 @@ describe("publish の確認(MRTR の elicitation)", () => {
     expect(await published(recordId)).toBe(true);
   });
 
+  // M5a-6: フォームの初期値は true。照合は明示の confirm: true だけ(16.8 の人の確認を弱めない)
+  it("requestedSchema の confirm は default: true", async () => {
+    const recordId = await newRecord(910);
+    const first = await call("record_publish", { recordId }, { elicitation: true });
+    const params = first.result?.inputRequests?.["confirm"]?.params as
+      | { requestedSchema?: { properties?: Record<string, Record<string, unknown>> } }
+      | undefined;
+    expect(params?.requestedSchema?.properties?.["confirm"]).toMatchObject({
+      type: "boolean",
+      default: true,
+    });
+  });
+
+  for (const [label, content] of [
+    ["confirm: false", { confirm: false }],
+    ["confirm の欠けた", {}],
+  ] as const) {
+    it(`${label} Accept は declined で公開されない`, async () => {
+      const recordId = await newRecord(label === "confirm: false" ? 911 : 912);
+      const first = await call("record_publish", { recordId }, { elicitation: true });
+      const second = await call(
+        "record_publish",
+        { recordId },
+        {
+          elicitation: true,
+          retry: {
+            inputResponses: { confirm: { action: "accept", content } },
+            requestState: first.result?.requestState ?? "",
+          },
+        },
+      );
+      expect(second.result?.structuredContent).toMatchObject({ error: { code: "declined" } });
+      expect(await published(recordId)).toBe(false);
+    });
+  }
+
   it("断ると declined で公開されない", async () => {
     const recordId = await newRecord(903);
     const first = await call("record_publish", { recordId }, { elicitation: true });
