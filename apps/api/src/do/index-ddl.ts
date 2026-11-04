@@ -64,6 +64,8 @@ export const LOOKUP_COLUMNS_FLAG = "lookup_columns_v1";
 // alarms.ts の種別。足りないカラムを 1 歩に 1 つずつ足す
 export const LOOKUP_COLUMNS_ALARM = "lookup_columns";
 export const LOOKUP_COLUMNS_STEP_DELAY_MS = 1_000;
+// 1 歩が失敗したときの再試行の間隔(失敗を alarm の外へ投げず、他の kind を止めない)
+export const LOOKUP_COLUMNS_RETRY_MS = 10 * 60 * 1000;
 
 export function sanitizeTypeKey(typeKey: string): string {
   return typeKey.replace(/\./g, "__");

@@ -49,6 +49,7 @@ import {
   addLookupColumnStep,
   checkLookupColumns,
   LOOKUP_COLUMNS_ALARM,
+  LOOKUP_COLUMNS_RETRY_MS,
   LOOKUP_COLUMNS_STEP_DELAY_MS,
 } from "./do/index-ddl";
 import { healthCheckCore, listAssetR2KeysCore, type HealthReport } from "./do/health";
@@ -187,8 +188,11 @@ export class TenantDO extends DurableObject<Env> {
       this.publishSeq = Math.max(storedSeq, snapshotMax ?? 0, outboxMax ?? 0, 0);
       // 保険: アラームを失っても（sweeper のバグ・リトライ枯渇）、次に DO が起きた時に張り直す。
       // outbox 行とアラームは同一トランザクションで書くため通常は失われない。
+      // 起動時に登録した論理タイマー(引き当て用カラム・再索引)が既存の物理アラームより早ければ前倒しする。
+      // モジュールの alarm が数日先に張られているテナントで、移行がそれまで待たされないようにする
       const due = minDueAt(ctx.storage.sql);
-      if (due !== null && (await ctx.storage.getAlarm()) === null) {
+      const armed = await ctx.storage.getAlarm();
+      if (due !== null && (armed === null || due < armed)) {
         await ctx.storage.setAlarm(due);
       }
     });
@@ -1047,15 +1051,22 @@ export class TenantDO extends DurableObject<Env> {
         continue;
       }
       if (kind === LOOKUP_COLUMNS_ALARM) {
-        // 決定 54: 引き当て用カラムを 1 つ足す。残りがあれば次の起床を張り直す
-        const step = this.ctx.storage.transactionSync(() =>
-          addLookupColumnStep(this.ctx.storage.sql),
-        );
+        // 決定 54: 引き当て用カラムを 1 つ足す。残りがあれば次の起床を張り直す。DDL が失敗しても
+        // 投げ直さない(この kind の due が最早のまま残り、後ろの outbox_sweep やモジュールの alarm が
+        // 回らなくなる)。記録して間隔を空けて再試行し、それまでの unique の判定は走査のまま
         clearAlarm(this.ctx.storage.sql, kind);
-        if (step.done) {
-          this.lookupReady = true;
-        } else {
-          registerAlarm(this.ctx.storage.sql, kind, Date.now() + LOOKUP_COLUMNS_STEP_DELAY_MS);
+        try {
+          const step = this.ctx.storage.transactionSync(() =>
+            addLookupColumnStep(this.ctx.storage.sql),
+          );
+          if (step.done) {
+            this.lookupReady = true;
+          } else {
+            registerAlarm(this.ctx.storage.sql, kind, Date.now() + LOOKUP_COLUMNS_STEP_DELAY_MS);
+          }
+        } catch (error) {
+          console.error("lookup column step failed", error);
+          registerAlarm(this.ctx.storage.sql, kind, Date.now() + LOOKUP_COLUMNS_RETRY_MS);
         }
         continue;
       }
