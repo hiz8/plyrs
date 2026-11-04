@@ -82,6 +82,8 @@ export interface WriteDeps {
   newEventId?: () => string;
   // Phase 9: モジュール alarm の予約 seam(§9.6)。定義のみ、使用は Task 9。
   scheduleModuleAlarm?: (moduleId: string, dueAtMs: number) => void;
+  // 決定 54(M5a-2): unique の引き当て用カラムを足し終えているか。省略は偽(走査。安全側)
+  lookupReady?: boolean;
 }
 
 const systemBeforeWriteHooks: readonly BeforeWriteHook[] = [assetGuardHook, uniqueCheckHook];
@@ -194,6 +196,7 @@ export function writeRecordCore(
       prev,
       sql: deps.sql,
       systemWrite: options.systemWrite === true,
+      lookupReady: deps.lookupReady === true,
       relations: relationState,
       scheduleModuleAlarm: deps.scheduleModuleAlarm,
     },

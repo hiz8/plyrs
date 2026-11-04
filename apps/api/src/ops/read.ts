@@ -28,6 +28,8 @@ export interface OpDeps {
   nextPublishSeq: () => number;
   newEventId: () => string;
   scheduleModuleAlarm: (moduleId: string, dueAtMs: number) => void;
+  // 決定 54: unique の引き当て用カラムを足し終えているか
+  lookupReady?: boolean;
 }
 
 export interface PublishExpectation {
@@ -63,6 +65,7 @@ export function writeDepsOf(ctx: OpContext): WriteDeps {
     newRelationId: ctx.deps.newId,
     newEventId: ctx.deps.newEventId,
     scheduleModuleAlarm: ctx.deps.scheduleModuleAlarm,
+    lookupReady: ctx.deps.lookupReady,
   };
 }
 

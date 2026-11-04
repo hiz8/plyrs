@@ -9,6 +9,7 @@ import { asInvokeResult, asWriteResult } from "./rpc-unwrap";
 // M4-6(Review Focus 5、ロードマップ 6 章): 書き込み 1 回の rows read が record 数に比例しないこと。
 // 10 件と 300 件のテナント(別 DO)で同じ操作の列を流し、各操作の rows read が一致することを確かめる。
 // rows written は記録のみ(報告書の表に写す)。
+// M5a-2(決定 54): indexed でない unique だけのフィールドを持つ型(coupon)でも比例しないこと。
 
 const SMALL = 10;
 const LARGE = 300;
@@ -22,12 +23,34 @@ function bodyOf(text: string) {
   };
 }
 
+// unique だけ(indexed なし)のフィールドを持つ型
+function couponType() {
+  return {
+    ...articleType(),
+    id: "01900000-0000-7000-8000-0000000c0001",
+    key: "coupon",
+    fields: [
+      { key: "title", type: "text" as const, required: true },
+      { key: "code", type: "text" as const, config: { unique: true } },
+    ],
+  };
+}
+
 async function seedTenant(count: number) {
   const tenantId = crypto.randomUUID();
   const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
   const owner = { ...auth("owner", "owner"), tenantId };
   expect((await stub.registerContentType(articleType(), owner)).ok).toBe(true);
+  expect((await stub.registerContentType(couponType(), owner)).ok).toBe(true);
   for (let i = 0; i < count; i += 1) {
+    const coupon = asWriteResult(
+      await stub.writeRecord(
+        "coupon",
+        { recordId: uuidv7(), input: { title: `c${i}`, code: `seed-${i}` } },
+        owner,
+      ),
+    );
+    expect(coupon.ok).toBe(true);
     const written = asWriteResult(
       await stub.writeRecord(
         "article",
@@ -74,6 +97,18 @@ async function runSequence(tenantId: string, stub: DurableObjectStub): Promise<M
     meters[label] = result.meter!;
     return result.ok ? (result.output as Record<string, unknown>) : {};
   };
+  const couponId = uuidv7();
+  await call("coupon_create", "record_create", {
+    type: "coupon",
+    recordId: couponId,
+    input: { title: "新しいクーポン", code: "target" },
+  });
+  const coupon = await call("coupon_get", "record_get", { recordId: couponId });
+  await call("coupon_update", "record_update", {
+    recordId: couponId,
+    input: { code: "target-2" },
+    baseFieldVersions: coupon["fieldVersions"],
+  });
   const recordId = uuidv7();
   await call("record_create", "record_create", {
     type: "article",

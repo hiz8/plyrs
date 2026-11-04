@@ -45,6 +45,12 @@ import {
 import { deleteRecordCore, type DeleteRecordResult } from "./do/delete-record";
 import { meterSql } from "./do/sql-meter";
 import { ensureAssetContentType } from "./do/ensure-asset-type";
+import {
+  addLookupColumnStep,
+  checkLookupColumns,
+  LOOKUP_COLUMNS_ALARM,
+  LOOKUP_COLUMNS_STEP_DELAY_MS,
+} from "./do/index-ddl";
 import { healthCheckCore, listAssetR2KeysCore, type HealthReport } from "./do/health";
 import {
   applyModuleTypes,
@@ -119,12 +125,21 @@ export class TenantDO extends DurableObject<Env> {
   // version の upsert/delete を生み、Queues の配信順序非保証と組み合わさると事故る）。
   // publish・unpublish（cascade 含む）は必ずこれで新しい publish_seq を採る。
   private publishSeq = 0;
+  // 決定 54(M5a-2): unique のフィールドの引き当て用カラムを足し終えているか。起動時と alarm の後に更新する
+  private lookupReady = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { schema });
     ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
+      // 決定 54(M5a-2): unique のフィールドの引き当て用カラム。部分インデックスの構築は records を走査する
+      // ので起動時に DDL は流さず(record の多いテナントで起動の上限を超えうる)、足りなければ alarm で
+      // 1 つずつ足す。型の登録(下の ensure*)より前に見る(新しく登録する型は applyIndexDdl がカラムを作る)
+      this.lookupReady = checkLookupColumns(ctx.storage.sql).ready;
+      if (!this.lookupReady) {
+        registerAlarm(ctx.storage.sql, LOOKUP_COLUMNS_ALARM, Date.now());
+      }
       // Phase 8 決定 2: システム asset 型を自動登録(冪等)。Phase 8 デプロイ以前から存在する
       // テナントも、次に DO が起きた時点でここを通って型を得る。変更があった時だけ、
       // hibernation 復帰で生きているソケットへ型カタログを配り直す(registerContentType RPC の
@@ -379,6 +394,7 @@ export class TenantDO extends DurableObject<Env> {
         {
           sql: this.ctx.storage.sql,
           nextSeq: () => ++this.seq,
+          lookupReady: this.lookupReady,
           now: () => new Date().toISOString(),
           newRelationId: () => uuidv7(),
           newEventId: () => uuidv7(),
@@ -472,6 +488,7 @@ export class TenantDO extends DurableObject<Env> {
         {
           sql: this.ctx.storage.sql,
           nextSeq: () => ++this.seq,
+          lookupReady: this.lookupReady,
           now: () => new Date().toISOString(),
           newRelationId: () => uuidv7(),
           newEventId: () => uuidv7(),
@@ -534,6 +551,7 @@ export class TenantDO extends DurableObject<Env> {
         {
           sql: this.ctx.storage.sql,
           nextSeq: () => ++this.seq,
+          lookupReady: this.lookupReady,
           now: () => new Date().toISOString(),
           newRelationId: () => uuidv7(),
           newEventId: () => uuidv7(),
@@ -596,6 +614,7 @@ export class TenantDO extends DurableObject<Env> {
         {
           sql: this.ctx.storage.sql,
           nextSeq: () => ++this.seq,
+          lookupReady: this.lookupReady,
           now: () => new Date().toISOString(),
           newRelationId: () => uuidv7(),
           newEventId: () => uuidv7(),
@@ -662,6 +681,7 @@ export class TenantDO extends DurableObject<Env> {
       auth,
       deps: {
         nextSeq: () => ++this.seq,
+        lookupReady: this.lookupReady,
         now: () => new Date().toISOString(),
         newId: () => uuidv7(),
         nextPublishSeq: () => this.nextPublishSeq(),
@@ -1026,6 +1046,19 @@ export class TenantDO extends DurableObject<Env> {
         }
         continue;
       }
+      if (kind === LOOKUP_COLUMNS_ALARM) {
+        // 決定 54: 引き当て用カラムを 1 つ足す。残りがあれば次の起床を張り直す
+        const step = this.ctx.storage.transactionSync(() =>
+          addLookupColumnStep(this.ctx.storage.sql),
+        );
+        clearAlarm(this.ctx.storage.sql, kind);
+        if (step.done) {
+          this.lookupReady = true;
+        } else {
+          registerAlarm(this.ctx.storage.sql, kind, Date.now() + LOOKUP_COLUMNS_STEP_DELAY_MS);
+        }
+        continue;
+      }
       const moduleId = moduleIdFromAlarmKind(kind);
       if (moduleId !== null) {
         this.runModuleAlarm(moduleId, now);
@@ -1084,6 +1117,7 @@ export class TenantDO extends DurableObject<Env> {
               {
                 sql,
                 nextSeq: () => ++this.seq,
+                lookupReady: this.lookupReady,
                 now: () => new Date().toISOString(),
                 newRelationId: () => uuidv7(),
                 newEventId: () => uuidv7(),
@@ -1344,6 +1378,7 @@ export class TenantDO extends DurableObject<Env> {
             {
               sql: this.ctx.storage.sql,
               nextSeq: () => ++this.seq,
+              lookupReady: this.lookupReady,
               now: () => new Date().toISOString(),
               newRelationId: () => uuidv7(),
               nextPublishSeq: () => this.nextPublishSeq(),

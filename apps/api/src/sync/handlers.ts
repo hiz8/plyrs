@@ -57,6 +57,7 @@ export interface PushDeps {
   // モジュール alarm 予約)。push 経路も writeRecordCore を通るため同じ seam を持つ。
   newEventId?: () => string;
   scheduleModuleAlarm?: (moduleId: string, dueAtMs: number) => void;
+  lookupReady?: boolean;
 }
 
 export interface PushOutcome {
