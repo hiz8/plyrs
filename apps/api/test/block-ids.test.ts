@@ -112,6 +112,86 @@ describe("最上位ブロックの安定 ID(M2-1)", () => {
     });
   });
 
+  // G4: v1 のまま保存された record に初めて書き込むとき、本文を変えていなければ body の版を上げない
+  // (保存値を導出 ID 付きに揃えてから比べる。上げると古い baseFieldVersions の書き込みが不要な conflict になる)
+  async function storeV1Body(recordId: string) {
+    await stub.writeRecord("article", { recordId, input: validArticleInput() }, auth("a"));
+    await runInDurableObject(stub, async (_instance, state) => {
+      const row = state.storage.sql
+        .exec<{ data: string }>("SELECT data FROM records WHERE id = ?", recordId)
+        .one();
+      const data = JSON.parse(row.data) as Record<string, unknown>;
+      data["body"] = v1Body();
+      state.storage.sql.exec(
+        "UPDATE records SET data = ? WHERE id = ?",
+        JSON.stringify(data),
+        recordId,
+      );
+    });
+  }
+
+  it("v1 の保存値に導出 ID 付きの同じ本文とタイトルの変更を書くと、body の版は上がらず ID は永続化される", async () => {
+    await storeV1Body(uuid(54));
+    const got = asInvokeResult(await stub.invoke("record_get", { recordId: uuid(54) }, auth("a")));
+    expect(got.ok).toBe(true);
+    if (!got.ok) return;
+    const output = got.output as {
+      data: Record<string, unknown>;
+      fieldVersions: Record<string, number>;
+    };
+    const before = output.fieldVersions;
+    const result = asWriteResult(
+      await stub.writeRecord(
+        "article",
+        {
+          recordId: uuid(54),
+          input: { ...validArticleInput(), title: "changed", body: output.data["body"] },
+        },
+        auth("a"),
+      ),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.changedFields).toEqual(["title"]);
+    expect(result.record.fieldVersions["body"]).toBe(before["body"]);
+    expect(result.record.fieldVersions["title"]).toBe((before["title"] ?? 0) + 1);
+    const body = result.record.data["body"] as RichTextEnvelope;
+    expect(body.schemaVersion).toBe(2);
+    expect(blockIds(body)).toEqual(blockIds(output.data["body"]));
+  });
+
+  it("v1 の保存値に ID 無しの同じ本文を書いても body は変更に数えない", async () => {
+    await storeV1Body(uuid(55));
+    const result = asWriteResult(
+      await stub.writeRecord(
+        "article",
+        { recordId: uuid(55), input: { ...validArticleInput(), title: "changed", body: v1Body() } },
+        auth("a"),
+      ),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.changedFields).toEqual(["title"]);
+  });
+
+  it("v1 の保存値に本文を変えて書くと body の版が上がる", async () => {
+    await storeV1Body(uuid(56));
+    const body: RichTextEnvelope = {
+      schemaVersion: 1,
+      doc: { type: "doc", content: [para("a"), para("c")] },
+    };
+    const result = asWriteResult(
+      await stub.writeRecord(
+        "article",
+        { recordId: uuid(56), input: { ...validArticleInput(), body } },
+        auth("a"),
+      ),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.changedFields).toEqual(["body"]);
+  });
+
   it("重複した ID を含む入力は 2 つ目が振り直されて保存される", async () => {
     const body: RichTextEnvelope = {
       schemaVersion: 2,

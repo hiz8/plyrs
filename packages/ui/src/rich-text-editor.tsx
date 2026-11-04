@@ -211,6 +211,26 @@ function comparableDoc(doc: unknown): string {
   return JSON.stringify(stripped);
 }
 
+// 保存する値から、TrailingNode が足した末尾の空の段落を外す(G4)。TrailingNode は最上位の最後が段落で
+// ないとき(画像・箇条書きなど)に空の段落を足すので、外すのは「空の段落で、1 つ前が段落でない」ときだけ。
+// 段落のあとの空の段落は利用者が足したもの(Enter)なので残す。外してもエディタの中には残り、
+// 保存値との比較(comparableDoc)は末尾の空の段落を無視するので文書は置き換わらない
+function withoutTrailingNode(doc: JSONContent): JSONContent {
+  const blocks = doc.content;
+  const last = blocks?.at(-1);
+  const prev = blocks?.at(-2);
+  if (
+    blocks === undefined ||
+    last?.type !== "paragraph" ||
+    (last.content ?? []).length > 0 ||
+    prev === undefined ||
+    prev.type === "paragraph"
+  ) {
+    return doc;
+  }
+  return { ...doc, content: blocks.slice(0, -1) };
+}
+
 function docContent(value: RichTextValue | undefined): JSONContent {
   return value === undefined ? EMPTY_DOC : (value.doc as JSONContent);
 }
@@ -379,7 +399,7 @@ export function RichTextEditor({
         }
         onChangeRef.current({
           schemaVersion: RICH_TEXT_SCHEMA_VERSION,
-          doc: current.getJSON(),
+          doc: withoutTrailingNode(current.getJSON()),
         });
       },
     },
