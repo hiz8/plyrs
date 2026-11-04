@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import { isBlocked, isMembershipBlocked } from "../auth/blocklist";
 import { sha256Hex } from "../auth/session";
 import { MAX_ASSET_SIZE_BYTES, readCapped, storeAsset } from "../assets/store";
+import type { McpAuth } from "../do/authorize";
 import { asClaimAssetUploadResult } from "../rpc-unwrap";
 
 // design-spec 16.11(M4-4、決定 51): asset_upload が発行した URL への本文の受け取り。
@@ -77,13 +78,22 @@ export const uploadRoutes = new Hono<{ Bindings: Env }>().all(
     if (read.body.byteLength === 0) {
       return c.json({ error: "empty_body" }, 400);
     }
-    // Content-Type は発行時に宣言したものを使う(要求のヘッダは信用しない)
-    const result = await storeAsset(
-      c.env,
+    // Content-Type は発行時に宣言したものを使う(要求のヘッダは信用しない)。発行に使ったトークンの
+    // 認可コンテキストを組んで渡すので、asset の履歴は via mcp と tokenId を持つ(M5a-3)
+    const auth: McpAuth = {
+      userId: claimed.userId,
+      role: claimed.role,
       tenantId,
-      { userId: claimed.userId, role: claimed.role, tenantId },
-      { body: read.body, filename: claimed.filename, contentType: claimed.contentType },
-    );
+      scopes: ["record:write"],
+      tokenId: claimed.tokenId,
+      tokenKind: claimed.tokenKind,
+      exp: Math.floor(Date.now() / 1000),
+    };
+    const result = await storeAsset(c.env, tenantId, auth, {
+      body: read.body,
+      filename: claimed.filename,
+      contentType: claimed.contentType,
+    });
     if (!result.ok) {
       return c.json(
         { error: result.code, message: result.message },

@@ -14,6 +14,7 @@ export interface AssetUploadRow {
   userId: string;
   role: Role;
   tokenId: string;
+  tokenKind: "pat" | "oauth";
   filename: string;
   contentType: string;
   expiresAt: string;
@@ -29,12 +30,13 @@ export function createAssetUploadCore(sql: SqlStorage, row: AssetUploadRow, now:
   );
   sql.exec(
     `INSERT INTO asset_upload_tokens
-       (token_hash, user_id, role, token_id, filename, content_type, expires_at, used_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)`,
+       (token_hash, user_id, role, token_id, token_kind, filename, content_type, expires_at, used_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)`,
     row.tokenHash,
     row.userId,
     row.role,
     row.tokenId,
+    row.tokenKind,
     row.filename,
     row.contentType,
     row.expiresAt,
@@ -48,6 +50,7 @@ export type ClaimAssetUploadResult =
       userId: string;
       role: Role;
       tokenId: string;
+      tokenKind: "pat" | "oauth";
       filename: string;
       contentType: string;
     }
@@ -65,12 +68,13 @@ export function claimAssetUploadCore(
       user_id: string;
       role: Role;
       token_id: string;
+      token_kind: string;
       filename: string;
       content_type: string;
       expires_at: string;
       used_at: string | null;
     }>(
-      `SELECT user_id, role, token_id, filename, content_type, expires_at, used_at
+      `SELECT user_id, role, token_id, token_kind, filename, content_type, expires_at, used_at
          FROM asset_upload_tokens WHERE token_hash = ?`,
       tokenHash,
     )
@@ -90,6 +94,7 @@ export function claimAssetUploadCore(
     userId: row.user_id,
     role: row.role,
     tokenId: row.token_id,
+    tokenKind: row.token_kind === "oauth" ? "oauth" : "pat",
     filename: row.filename,
     contentType: row.content_type,
   };

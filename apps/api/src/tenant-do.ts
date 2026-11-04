@@ -456,7 +456,13 @@ export class TenantDO extends DurableObject<Env> {
     }
     createAssetUploadCore(
       this.ctx.storage.sql,
-      { ...params, userId: auth.userId, role: auth.role, tokenId: auth.tokenId },
+      {
+        ...params,
+        userId: auth.userId,
+        role: auth.role,
+        tokenId: auth.tokenId,
+        tokenKind: auth.tokenKind,
+      },
       new Date().toISOString(),
     );
     return { ok: true };
@@ -472,7 +478,10 @@ export class TenantDO extends DurableObject<Env> {
   // Phase 8 決定 1: asset record の作成・システム管理フィールドの書き込みはアップロード API
   // 専用の経路。writeRecord と同じコアを systemWrite で通す(assetGuardHook だけが免除される —
   // unique 検証や validate-on-write は同じに掛かる)。
-  async createAssetRecord(params: WriteRecordInput, auth: AuthContext): Promise<WriteRecordResult> {
+  async createAssetRecord(
+    params: WriteRecordInput,
+    auth: AuthContext | McpAuth,
+  ): Promise<WriteRecordResult> {
     const denial = requireOperation(auth, "record:write");
     if (denial !== null) {
       return denial;
@@ -498,8 +507,11 @@ export class TenantDO extends DurableObject<Env> {
           },
         },
         contentType,
-        // アップロード API(HTTP)からの経路なので via は rest
-        { ...params, actor: auth.userId, via: "rest" },
+        // 管理画面のアップロード API は via rest。MCP の 2 経路(アップロードトークンの受け取り・URL
+        // 取り込み)は認可コンテキストがスコープを持つので via mcp と tokenId を残す(M5a-3)
+        hasScopes(auth)
+          ? { ...params, actor: auth.userId, via: "mcp", tokenId: auth.tokenId }
+          : { ...params, actor: auth.userId, via: "rest" },
         { systemWrite: true },
       );
       if (countUnsentModuleEvents(this.ctx.storage.sql) > 0 && auth.tenantId !== undefined) {

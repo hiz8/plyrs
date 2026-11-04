@@ -5,6 +5,7 @@ import { memberships, tenants, users } from "@plyrs/db/control-plane";
 import { blockUser } from "../src/auth/blocklist";
 import { issuePat } from "../src/auth/pat";
 import { MAX_ASSET_SIZE_BYTES } from "../src/assets/store";
+import { loadHistory } from "../src/do/history";
 import { app } from "../src/index";
 import { fakeLimiter } from "./rate-limit-helper";
 
@@ -25,7 +26,18 @@ interface Tenant {
   tenantId: string;
   userId: string;
   writePat: string;
+  writePatId: string;
   readPat: string;
+}
+
+// asset の record の最初の版の経路と tokenId(M5a-3)
+async function firstHistory(tenantId: string, recordId: string) {
+  const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+  return runInDurableObject(stub, (_instance, state) => {
+    const items = loadHistory(state.storage.sql, recordId, { limit: 10 }).items;
+    const first = items[items.length - 1];
+    return { via: first?.via, tokenId: first?.tokenId };
+  });
 }
 
 async function setupTenant(): Promise<Tenant> {
@@ -41,18 +53,18 @@ async function setupTenant(): Promise<Tenant> {
     .values({ id: userId, email: `${userId}@example.com`, passwordHash: "h", createdAt: now });
   await db.insert(memberships).values({ userId, tenantId, role: "editor", createdAt: now });
   const issue = async (scopes: string[]) =>
-    (
-      await issuePat(
-        env.DB,
-        { userId, tenantId, name: "p", scopes: scopes as never, expiresInDays: 1 },
-        new Date(),
-      )
-    ).token;
+    issuePat(
+      env.DB,
+      { userId, tenantId, name: "p", scopes: scopes as never, expiresInDays: 1 },
+      new Date(),
+    );
+  const write = await issue(["record:read", "record:write"]);
   return {
     tenantId,
     userId,
-    writePat: await issue(["record:read", "record:write"]),
-    readPat: await issue(["record:read"]),
+    writePat: write.token,
+    writePatId: write.id,
+    readPat: (await issue(["record:read"])).token,
   };
 }
 
@@ -144,6 +156,8 @@ describe("asset_upload とアップロード URL", () => {
       },
     });
     expect(await env.ASSETS.head(`${a.tenantId}/${assetId}`)).not.toBeNull();
+    // M5a-3: 履歴の経路は mcp で、tokenId は発行に使った PAT の行 ID
+    expect(await firstHistory(a.tenantId, assetId)).toEqual({ via: "mcp", tokenId: a.writePatId });
   });
 
   it("同じ URL への 2 回目は 410", async () => {
@@ -281,6 +295,7 @@ describe("asset_import_url(M4-5)", () => {
       type: "asset",
       data: { filename: "spring.png", content_type: "image/png", width: 16, height: 8 },
     });
+    expect(await firstHistory(a.tenantId, assetId)).toEqual({ via: "mcp", tokenId: a.writePatId });
   });
 
   it("許されない URL は url_not_allowed の業務エラーで、fetch を呼ばない", async () => {
