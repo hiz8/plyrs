@@ -187,7 +187,8 @@ describe("/v1/t/:tenantId/oauth-grants", () => {
       )
     ).json<{ grants: TenantGrant[] }>();
     expect(grants.map((g) => g.id)).toContain(editorGrant.access_token.split(":")[1]);
-  });
+    // 付与を 105 件順に作るので、手元で約 1.8 秒、CI の runner では既定の 5 秒を超えることがある
+  }, 30_000);
 
   it("認可コードを交換していない付与は pending: true(M3 の見送り指摘 (h))", async () => {
     const { tenantId, owner } = await setup();
