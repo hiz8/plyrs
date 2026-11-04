@@ -99,7 +99,7 @@ M4-6 の実測では、本文を 1 段落直しただけでも逆差分に本文
 
 ## Task 2(M5a-2): unique のフィールドに引き当て用カラムを持たせる(決定 54)
 
-所有者の判断カード(unique の重複検査をどう全件走査から外すか)の結果で形が変わる。推奨の「unique なら索引を自動で作る」で書く。「unique に indexed を必須にする」が選ばれたら、Step 0 の差し替えに従う。
+所有者の判断(2026-11-04、判断カード「unique なフィールドの重複検査を、どう全件走査から外しますか」)で「unique なら索引を自動で作る」に決まった。管理画面の操作は変えず、公開 API の絞り込みも従来どおり indexed のときだけ。
 
 **Files:** Modify `apps/api/src/do/index-ddl.ts`、`apps/api/src/do/unique-check.ts`、`apps/api/src/tenant-do.ts`(起動時)、`apps/admin/src/components/content-types/field-panel.tsx` の `uniqueHelp` の文言。Test: `apps/api/test/unique.test.ts`、`apps/api/src/do/index-ddl.test.ts`(無ければ新規)、`apps/api/test/ops-meter.test.ts`
 
@@ -117,7 +117,6 @@ M4-6 の実測では、本文を 1 段落直しただけでも逆差分に本文
 - `unique-check.ts` は常に生成カラムで引く(`json_extract` の分岐を消す)
 - 管理画面の `uniqueHelp`: 「同じ型の record で値が重ならないようにします。重複の検査には専用の索引を自動で作ります」(用語集の「索引」の語に合わせて調整する)
 
-- [ ] **Step 0: 所有者の判断を反映する。** 「unique に indexed を必須にする」なら、`lookupColumns` を作らずに metamodel の `fieldDefinitionSchema` で unique かつ indexed でないものを拒否し(既存の型は tolerant read で読めるまま、次の保存で管理画面が indexed を付ける)、管理画面で unique を付けると indexed が付いて外せないようにする。`ensureLookupColumns` の代わりに、unique だけの既存フィールドを起動時に indexed 扱いにする移行を書く。「今のまま」なら本タスクを外し、申し送りに理由を書く
 - [ ] **Step 1: 失敗するテストを書く**: `lookupColumns` が unique だけの text を含み、`indexedColumns` は含まない / unique だけ → unique + indexed の型の保存で `computeIndexDdlDiff` が空 / unique + indexed → indexed だけ(unique を外す)でも空、両方外すと drop / unique だけのフィールドを持つ型を M4 の形で作った DO(カラム無し)で `ensureLookupColumns` が 1 を返し、2 回目は 0、その後に型を保存し直しても失敗しない(Review Focus 3)/ `unique.test.ts` の既存の重複検出が unique だけのフィールドでも PASS / `ops-meter.test.ts` に unique だけの text を持つ型を足し、10 件と 300 件で `record_create` / `record_update` の rows read が一致する / 公開 API と `record_list` で unique だけのフィールドの絞り込みは従来どおり拒否される
 - [ ] **Step 2: FAIL を確かめる** `pnpm --filter @plyrs/api exec vitest run --no-isolate --max-workers=1 test/unique.test.ts test/ops-meter.test.ts src/do/index-ddl.test.ts`
 - [ ] **Step 3: 実装して PASS を確かめる。** admin の `field-panel.test.tsx` も PASS
