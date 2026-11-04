@@ -276,15 +276,23 @@ describe("publish の確認(MRTR の elicitation)", () => {
     expect(await published(recordId)).toBe(false);
   });
 
-  it("record:publish の無いトークンは確認より前に入口で 403", async () => {
+  it("record:publish の無い PAT は確認より前に入口で insufficient_scope の業務エラー(決定 55)", async () => {
     const recordId = await newRecord(908);
     const res = await callRaw(
       "record_publish",
       { recordId },
       { token: writePat, elicitation: true },
     );
-    expect(res.status).toBe(403);
-    expect(res.headers.get("www-authenticate")).toContain('scope="record:publish"');
+    expect(res.status).toBe(200);
+    const json = await res.json<{
+      result?: { isError?: boolean; inputRequests?: unknown; structuredContent?: unknown };
+    }>();
+    expect(json.result?.isError).toBe(true);
+    expect(json.result?.inputRequests).toBeUndefined();
+    expect(json.result?.structuredContent).toMatchObject({
+      error: { code: "insufficient_scope", details: { required: "record:publish" } },
+    });
+    expect(await published(recordId)).toBe(false);
   });
 
   it("unpublish も確認を通ってから取り下げる", async () => {

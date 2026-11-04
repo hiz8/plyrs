@@ -4,7 +4,7 @@ import { MAX_ASSET_SIZE_BYTES, storeAsset } from "../assets/store";
 import { requireOperation } from "../do/authorize";
 import { ASSET_UPLOAD_TTL_SECONDS } from "../ops/assets";
 import type { OpSpec } from "../ops/catalog";
-import type { InvokeResult } from "../ops/invoke";
+import { missingScope, type InvokeResult } from "../ops/invoke";
 import { asCreateAssetUploadResult } from "../rpc-unwrap";
 import type { McpServerDeps } from "./server";
 
@@ -90,11 +90,12 @@ export async function runWorkerOperation(
   if (handler === undefined) {
     return { ok: false, code: "unknown_operation", message: `unknown operation: ${spec.name}` };
   }
-  if (!deps.auth.scopes.includes(spec.requires)) {
+  const missing = missingScope(deps.auth, spec);
+  if (missing !== null) {
     return {
       ok: false,
       code: "insufficient_scope",
-      message: `token scope does not include ${spec.requires}`,
+      message: `token scope does not include ${missing}`,
     };
   }
   const denial = requireOperation(deps.auth, spec.requires);

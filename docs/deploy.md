@@ -144,7 +144,7 @@ PAT の代わりに、MCP クライアントが OAuth 2.1(認可コード + PKCE
 - クライアントの登録: CIMD(client_id が `https://` の metadata URL)を優先し、DCR(`<issuer>/oauth/register`、RFC 7591)を fallback として残す。CIMD の取得は wrangler.jsonc の `compatibility_flags: ["global_fetch_strictly_public"]` が要る(ローカルの URL は取れないので、dev と E2E は DCR だけ)
 - 同意画面: api が描画する。未ログインなら admin の `/login?return_to=` に回り、ログイン後に同じ URL へ戻る。テナントの会員でなければ進めない。選べるスコープは利用者のロールが付与できる範囲で、`record:publish` は求められていても既定で外れる(所有者だけが付けられる)
 - トークン: access token は 15 分、refresh のたびに D1 の現在のロールを読み直す。会員でなくなった、または利用停止の利用者の refresh は `invalid_grant` で付与ごと失効する。期限切れの付与は日次 cron(`scheduled`)が `OAUTH_KV` から掃く
-- スコープ不足: `tools/call` が要するスコープ(操作カタログの `requires`)がトークンに無ければ `403` と `WWW-Authenticate: Bearer error="insufficient_scope", scope="…"`。OAuth のクライアントはそのスコープを含めて再認可(step-up)し、PAT は所有者がスコープ付きのトークンを発行し直す
+- スコープ不足: `tools/call` が要するスコープ(操作カタログの `requires`)がトークンに無ければ、OAuth は `403` と `WWW-Authenticate: Bearer error="insufficient_scope", scope="…"` で、クライアントはそのスコープを含めて再認可(step-up)する。PAT は再認可できないので、HTTP 200 のツールの業務エラー `insufficient_scope` で、所有者にスコープ付きのトークンを発行し直してもらう対処を返す(M5a-5、決定 55)
 - 失効: 管理画面の **設定 › 接続中のアプリ** に、テナント全員の OAuth の付与と PAT が 1 つの一覧で並ぶ(所有者だけ)。失効すると、その付与の access token はすぐに 401 になる
 
 必要な設定は `OAUTH_KV`(1 節)と `ADMIN_ORIGIN` / `API_ORIGIN`(2 節)。`API_ORIGIN` は実際にクライアントが接続する api のオリジンと一致していなければならない(違うと token が入口で 401)。
@@ -169,7 +169,7 @@ npx @modelcontextprotocol/inspector --transport http \
 
 ### 3.6 書き込みツール(M4、design-spec 16.6・16.8・16.10・16.11)
 
-M4 で MCP から record を書けるようになった。`tools/list` はトークンのスコープで絞らず、全ツールをカタログの宣言順に出す(スコープ不足は `tools/call` の 403 で step-up する)。3.5 のスモークは「先頭に読み取りの 7 ツールが並ぶ」に読み替える。
+M4 で MCP から record を書けるようになった。`tools/list` はトークンのスコープで絞らず、全ツールをカタログの宣言順に出す(スコープ不足は `tools/call` で、OAuth は 403 の step-up、PAT は業務エラー `insufficient_scope`。M5a-5)。3.5 のスモークは「先頭に読み取りの 7 ツールが並ぶ」に読み替える。
 
 | ツール | スコープ | 内容 |
 | --- | --- | --- |
@@ -215,7 +215,7 @@ pnpm --filter @plyrs/api exec wrangler tail plyrs-api-preview --format json | gr
 
 1. `record:read record:write record:delete` の PAT と、`record:publish` も付けた PAT の 2 本を発行する
 2. Claude Code(と、あれば elicitation に対応する別のクライアント)で接続し、記事を Markdown で作成 → 1 段落だけ差し替え → 管理画面で同じ記事のタイトルを直してから、もう一度エージェントに更新させて conflict → 読み直して再適用、を一通り行う
-3. 公開を頼む。elicitation に対応するクライアントなら確認が出て、承諾すると公開される。対応しないクライアントは `confirmation_unavailable` で止まる。`record:publish` の無い PAT では 403 で止まる
+3. 公開を頼む。elicitation に対応するクライアントなら確認が出て、承諾すると公開される。対応しないクライアントは `confirmation_unavailable` で止まる。`record:publish` の無い PAT では業務エラー `insufficient_scope` で止まり、エージェントが「所有者に `record:publish` を含む PAT を発行してもらう」旨を伝える(M5a-5)
 4. 画像の URL 取り込みとアップロード(uploadUrl への POST)を 1 回ずつ行い、本文に `plyrs://asset/…` で入れて管理画面で表示されることを見る
 5. 並行して手元で上の `wrangler tail … | grep mcp.op` を流し、ツールごとの `rowsRead` / `rowsWritten` を控える
 

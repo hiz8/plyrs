@@ -247,15 +247,19 @@ describe("asset_upload とアップロード URL", () => {
     expect((await post(url, PNG)).status).toBe(201);
   });
 
-  it("record:read だけの PAT で asset_upload は入口で 403", async () => {
+  it("record:read だけの PAT で asset_upload は入口で insufficient_scope の業務エラー(決定 55)", async () => {
     const res = await callRaw(
       a,
       "asset_upload",
       { filename: "x.png", contentType: "image/png" },
       a.readPat,
     );
-    expect(res.status).toBe(403);
-    expect(res.headers.get("www-authenticate")).toContain('scope="record:write"');
+    expect(res.status).toBe(200);
+    const json = await res.json<ToolResult>();
+    expect(json.result?.isError).toBe(true);
+    expect(json.result?.structuredContent).toMatchObject({
+      error: { code: "insufficient_scope", details: { required: "record:write" } },
+    });
   });
 
   it("SVG は入力の検査で拒否する", async () => {
@@ -317,14 +321,24 @@ describe("asset_import_url(M4-5)", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("record:read だけの PAT は入口で 403", async () => {
+  it("record:read だけの PAT は入口で insufficient_scope の業務エラー(決定 55)で、fetch を呼ばない", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
     const res = await callRaw(
       a,
       "asset_import_url",
       { url: "https://images.example.com/a.png" },
       a.readPat,
     );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    const json = await res.json<ToolResult>();
+    expect(json.result?.isError).toBe(true);
+    expect(json.result?.structuredContent).toMatchObject({
+      error: {
+        code: "insufficient_scope",
+        details: { required: "record:write", tokenKind: "pat" },
+      },
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 

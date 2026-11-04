@@ -729,6 +729,7 @@ single-writer の DO が競合を判定する。分散マージの難問が「DO
 | 52 | **URL 取り込みは名前の規則で SSRF を防ぎ、名前解決の検査は `global_fetch_strictly_public` に任せる**（M4-5、2026-11-03）。IP リテラル・ローカルの名前・既定以外のポート・https 以外を拒否し、リダイレクトは手で 3 回まで辿って各ホップで再検査する | Workers から名前解決の結果を見る手段が無く、自前で DNS を引いても fetch 時の解決と一致する保証が無い（rebinding）。IP リテラルを個別判定すると表記ゆれ（10 進・IPv4 射影の IPv6 など）の漏れが出るので一律に拒否する |
 | 53 | **履歴の逆差分は、リッチテキストの値を最上位ブロック単位で持つ**（M5a-1、2026-11-04）。古い版の本文を、新しい版の同じ ID のブロックの参照と変わったブロックの実体の列（`blocks`）で表し、作るときに当て直して元に戻ることを確かめる。戻らなければ値全体（`set`）。旧い行は書き換えない | M4-6 の実測で、1 段落の直しでも逆差分に本文全体が入り、差分 1 版が全文 1 版とほぼ同じ大きさだった。最上位ブロックには安定 ID（決定 44・46）があるので参照で表せる。当て直しの確認で、ID の重複などで戻らない文書を壊さない。300 回の編集の実測で逆差分の合計は 976 KB → 112 KB |
 | 54 | **unique のフィールドは indexed でなくても DO 内に引き当て用の生成カラムを持つ**（M5a-2、2026-11-04、所有者の判断「unique なら索引を自動で作る」）。絞り込みには使わない。既存テナントには alarm で足し、足し終えるまでは走査。比較は生成カラムの affinity に従う | M4-6 の実測で、indexed でない unique の重複検査が型の record を全件走査していた。管理画面で indexed を必須にすると利用者の操作が増え、公開 API の絞り込みの意味も変わる。部分インデックスの構築は records を走査するので、起動時にまとめて流すと record の多いテナントで起動の上限を超えうる |
+| 55 | **PAT のスコープ不足は、HTTP 403 ではなくツールの業務エラーで対処を返す**（M5a-5、2026-11-04）。OAuth は従来どおり 403 の step-up。判定の位置（DO と Rate Limiting の前）は変えない | PAT は再認可できないので step-up の 403 は役に立たない。G4 で Claude Code は 403 の説明を表示せず、所有者に発行し直してもらう対処が届かなかった。業務エラーならエージェントが message を読んで利用者に伝えられる |
 
 ---
 
@@ -776,6 +777,8 @@ MCP は、管理画面の同期（第 8・10 章）と REST（`/v1/t/:tenantId/.
 
 **スコープ（論点 C3）**: DO の `Operation`（`record:read` `record:write` `record:delete` `record:publish` `type:manage` など、`auth/permissions.ts`）をそのままスコープ名にする。**実効権限 = スコープ ∩ ロール**を DO の第 2 段（第 11.5 章）で判定する。スコープは権限を絞るだけで増やさない。認可コンテキスト `{userId, role, tenantId, exp}` に `scopes` と `tokenId` を足し、`record:read` の `requireOperation` を MCP で初めて実装する（読み取り拒否はここが最初）。型単位のスコープ（例 `record:write:article`）は初期には採らない（第 11.4 章の決定の見直しが先。未処理論点）。
 
+**スコープ不足の返し方（決定 55、M5a-5）**: `tools/call` のスコープ不足は、DO を起こす前（Rate Limiting の前）に入口で判定する。OAuth は従来どおり HTTP `403` + `WWW-Authenticate: Bearer error="insufficient_scope"` で step-up（再認可）させる。PAT は再認可できないので、HTTP 200 の JSON-RPC 応答でツールの業務エラー（`isError: true`、`code: "insufficient_scope"`、`details: { required, tokenKind: "pat" }`）を返し、message で対処（所有者に、該当スコープを含むトークンを 設定 › 接続中のアプリ で発行してもらい、接続を設定し直す）を示す。G4 で Claude Code は 403 を「Insufficient scope」とだけ表示し、対処がエージェントにも利用者にも届かなかったため。
+
 **同意画面とセッション cookie**: 管理画面のセッション cookie は `SameSite=Strict`（CSRF の前提）のまま変えない。ホスト型クライアントから `/authorize` へ遷移すると cookie が送られないので、ログイン済みでも毎回 `/login` を経由して同じ URL へ戻る（仕様。M4-0b で確認）。同意 POST は保存済み要求の `resource` が URL のテナントのものかを照合し、`/authorize` の GET はセッションを確かめてから要求を解釈する（CIMD の外向き fetch を未ログインの要求で起こさない）。会員解除・BAN では PAT と同じく OAuth の付与も失効させる。
 
 **publish 権限の既定（論点 C5）**: PAT の発行画面と OAuth の同意画面の両方で、`record:publish` は **既定で外し、所有者だけが付与できる**。既定は人が公開する。
@@ -822,7 +825,7 @@ record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴�
 
 | 層 | 例 | 返し方 |
 | --- | --- | --- |
-| トークンのスコープ不足 | `record:publish` の無い PAT で publish | HTTP `403` + `WWW-Authenticate: Bearer error="insufficient_scope", scope="…"`。必要なスコープは 1 回の challenge にまとめる。OAuth 接続は step-up（再認可）し、PAT 接続は `error_description` の導線（所有者が該当スコープ付きの PAT を発行する）に従う |
+| トークンのスコープ不足 | `record:publish` の無いトークンで publish | OAuth 接続は HTTP `403` + `WWW-Authenticate: Bearer error="insufficient_scope", scope="…"` で step-up（再認可）する。必要なスコープは 1 回の challenge にまとめる。PAT 接続は再認可できないので、HTTP 200 のツールの業務エラー `insufficient_scope`（message に、所有者が該当スコープ付きの PAT を発行する導線。決定 55） |
 | 業務エラー | ロール不足・検証失敗・一意性違反・競合・`already_exists` | `isError: true`。ロール不足は DO の第 2 段で判定し、再認可しても変わらないのでこちら。`structuredContent` に `code` / `details` を載せ、業務エラーの形も `outputSchema` に含める |
 | プロトコル違反 | ヘッダと本文の不一致、不正な JSON-RPC | JSON-RPC エラー。仕様が定めるコード（`-32020〜-32099` は MCP 予約。例: ヘッダ不一致の `-32020`、16.2）はそのまま使う。独自コードは `-32000〜-32019`（implementation-defined）か予約範囲 `-32768〜-32000` の外に置く |
 

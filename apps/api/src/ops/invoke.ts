@@ -1,3 +1,4 @@
+import type { Operation } from "../auth/permissions";
 import { requireOperation, type AuthContext, type McpAuth } from "../do/authorize";
 import { findOperation, OPERATIONS, type OpSpec } from "./catalog";
 import { HISTORY_HANDLERS } from "./history";
@@ -66,6 +67,13 @@ export function hasScopes(auth: AuthContext | McpAuth): auth is McpAuth {
   return Array.isArray((auth as McpAuth).scopes);
 }
 
+// 16.3: MCP の認可コンテキストでスコープが足りなければ、その操作が要するスコープ。足りるか、MCP でない
+// (AuthContext。スコープを持たない)なら null。MCP の入口(route.ts)、Worker の操作(worker-ops.ts)、
+// DO の runOperation の 3 か所で同じ判定を使う
+export function missingScope(auth: AuthContext | McpAuth, spec: OpSpec): Operation | null {
+  return hasScopes(auth) && !auth.scopes.includes(spec.requires) ? spec.requires : null;
+}
+
 // 16.3: 実効権限 = スコープ ∩ ロール。スコープは権限を絞るだけで増やさない。
 // (1) MCP の認可コンテキスト(scopes あり)なら spec.requires がスコープに含まれるか、
 // (2) ロールで requireOperation(record:read の判定はここが最初)、(3) Zod の parse、(4) 実装。
@@ -76,11 +84,12 @@ export function runOperation(
   input: unknown,
   auth: AuthContext | McpAuth,
 ): InvokeResult {
-  if (hasScopes(auth) && !auth.scopes.includes(spec.requires)) {
+  const missing = missingScope(auth, spec);
+  if (missing !== null) {
     return {
       ok: false,
       code: "insufficient_scope",
-      message: `token scope does not include ${spec.requires}`,
+      message: `token scope does not include ${missing}`,
     };
   }
   const denial = requireOperation(auth, spec.requires);
