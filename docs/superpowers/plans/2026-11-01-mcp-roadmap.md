@@ -274,8 +274,8 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 
      スコープ不足と `declined` の publish は `mcp.op` の行が出ない(操作の実行前に止まるため)。基準(M4-6: rows read が record 数に比例しない)は 1 テナントの測定では比例を見られないが、書き込み 1 回の rowsRead は 5〜23 に収まり、M4-6 の実測(10 件と 300 件で一致)と矛盾しない
 - **G4 で見つかったこと(未対応)**:
-  - 旧形式(ブロック ID 無し)の本文の record に初めて書き込むと、本文を変えていなくても `body` の fieldVersion が上がる。`writeRecordCore` が入力にだけ `ensureRecordBlockIds` を当て、保存済みの ID 無しの値と比べるため。修正の計画は別途
-  - 管理画面のエディタの TrailingNode が足す末尾の空の段落が、本文の保存で一緒に保存される(`via: sync` の版で確認。管理画面での再現は未確認)。修正の計画は別途
+  - ~~旧形式(ブロック ID 無し)の本文の record に初めて書き込むと、本文を変えていなくても `body` の fieldVersion が上がる~~ → 直した。`writeRecordCore` が入力にだけ `ensureRecordBlockIds` を当て、保存済みの ID 無しの値と比べていた。差分を取る前に保存値にも同じ導出を当てる(導出 ID は位置 + 内容で決まるので、内容が同じなら一致する)
+  - ~~管理画面のエディタの TrailingNode が足す末尾の空の段落が、本文の保存で一緒に保存される~~ → 直した。エディタの `onUpdate` で、末尾の空の段落の 1 つ前が段落でない(TrailingNode が足す条件)ときだけ外して渡す。段落のあとに利用者が足した空の段落は残す。すでに保存された空の段落は消さない(次に本文を編集したときに外れる)
   - スコープ不足のエラーのメッセージに対処の方法が無い(ツールの説明文にはある)
   - `asset_import_url` が Wikimedia(upload.wikimedia.org)で 403 になる。Worker の fetch に User-Agent が無いためとみられる(未確認)
   - Claude Code の elicitation フォームで boolean の欄を切り替えられないことがある。サーバー側の対策案は `confirmSchema` の `confirm` に `default: true` を付けること(Accept / Decline の選択だけで確認になる。仕様と SDK の扱いは未確認)

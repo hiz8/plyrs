@@ -154,7 +154,13 @@ export function writeRecordCore(
 
   const prevRelations =
     prev === null ? new Map<string, RelationRef[]>() : loadRelationRefs(deps.sql, params.recordId);
-  const change = computeChangeSet(definition, input, prev?.data ?? null, prevRelations);
+  // G4: 差分は保存値にも同じ ensureRecordBlockIds を当ててから取る。v1(ID 無し)のまま保存された
+  // 本文と、ID を付けた入力をそのまま比べると、本文を変えていなくても body が変更に数えられ
+  // fieldVersion が上がる(record_get の導出 ID で読んだ古い baseFieldVersions が不要な conflict になる)。
+  // 導出 ID は位置 + 内容で決まるので、内容が同じなら一致する。ID の永続化は他のフィールドの変更と
+  // 一緒に保存されるか、本文の次の書き込みで行われる(§4.2 の遅延マイグレーション)
+  const prevComparable = prev === null ? null : ensureRecordBlockIds(definition, prev.data).data;
+  const change = computeChangeSet(definition, input, prevComparable, prevRelations);
 
   const nextStatus: WorkflowStatus = params.status ?? prev?.status ?? "draft";
   const statusChanged = prev !== null && nextStatus !== prev.status;

@@ -441,4 +441,48 @@ describe("RichTextEditor block ids", () => {
     expect(typeof addedId).toBe("string");
     expect(addedId).not.toBe("");
   });
+
+  // G4: 最上位の最後が段落でないと TrailingNode が空の段落を足す。編集の保存にそれを含めない
+  type Block = { type: string; attrs?: Record<string, unknown>; content?: unknown[] };
+  const blocksOf = (value: RichTextValue) => (value.doc as { content: Block[] }).content;
+
+  it("TrailingNode が足した末尾の空の段落は、ほかのブロックを編集しても保存値に入らない", async () => {
+    const onChange = vi.fn();
+    let editor: Editor | undefined;
+    render(<Harness initial={v2WithList} onChange={onChange} onReady={(e) => (editor = e)} />);
+    await screen.findByRole("textbox", { name: "body" });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // エディタの中には末尾の空の段落がある(TrailingNode)
+    expect(editor!.state.doc.lastChild?.type.name).toBe("paragraph");
+    editor!.chain().setTextSelection(3).insertContent("追記").run();
+    const blocks = blocksOf(lastValue(onChange));
+    expect(blocks.map((b) => b.type)).toEqual(["paragraph", "bulletList"]);
+    expect(JSON.stringify(blocks[0])).toContain("追記");
+    // 保存値との比較で文書を置き換えない(末尾の空の段落はエディタに残る)
+    expect(editor!.state.doc.lastChild?.type.name).toBe("paragraph");
+  });
+
+  it("末尾の段落に書き込めば、その段落は保存値に入る", async () => {
+    const onChange = vi.fn();
+    let editor: Editor | undefined;
+    render(<Harness initial={v2WithList} onChange={onChange} onReady={(e) => (editor = e)} />);
+    await screen.findByRole("textbox", { name: "body" });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    editor!.chain().focus("end").insertContent("末尾").run();
+    const blocks = blocksOf(lastValue(onChange));
+    expect(blocks.map((b) => b.type)).toEqual(["paragraph", "bulletList", "paragraph"]);
+    expect(JSON.stringify(blocks[2])).toContain("末尾");
+  });
+
+  it("段落のあとに利用者が足した空の段落は外さない(TrailingNode が足すものではない)", async () => {
+    const onChange = vi.fn();
+    let editor: Editor | undefined;
+    render(
+      <Harness initial={docWith("一行目")} onChange={onChange} onReady={(e) => (editor = e)} />,
+    );
+    await screen.findByRole("textbox", { name: "body" });
+    editor!.chain().focus("end").splitBlock().run();
+    const blocks = blocksOf(lastValue(onChange));
+    expect(blocks.map((b) => b.type)).toEqual(["paragraph", "paragraph"]);
+  });
 });
