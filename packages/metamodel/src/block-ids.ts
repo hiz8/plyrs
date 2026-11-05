@@ -17,6 +17,21 @@ export const RICH_TEXT_SCHEMA_VERSION = 2;
 export const BLOCK_ID_ATTR = "id";
 export const DERIVED_ID_PREFIX = "v1-";
 
+// 管理画面のエディタ(UniqueID)が attrs.id を付けるノード種。契約は最上位ブロックだけだが、types は
+// ノード種の指定なので箇条書きの中の段落にも付く。ui は metamodel に依存しないので同じ値を写して持ち、
+// 一致は apps/admin/src/lib/mention-contract.test.ts が固定する。書き込み時の構造の検査(M5a-6)は、
+// この種類のノードにだけ attrs.id を許す
+export const BLOCK_ID_NODE_TYPES = [
+  "paragraph",
+  "heading",
+  "bulletList",
+  "orderedList",
+  "blockquote",
+  "codeBlock",
+  "horizontalRule",
+  "assetImage",
+] as const;
+
 // JSON.stringify はキー順に依存するため、キーを整列した正規形にしてからハッシュする
 // (ProseMirror の toJSON は attrs のキー順が拡張の登録順に依存しうる)。undefined の値は省く。
 export function canonicalJson(value: unknown): string {

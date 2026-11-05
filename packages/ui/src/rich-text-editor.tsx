@@ -162,8 +162,9 @@ export const BLOCK_ID_ATTR_NAME = "id";
 export const RICH_TEXT_HEADING_LEVELS = [1, 2, 3] as const;
 
 // UniqueID が ID を振るノード種。契約は最上位ブロックだけだが、types は「ノード種」の指定なので
-// 箇条書きの中の段落にも付く(害は無い。M0-2 結果 2 節)。
-const BLOCK_ID_NODE_TYPES = [
+// 箇条書きの中の段落にも付く(害は無い。M0-2 結果 2 節)。metamodel の BLOCK_ID_NODE_TYPES(書き込み時の
+// 構造の検査が attrs.id を許すノード種)と一致する(mention-contract.test.ts)
+export const BLOCK_ID_NODE_TYPES = [
   "paragraph",
   "heading",
   "bulletList",

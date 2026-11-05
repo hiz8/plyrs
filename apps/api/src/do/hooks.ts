@@ -14,6 +14,9 @@ export interface BeforeWriteContext {
   // Phase 8: サーバー内部の書き込み(アップロード API 経由の createAssetRecord)は true。
   // クライアント由来(同期 push / HTTP writeRecord)は false — assetGuardHook が参照する。
   systemWrite: boolean;
+  // 決定 54(M5a-2): unique のフィールドの引き当て用カラムを足し終えているか(DO が起動時と alarm の後に
+  // メモリに持つ)。偽なら indexed でない unique は従来の json_extract の走査で引く
+  lookupReady: boolean;
   // Phase 9: この書き込みが確定させる relation 全量(フィールドキー → refs)。
   // data には relation が入らない(§6)ため、関係を検証するフック(予約の空き枠等)はこちらを見る。
   relations: ReadonlyMap<string, readonly RelationRef[]>;

@@ -1,7 +1,8 @@
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { McpAuth } from "../src/do/authorize";
-import { OPERATIONS } from "../src/ops/catalog";
+import { findOperation, OPERATIONS } from "../src/ops/catalog";
+import { missingScope } from "../src/ops/invoke";
 import { articleType, auth, uuid, validArticleInput } from "./fixtures";
 import { asInvokeResult, asWriteResult } from "./rpc-unwrap";
 
@@ -186,5 +187,23 @@ describe("invoke RPC", () => {
       await stub.invoke("record_get", { recordId: RECORD }, mcpAuth({ tenantId: uuid(777) })),
     );
     expect(result).toMatchObject({ ok: false, code: "forbidden" });
+  });
+});
+
+describe("missingScope(決定 55)", () => {
+  it("MCP の認可コンテキストでスコープが足りなければ要するスコープ、AuthContext は常に null", () => {
+    const spec = findOperation("record_update")!;
+    const mcp = {
+      userId: "u",
+      role: "owner" as const,
+      tenantId: "t",
+      exp: 0,
+      scopes: ["record:read" as const],
+      tokenId: "x",
+      tokenKind: "pat" as const,
+    };
+    expect(missingScope(mcp, spec)).toBe("record:write");
+    expect(missingScope({ ...mcp, scopes: ["record:read", "record:write"] }, spec)).toBeNull();
+    expect(missingScope({ userId: "u", role: "viewer", tenantId: "t" }, spec)).toBeNull();
   });
 });

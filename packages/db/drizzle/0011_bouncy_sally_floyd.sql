@@ -1,0 +1,1 @@
+ALTER TABLE `asset_upload_tokens` ADD `token_kind` text DEFAULT 'pat' NOT NULL;

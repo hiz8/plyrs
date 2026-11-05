@@ -8,7 +8,9 @@ export {
 export { AssetImage, RecordMention, workerExtensions } from "./extensions";
 export {
   checkRichText,
+  checkRichTextVocabulary,
   markdownToRichText,
+  richTextSchema,
   richTextToMarkdown,
   type MarkdownToRichTextResult,
   type UnsupportedMarkdownKind,

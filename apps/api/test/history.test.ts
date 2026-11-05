@@ -1,7 +1,10 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
+import { canonicalJson } from "@plyrs/metamodel";
 import {
+  applyBlockPatch,
+  blockPatchOf,
   compareVersions,
   HISTORY_FULL_VERSIONS,
   HISTORY_MAX_VERSIONS,
@@ -234,6 +237,204 @@ describe("recordHistory(保持と差分圧縮)", () => {
       const last = loadHistory(sql, uuid(1), { limit: 2, cursor: second.nextCursor });
       expect(last.items.map((item) => item.historySeq)).toEqual([1]);
       expect(last.nextCursor).toBeNull();
+    });
+  });
+});
+
+// 決定 53(M5a-1): リッチテキストの逆差分をブロック単位にする
+function para(id: string | undefined, text: string) {
+  return {
+    type: "paragraph",
+    ...(id === undefined ? {} : { attrs: { id } }),
+    content: [{ type: "text", text }],
+  };
+}
+
+function envelope(blocks: unknown[]) {
+  return { schemaVersion: 2, doc: { type: "doc", content: blocks } };
+}
+
+const LONG = "長い段落の本文。".repeat(40);
+
+function tenParagraphs(change: (i: number) => string = () => "") {
+  return envelope(Array.from({ length: 10 }, (_, i) => para(`b${i}`, `${LONG}${i}${change(i)}`)));
+}
+
+function roundTrips(older: unknown, newer: unknown): void {
+  const patch = blockPatchOf(older, newer);
+  expect(patch).not.toBeNull();
+  if (patch === null) {
+    return;
+  }
+  expect(canonicalJson(applyBlockPatch(newer, JSON.parse(JSON.stringify(patch))))).toBe(
+    canonicalJson(older),
+  );
+}
+
+describe("blockPatchOf / applyBlockPatch(決定 53)", () => {
+  it("10 段落の 3 段落目だけを変えると ref 9 個 + node 1 個になり、当てると古い版に戻る", () => {
+    const older = tenParagraphs();
+    const newer = tenParagraphs((i) => (i === 2 ? "(改稿)" : ""));
+    const patch = blockPatchOf(older, newer);
+    expect(patch?.content.filter((item) => "ref" in item)).toHaveLength(9);
+    expect(patch?.content.filter((item) => "node" in item)).toHaveLength(1);
+    expect(patch?.content[2]).toEqual({ node: older.doc.content[2] });
+    roundTrips(older, newer);
+  });
+
+  it("段落の挿入・削除・並べ替えでも戻る", () => {
+    const base = tenParagraphs();
+    const blocks = base.doc.content;
+    // 挿入(新しい側に b10 がある)
+    roundTrips(base, envelope([...blocks.slice(0, 3), para("b10", "挿入"), ...blocks.slice(3)]));
+    // 削除(新しい側から b4 が消えた)
+    roundTrips(base, envelope(blocks.filter((_, i) => i !== 4)));
+    // 並べ替え
+    roundTrips(base, envelope([...blocks].reverse()));
+  });
+
+  it("新しい側に重複 ID・ID の無いブロックがある、エンベロープでない、null のとき null", () => {
+    const older = tenParagraphs();
+    const newer = tenParagraphs((i) => (i === 0 ? "x" : ""));
+    const dup = envelope([...newer.doc.content, para("b1", "重複")]);
+    expect(blockPatchOf(older, dup)).toBeNull();
+    const noId = envelope([...newer.doc.content, para(undefined, "ID 無し")]);
+    expect(blockPatchOf(older, noId)).toBeNull();
+    expect(blockPatchOf("旧い文字列", newer)).toBeNull();
+    expect(blockPatchOf(older, "新しい文字列")).toBeNull();
+    expect(blockPatchOf(null, newer)).toBeNull();
+    expect(blockPatchOf(older, null)).toBeNull();
+    expect(blockPatchOf({ schemaVersion: 1, doc: { type: "doc" } }, newer)).toBeNull();
+  });
+
+  it("短くならない(全部のブロックが変わった)ときは null", () => {
+    const older = envelope([para("a", "x")]);
+    const newer = envelope([para("a", "y")]);
+    expect(blockPatchOf(older, newer)).toBeNull();
+  });
+
+  it("参照先のブロックが無ければ applyBlockPatch は null", () => {
+    const patch = { base: { schemaVersion: 2, doc: { type: "doc" } }, content: [{ ref: "zz" }] };
+    expect(applyBlockPatch(tenParagraphs(), patch)).toBeNull();
+  });
+});
+
+describe("recordHistory と loadVersion(ブロック単位の逆差分、決定 53)", () => {
+  it("12 版を書いてから全版を読むと、書いた data と正規化 JSON で一致する", async () => {
+    await withSql((sql) => {
+      const written: Record<string, unknown>[] = [];
+      let paragraphs = Array.from({ length: 10 }, (_, i) => para(`b${i}`, `${LONG}${i}`));
+      for (let v = 1; v <= 12; v++) {
+        let data: Record<string, unknown>;
+        if (v === 6) {
+          data = { title: `t${v}` }; // 本文の削除
+        } else if (v === 4) {
+          data = { title: `t${v}`, body: envelope(paragraphs) }; // タイトルだけの変更(本文は v3 と同じ)
+        } else {
+          paragraphs = paragraphs.map((block, i) =>
+            i === v % 10 ? para(`b${i}`, `${LONG}${i}-v${v}`) : block,
+          );
+          if (v === 9) {
+            paragraphs = [para("n9", "挿入"), ...paragraphs.slice(1)]; // 先頭の差し替え
+          }
+          data = { title: v === 3 ? "t2" : `t${v}`, body: envelope(paragraphs) };
+        }
+        written.push(data);
+        recordHistory(
+          sql,
+          at(v * 20 * MINUTE),
+          entry({ version: v, data, actor: v % 2 === 0 ? "even" : "odd" }),
+        );
+      }
+      const diffs = sql
+        .exec<{ diff: string | null }>(
+          "SELECT diff FROM record_history WHERE record_id = ? AND diff IS NOT NULL",
+          uuid(1),
+        )
+        .toArray();
+      expect(diffs).toHaveLength(2);
+      for (let seq = 1; seq <= 12; seq++) {
+        expect(canonicalJson(loadVersion(sql, uuid(1), seq)?.data)).toBe(
+          canonicalJson(written[seq - 1]),
+        );
+      }
+    });
+  });
+
+  it("差分化した版の本文は blocks で持つ(set に本文全体を入れない)", async () => {
+    await withSql((sql) => {
+      for (let v = 1; v <= HISTORY_FULL_VERSIONS + 1; v++) {
+        recordHistory(
+          sql,
+          at(v * 20 * MINUTE),
+          entry({
+            version: v,
+            actor: v % 2 === 0 ? "even" : "odd",
+            data: { title: "t", body: tenParagraphs((i) => (i === v % 10 ? `-v${v}` : "")) },
+          }),
+        );
+      }
+      const row = sql
+        .exec<{ diff: string }>(
+          "SELECT diff FROM record_history WHERE record_id = ? AND history_seq = 1",
+          uuid(1),
+        )
+        .one();
+      const diff = JSON.parse(row.diff) as { set: object; blocks?: Record<string, unknown> };
+      expect(diff.set).toEqual({});
+      expect(Object.keys(diff.blocks ?? {})).toEqual(["body"]);
+    });
+  });
+
+  it("M4 の形の {set, unset} だけの行を含む鎖でも読める", async () => {
+    await withSql((sql) => {
+      for (let v = 1; v <= 3; v++) {
+        recordHistory(
+          sql,
+          at(v * 20 * MINUTE),
+          entry({
+            version: v,
+            actor: v % 2 === 0 ? "even" : "odd",
+            data: { title: `t${v}`, body: tenParagraphs((i) => (i === v ? `-v${v}` : "")) },
+          }),
+        );
+      }
+      // 版 1・2 を M4 の形の逆差分に書き換える(デプロイ前に作られた行)
+      const v1 = { title: "t1", body: tenParagraphs((i) => (i === 1 ? "-v1" : "")) };
+      const v2 = { title: "t2", body: tenParagraphs((i) => (i === 2 ? "-v2" : "")) };
+      sql.exec(
+        "UPDATE record_history SET data = NULL, diff = ? WHERE record_id = ? AND history_seq = 2",
+        JSON.stringify({ set: v2, unset: [] }),
+        uuid(1),
+      );
+      sql.exec(
+        "UPDATE record_history SET data = NULL, diff = ? WHERE record_id = ? AND history_seq = 1",
+        JSON.stringify({ set: { title: "t1", body: v1.body }, unset: [] }),
+        uuid(1),
+      );
+      expect(canonicalJson(loadVersion(sql, uuid(1), 1)?.data)).toBe(canonicalJson(v1));
+      expect(canonicalJson(loadVersion(sql, uuid(1), 2)?.data)).toBe(canonicalJson(v2));
+    });
+  });
+
+  it("当てられないブロックの参照を含む行があれば loadVersion は null", async () => {
+    await withSql((sql) => {
+      recordHistory(sql, at(0), entry({ version: 1, data: { body: tenParagraphs() } }));
+      recordHistory(
+        sql,
+        at(20 * MINUTE),
+        entry({ version: 2, actor: "b", data: { body: tenParagraphs() } }),
+      );
+      sql.exec(
+        "UPDATE record_history SET data = NULL, diff = ? WHERE record_id = ? AND history_seq = 1",
+        JSON.stringify({
+          set: {},
+          unset: [],
+          blocks: { body: { base: { doc: { type: "doc" } }, content: [{ ref: "missing" }] } },
+        }),
+        uuid(1),
+      );
+      expect(loadVersion(sql, uuid(1), 1)).toBeNull();
     });
   });
 });

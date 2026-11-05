@@ -14,7 +14,8 @@ import type { McpAuth } from "../do/authorize";
 import type { Operation } from "../auth/permissions";
 import { mcpTokenValidator, type McpTokenProps } from "../middleware/mcp-gate";
 import { tenantIssuer, tenantResource } from "../oauth/server";
-import { findOperation } from "../ops/catalog";
+import { findOperation, type OpSpec } from "../ops/catalog";
+import { missingScope } from "../ops/invoke";
 import { buildMcpServer } from "./server";
 
 // design-spec 16.2(決定 48、M1-5): MCP の入口 `/mcp/t/:tenantId`。api Worker の直接オリジンで受け、
@@ -22,7 +23,8 @@ import { buildMcpServer } from "./server";
 // 403 はライブラリが出す)。
 // 入口の順序: POST のみ(405) → Origin の許可リスト → 接続元 IP の Rate Limiting(未認証の連打で
 // D1 の PAT 照会を無制限に起こさないため。/auth と同じ考え方)→ トークン検証 → ヘッダと本文の照合
-// (-32020)→ tools/call のスコープ判定(403 insufficient_scope、M3-3)→ ツール名単位の Rate Limiting
+// (-32020)→ tools/call のスコープ判定(OAuth は 403 insufficient_scope の step-up、M3-3。PAT は業務エラー、
+// 決定 55)→ ツール名単位の Rate Limiting
 // → SDK(server/discover・tools/list・tools/call)。
 
 export const MCP_REQUIRED_SCOPES = ["record:read"];
@@ -93,24 +95,17 @@ function authFromProps(
   };
 }
 
-// 16.3(M3-3、決定 49): スコープ不足は DO を起こす前に 403 insufficient_scope で返し、クライアントが
+// 16.3(M3-3、決定 49): OAuth のスコープ不足は DO を起こす前に 403 insufficient_scope で返し、クライアントが
 // 一往復で step-up できるようにする(challenge の scope と resource_metadata はライブラリが組む)。
-// PAT は再認可できないので、所有者がスコープ付きのトークンを発行し直す導線を文で示す
+// PAT は再認可できないので使わない(patScopeFailure。決定 55)
 export async function insufficientScopeFor(
   auth: OAuthResourceAuth,
-  tokenKind: McpAuth["tokenKind"],
   scope: Operation,
 ): Promise<Response> {
   // M3 の見送り指摘 (i): WWW-Authenticate は ASCII しか運べず、日本語の説明はヘッダから落ちる。
   // ヘッダには英文を載せ、本文 JSON の error_description は日本語に差し替える
-  const header =
-    tokenKind === "pat"
-      ? `This token lacks ${scope}. Ask the site owner to issue a token with ${scope} in Settings > Connected apps.`
-      : `Re-authorize with ${scope}.`;
-  const description =
-    tokenKind === "pat"
-      ? `この接続トークンには ${scope} がありません。管理画面の 設定 › 接続中のアプリ で ${scope} を含むトークンを発行してください`
-      : `${scope} を含めて再認可してください`;
+  const header = `Re-authorize with ${scope}.`;
+  const description = `${scope} を含めて再認可してください`;
   const res = insufficientScope(auth, [scope], header);
   const body = await res.json<Record<string, unknown>>();
   return Response.json(
@@ -119,14 +114,41 @@ export async function insufficientScopeFor(
   );
 }
 
-// tools/call が MCP に出ている操作なら、その操作の要するスコープ(無ければ undefined。未知の名前は
+// 決定 55(M5a-5): PAT のスコープ不足で、エージェントと利用者に示す対処
+export function patScopeRemedy(scope: Operation): string {
+  return `この接続トークンには ${scope} がありません。所有者に、管理画面の 設定 › 接続中のアプリ で ${scope} を含むトークンを発行してもらい、接続を設定し直してください`;
+}
+
+// 決定 55(M5a-5): PAT は再認可できないので、step-up の 403 は役に立たない(G4 で Claude Code は
+// 「Insufficient scope」とだけ表示し、対処が届かなかった)。tools/call の結果の業務エラーで対処を返す。
+// SDK の手前で JSON-RPC の応答を組むので、buildMcpServer も DO も起こさず、ツール単位の枠も消費しない
+export function patScopeFailure(id: unknown, scope: Operation): Response {
+  const message = patScopeRemedy(scope);
+  return Response.json({
+    jsonrpc: "2.0",
+    id,
+    result: {
+      content: [{ type: "text", text: `insufficient_scope: ${message}` }],
+      structuredContent: {
+        error: {
+          code: "insufficient_scope",
+          message,
+          details: { required: scope, tokenKind: "pat" },
+        },
+      },
+      isError: true,
+    },
+  });
+}
+
+// tools/call が MCP に出ている操作なら、その操作の宣言(無ければ undefined。未知の名前は
 // SDK の unknown tool に任せる)
-function requiredScopeOf(rpc: ParsedRpc): Operation | undefined {
+function mcpOperationOf(rpc: ParsedRpc): OpSpec | undefined {
   if (rpc.method !== "tools/call" || rpc.tool === undefined) {
     return undefined;
   }
   const spec = findOperation(rpc.tool);
-  return spec !== undefined && spec.via.includes("mcp") ? spec.requires : undefined;
+  return spec !== undefined && spec.via.includes("mcp") ? spec : undefined;
 }
 
 async function serveMcp(
@@ -166,9 +188,12 @@ async function serveMcp(
       rpc.id,
     );
   }
-  const required = requiredScopeOf(rpc);
-  if (required !== undefined && !auth.scopes.includes(required)) {
-    return await insufficientScopeFor(resourceAuth, auth.tokenKind, required);
+  const spec = mcpOperationOf(rpc);
+  const missing = spec === undefined ? null : missingScope(auth, spec);
+  if (missing !== null) {
+    return auth.tokenKind === "pat"
+      ? patScopeFailure(rpc.id, missing)
+      : await insufficientScopeFor(resourceAuth, missing);
   }
   // 16.1 / 16.2: 読み取りも DO を起こすのでツール名単位で制限する。未構成は fail-closed
   // (公開 write と同じ方針)。キーは テナント:利用者:ツール名(tools/call 以外はメソッド名。

@@ -27,6 +27,7 @@ export {
 } from "./slots";
 export {
   BLOCK_ID_ATTR_NAME,
+  BLOCK_ID_NODE_TYPES as RICH_TEXT_BLOCK_ID_NODE_TYPES,
   RICH_TEXT_HEADING_LEVELS,
   RICH_TEXT_SCHEMA_VERSION,
   RichTextEditor,

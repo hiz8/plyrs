@@ -1,10 +1,16 @@
 import { env, runInDurableObject } from "cloudflare:test";
 import { drizzle } from "drizzle-orm/d1";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { memberships, tenants, users } from "@plyrs/db/control-plane";
+import { and, eq } from "drizzle-orm";
+import { memberships, personalAccessTokens, tenants, users } from "@plyrs/db/control-plane";
 import { blockUser } from "../src/auth/blocklist";
-import { issuePat } from "../src/auth/pat";
+import { issuePat, revokePat } from "../src/auth/pat";
+import { generateSessionToken, sha256Hex } from "../src/auth/session";
+import type { McpAuth } from "../src/do/authorize";
+import { revokeTenantGrant } from "../src/oauth/grants";
+import { authorize, oauthEnv } from "./oauth-helpers";
 import { MAX_ASSET_SIZE_BYTES } from "../src/assets/store";
+import { loadHistory } from "../src/do/history";
 import { app } from "../src/index";
 import { fakeLimiter } from "./rate-limit-helper";
 
@@ -25,7 +31,18 @@ interface Tenant {
   tenantId: string;
   userId: string;
   writePat: string;
+  writePatId: string;
   readPat: string;
+}
+
+// asset の record の最初の版の経路と tokenId(M5a-3)
+async function firstHistory(tenantId: string, recordId: string) {
+  const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+  return runInDurableObject(stub, (_instance, state) => {
+    const items = loadHistory(state.storage.sql, recordId, { limit: 10 }).items;
+    const first = items[items.length - 1];
+    return { via: first?.via, tokenId: first?.tokenId };
+  });
 }
 
 async function setupTenant(): Promise<Tenant> {
@@ -41,18 +58,18 @@ async function setupTenant(): Promise<Tenant> {
     .values({ id: userId, email: `${userId}@example.com`, passwordHash: "h", createdAt: now });
   await db.insert(memberships).values({ userId, tenantId, role: "editor", createdAt: now });
   const issue = async (scopes: string[]) =>
-    (
-      await issuePat(
-        env.DB,
-        { userId, tenantId, name: "p", scopes: scopes as never, expiresInDays: 1 },
-        new Date(),
-      )
-    ).token;
+    issuePat(
+      env.DB,
+      { userId, tenantId, name: "p", scopes: scopes as never, expiresInDays: 1 },
+      new Date(),
+    );
+  const write = await issue(["record:read", "record:write"]);
   return {
     tenantId,
     userId,
-    writePat: await issue(["record:read", "record:write"]),
-    readPat: await issue(["record:read"]),
+    writePat: write.token,
+    writePatId: write.id,
+    readPat: (await issue(["record:read"])).token,
   };
 }
 
@@ -144,6 +161,8 @@ describe("asset_upload とアップロード URL", () => {
       },
     });
     expect(await env.ASSETS.head(`${a.tenantId}/${assetId}`)).not.toBeNull();
+    // M5a-3: 履歴の経路は mcp で、tokenId は発行に使った PAT の行 ID
+    expect(await firstHistory(a.tenantId, assetId)).toEqual({ via: "mcp", tokenId: a.writePatId });
   });
 
   it("同じ URL への 2 回目は 410", async () => {
@@ -228,15 +247,19 @@ describe("asset_upload とアップロード URL", () => {
     expect((await post(url, PNG)).status).toBe(201);
   });
 
-  it("record:read だけの PAT で asset_upload は入口で 403", async () => {
+  it("record:read だけの PAT で asset_upload は入口で insufficient_scope の業務エラー(決定 55)", async () => {
     const res = await callRaw(
       a,
       "asset_upload",
       { filename: "x.png", contentType: "image/png" },
       a.readPat,
     );
-    expect(res.status).toBe(403);
-    expect(res.headers.get("www-authenticate")).toContain('scope="record:write"');
+    expect(res.status).toBe(200);
+    const json = await res.json<ToolResult>();
+    expect(json.result?.isError).toBe(true);
+    expect(json.result?.structuredContent).toMatchObject({
+      error: { code: "insufficient_scope", details: { required: "record:write" } },
+    });
   });
 
   it("SVG は入力の検査で拒否する", async () => {
@@ -281,6 +304,7 @@ describe("asset_import_url(M4-5)", () => {
       type: "asset",
       data: { filename: "spring.png", content_type: "image/png", width: 16, height: 8 },
     });
+    expect(await firstHistory(a.tenantId, assetId)).toEqual({ via: "mcp", tokenId: a.writePatId });
   });
 
   it("許されない URL は url_not_allowed の業務エラーで、fetch を呼ばない", async () => {
@@ -297,13 +321,145 @@ describe("asset_import_url(M4-5)", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("record:read だけの PAT は入口で 403", async () => {
+  it("record:read だけの PAT は入口で insufficient_scope の業務エラー(決定 55)で、fetch を呼ばない", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
     const res = await callRaw(
       a,
       "asset_import_url",
       { url: "https://images.example.com/a.png" },
       a.readPat,
     );
+    expect(res.status).toBe(200);
+    const json = await res.json<ToolResult>();
+    expect(json.result?.isError).toBe(true);
+    expect(json.result?.structuredContent).toMatchObject({
+      error: {
+        code: "insufficient_scope",
+        details: { required: "record:write", tokenKind: "pat" },
+      },
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+// M5a-4(Review Focus 4): 発行後の失効と降格。どれも本文を読む前に 403 で、R2 に何も残らず、2 回目は 410
+describe("アップロードの受け取りで発行に使ったトークンとロールを引き直す(M5a-4)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function expectRejected(t: Tenant, url: string, error: string): Promise<void> {
+    const putSpy = vi.spyOn(TEST_ENV.ASSETS, "put");
+    const res = await post(url, PNG);
     expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error });
+    expect(putSpy).not.toHaveBeenCalled();
+    const listed = await env.ASSETS.list({ prefix: `${t.tenantId}/` });
+    expect(listed.objects).toHaveLength(0);
+    expect((await post(url, PNG)).status).toBe(410);
+  }
+
+  async function setRole(t: Tenant, role: "viewer" | "editor"): Promise<void> {
+    await drizzle(env.DB)
+      .update(memberships)
+      .set({ role })
+      .where(and(eq(memberships.userId, t.userId), eq(memberships.tenantId, t.tenantId)));
+  }
+
+  it("発行後に PAT を失効すると 403 token_revoked", async () => {
+    const t = await setupTenant();
+    const url = await issueUpload(t);
+    expect(await revokePat(env.DB, t.tenantId, t.writePatId, new Date())).toBe(true);
+    await expectRejected(t, url, "token_revoked");
+  });
+
+  it("発行後に PAT の期限が過ぎると 403 token_revoked", async () => {
+    const t = await setupTenant();
+    const url = await issueUpload(t);
+    await drizzle(env.DB)
+      .update(personalAccessTokens)
+      .set({ expiresAt: new Date(Date.now() - 1000).toISOString() })
+      .where(eq(personalAccessTokens.id, t.writePatId));
+    await expectRejected(t, url, "token_revoked");
+  });
+
+  it("発行後にロールを viewer に下げると 403 forbidden で、本文を読まない", async () => {
+    const t = await setupTenant();
+    const url = await issueUpload(t);
+    await setRole(t, "viewer");
+    await expectRejected(t, url, "forbidden");
+  });
+
+  it("発行後に会員から外すと 403 token_revoked", async () => {
+    const t = await setupTenant();
+    const url = await issueUpload(t);
+    await drizzle(env.DB)
+      .delete(memberships)
+      .where(and(eq(memberships.userId, t.userId), eq(memberships.tenantId, t.tenantId)));
+    await expectRejected(t, url, "token_revoked");
+  });
+
+  // OAuth の受け取りは DO の createAssetUpload に McpAuth(tokenKind: oauth)を直接渡して発行する
+  async function issueOauthUpload(tenantId: string, auth: McpAuth): Promise<string> {
+    const token = generateSessionToken();
+    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    const created = await stub.createAssetUpload(
+      {
+        tokenHash: await sha256Hex(token),
+        filename: "o.png",
+        contentType: "image/png",
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+      },
+      auth,
+    );
+    expect(created).toEqual({ ok: true });
+    return `${ORIGIN}/mcp/t/${tenantId}/uploads/${token}`;
+  }
+
+  async function oauthTenant() {
+    const t = await setupTenant();
+    const testEnv = oauthEnv();
+    const issued = await authorize(t.tenantId, ["record:read", "record:write"], {
+      userId: t.userId,
+      role: "editor",
+      env: testEnv,
+    });
+    const grantId = issued.access_token.split(":")[1] ?? "";
+    const auth: McpAuth = {
+      userId: t.userId,
+      role: "editor",
+      tenantId: t.tenantId,
+      scopes: ["record:read", "record:write"],
+      tokenId: grantId,
+      tokenKind: "oauth",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    };
+    return { t, testEnv, grantId, auth, clientId: issued.clientId };
+  }
+
+  it("OAuth の付与が残っていれば受け取れ、履歴の tokenId はグラント ID", async () => {
+    const { t, grantId, auth } = await oauthTenant();
+    const url = await issueOauthUpload(t.tenantId, auth);
+    const res = await post(url, PNG);
+    expect(res.status, await res.clone().text()).toBe(201);
+    const { assetId } = await res.json<{ assetId: string }>();
+    expect(await firstHistory(t.tenantId, assetId)).toEqual({ via: "mcp", tokenId: grantId });
+  });
+
+  it("発行後に OAuth の付与を失効すると 403 token_revoked で、付与の確認は KV の get 1 回(list しない)", async () => {
+    const { t, testEnv, grantId, auth } = await oauthTenant();
+    const url = await issueOauthUpload(t.tenantId, auth);
+    expect(await revokeTenantGrant(testEnv, t.tenantId, t.userId, grantId)).toBe(true);
+    const getSpy = vi.spyOn(TEST_ENV.OAUTH_KV, "get");
+    const listSpy = vi.spyOn(TEST_ENV.OAUTH_KV, "list");
+    await expectRejected(t, url, "token_revoked");
+    expect(getSpy.mock.calls.filter(([key]) => String(key).startsWith("grant:"))).toHaveLength(1);
+    expect(listSpy).not.toHaveBeenCalled();
+  });
+
+  it("tokenId が clientId(grantId を取り出せなかった形)の OAuth で発行した受け取りは 403 token_revoked", async () => {
+    const { t, auth, clientId } = await oauthTenant();
+    const url = await issueOauthUpload(t.tenantId, { ...auth, tokenId: clientId });
+    await expectRejected(t, url, "token_revoked");
   });
 });

@@ -90,6 +90,12 @@ async function isPending(env: Env, userId: string, grantId: string): Promise<boo
   return stored !== null && typeof stored["authCodeWrappedKey"] === "string";
 }
 
+// M5a-4: 付与が今もあるか。OAUTH_KV の `grant:<userId>:<grantId>` を 1 回 get する(isPending と同じ方式。
+// 一覧の list はしない)。テナントとの結び付きは呼び出し元が検証済み(tokenId は検証した token から取った)
+export async function hasGrant(env: Env, userId: string, grantId: string): Promise<boolean> {
+  return (await env.OAUTH_KV.get(`grant:${userId}:${grantId}`)) !== null;
+}
+
 export async function listTenantGrants(env: Env, tenantId: string): Promise<TenantGrant[]> {
   const origins = oauthOrigins(env);
   const server = createTenantAuthServer(env, tenantId);

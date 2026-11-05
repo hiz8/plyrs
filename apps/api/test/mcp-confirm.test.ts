@@ -164,6 +164,42 @@ describe("publish の確認(MRTR の elicitation)", () => {
     expect(await published(recordId)).toBe(true);
   });
 
+  // M5a-6: フォームの初期値は true。照合は明示の confirm: true だけ(16.8 の人の確認を弱めない)
+  it("requestedSchema の confirm は default: true", async () => {
+    const recordId = await newRecord(910);
+    const first = await call("record_publish", { recordId }, { elicitation: true });
+    const params = first.result?.inputRequests?.["confirm"]?.params as
+      | { requestedSchema?: { properties?: Record<string, Record<string, unknown>> } }
+      | undefined;
+    expect(params?.requestedSchema?.properties?.["confirm"]).toMatchObject({
+      type: "boolean",
+      default: true,
+    });
+  });
+
+  for (const [label, content] of [
+    ["confirm: false", { confirm: false }],
+    ["confirm の欠けた", {}],
+  ] as const) {
+    it(`${label} Accept は declined で公開されない`, async () => {
+      const recordId = await newRecord(label === "confirm: false" ? 911 : 912);
+      const first = await call("record_publish", { recordId }, { elicitation: true });
+      const second = await call(
+        "record_publish",
+        { recordId },
+        {
+          elicitation: true,
+          retry: {
+            inputResponses: { confirm: { action: "accept", content } },
+            requestState: first.result?.requestState ?? "",
+          },
+        },
+      );
+      expect(second.result?.structuredContent).toMatchObject({ error: { code: "declined" } });
+      expect(await published(recordId)).toBe(false);
+    });
+  }
+
   it("断ると declined で公開されない", async () => {
     const recordId = await newRecord(903);
     const first = await call("record_publish", { recordId }, { elicitation: true });
@@ -276,15 +312,23 @@ describe("publish の確認(MRTR の elicitation)", () => {
     expect(await published(recordId)).toBe(false);
   });
 
-  it("record:publish の無いトークンは確認より前に入口で 403", async () => {
+  it("record:publish の無い PAT は確認より前に入口で insufficient_scope の業務エラー(決定 55)", async () => {
     const recordId = await newRecord(908);
     const res = await callRaw(
       "record_publish",
       { recordId },
       { token: writePat, elicitation: true },
     );
-    expect(res.status).toBe(403);
-    expect(res.headers.get("www-authenticate")).toContain('scope="record:publish"');
+    expect(res.status).toBe(200);
+    const json = await res.json<{
+      result?: { isError?: boolean; inputRequests?: unknown; structuredContent?: unknown };
+    }>();
+    expect(json.result?.isError).toBe(true);
+    expect(json.result?.inputRequests).toBeUndefined();
+    expect(json.result?.structuredContent).toMatchObject({
+      error: { code: "insufficient_scope", details: { required: "record:publish" } },
+    });
+    expect(await published(recordId)).toBe(false);
   });
 
   it("unpublish も確認を通ってから取り下げる", async () => {

@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { drizzle } from "drizzle-orm/d1";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { memberships, tenants, users } from "@plyrs/db/control-plane";
 import { issuePat } from "../src/auth/pat";
 import { app } from "../src/index";
@@ -338,11 +338,54 @@ describe("/mcp/t/:tenantId の入口", () => {
     expect(denied.status).toBe(401);
   });
 
-  it("スコープ不足の tools/call は 403 insufficient_scope(必要なスコープと PRM を challenge に出す)", async () => {
+  // 決定 55(M5a-5、Review Focus 5): PAT は再認可できないので、スコープ不足は HTTP 200 の業務エラーで
+  // 対処を返す。SDK の手前で返すので DO も Rate Limiting の枠も使わない(TENANT_DO を偽物にし、limit の
+  // 呼び出しを数える。limit は SDK より前にあるので、呼ばれなければ buildMcpServer も起きていない)
+  it("PAT のスコープ不足の tools/call は HTTP 200 の業務エラーで、DO も Rate Limiting も使わない", async () => {
+    const limit = vi.fn(async () => ({ success: true }));
+    const doGet = vi.fn();
     const res = await post(
       "tools/call",
       { name: "record_get", arguments: { id: crypto.randomUUID() } },
-      { token: writeOnlyPat },
+      {
+        token: writeOnlyPat,
+        body: envelope("tools/call", { name: "record_get", arguments: {} }, 42),
+        limiter: { limit } as unknown as RateLimit,
+        env: {
+          TENANT_DO: { get: doGet, idFromName: vi.fn() } as unknown as Env["TENANT_DO"],
+        },
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type") ?? "").toContain("application/json");
+    const json = await res.json<{
+      id: unknown;
+      result: {
+        isError: boolean;
+        content: { type: string; text: string }[];
+        structuredContent: {
+          error: { code: string; message: string; details: Record<string, unknown> };
+        };
+      };
+    }>();
+    expect(json.id).toBe(42);
+    expect(json.result.isError).toBe(true);
+    expect(json.result.structuredContent.error).toMatchObject({
+      code: "insufficient_scope",
+      details: { required: "record:read", tokenKind: "pat" },
+    });
+    expect(json.result.structuredContent.error.message).toContain("所有者に");
+    expect(json.result.content[0]?.text).toContain("record:read");
+    expect(doGet).not.toHaveBeenCalled();
+    expect(limit).not.toHaveBeenCalled();
+  });
+
+  it("OAuth のスコープ不足は 403 insufficient_scope(必要なスコープと PRM を challenge に出す)", async () => {
+    const issued = await authorize(tenantId, ["record:write"], { userId, role: "owner" });
+    const res = await post(
+      "tools/call",
+      { name: "record_get", arguments: { id: crypto.randomUUID() } },
+      { token: issued.access_token, env: OAUTH_ENV },
     );
     expect(res.status).toBe(403);
     const challenge = res.headers.get("www-authenticate") ?? "";
@@ -351,13 +394,8 @@ describe("/mcp/t/:tenantId の入口", () => {
     expect(challenge).toContain(
       `resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp/t/${tenantId}"`,
     );
-    const body = await res.json<{ error: string; error_description?: string }>();
-    expect(body.error).toBe("insufficient_scope");
-    // PAT は再認可できないので、所有者がスコープ付きのトークンを発行し直す導線を示す
-    expect(body.error_description).toContain("接続トークン");
-    expect(body.error_description).toContain("record:read");
     // M3 の見送り指摘 (i): WWW-Authenticate は ASCII しか運べないので、ヘッダには英文の説明を載せる
-    expect(challenge).toContain('error_description="This token lacks record:read.');
+    expect(challenge).toContain('error_description="Re-authorize with record:read.');
   });
 
   it("OAuth のスコープ不足は再認可(step-up)を案内する。tools/list と未知のツール名は対象外", async () => {

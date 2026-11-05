@@ -180,10 +180,15 @@ test("MCP で書いた record が管理画面に出て、競合・ブロック�
   await expect(page.getByText("最初の段落")).toBeVisible();
   await expect(page.getByText("二番目の段落")).toHaveCount(0);
 
-  // 4. record:publish の無い PAT は入口で 403 insufficient_scope
-  const forbidden = await call(page.request, endpoint, writer, "record_publish", { recordId });
-  expect(forbidden.status()).toBe(403);
-  expect(forbidden.headers()["www-authenticate"] ?? "").toContain('scope="record:publish"');
+  // 4. record:publish の無い PAT は入口で業務エラー insufficient_scope(決定 55。PAT は再認可できない)
+  const forbidden = await tool(page.request, endpoint, writer, "record_publish", { recordId });
+  expect(forbidden.isError).toBe(true);
+  expect(forbidden.structuredContent).toMatchObject({
+    error: {
+      code: "insufficient_scope",
+      details: { required: "record:publish", tokenKind: "pat" },
+    },
+  });
 
   // 5. record:publish があっても、elicitation を宣言しないクライアントは確認できないので止まる(決定 50)
   const unavailable = await tool(page.request, endpoint, publisher, "record_publish", {

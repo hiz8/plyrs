@@ -4,6 +4,7 @@ import { render } from "@testing-library/react";
 import {
   ASSET_IMAGE_NODE_TYPE,
   BLOCK_ID_ATTR,
+  BLOCK_ID_NODE_TYPES,
   RECORD_MENTION_NODE_TYPE,
   RICH_TEXT_SCHEMA_VERSION as METAMODEL_RICH_TEXT_SCHEMA_VERSION,
   extractBodyRelations,
@@ -13,12 +14,13 @@ import {
   ASSET_IMAGE_NODE_NAME,
   BLOCK_ID_ATTR_NAME,
   RECORD_MENTION_NODE_NAME,
+  RICH_TEXT_BLOCK_ID_NODE_TYPES,
   RICH_TEXT_HEADING_LEVELS,
   RICH_TEXT_SCHEMA_VERSION,
   RichTextEditor,
   type RichTextEditorProps,
 } from "@plyrs/ui";
-import { HEADING_LEVELS } from "@plyrs/richtext";
+import { HEADING_LEVELS, richTextSchema } from "@plyrs/richtext";
 
 // このファイルは .ts(.tsx ではない)なので JSX 構文は使わず createElement を直接呼ぶ
 // (拡張子は brief / セッション規約の git add パスに合わせて固定 — .tsx への改名はしない)。
@@ -47,6 +49,47 @@ describe("record mention / asset image contract", () => {
   // M2-2: エディタの見出しレベルは Worker 側(Markdown 変換・スキーマ検証)の語彙と一致する
   it("ui heading levels match the richtext vocabulary", () => {
     expect(RICH_TEXT_HEADING_LEVELS).toEqual([...HEADING_LEVELS]);
+  });
+
+  // M5a-6: 書き込み時の構造の検査(Worker 側のスキーマ ∪ ブロック ID)が、エディタの作る本文を拒否しない。
+  // ノード種・マーク種の名前と、種類ごとの属性の集合が一致することを固定する
+  it("editor schema matches the worker schema plus block ids (node / mark attrs)", async () => {
+    expect([...RICH_TEXT_BLOCK_ID_NODE_TYPES].sort()).toEqual([...BLOCK_ID_NODE_TYPES].sort());
+    let captured: Editor | null = null;
+    render(
+      createElement(RichTextEditor, {
+        label: "body",
+        value: undefined,
+        onChange: () => {},
+        onEditorReady: (editor: Editor) => {
+          captured = editor;
+        },
+      }),
+    );
+    await vi.waitFor(() => expect(captured).not.toBeNull());
+    if (captured === null) {
+      throw new Error("editor not ready");
+    }
+    const editorSchema = (captured as Editor).schema;
+    const worker = richTextSchema();
+    const blockIdTypes = new Set<string>(BLOCK_ID_NODE_TYPES);
+    const attrsOf = (spec: { attrs?: Record<string, unknown> | null }) =>
+      Object.keys(spec.attrs ?? {}).sort();
+    const editorNodes = Object.fromEntries(
+      Object.entries(editorSchema.nodes).map(([name, type]) => [name, attrsOf(type.spec)]),
+    );
+    const workerNodes = Object.fromEntries(
+      Object.entries(worker.nodes).map(([name, type]) => [
+        name,
+        [...attrsOf(type.spec), ...(blockIdTypes.has(name) ? [BLOCK_ID_ATTR] : [])].sort(),
+      ]),
+    );
+    expect(editorNodes).toEqual(workerNodes);
+    const marksOf = (schema: typeof worker) =>
+      Object.fromEntries(
+        Object.entries(schema.marks).map(([name, type]) => [name, attrsOf(type.spec)]),
+      );
+    expect(marksOf(editorSchema as unknown as typeof worker)).toEqual(marksOf(worker));
   });
 
   // ロードマップ §13 推奨: ノード名だけでなく attrs キーまで(ui 産の実 doc を

@@ -290,22 +290,37 @@ describe("書き込みツール(M4-1b)", () => {
     expect(latest).toMatchObject({ kind: "restore", via: "mcp" });
   });
 
-  it("record:write の無いトークンの record_restore は入口で 403", async () => {
+  it("record:write の無い PAT の record_restore は入口で insufficient_scope の業務エラー(決定 55)", async () => {
     const res = await rpcRaw("tools/call", {
       name: "record_restore",
       arguments: { recordId: uuid(822), historySeq: 1 },
     });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    const json = await res.json<{
+      result?: { isError?: boolean; structuredContent?: Record<string, unknown> };
+    }>();
+    expect(json.result?.structuredContent).toMatchObject({
+      error: { code: "insufficient_scope", details: { required: "record:write" } },
+    });
   });
 
-  it("record:delete の無いトークンの record_delete は入口で 403 insufficient_scope", async () => {
+  it("record:delete の無い PAT の record_delete は入口で insufficient_scope の業務エラー(決定 55)", async () => {
     const res = await rpcRaw(
       "tools/call",
       { name: "record_delete", arguments: { recordId: uuid(821) } },
       writePat,
     );
-    expect(res.status).toBe(403);
-    expect(res.headers.get("www-authenticate")).toContain('scope="record:delete"');
+    expect(res.status).toBe(200);
+    const json = await res.json<{
+      result?: { isError?: boolean; structuredContent?: Record<string, unknown> };
+    }>();
+    expect(json.result?.isError).toBe(true);
+    expect(json.result?.structuredContent).toMatchObject({
+      error: {
+        code: "insufficient_scope",
+        details: { required: "record:delete", tokenKind: "pat" },
+      },
+    });
   });
 });
 

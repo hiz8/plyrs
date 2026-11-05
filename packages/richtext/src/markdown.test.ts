@@ -3,7 +3,12 @@ import { BLOCK_ID_ATTR, type RichTextEnvelope } from "@plyrs/metamodel";
 import { getSchema, type JSONContent } from "@tiptap/core";
 import { workerExtensions } from "./extensions";
 import { fixtures } from "./fixtures";
-import { checkRichText, markdownToRichText, richTextToMarkdown } from "./markdown";
+import {
+  checkRichText,
+  checkRichTextVocabulary,
+  markdownToRichText,
+  richTextToMarkdown,
+} from "./markdown";
 import { normalize } from "./normalize";
 
 // M2-2(決定 46): Tiptap の全ノード種・全マーク種 19 件が Markdown との往復で可逆であることを固定する
@@ -147,5 +152,31 @@ describe("markdownToRichText", () => {
       type: "orderedList",
       attrs: { start: 3 },
     });
+  });
+});
+
+describe("checkRichTextVocabulary(M5a-6)", () => {
+  const doc = (content: unknown[]) => ({
+    schemaVersion: 2,
+    doc: { type: "doc", content } as never,
+  });
+
+  it("空の doc とブロック ID 付きの段落は通る", () => {
+    expect(checkRichTextVocabulary(doc([]))).toEqual({ ok: true });
+    expect(
+      checkRichTextVocabulary(doc([{ type: "paragraph", attrs: { id: "p" }, content: [] }])),
+    ).toEqual({ ok: true });
+  });
+
+  it("語彙に無いノード、余分な属性、ブロック ID の付かないノードの id は拒否する", () => {
+    expect(checkRichTextVocabulary(doc([{ type: "iframe" }])).ok).toBe(false);
+    expect(
+      checkRichTextVocabulary(doc([{ type: "paragraph", attrs: { src: "javascript:x" } }])).ok,
+    ).toBe(false);
+    expect(
+      checkRichTextVocabulary(
+        doc([{ type: "bulletList", content: [{ type: "listItem", attrs: { id: "x" } }] }]),
+      ).ok,
+    ).toBe(false);
   });
 });

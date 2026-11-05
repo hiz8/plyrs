@@ -1,7 +1,8 @@
-import { env } from "cloudflare:test";
+import { env, runInDurableObject } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { ASSET_TYPE_KEY } from "@plyrs/metamodel";
 import { app } from "../src/index";
+import { loadHistory } from "../src/do/history";
 import { signTenantToken } from "../src/auth/jwt";
 import { insertTenantWithOwner } from "./create-tenant";
 import { fakeLimiter } from "./rate-limit-helper";
@@ -77,6 +78,13 @@ describe("アセットのアップロードとプレビュー (Phase 8 決定 1,
 
     const stored = await env.ASSETS.get(`${tenantId}/${body.record.id}`);
     expect(stored).not.toBeNull();
+    // M5a-3: 管理画面のアップロードは via rest で tokenId を持たない
+    const stub = env.TENANT_DO.get(env.TENANT_DO.idFromName(tenantId));
+    const items = await runInDurableObject(
+      stub,
+      (_instance, state) => loadHistory(state.storage.sql, body.record.id, { limit: 10 }).items,
+    );
+    expect(items.map((item) => [item.via, item.tokenId])).toEqual([["rest", null]]);
   });
 
   it("rejects a missing filename and an empty body", async () => {

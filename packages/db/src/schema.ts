@@ -194,6 +194,9 @@ export const assetUploadTokens = sqliteTable(
     userId: text("user_id").notNull(),
     role: text("role").notNull(),
     tokenId: text("token_id").notNull(),
+    // M5a-3: 発行に使ったトークンの種別(pat / oauth)。受け取りで履歴の経路と、発行トークンの有効性の
+    // 引き直し(M5a-4)に使う。デプロイ前に発行された行は既定の pat になる
+    tokenKind: text("token_kind").notNull().default("pat"),
     filename: text("filename").notNull(),
     contentType: text("content_type").notNull(),
     expiresAt: text("expires_at").notNull(),

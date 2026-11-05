@@ -4,6 +4,7 @@ import { MAX_ASSET_SIZE_BYTES } from "../src/assets/store";
 
 // M4-5(design-spec 16.11、決定 52): URL からの取り込みの SSRF 対策
 
+const UA = "plyrs-asset-import/1 (+https://api.example)";
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 function png(headers: Record<string, string> = {}): Response {
@@ -43,21 +44,27 @@ describe("fetchPublicImage", () => {
     "not a url",
   ])("%s は url_not_allowed で、fetch を呼ばない", async (url) => {
     const fetcher = fetcherOf();
-    const result = await fetchPublicImage(url, fetcher);
+    const result = await fetchPublicImage(url, { userAgent: UA, fetcher: fetcher });
     expect(result).toMatchObject({ ok: false, code: "url_not_allowed" });
     expect(fetcher).not.toHaveBeenCalled();
   });
 
   it("公開ホストから 169.254.169.254 へ 302 すると、2 回目の fetch をせず url_not_allowed(Review Focus 4)", async () => {
     const fetcher = fetcherOf(redirect("http://169.254.169.254/latest/meta-data/"));
-    const result = await fetchPublicImage("https://example.com/a.png", fetcher);
+    const result = await fetchPublicImage("https://example.com/a.png", {
+      userAgent: UA,
+      fetcher: fetcher,
+    });
     expect(result).toMatchObject({ ok: false, code: "url_not_allowed" });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it("https の IP リテラルへのリダイレクトも url_not_allowed", async () => {
     const fetcher = fetcherOf(redirect("https://10.0.0.1/a.png", 301));
-    const result = await fetchPublicImage("https://example.com/a.png", fetcher);
+    const result = await fetchPublicImage("https://example.com/a.png", {
+      userAgent: UA,
+      fetcher: fetcher,
+    });
     expect(result).toMatchObject({ ok: false, code: "url_not_allowed" });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
@@ -69,7 +76,10 @@ describe("fetchPublicImage", () => {
       redirect("d.png"),
       png(),
     );
-    const result = await fetchPublicImage("https://example.com/a.png", fetcher);
+    const result = await fetchPublicImage("https://example.com/a.png", {
+      userAgent: UA,
+      fetcher: fetcher,
+    });
     expect(result).toMatchObject({ ok: true, contentType: "image/png", filename: "d.png" });
     expect(fetcher.mock.calls.map((call) => String(call[0]))).toEqual([
       "https://example.com/a.png",
@@ -79,25 +89,32 @@ describe("fetchPublicImage", () => {
     ]);
     for (const call of fetcher.mock.calls) {
       expect(call[1]).toMatchObject({ redirect: "manual" });
+      // M5a-6: 各ホップに User-Agent を付ける(リダイレクト先でも)
+      expect(new Headers(call[1]?.headers).get("user-agent")).toBe(UA);
     }
   });
 
   it(`${MAX_IMPORT_REDIRECTS + 1} 回目のリダイレクトは fetch_failed`, async () => {
     const fetcher = fetcherOf(redirect("/1"), redirect("/2"), redirect("/3"), redirect("/4"));
-    const result = await fetchPublicImage("https://example.com/a.png", fetcher);
+    const result = await fetchPublicImage("https://example.com/a.png", {
+      userAgent: UA,
+      fetcher: fetcher,
+    });
     expect(result).toMatchObject({ ok: false, code: "fetch_failed" });
     expect(fetcher).toHaveBeenCalledTimes(4);
   });
 
   it("2xx 以外と fetch の例外は fetch_failed", async () => {
     expect(
-      await fetchPublicImage(
-        "https://example.com/a.png",
-        fetcherOf(new Response("no", { status: 404 })),
-      ),
+      await fetchPublicImage("https://example.com/a.png", {
+        userAgent: UA,
+        fetcher: fetcherOf(new Response("no", { status: 404 })),
+      }),
     ).toMatchObject({ ok: false, code: "fetch_failed" });
     const throwing = vi.fn<typeof fetch>().mockRejectedValueOnce(new Error("timeout"));
-    expect(await fetchPublicImage("https://example.com/a.png", throwing)).toMatchObject({
+    expect(
+      await fetchPublicImage("https://example.com/a.png", { userAgent: UA, fetcher: throwing }),
+    ).toMatchObject({
       ok: false,
       code: "fetch_failed",
     });
@@ -105,24 +122,24 @@ describe("fetchPublicImage", () => {
 
   it("image/svg+xml と Content-Type 無しは unsupported_type", async () => {
     expect(
-      await fetchPublicImage(
-        "https://example.com/a.svg",
-        fetcherOf(png({ "content-type": "image/svg+xml" })),
-      ),
+      await fetchPublicImage("https://example.com/a.svg", {
+        userAgent: UA,
+        fetcher: fetcherOf(png({ "content-type": "image/svg+xml" })),
+      }),
     ).toMatchObject({ ok: false, code: "unsupported_type" });
     expect(
-      await fetchPublicImage(
-        "https://example.com/a",
-        fetcherOf(new Response(PNG, { status: 200 })),
-      ),
+      await fetchPublicImage("https://example.com/a", {
+        userAgent: UA,
+        fetcher: fetcherOf(new Response(PNG, { status: 200 })),
+      }),
     ).toMatchObject({ ok: false, code: "unsupported_type" });
   });
 
   it("Content-Length が上限を超えると too_large", async () => {
-    const result = await fetchPublicImage(
-      "https://example.com/a.png",
-      fetcherOf(png({ "content-length": String(MAX_ASSET_SIZE_BYTES + 1) })),
-    );
+    const result = await fetchPublicImage("https://example.com/a.png", {
+      userAgent: UA,
+      fetcher: fetcherOf(png({ "content-length": String(MAX_ASSET_SIZE_BYTES + 1) })),
+    });
     expect(result).toMatchObject({ ok: false, code: "too_large" });
   });
 
@@ -139,25 +156,37 @@ describe("fetchPublicImage", () => {
         controller.enqueue(chunk);
       },
     });
-    const result = await fetchPublicImage(
-      "https://example.com/a.png",
-      fetcherOf(new Response(stream, { status: 200, headers: { "content-type": "image/png" } })),
-    );
+    const result = await fetchPublicImage("https://example.com/a.png", {
+      userAgent: UA,
+      fetcher: fetcherOf(
+        new Response(stream, { status: 200, headers: { "content-type": "image/png" } }),
+      ),
+    });
     expect(result).toMatchObject({ ok: false, code: "too_large" });
   });
 
   it("正常な PNG は ok。Content-Type の引数は落とし、ファイル名は最後のパス要素(無ければ image)", async () => {
-    const ok = await fetchPublicImage(
-      "https://example.com/photos/%E6%98%A5.png?w=1",
-      fetcherOf(png({ "content-type": "IMAGE/PNG; charset=binary" })),
-    );
+    const ok = await fetchPublicImage("https://example.com/photos/%E6%98%A5.png?w=1", {
+      userAgent: UA,
+      fetcher: fetcherOf(png({ "content-type": "IMAGE/PNG; charset=binary" })),
+    });
     expect(ok).toMatchObject({ ok: true, contentType: "image/png", filename: "春.png" });
     if (ok.ok) {
       expect(ok.body.byteLength).toBe(PNG.byteLength);
     }
-    expect(await fetchPublicImage("https://example.com/", fetcherOf(png()))).toMatchObject({
+    expect(
+      await fetchPublicImage("https://example.com/", { userAgent: UA, fetcher: fetcherOf(png()) }),
+    ).toMatchObject({
       ok: true,
       filename: "image",
     });
+  });
+});
+
+describe("importUserAgent(M5a-6)", () => {
+  it("API_ORIGIN があれば連絡先として添え、無ければ名前だけ", async () => {
+    const { importUserAgent } = await import("../src/assets/fetch-url");
+    expect(importUserAgent("https://api.example")).toBe(UA);
+    expect(importUserAgent(undefined)).toBe("plyrs-asset-import/1");
   });
 });

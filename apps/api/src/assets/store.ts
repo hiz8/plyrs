@@ -1,5 +1,5 @@
 import { v7 as uuidv7 } from "uuid";
-import type { AuthContext } from "../do/authorize";
+import type { AuthContext, McpAuth } from "../do/authorize";
 import type { WriteRecordResult } from "../do/types";
 import { asWriteResult } from "../rpc-unwrap";
 import { sniffImageSize } from "./image-size";
@@ -67,7 +67,8 @@ export interface AssetFile {
 export async function storeAsset(
   env: Env,
   tenantId: string,
-  auth: AuthContext,
+  // McpAuth なら履歴に via mcp と tokenId が残る(createAssetRecord)
+  auth: AuthContext | McpAuth,
   file: AssetFile,
 ): Promise<WriteRecordResult> {
   // ID はサーバー生成(uuidv7)。r2_key は `${tenantId}/${assetId}` 規約 — バイナリは不変
