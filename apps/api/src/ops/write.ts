@@ -68,7 +68,7 @@ export const MAX_ATTEMPT = 3;
 export const recordUpdate = defineOperation({
   name: "record_update",
   title: "record の更新",
-  description: `record のフィールドを更新する。record_get で得た fieldVersions を baseFieldVersions にそのまま渡す。input には変えるフィールドだけを入れる(changedFields を省略すると input のキー)。本文の一部だけを変えるときは、リッチテキストのフィールドに { "blocks": [{ "op": "replace", "id": "<ブロック ID>", "markdown": "..." }] } を渡す(ブロック ID は record_get の outline。op は replace / insert(after: ID か null)/ delete)。他の人の編集で版が進んでいれば conflict になり、details.current に現在の内容と fieldVersions が返る。そのときは current を読み直して変更を当て直し、attempt を 1 増やして送る。再適用は 2 回まで(attempt 3 で conflict なら、それ以上は試さずに人に確認を依頼する)。status を変える更新は、現在の fieldVersions を全部渡したときだけ通る。${RICH_TEXT_NOTE}${UNTRUSTED_NOTE}`,
+  description: `record のフィールドを更新する。record_get で得た fieldVersions を baseFieldVersions にそのまま渡す。input には変えるフィールドだけを入れる(changedFields を省略すると input のキー)。本文の一部だけを変えるときは、リッチテキストのフィールドに { "blocks": [{ "op": "replace", "id": "<ブロック ID>", "markdown": "..." }] } を渡す(ブロック ID は record_get の outline。op は replace / insert(after: ID か null)/ delete)。他の人の編集で版が進んでいれば conflict になり、details.current に現在の内容と fieldVersions が返る。そのときは current を読み直して変更を当て直し、attempt を 1 増やして送る。再適用は 2 回まで(attempt 3 で conflict なら、それ以上は試さずに proposal_create で変更を提案にして人に確認を依頼する)。status を変える更新は、現在の fieldVersions を全部渡したときだけ通る。${RICH_TEXT_NOTE}${UNTRUSTED_NOTE}`,
   input: z.object({
     recordId: uuidSchema,
     input: z.record(z.string(), z.unknown()).describe("変えるフィールドの値"),
@@ -109,7 +109,7 @@ export const recordPublish = defineOperation({
   name: "record_publish",
   title: "record の公開",
   description:
-    "record の現在の内容を公開する(誰でも読めるようになる)。既定では公開は人が管理画面で行うので、頼まれたときだけ使う。実行前に利用者への確認(elicitation)が出る。確認に対応していないクライアントでは confirmation_unavailable になるので、status を ready にして人に公開を依頼する。確認の後に record が更新されると record_changed になるので、確認からやり直す。トークンに record:publish が無ければ 403(OAuth は再認可、PAT は所有者が record:publish 付きの接続トークンを 設定 › 接続中のアプリ で発行する)。参照している未公開の asset も一緒に公開する。既に現在の版が公開済みなら何もせず成功を返す。",
+    "record の現在の内容を公開する(誰でも読めるようになる)。既定では公開は人が管理画面で行うので、頼まれたときだけ使う。実行前に利用者への確認(elicitation)が出る。確認に対応していないクライアントでは confirmation_unavailable になるので、status を ready にして人に公開を依頼するか、proposal_create(kind: publish)で公開を提案する。確認の後に record が更新されると record_changed になるので、確認からやり直す。トークンに record:publish が無ければ 403(OAuth は再認可、PAT は所有者が record:publish 付きの接続トークンを 設定 › 接続中のアプリ で発行する)。参照している未公開の asset も一緒に公開する。既に現在の版が公開済みなら何もせず成功を返す。",
   input: z.object({ recordId: uuidSchema }),
   output: z.object({
     recordId: uuidSchema,
@@ -127,7 +127,7 @@ export const recordUnpublish = defineOperation({
   name: "record_unpublish",
   title: "record の公開の取り下げ",
   description:
-    "公開を取り下げる(内容は下書きとして残る)。実行前に利用者への確認(elicitation)が出る。確認に対応していないクライアントでは confirmation_unavailable。要るスコープは record:publish。未公開なら何もせず成功を返す(sourceVersion は null)。",
+    "公開を取り下げる(内容は下書きとして残る)。実行前に利用者への確認(elicitation)が出る。確認に対応していないクライアントでは confirmation_unavailable(proposal_create(kind: unpublish)で取り下げを提案できる)。要るスコープは record:publish。未公開なら何もせず成功を返す(sourceVersion は null)。",
   input: z.object({ recordId: uuidSchema }),
   output: z.object({ recordId: uuidSchema, sourceVersion: z.number().int().nullable() }),
   requires: "record:publish",
