@@ -667,7 +667,7 @@ single-writer の DO が競合を判定する。分散マージの難問が「DO
 - **型単位のスコープ（第16章・論点 C3）**: `record:write:article` のような型単位のスコープを採るか。第11.4章「権限マトリクスは JWT に載せない」の見直しが先。M5 で判断。
 - **ブロック単位の競合判定（第16章・論点 B3 ④）**: `field_versions` をブロック単位にするか DO 内 3-way merge にするか。A1 確定後、M5 で判断。
 - **サービスアカウント・公開側 MCP の認証・意味検索（第16章・論点 C4・D4・A4）**: いずれも M5 で設計。
-- **旧版 MCP プロトコルのクライアントへの対応（第16章）**: 2026-07-28 より前の版だけを話すクライアントが公開時点でどれだけ残っているかで、SDK の互換層を使うかを M1-5 で判断。
+- ~~**旧版 MCP プロトコルのクライアントへの対応（第16章）**~~ → 決定 56（M5b、2026-11-07）。2026-07-28 のみを受ける。ChatGPT への対応が必要になったら再検討する。
 
 ---
 
@@ -730,6 +730,7 @@ single-writer の DO が競合を判定する。分散マージの難問が「DO
 | 53 | **履歴の逆差分は、リッチテキストの値を最上位ブロック単位で持つ**（M5a-1、2026-11-04）。古い版の本文を、新しい版の同じ ID のブロックの参照と変わったブロックの実体の列（`blocks`）で表し、作るときに当て直して元に戻ることを確かめる。戻らなければ値全体（`set`）。旧い行は書き換えない | M4-6 の実測で、1 段落の直しでも逆差分に本文全体が入り、差分 1 版が全文 1 版とほぼ同じ大きさだった。最上位ブロックには安定 ID（決定 44・46）があるので参照で表せる。当て直しの確認で、ID の重複などで戻らない文書を壊さない。300 回の編集の実測で逆差分の合計は 976 KB → 112 KB |
 | 54 | **unique のフィールドは indexed でなくても DO 内に引き当て用の生成カラムを持つ**（M5a-2、2026-11-04、所有者の判断「unique なら索引を自動で作る」）。絞り込みには使わない。既存テナントには alarm で足し、足し終えるまでは走査。比較は生成カラムの affinity に従う | M4-6 の実測で、indexed でない unique の重複検査が型の record を全件走査していた。管理画面で indexed を必須にすると利用者の操作が増え、公開 API の絞り込みの意味も変わる。部分インデックスの構築は records を走査するので、起動時にまとめて流すと record の多いテナントで起動の上限を超えうる |
 | 55 | **PAT のスコープ不足は、HTTP 403 ではなくツールの業務エラーで対処を返す**（M5a-5、2026-11-04）。OAuth は従来どおり 403 の step-up。判定の位置（DO と Rate Limiting の前）は変えない | PAT は再認可できないので step-up の 403 は役に立たない。G4 で Claude Code は 403 の説明を表示せず、所有者に発行し直してもらう対処が届かなかった。業務エラーならエージェントが message を読んで利用者に伝えられる |
+| 56 | **MCP は仕様 2026-07-28 のみを受け、2025 年版の `initialize` は拒否する**（M5b、2026-11-07、所有者の判断）。対象のクライアントは claude.ai と Claude デスクトップアプリなどの汎用アプリとし、VS Code・Cursor・MCP Inspector の既定（2025 年版）は対象外。ChatGPT への対応が必要になったら、実際に接続して版を確かめてから再検討する。JSON-RPC のバッチは入口で拒否する | CMS の利用者はエディタではなく Web やデスクトップの汎用アプリから接続する。claude.ai は G3（2026-11-03）で 2026-07-28 の入口に接続できた。2025 年版を受けると SDK の別の経路が攻撃面に加わり（試作で、バッチによる入口の判定のすり抜けと、確認の状態の付け替えによる確認なしの公開を見つけた）、その接続では publish の確認も出せない。受ける実装は試作済み（SDK の `legacy: "stateless"` と 2 つの判定）で、必要になればすぐ戻せる |
 
 ---
 
@@ -752,7 +753,7 @@ MCP は、管理画面の同期（第 8・10 章）と REST（`/v1/t/:tenantId/.
 - **テナント別 URL**: `/mcp/t/:tenantId`。Protected Resource Metadata（RFC 9728）もパス付きで出し、`resource` はパス込みの canonical URI としてテナントを運ぶ。トークンは `resource` に束縛されるので、同意画面で選ぶのはスコープだけになる。
 - **配置（論点 D2）**: **api Worker の直接オリジン**で受ける（`https://<api>/mcp/t/:tenantId`、決定 48）。`resource` と PRM はこのオリジンで出す。admin オリジン経由（同一オリジン転送）にはしない: MCP はセッション cookie を使わず、1 ホップ増えるだけで得るものがない。dev で api → admin の逆向き Service Binding は組める（M0-3 で確認）が、認可サーバーを api に置くので不要（16.3）。
 - **認可サーバーの入口**は admin オリジンのテナント別パス `https://<admin>/oauth/t/:tenantId/{authorize,oauth/token,oauth/register}` と `https://<admin>/.well-known/oauth-authorization-server/oauth/t/:tenantId`。admin は既存の同一オリジン転送（`/auth` `/v1` と同じ仕組み）に `/oauth` と `/.well-known/oauth-authorization-server` を足して api へ渡す。ログイン状態（セッション cookie）を見るのは `/authorize` だけで、cookie は admin オリジンのものがそのまま届く。
-- **トランスポート**: stateless Streamable HTTP。POST のみ受け、旧クライアントの GET / DELETE には 405、`Mcp-Session-Id` は無視する。`server/discover` を実装する。
+- **トランスポート**: stateless Streamable HTTP。POST のみ受け、旧クライアントの GET / DELETE には 405、`Mcp-Session-Id` は無視する。`server/discover` を実装する。2025 年版の `initialize` は受けない（`-32022`、決定 56）。JSON-RPC のバッチ（配列の本文）は入口で `400` + `-32600` にする（以降のヘッダ照合・スコープ判定・Rate Limiting は 1 要求を前提にする）。
 - **ヘッダと本文の一致検証（論点 E4）**: 入口で `Mcp-Method` / `Mcp-Name` を本文と照合し、不一致は `400` + JSON-RPC `-32020` で拒否する。照合後はヘッダの `Mcp-Name`（ツール名）単位で Rate Limiting を掛ける（公開 write の `ratelimit` binding と同じ仕組み。MCP 用の namespace を別に持つ）。
 - **Origin の検証**: ブラウザからの直接呼び出しを想定しないため、`Origin` ヘッダ付きの要求は許可リストに無ければ拒否する。
 - セッション cookie では通さない（Bearer トークン専用。CSRF を考えずに済む）。

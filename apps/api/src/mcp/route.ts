@@ -33,6 +33,8 @@ export const MCP_REQUIRED_SCOPES = ["record:read"];
 const RETRY_AFTER_SECONDS = "60";
 // 仕様 2026-07-28 の予約コード: ヘッダと本文の不一致
 const HEADER_MISMATCH = -32020;
+// JSON-RPC の Invalid Request(バッチの拒否に使う)
+const INVALID_REQUEST = -32600;
 
 function jsonRpcError(status: number, code: number, message: string, id: unknown = null): Response {
   return Response.json({ jsonrpc: "2.0", id, error: { code, message } }, { status });
@@ -178,6 +180,16 @@ async function serveMcp(
   } catch {
     return jsonRpcError(400, -32700, "Parse error: the request body is not valid JSON");
   }
+  // 決定 56(M5b): JSON-RPC のバッチ(配列)は受けない。以降のヘッダ照合・スコープ判定・Rate Limiting の
+  // キーは 1 要求を前提にしていて、配列は素通りしてしまう(2026-07-28 にバッチは無く、SDK の 2025 年版の
+  // 経路が受けうるものを入口で止める)
+  if (Array.isArray(body)) {
+    return jsonRpcError(
+      400,
+      INVALID_REQUEST,
+      "Invalid Request: JSON-RPC batches are not supported",
+    );
+  }
   const rpc = readRpc(body);
   const mismatch = headerMismatch(request, rpc);
   if (mismatch !== null) {
@@ -209,8 +221,8 @@ async function serveMcp(
     res.headers.set("retry-after", RETRY_AFTER_SECONDS);
     return res;
   }
-  // 仕様 2026-07-28 のみ(未決事項「旧版プロトコルのクライアントへの対応」の仮置き)。
-  // 廃止済みの initialize や GET/DELETE のセッション運用は受けない
+  // 決定 56(M5b): 仕様 2026-07-28 のみ。廃止済みの initialize や GET/DELETE のセッション運用は受けない
+  // (対象のクライアント claude.ai / Claude デスクトップは 2026-07-28 で話す。ChatGPT で必要になったら再検討)
   const handler = createMcpHandler(() => buildMcpServer({ env, tenantId, auth, origin }), {
     legacy: "reject",
     onerror: (error) => console.warn("mcp", tenantId, error.message),

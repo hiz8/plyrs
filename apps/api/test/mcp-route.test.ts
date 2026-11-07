@@ -305,6 +305,29 @@ describe("/mcp/t/:tenantId の入口", () => {
     expect(res.status).toBe(400);
   });
 
+  it("JSON-RPC のバッチ(配列)は SDK に渡さず 400 / -32600 で、Rate Limiting の枠を使わない(決定 56)", async () => {
+    const keys: string[] = [];
+    const recording = {
+      limit: async ({ key }: { key: string }) => (keys.push(key), { success: true }),
+    } as RateLimit;
+    const res = await post(
+      "tools/call",
+      {},
+      {
+        token: pat,
+        limiter: recording,
+        headers: { "mcp-method": "tools/call" },
+        body: [
+          envelope("tools/list"),
+          envelope("tools/call", { name: "record_create", arguments: {} }, 2),
+        ],
+      },
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: { code: -32600 } });
+    expect(keys).toEqual([]);
+  });
+
   // M3-3(決定 49): OAuth の access token は PAT と同じ入口・同じ認可コンテキストに合流する。
   // 認可サーバーの resource は API_ORIGIN(= この入口のオリジン)で組むので、env を上書きして渡す
   const OAUTH_ENV = { ADMIN_ORIGIN, API_ORIGIN: ORIGIN };
