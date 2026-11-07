@@ -57,9 +57,6 @@ export interface McpServerDeps {
   auth: McpAuth;
   // api Worker のオリジン(asset_upload の uploadUrl を組む。DO は自分のオリジンを知らない)
   origin: string;
-  // 決定 56(M5b): この要求のプロトコルの版。modern は 2026-07-28 の封筒、legacy は 2025 年版
-  // (stateless で受け、サーバー発の要求を送れない)
-  era: "legacy" | "modern";
 }
 
 const MCP_OPERATIONS: readonly OpSpec[] = OPERATIONS.filter((op) => op.via.includes("mcp"));
@@ -278,7 +275,6 @@ function logOperation(deps: McpServerDeps, op: string, result: InvokeResult, ms:
       event: "mcp.op",
       tenantId: deps.tenantId,
       op,
-      era: deps.era,
       ok: result.ok,
       ...(result.ok ? {} : { code: result.code }),
       rowsRead: result.meter?.rowsRead ?? null,
@@ -378,7 +374,6 @@ async function callConfirmed(
     op: spec.name,
     recordId,
     describe: () => describeRecord(deps, recordId),
-    legacyEra: deps.era === "legacy",
     clientCanElicit: canElicit(ctx.mcpReq.envelope),
     inputResponses: ctx.mcpReq.inputResponses,
     state: ctx.mcpReq.requestState<ConfirmState>(),

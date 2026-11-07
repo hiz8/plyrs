@@ -132,66 +132,6 @@ async function published(recordId: string): Promise<boolean> {
 
 const accept = { confirm: { action: "accept", content: { confirm: true } } };
 
-// 決定 56(M5b): 2025 年版の接続(封筒なし)。SDK の旧版の経路は SSE で答える
-async function callLegacy(name: string, params: Record<string, unknown>) {
-  const res = await app.request(
-    `${ORIGIN}/mcp/t/${tenantId}`,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        accept: "application/json, text/event-stream",
-        "mcp-protocol-version": "2025-11-25",
-        authorization: `Bearer ${publishPat}`,
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "tools/call",
-        params: { name, ...params },
-      }),
-    },
-    { ...env, MCP_LIMITER: fakeLimiter(true), MCP_IP_LIMITER: fakeLimiter(true) },
-    CTX,
-  );
-  expect(res.status).toBe(200);
-  const text = await res.text();
-  const line = text.split("\n").find((l) => l.startsWith("data:")) ?? "";
-  return JSON.parse(line.slice(5)) as RpcResult;
-}
-
-describe("2025 年版の接続の publish(決定 56)", () => {
-  it("確認に進まず confirmation_unavailable で、旧版であることと対処を示す。公開されない", async () => {
-    const recordId = await newRecord(951);
-    const json = await callLegacy("record_publish", { arguments: { recordId } });
-    expect(json.result?.isError).toBe(true);
-    const error = json.result?.structuredContent?.["error"] as
-      | { code?: string; message?: string }
-      | undefined;
-    expect(error?.code).toBe("confirmation_unavailable");
-    expect(error?.message).toContain("旧版");
-    expect(error?.message).toContain("2026-07-28");
-    expect(await published(recordId)).toBe(false);
-  });
-
-  it("2026-07-28 で得た requestState と承諾を旧版の要求に付けても公開されない", async () => {
-    const recordId = await newRecord(952);
-    const first = await call("record_publish", { recordId }, { elicitation: true });
-    const requestState = first.result?.requestState ?? "";
-    expect(requestState).not.toBe("");
-    const json = await callLegacy("record_publish", {
-      arguments: { recordId },
-      inputResponses: accept,
-      requestState,
-    });
-    expect(json.result?.isError).toBe(true);
-    expect(json.result?.structuredContent).toMatchObject({
-      error: { code: "confirmation_unavailable" },
-    });
-    expect(await published(recordId)).toBe(false);
-  });
-});
-
 describe("publish の確認(MRTR の elicitation)", () => {
   it("elicitation を宣言しないクライアントは confirmation_unavailable で、公開されない", async () => {
     const recordId = await newRecord(901);

@@ -131,15 +131,13 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | M5a-5 | PAT のスコープ不足をツールの業務エラーにして対処を示す(決定 55) | C3・E2 | S | #91 |
 | M5a-6 | G4 の小さな不具合(取り込みの User-Agent、確認の `default: true`、エンベロープ入力の検査)、/security-review、申し送り | E1・C5 | S | #92 |
 
-#### M5b 旧版プロトコルのクライアントの受け入れ — 詳細計画 `2026-11-07-m5b-legacy-protocol.md`
+#### M5b 旧版プロトコルのクライアントへの対応を決める — 詳細計画 `2026-11-07-m5b-legacy-protocol.md`
 
-M5a の確認で、公式の MCP Inspector と SDK v2 のクライアントの既定がまだ 2025 年版と分かったので、4 章の未決事項「旧版プロトコルのクライアントへの対応」を先に片付ける(所有者に範囲を確認、2026-11-07)。PR は 1 本(計画・実装・E2E・文書をコミットに分ける)。
+4 章の未決事項「旧版プロトコルのクライアントへの対応」を決めた(決定 56、所有者の判断、2026-11-07)。2025 年版を受ける実装を #94 で試作・検証したうえで、対象のクライアント(claude.ai・Claude デスクトップなどの汎用アプリ)が 2026-07-28 で話すことから、受けない方針にした(#94 は閉じた)。入口でのバッチの拒否だけを残す。
 
-| タスク | 内容 | 論点 | 規模 |
+| PR | 内容 | 論点 | 規模 |
 | --- | --- | --- | --- |
-| Task 1 | 2025 年版を SDK の stateless で受ける(決定 56)。バッチの拒否、2025 年版の publish / unpublish は `confirmation_unavailable`、`mcp.op` に `era` | C5・E4 | S |
-| Task 2 | E2E のスモークに 2025 年版の `initialize` → `tools/list` | — | S |
-| Task 3 | design-spec・deploy.md(VS Code / Cursor の接続例、「M5b の確認」)・申し送り | — | S |
+| M5b | 決定 56(2026-07-28 のみ)、JSON-RPC のバッチを入口で拒否、文書と申し送り | E4 | S |
 
 ## 3. 依存関係
 
@@ -175,7 +173,7 @@ M5a の確認で、公式の MCP Inspector と SDK v2 のクライアントの�
 | 変更履歴の保持本数・期間、区切り | — | M0-1 | **決定 41**(M2-3a で実装。本数・期間の妥当性は M4-6 で実測) |
 | DO 側の一覧でフィルタできるフィールドの範囲 | 索引宣言済み + システム列 | M1-2 | 未決 |
 | PAT の有効期限の上限 | 書き込みスコープ付きは短くする | M1-3a | 未決(M1 計画の仮置き: 読み取りのみ 365 日、書き込み付き 90 日) |
-| 旧版プロトコルのクライアントへの対応(廃止済みの `initialize` / `notifications/initialized` を送るクライアントに何を返すか) | 2026-07-28 のみ | M1-5 | **決定 56**(M5b、2026-11-07): SDK の stateless の経路で受ける。2025 年版の接続の publish は確認できないので `confirmation_unavailable` |
+| 旧版プロトコルのクライアントへの対応(廃止済みの `initialize` / `notifications/initialized` を送るクライアントに何を返すか) | 2026-07-28 のみ | M1-5 | **決定 56**(M5b、2026-11-07、所有者の判断): 2026-07-28 のみ。ChatGPT で必要になったら再検討 |
 | 同意画面の実装形(api の HTML か admin の SPA 経路か) | api の HTML | M3-2 | **決定済み(2026-11-03)**: api が `hono/html` で描画(M3-2、`apps/api/src/oauth/consent-page.ts`)。管理画面の見た目に揃えたくなったら SPA 経路に移せる |
 | エージェント経路の競合判定の既定(B3 ①) | strict | M2-6 | **決定 42** |
 | 再適用回数の数え方(B3 ③) | `attempt` 引数の自己申告 | M4-1 | **決定済み(2026-11-03)**: `attempt`(1〜3)の自己申告。3 回目の conflict は `giveUp`(M4-1b) |
@@ -208,7 +206,7 @@ M5a の確認で、公式の MCP Inspector と SDK v2 のクライアントの�
 | M2 | `2026-11-02-m2-data-and-operations.md` | 完了(2026-11-02) |
 | M3 | `2026-11-03-m3-oauth.md` | 完了(2026-11-03)。ゲート G3 通過 |
 | M4 | `2026-11-03-m4-write-mcp.md` | 実装完了(2026-11-03)。ゲート G4 は preview での所有者の確認待ち |
-| M5 | `2026-11-04-m5a-carryovers.md`(M5a)、`2026-11-07-m5b-legacy-protocol.md`(M5b。M5c 以降は着手時に作る) | M5a 実装済み(2026-11-04、#87〜#92、スタック PR)。M5b 実装済み(2026-11-07) |
+| M5 | `2026-11-04-m5a-carryovers.md`(M5a)、`2026-11-07-m5b-legacy-protocol.md`(M5b。M5c 以降は着手時に作る) | M5a 実装済み(2026-11-04、#87〜#92、スタック PR)。M5b 決定済み(2026-11-07) |
 
 ## 7. M1 完了時の申し送り(2026-11-01)
 
@@ -321,8 +319,7 @@ M5a の確認で、公式の MCP Inspector と SDK v2 のクライアントの�
 
 ## 13. M5b 完了時の申し送り(2026-11-07)
 
-- **2025 年版のクライアント(決定 56)**: `createMcpHandler` の `legacy` を `"stateless"` にした。`initialize`(2025-11-25 / 2025-06-18 / 2025-03-26)・`notifications/initialized`(202)・封筒なしの `tools/list` / `tools/call` / `resources/*` / `prompts/*` に、要求ごとに同じ factory のサーバーが答える。応答は SSE(`event: message` の 1 件)で、`Mcp-Session-Id` は出さない。GET / DELETE は従来どおり入口で 405。入口の順序(Origin → IP の Rate Limiting → トークン検証 → ヘッダ照合 → スコープ判定 → ツール名の Rate Limiting)は 2025 年版でも同じ
-- **バッチの拒否**: 配列の本文は 400 / `-32600`。試作で、SDK の 2025 年版の経路は 2025-03-26 のバッチを受け、配列の中の `tools/call` は入口のスコープ判定と Rate Limiting のキーを素通りしていた(DO の `runOperation` のスコープ判定は残るが、入口で止める)
-- **2025 年版の publish**: stateless の 2025 年版はサーバー発の `elicitation/create` を受け取れない(SDK の互換層も失敗にする)ので、`confirmOperation` は `legacyEra` を最初に見て `confirmation_unavailable`(旧版で接続している旨と、2026-07-28 で接続し直す対処の文面)を返す。試作で、この判定が無いと 2026-07-28 で得た `requestState` と承諾の `inputResponses` を 2025 年版の要求に付け替えたとき公開まで進んだ(同じトークンの持ち主に限られるが、確認のフォームを経ない)。テストで固定した
-- **計測**: `mcp.op` に `era`(`modern` / `legacy`)。どのクライアントが 2025 年版で話しているかは `wrangler tail` で見る
-- **残り**: (1) 2025 年版の接続で publish の確認を出すには、セッションを持つ運用(SSE の GET とサーバー発の要求の置き場)が要る。採らない(決定 56)。M5 の提案(change set)ができたら、確認できない接続の publish を提案に回す案がある(11 章の決定 50 の申し送りと同じ)。(2) `initialize` の応答の `capabilities` は SDK の既定で `listChanged: true` を含むが、stateless なので通知は送らない(GET の SSE は 405)。(3) VS Code / Cursor の接続例(deploy.md 3.5)は各クライアントの文書に沿って書いたもので、実機での確認は所有者の「M5b の確認」による
+- **決定 56: 2026-07-28 のみ**: 2025 年版の `initialize` は従来どおり `-32022`(`data.supported`)で拒否する。対象のクライアントは claude.ai のコネクタ・Claude デスクトップアプリなどの汎用アプリと Claude Code。claude.ai は G3(10 章)で 2026-07-28 の入口に接続できている。Claude デスクトップのリモート MCP は claude.ai と同じコネクタの仕組みなので同じ扱いとみる(実機では未確認)。VS Code(1.142)・Cursor・MCP Inspector の既定は 2025 年版しか話さないので対象外(Inspector は Protocol Era を Modern にすれば使える)
+- **受け入れの試作(#94、閉じた)**: SDK の `createMcpHandler` の `legacy: "stateless"` で受けられることを確かめた(api のテスト 800 件と E2E 全 8 spec が通過)。試作で 2 つの穴を見つけた。(1) SDK の 2025 年版の経路は 2025-03-26 の JSON-RPC バッチを受け、配列の中の `tools/call` が入口のスコープ判定と Rate Limiting のキーを素通りした。(2) 2026-07-28 で得た確認の `requestState` と承諾を 2025 年版の要求に付け替えると、確認のフォームを経ずに公開まで進んだ。受け入れを再検討するときは、#94 のコミット(閉じた PR に残る)の内容(バッチの拒否、2025 年版の接続の publish を `confirmation_unavailable` にする判定、`mcp.op` の `era`)をそのまま使える
+- **残したもの**: バッチ(配列の本文)は入口で 400 / `-32600`。2026-07-28 にバッチは無いが、入口の判定が 1 要求を前提にしているので、SDK に渡す前に止める
+- **再検討の条件**: ChatGPT への対応が必要になったら、ChatGPT から実際に接続して版を確かめる。2025 年版で話すなら #94 の変更を戻す。主要な汎用クライアントの対応状況(2026 年 10 月時点の外部の調査): ChatGPT は通常の接続の版が公表されておらず、OpenAI の案内は 2025 年版の `initialize` を前提にしている

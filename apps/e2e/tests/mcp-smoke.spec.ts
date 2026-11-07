@@ -11,11 +11,10 @@ import {
 // M1-7(design-spec 16.2・16.3・16.11)の MCP スモーク。playwright.config.ts の projects/dependencies により
 // core-journey の後に実行される(super 管理者の bootstrap を前提にできる)。テナントとユーザーは
 // 自前で作る(他 spec と干渉しない)。管理画面で PAT を発行し、/mcp/t/<tenantId> に server/discover →
-// tools/list → record_list → record_get を送り、2025 年版の initialize → tools/list も確かめる。dev では admin が /mcp を api へ転送する
+// tools/list → record_list → record_get を送る。dev では admin が /mcp を api へ転送する
 // (DEV_PROXY_PUBLIC=1。本番は api 直接オリジン、決定 48)。
 
 const PROTOCOL = "2026-07-28";
-const LEGACY_PROTOCOL = "2025-11-25";
 
 function envelope(method: string, params: Record<string, unknown> = {}) {
   return {
@@ -51,32 +50,6 @@ async function rpc(
     data: envelope(method, params),
   });
   return res;
-}
-
-// 決定 56(M5b): 2025 年版のクライアント(initialize から始める。封筒も Mcp-Method も送らない)。
-// SDK の旧版の経路は SSE(`data:` 1 行)で答える
-async function legacyResult(
-  request: APIRequestContext,
-  endpoint: string,
-  token: string,
-  body: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  const res = await request.post(endpoint, {
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-      ...(body["method"] === "initialize" ? {} : { "mcp-protocol-version": LEGACY_PROTOCOL }),
-      authorization: `Bearer ${token}`,
-    },
-    data: body,
-  });
-  const text = await res.text();
-  expect(res.status(), text).toBe(200);
-  expect(res.headers()["mcp-session-id"]).toBeUndefined();
-  const line = text.split("\n").find((l) => l.startsWith("data:")) ?? "";
-  const json = JSON.parse(line.slice(5)) as { result?: Record<string, unknown>; error?: unknown };
-  expect(json.error, text).toBeUndefined();
-  return json.result ?? {};
 }
 
 async function result(res: Awaited<ReturnType<typeof rpc>>): Promise<Record<string, unknown>> {
@@ -169,25 +142,6 @@ test("PAT を発行して MCP から型と record を読む", async ({ page }) =
   const hits = (found["structuredContent"] as { items: { id: string; snippet: string }[] }).items;
   expect(hits.map((hit) => hit.id)).toEqual([items[0]?.id]);
   expect(hits[0]?.snippet).toContain("[MCP]");
-
-  // 2025 年版の initialize → tools/list でも同じツールが同じ順で並ぶ(MCP Inspector の既定、VS Code など)
-  const initialized = await legacyResult(page.request, endpoint, token, {
-    jsonrpc: "2.0",
-    id: 1,
-    method: "initialize",
-    params: {
-      protocolVersion: LEGACY_PROTOCOL,
-      capabilities: {},
-      clientInfo: { name: "e2e", version: "0" },
-    },
-  });
-  expect(initialized["protocolVersion"]).toBe(LEGACY_PROTOCOL);
-  const legacyList = await legacyResult(page.request, endpoint, token, {
-    jsonrpc: "2.0",
-    id: 2,
-    method: "tools/list",
-  });
-  expect((legacyList["tools"] as { name: string }[]).map((t) => t.name)).toEqual(names);
 
   // 形だけ合っていて存在しないトークンは 401(WWW-Authenticate に PRM の URL)
   const bogus = await rpc(page.request, endpoint, `plyrs_pat_${"x".repeat(43)}`, "tools/list");

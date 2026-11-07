@@ -25,7 +25,7 @@ import { buildMcpServer } from "./server";
 // D1 の PAT 照会を無制限に起こさないため。/auth と同じ考え方)→ トークン検証 → ヘッダと本文の照合
 // (-32020)→ tools/call のスコープ判定(OAuth は 403 insufficient_scope の step-up、M3-3。PAT は業務エラー、
 // 決定 55)→ ツール名単位の Rate Limiting
-// → SDK(server/discover・tools/list・tools/call。2025 年版の initialize も stateless で受ける。決定 56)。
+// → SDK(server/discover・tools/list・tools/call)。
 
 export const MCP_REQUIRED_SCOPES = ["record:read"];
 
@@ -180,8 +180,9 @@ async function serveMcp(
   } catch {
     return jsonRpcError(400, -32700, "Parse error: the request body is not valid JSON");
   }
-  // 決定 56(M5b): 2025-03-26 の JSON-RPC バッチ(配列)は受けない。以降のヘッダ照合・スコープ判定・
-  // Rate Limiting のキーは 1 要求を前提にしていて、配列は素通りしてしまう(2025-06-18 以降の版はバッチを廃止)
+  // 決定 56(M5b): JSON-RPC のバッチ(配列)は受けない。以降のヘッダ照合・スコープ判定・Rate Limiting の
+  // キーは 1 要求を前提にしていて、配列は素通りしてしまう(2026-07-28 にバッチは無く、SDK の 2025 年版の
+  // 経路が受けうるものを入口で止める)
   if (Array.isArray(body)) {
     return jsonRpcError(
       400,
@@ -220,17 +221,12 @@ async function serveMcp(
     res.headers.set("retry-after", RETRY_AFTER_SECONDS);
     return res;
   }
-  // 決定 56(M5b): 2026-07-28 の封筒に加え、2025 年版(initialize から始めるクライアント)も SDK の
-  // stateless の経路で受ける。どちらも要求ごとに同じ factory で McpServer を作り、セッションは持たない
-  // (Mcp-Session-Id を出さない。GET / DELETE は入口で 405)。旧版の接続はサーバー発の要求を受け取れないので、
-  // publish / unpublish の確認はできない(server.ts が era を見て人に回す)
-  const handler = createMcpHandler(
-    (ctx) => buildMcpServer({ env, tenantId, auth, origin, era: ctx.era }),
-    {
-      legacy: "stateless",
-      onerror: (error) => console.warn("mcp", tenantId, error.message),
-    },
-  );
+  // 決定 56(M5b): 仕様 2026-07-28 のみ。廃止済みの initialize や GET/DELETE のセッション運用は受けない
+  // (対象のクライアント claude.ai / Claude デスクトップは 2026-07-28 で話す。ChatGPT で必要になったら再検討)
+  const handler = createMcpHandler(() => buildMcpServer({ env, tenantId, auth, origin }), {
+    legacy: "reject",
+    onerror: (error) => console.warn("mcp", tenantId, error.message),
+  });
   return handler.fetch(request, {
     parsedBody: body,
     authInfo: {
