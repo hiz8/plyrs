@@ -118,8 +118,10 @@ export const recordHistory = sqliteTable(
     actor: text("actor").notNull(), // userId / module:{id} / public:{id}
     via: text("via").notNull(), // 'sync' | 'mcp' | 'rest'(@plyrs/sync-protocol の Via)
     tokenId: text("token_id"), // MCP(PAT / OAuth)のトークンの行 ID
-    clientId: text("client_id"), // OAuth の client_id(自己申告。表示の補足だけに使う)
+    clientId: text("client_id"), // OAuth の client_id(自己申告。表示の補足だけに使う。決定 57: 埋めない)
     restoredFrom: integer("restored_from"), // restore のとき復元元の history_seq
+    // 16.8(M5c、決定 57): 提案の採用で生まれた版は、どの提案から来たかを持つ(採用の版は畳み込まない)
+    proposalId: text("proposal_id"),
     createdAt: text("created_at").notNull(), // 版を開いた時刻(区切りの 15 分はここから数える)
     updatedAt: text("updated_at").notNull(), // 最後に畳み込んだ時刻
   },
@@ -204,4 +206,37 @@ export const assetUploadTokens = sqliteTable(
     createdAt: text("created_at").notNull(),
   },
   (table) => [index("idx_asset_upload_tokens_expires").on(table.expiresAt)],
+);
+
+// design-spec 16.8(M5c、決定 57、論点 B4): 提案(change set)。エージェントの変更を record へ直接書かず、
+// 採用・却下を待つ形で置く。中身(input)は作成時に Markdown / ブロック操作を解決した具体値で、変えるフィールド
+// だけを持つ。採用は管理画面の操作で、採用した人の権限と actor で既存の書き込み経路を通す。公開状態・
+// ワークフロー状態に加わる 3 本目の軸なので records の version や field_versions は進めない
+export const proposals = sqliteTable(
+  "proposals",
+  {
+    id: text("id").primaryKey(), // クライアント生成の UUIDv7(16.7 の冪等性)
+    recordId: text("record_id").notNull(),
+    type: text("type").notNull(),
+    kind: text("kind").notNull(), // 'create' | 'update' | 'delete' | 'publish' | 'unpublish'
+    state: text("state").notNull().default("open"), // 'open' | 'accepted' | 'rejected'
+    input: text("input"), // JSON: create / update の提案値(解決済み。変えるフィールドだけ)
+    changedFields: text("changed_fields").notNull().default("[]"), // JSON: string[]
+    status: text("status"), // 提案するワークフロー状態(無ければ NULL)
+    baseVersion: integer("base_version").notNull(), // 提案時の records.version(create は 0)
+    note: text("note"), // 提案者の説明
+    actor: text("actor").notNull(),
+    via: text("via").notNull(),
+    tokenId: text("token_id"),
+    clientId: text("client_id"),
+    createdAt: text("created_at").notNull(),
+    resolvedAt: text("resolved_at"),
+    resolvedBy: text("resolved_by"),
+    resolutionNote: text("resolution_note"), // 却下の理由
+    resultHistorySeq: integer("result_history_seq"), // 採用で生まれた版の history_seq
+  },
+  (table) => [
+    index("idx_proposals_state").on(table.state, table.createdAt),
+    index("idx_proposals_record").on(table.recordId, table.state),
+  ],
 );

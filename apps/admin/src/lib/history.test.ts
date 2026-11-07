@@ -21,6 +21,7 @@ const entry = (overrides: Partial<HistoryEntry> = {}): HistoryEntry => ({
   tokenId: "tok",
   clientId: null,
   restoredFrom: null,
+  proposalId: null,
   createdAt: "2026-11-02T00:00:00.000Z",
   updatedAt: "2026-11-02T00:05:00.000Z",
   ...overrides,

@@ -24,6 +24,7 @@ export interface HistoryEntry {
   tokenId: string | null;
   clientId: string | null;
   restoredFrom: number | null;
+  proposalId: string | null;
   createdAt: string;
   updatedAt: string;
 }

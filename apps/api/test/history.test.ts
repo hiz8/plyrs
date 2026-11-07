@@ -119,6 +119,20 @@ describe("recordHistory(16.5 / 決定 41: 区切りと畳み込み)", () => {
     });
   });
 
+  it("提案から来た版(proposalId 付き)は畳み込まず、その直後の write も畳み込まない(M5c)", async () => {
+    await withSql((sql) => {
+      expect(recordHistory(sql, at(0), entry({ version: 1, proposalId: uuid(11) }))).toBe(1);
+      // 同じ人が 15 分以内に別の提案を採用しても別の版
+      expect(recordHistory(sql, at(MINUTE), entry({ version: 2, proposalId: uuid(12) }))).toBe(2);
+      // 採用の直後の通常の編集も、採用の版には畳み込まない
+      expect(recordHistory(sql, at(2 * MINUTE), entry({ version: 3 }))).toBe(3);
+      // 通常の編集どうしは従来どおり畳み込む
+      expect(recordHistory(sql, at(3 * MINUTE), entry({ version: 4 }))).toBe(3);
+      const items = loadHistory(sql, uuid(1), { limit: 10 }).items;
+      expect(items.map((item) => item.proposalId)).toEqual([null, uuid(12), uuid(11)]);
+    });
+  });
+
   it("changedFields は直前の版との差分(畳み込み時も、畳み込み先の 1 つ前の版と比べる)", async () => {
     await withSql((sql) => {
       recordHistory(sql, at(0), entry({ version: 1, data: { title: "a", body: "x" } }));

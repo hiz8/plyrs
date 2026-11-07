@@ -10,6 +10,7 @@ import { can, type Operation, type Role } from "./permissions";
 
 export const PAT_SCOPES = [
   "record:read",
+  "record:propose",
   "record:write",
   "record:delete",
   "record:publish",

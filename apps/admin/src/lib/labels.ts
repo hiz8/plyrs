@@ -567,6 +567,7 @@ export const TOKEN_LABELS = {
   },
   scopes: {
     "record:read": "読み取り(record:read)",
+    "record:propose": "提案(record:propose)",
     "record:write": "作成・編集(record:write)",
     "record:delete": "削除(record:delete)",
     "record:publish": "公開(record:publish)",
@@ -574,6 +575,7 @@ export const TOKEN_LABELS = {
   },
   scopeDescriptions: {
     "record:read": `${TERMS.contentType}と${TERMS.content}を読み取ります。下書きも含みます`,
+    "record:propose": `${TERMS.content}の作成・編集・削除・公開を提案します。提案は管理画面で人が採用・却下します`,
     "record:write": `${TERMS.content}を作成・編集します`,
     "record:delete": `${TERMS.content}を削除します`,
     "record:publish": `${TERMS.content}を公開します。既定では外れています。人が公開する運用のままにするなら付けないでください`,
