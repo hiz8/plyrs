@@ -220,7 +220,13 @@ function ProposalPage() {
               </>
             )}
           </dl>
-          <ProposalDiff kind={detail.kind} fields={detail.fields} definition={definition} />
+          <ProposalDiff
+            kind={detail.kind}
+            fields={detail.fields}
+            definition={definition}
+            status={detail.status}
+            currentStatus={detail.currentStatus}
+          />
           <div {...stylex.props(styles.actions)}>
             {!resolved && canAccept && (
               <Button variant="primary" onPress={() => setAcceptOpen(true)}>

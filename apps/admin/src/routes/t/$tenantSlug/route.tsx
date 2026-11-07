@@ -154,7 +154,7 @@ function ShellLayout() {
     modules: modulesQuery.data,
     slotItems: slots.get("nav:item"),
     syncState,
-    openProposalCount: openProposalsQuery.data?.items.length ?? null,
+    openProposalCount: openProposalsQuery.data?.openCount ?? null,
     pathname,
     onSwitchTenant: (slug) => void navigate({ to: "/t/$tenantSlug", params: { tenantSlug: slug } }),
     onOpenAccount: () =>

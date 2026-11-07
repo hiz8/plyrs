@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Banner, Button, Tabs } from "@plyrs/ui";
+import { Banner, Button, Tabs, toaster } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { ProposalList } from "../../../../components/proposals/proposal-list";
 import { PageBody, TenantPageHeader } from "../../../../components/tenant-page-header";
@@ -23,6 +23,8 @@ import { useCan } from "../../../../lib/use-can";
 
 const TABS = ["open", "resolved"] as const;
 type Tab = (typeof TABS)[number];
+
+type ProposalPage = { items: ProposalSummary[]; nextCursor: string | null };
 
 export interface ProposalsSearch {
   tab?: Tab;
@@ -66,44 +68,34 @@ function ProposalsPage() {
   const types = useSyncTypes(sync);
   const canSeeMembers = useCan("member:manage");
 
+  // 先頭ページ: 未処理は共有のクエリ(バッジ・編集画面と同じ)、処理済みはサーバーで state != open に絞る。
+  // 続き(「さらに表示」)はどちらも API を直接呼んで積む。先頭ページが取り直されたら積んだ続きは捨てる
   const open = useQuery(openProposalsQueryOptions(adminApi, tenant.id));
-  // 処理済みは件数が増え続けるので、先頭ページだけ React Query で読み、続きは「さらに表示」で足す
   const resolvedFirst = useQuery({
-    queryKey: [...proposalsQueryKey(tenant.id), "all", search.recordId ?? null],
-    queryFn: () => adminApi.listProposals(tenant.id, { recordId: search.recordId }),
+    queryKey: [...proposalsQueryKey(tenant.id), "resolved", search.recordId ?? null],
+    queryFn: () =>
+      adminApi.listProposals(tenant.id, { state: "resolved", recordId: search.recordId }),
     enabled: tab === "resolved",
     staleTime: 0,
     retry: 1,
   });
-  const [morePages, setMorePages] = useState<
-    { items: ProposalSummary[]; nextCursor: string | null }[]
-  >([]);
+  const first = tab === "open" ? open : resolvedFirst;
+  const [morePages, setMorePages] = useState<ProposalPage[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [moreBase, setMoreBase] = useState<unknown>(resolvedFirst.data);
-  if (moreBase !== resolvedFirst.data) {
-    // 先頭ページが取り直されたら、積んだ続きは捨てる
-    setMoreBase(resolvedFirst.data);
+  const [moreBase, setMoreBase] = useState<{ tab: Tab; data: unknown }>({ tab, data: first.data });
+  if (moreBase.tab !== tab || moreBase.data !== first.data) {
+    setMoreBase({ tab, data: first.data });
     setMorePages([]);
   }
 
   const members = useQuery({ ...membersQueryOptions(adminApi, tenant.id), enabled: canSeeMembers });
 
-  const openItems = useMemo(() => {
-    const items = open.data?.items ?? [];
-    return search.recordId === undefined
-      ? items
-      : items.filter((p) => p.recordId === search.recordId);
-  }, [open.data, search.recordId]);
-  const resolvedItems = useMemo(
-    () =>
-      [...(resolvedFirst.data?.items ?? []), ...morePages.flatMap((p) => p.items)].filter(
-        (p) => p.state !== "open",
-      ),
-    [resolvedFirst.data, morePages],
-  );
-  const items = tab === "open" ? openItems : resolvedItems;
-  const lastPage = morePages[morePages.length - 1] ?? resolvedFirst.data;
-  const nextCursor = tab === "resolved" ? (lastPage?.nextCursor ?? null) : null;
+  const items = useMemo(() => {
+    const all = [...(first.data?.items ?? []), ...morePages.flatMap((p) => p.items)];
+    return search.recordId === undefined ? all : all.filter((p) => p.recordId === search.recordId);
+  }, [first.data, morePages, search.recordId]);
+  const lastPage = morePages[morePages.length - 1] ?? first.data;
+  const nextCursor = lastPage?.nextCursor ?? null;
 
   const typeKeys = useMemo(() => [...new Set(items.map((p) => p.type))].toSorted(), [items]);
   const records = useRecordsOfTypes(sync.registry, typeKeys);
@@ -119,19 +111,24 @@ function ProposalsPage() {
 
   async function loadMore() {
     if (nextCursor === null) return;
+    const base = first.data;
     setLoadingMore(true);
     try {
       const page = await adminApi.listProposals(tenant.id, {
+        state: tab === "open" ? "open" : "resolved",
         recordId: search.recordId,
         cursor: nextCursor,
       });
-      setMorePages((pages) => [...pages, page]);
+      // 取得中に先頭ページが取り直されていたら、古い続きは積まない
+      if (base === first.data) setMorePages((pages) => [...pages, page]);
+    } catch {
+      toaster.error(PROPOSAL_LABELS.loadMoreFailed);
     } finally {
       setLoadingMore(false);
     }
   }
 
-  const query = tab === "open" ? open : resolvedFirst;
+  const query = first;
   const breadcrumbs = [homeCrumb(tenantSlug), currentCrumb(PROPOSAL_LABELS.crumb)];
 
   return (
@@ -162,7 +159,14 @@ function ProposalsPage() {
             items={TABS.map((id) => ({
               id,
               label: PROPOSAL_LABELS.tabs[id],
-              ...(id === "open" && open.data !== undefined ? { count: openItems.length } : {}),
+              ...(id === "open" && open.data !== undefined
+                ? {
+                    count:
+                      search.recordId === undefined
+                        ? open.data.openCount
+                        : open.data.items.filter((p) => p.recordId === search.recordId).length,
+                  }
+                : {}),
             }))}
             selectedKey={tab}
             keyboardActivation="manual"

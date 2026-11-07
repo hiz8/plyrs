@@ -16,6 +16,8 @@ export interface ProposalRow {
   state: ProposalState;
   input: Record<string, unknown> | null;
   changedFields: string[];
+  /** 作成要求の SHA-256(hex)。同じ proposalId の再送の照合に使う */
+  requestDigest: string;
   status: WorkflowStatus | null;
   baseVersion: number;
   note: string | null;
@@ -47,6 +49,7 @@ interface RawProposalRow extends Record<string, SqlStorageValue> {
   state: string;
   input: string | null;
   changed_fields: string;
+  request_digest: string;
   status: string | null;
   base_version: number;
   note: string | null;
@@ -62,7 +65,7 @@ interface RawProposalRow extends Record<string, SqlStorageValue> {
 }
 
 const COLUMNS =
-  "id, record_id, type, kind, state, input, changed_fields, status, base_version, note, actor, via, token_id, client_id, created_at, resolved_at, resolved_by, resolution_note, result_history_seq";
+  "id, record_id, type, kind, state, input, changed_fields, request_digest, status, base_version, note, actor, via, token_id, client_id, created_at, resolved_at, resolved_by, resolution_note, result_history_seq";
 
 function rowToProposal(row: RawProposalRow): ProposalRow {
   return {
@@ -73,6 +76,7 @@ function rowToProposal(row: RawProposalRow): ProposalRow {
     state: row.state as ProposalState,
     input: row.input === null ? null : (JSON.parse(row.input) as Record<string, unknown>),
     changedFields: JSON.parse(row.changed_fields) as string[],
+    requestDigest: row.request_digest,
     status: row.status as WorkflowStatus | null,
     baseVersion: row.base_version,
     note: row.note,
@@ -97,13 +101,14 @@ export function loadProposal(sql: SqlStorage, id: string): ProposalRow | null {
 
 export function insertProposal(sql: SqlStorage, row: NewProposal): void {
   sql.exec(
-    `INSERT INTO proposals (${COLUMNS}) VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL)`,
+    `INSERT INTO proposals (${COLUMNS}) VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL)`,
     row.id,
     row.recordId,
     row.type,
     row.kind,
     row.input === null ? null : JSON.stringify(row.input),
     JSON.stringify(row.changedFields),
+    row.requestDigest,
     row.status,
     row.baseVersion,
     row.note,
@@ -138,7 +143,8 @@ export function resolveProposal(
 }
 
 export interface ProposalListQuery {
-  state?: ProposalState;
+  /** "resolved" は open 以外(accepted と rejected) */
+  state?: ProposalState | "resolved";
   recordId?: string;
   limit: number;
   cursor?: string;
@@ -151,7 +157,9 @@ export function listProposals(
 ): { items: ProposalRow[]; nextCursor: string | null } {
   const where: string[] = [];
   const params: SqlStorageValue[] = [];
-  if (query.state !== undefined) {
+  if (query.state === "resolved") {
+    where.push("state != 'open'");
+  } else if (query.state !== undefined) {
     where.push("state = ?");
     params.push(query.state);
   }

@@ -12,6 +12,7 @@ import { issuesToMessage, loadContentTypeByKey, rowToDefinition } from "../do/co
 import { compareVersions, latestHistorySeq } from "../do/history";
 import {
   insertProposal,
+  countOpenProposals,
   listProposals,
   loadProposal,
   resolveProposal,
@@ -49,6 +50,9 @@ export const proposalSummarySchema = z.object({
   state: proposalStateSchema,
   changedFields: z.array(z.string()),
   status: statusSchema.nullable().describe("提案するワークフロー状態(変えないなら null)"),
+  currentStatus: statusSchema
+    .nullable()
+    .describe("record の今のワークフロー状態(record が無ければ null)。採用で status に変わる"),
   baseVersion: z.number().int().describe("提案したときの record の version(create は 0)"),
   currentVersion: z
     .number()
@@ -109,14 +113,18 @@ export const proposalCreate = defineOperation({
 export const proposalList = defineOperation({
   name: "proposal_list",
   title: "提案の一覧",
-  description: `提案を新しい順に一覧する。state(open / accepted / rejected)と recordId で絞れる。limit は既定 20・最大 100。続きは nextCursor を cursor に渡す。${UNTRUSTED_NOTE}`,
+  description: `提案を新しい順に一覧する。state(open / accepted / rejected、resolved は open 以外)と recordId で絞れる。limit は既定 20・最大 100。続きは nextCursor を cursor に渡す。openCount は(recordId で絞ればその record の)未処理の総数。${UNTRUSTED_NOTE}`,
   input: z.object({
-    state: proposalStateSchema.optional(),
+    state: z.union([proposalStateSchema, z.literal("resolved")]).optional(),
     recordId: uuidSchema.optional(),
     limit: z.number().int().min(1).max(100).default(20),
     cursor: z.string().optional(),
   }),
-  output: z.object({ items: z.array(proposalSummarySchema), nextCursor: z.string().nullable() }),
+  output: z.object({
+    items: z.array(proposalSummarySchema),
+    nextCursor: z.string().nullable(),
+    openCount: z.number().int(),
+  }),
   requires: "record:read",
   via: ["mcp", "rest"],
   hints: { readOnly: true, destructive: false, idempotent: true, openWorld: false },
@@ -178,6 +186,7 @@ type Detail = z.infer<typeof proposalDetailSchema>;
 function summaryOf(ctx: OpContext, row: ProposalRow): Summary {
   const record = loadRecord(ctx.sql, row.recordId);
   const currentVersion = record?.version ?? null;
+  const currentStatus = record === null || record.deletedAt !== null ? null : record.status;
   const stale =
     row.kind === "create"
       ? record !== null
@@ -190,6 +199,7 @@ function summaryOf(ctx: OpContext, row: ProposalRow): Summary {
     state: row.state,
     changedFields: row.changedFields,
     status: row.status,
+    currentStatus,
     baseVersion: row.baseVersion,
     currentVersion,
     stale,
@@ -308,26 +318,34 @@ function prepare(ctx: OpContext, input: CreateInput): Prepared | OpFailure {
   return { type: typeKey, resolvedInput: proposed, changedFields, baseVersion };
 }
 
-function sameContent(row: ProposalRow, input: CreateInput, p: Prepared): boolean {
+// 作成要求そのものの指紋。解決済みの input ではなく生の要求で比べるので、record の状態や型定義が変わった後の
+// 再送(応答が途切れたときの再送)も同じ要求と判定できる(16.7。レビューの指摘で prepare の前に照合する形にした)。
+// DO の invoke は同期なので WebCrypto は使えない。FNV-1a 64bit を seed 違いの 2 系統で回す(同じ proposalId の
+// 要求同士を区別できればよい用途)
+function fnv1a64(input: string, seed: bigint): bigint {
+  const prime = 0x100000001b3n;
+  const mask = 0xffffffffffffffffn;
+  let hash = seed;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= BigInt(input.charCodeAt(i));
+    hash = (hash * prime) & mask;
+  }
+  return hash;
+}
+
+function requestDigestOf(input: CreateInput): string {
+  const json = canonicalJson({
+    kind: input.kind,
+    recordId: input.recordId,
+    type: input.type ?? null,
+    input: input.input ?? null,
+    changedFields: input.changedFields ?? null,
+    status: input.status ?? null,
+    note: input.note ?? null,
+  });
   return (
-    canonicalJson({
-      kind: row.kind,
-      recordId: row.recordId,
-      type: row.type,
-      input: row.input,
-      changedFields: row.changedFields,
-      status: row.status,
-      note: row.note,
-    }) ===
-    canonicalJson({
-      kind: input.kind,
-      recordId: input.recordId,
-      type: p.type,
-      input: p.resolvedInput,
-      changedFields: p.changedFields,
-      status: input.status ?? null,
-      note: input.note ?? null,
-    })
+    fnv1a64(json, 0xcbf29ce484222325n).toString(16).padStart(16, "0") +
+    fnv1a64(json, 0x84222325cbf29ce4n).toString(16).padStart(16, "0")
   );
 }
 
@@ -348,14 +366,13 @@ function acceptOperationFor(
 
 export const PROPOSAL_HANDLERS = {
   proposal_create: (ctx: OpContext, input: CreateInput): Ok<Detail> | OpFailure => {
-    const prepared = prepare(ctx, input);
-    if (isFailure(prepared)) {
-      return prepared;
-    }
+    // 16.7: 同じ ID・同じ要求の再送は既存を返す(採用済みでも、record がその後変わっていても同じ行)。
+    // 要求が違えば別の ID を使わせる。対象の確認(prepare)より先に照合するので、採用で record ができた
+    // 後の create の再送が already_exists にならない
+    const requestDigest = requestDigestOf(input);
     const existing = loadProposal(ctx.sql, input.proposalId);
     if (existing !== null) {
-      // 16.7: 同じ ID・同じ内容の再送は既存を返す(採用済みでも同じ行)。内容が違えば別の ID を使わせる
-      if (!sameContent(existing, input, prepared)) {
+      if (existing.requestDigest !== requestDigest) {
         return {
           ok: false,
           code: "already_exists",
@@ -363,6 +380,10 @@ export const PROPOSAL_HANDLERS = {
         };
       }
       return { ok: true, output: detailOf(ctx, existing) };
+    }
+    const prepared = prepare(ctx, input);
+    if (isFailure(prepared)) {
+      return prepared;
     }
     const actor = historyActorOf(ctx);
     const now = ctx.deps.now();
@@ -373,6 +394,7 @@ export const PROPOSAL_HANDLERS = {
       kind: input.kind,
       input: prepared.resolvedInput,
       changedFields: prepared.changedFields,
+      requestDigest,
       status: input.status ?? null,
       baseVersion: prepared.baseVersion,
       note: input.note ?? null,
@@ -392,7 +414,7 @@ export const PROPOSAL_HANDLERS = {
   proposal_list: (
     ctx: OpContext,
     input: z.infer<typeof proposalList.input>,
-  ): Ok<{ items: Summary[]; nextCursor: string | null }> => {
+  ): Ok<{ items: Summary[]; nextCursor: string | null; openCount: number }> => {
     const page = listProposals(ctx.sql, {
       state: input.state,
       recordId: input.recordId,
@@ -401,7 +423,12 @@ export const PROPOSAL_HANDLERS = {
     });
     return {
       ok: true,
-      output: { items: page.items.map((row) => summaryOf(ctx, row)), nextCursor: page.nextCursor },
+      output: {
+        items: page.items.map((row) => summaryOf(ctx, row)),
+        nextCursor: page.nextCursor,
+        // 一覧が 1 ページに収まらなくても、サイドバーのバッジと編集画面の案内が総数を出せるように
+        openCount: countOpenProposals(ctx.sql, input.recordId),
+      },
     };
   },
   proposal_get: (

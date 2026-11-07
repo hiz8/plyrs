@@ -26,6 +26,7 @@ export type InvokeErrorCode =
   | "unique_violation"
   | "invalid_status"
   | "unknown_type"
+  | "not_published"
   // 16.8(M5c): 採用・却下済みの提案への採用・却下
   | "proposal_not_open"
   | (string & {});

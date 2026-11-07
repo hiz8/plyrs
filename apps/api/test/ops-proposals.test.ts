@@ -324,6 +324,36 @@ describe("提案の操作", () => {
     expect(afterAccept).toMatchObject({ id: first.id, state: "accepted" });
   });
 
+  it("create の提案は採用の後も同じ内容の再送で既存の行を返し、内容が違えば already_exists(レビュー Important 1)", async () => {
+    const newId = uuid(775);
+    const input = {
+      proposalId: uuid(776),
+      kind: "create",
+      recordId: newId,
+      type: "article",
+      input: { ...validArticleInput(), slug: "resend", body: "## 見出し\n\n本文" },
+      note: "新しい記事",
+    };
+    output<ProposalOut>(await stub.invoke("proposal_create", input, agent()));
+    output(
+      await stub.invoke("proposal_accept", { proposalId: uuid(776) }, editor, { tenantSlug: SLUG }),
+    );
+    // record ができた後の再送(応答が途切れたときの再送)は、already_exists ではなく同じ行
+    const again = output<ProposalOut>(await stub.invoke("proposal_create", input, agent()));
+    expect(again).toMatchObject({ id: uuid(776), state: "accepted" });
+    const different = asInvokeResult(
+      await stub.invoke("proposal_create", { ...input, note: "別の説明" }, agent()),
+    );
+    expect(different).toMatchObject({ ok: false, code: "already_exists" });
+  });
+
+  it("提案の要約は record の今の status を持つ(採用で状態が変わることを人が見られる。レビュー Important 2)", async () => {
+    const created = output<ProposalOut & { currentStatus: string | null }>(
+      await stub.invoke("proposal_create", { ...updateInput(uuid(777)), status: "ready" }, agent()),
+    );
+    expect(created).toMatchObject({ status: "ready", currentStatus: "draft" });
+  });
+
   it("処理済みの提案は再び採用・却下できず、却下の理由が残る", async () => {
     output<ProposalOut>(await stub.invoke("proposal_create", updateInput(), agent()));
     const rejected = output<{ proposal: ProposalOut }>(
@@ -383,6 +413,16 @@ describe("提案の操作", () => {
     );
     expect(all.items.map((p) => p.id)).toEqual([uuid(783), uuid(782), uuid(781)]);
     expect(all.nextCursor).toBeNull();
+    // openCount は絞り込みに関わらず未処理の総数(record で絞ればその record の数)
+    expect((all as { openCount?: number }).openCount).toBe(2);
+    const resolved = output<{ items: ProposalOut[]; openCount: number }>(
+      await stub.invoke("proposal_list", { state: "resolved" }, agent()),
+    );
+    expect(resolved.items.map((p) => p.id)).toEqual([uuid(782)]);
+    const byRecordCount = output<{ openCount: number }>(
+      await stub.invoke("proposal_list", { recordId: other }, agent()),
+    );
+    expect(byRecordCount.openCount).toBe(0);
     const open = output<{ items: ProposalOut[]; nextCursor: string | null }>(
       await stub.invoke("proposal_list", { state: "open", limit: 1 }, agent()),
     );

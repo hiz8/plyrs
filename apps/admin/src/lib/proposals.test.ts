@@ -22,6 +22,7 @@ const summary = (overrides: Partial<ProposalSummary> = {}): ProposalSummary => (
   state: "open",
   changedFields: ["title", "body"],
   status: null,
+  currentStatus: "draft",
   baseVersion: 2,
   currentVersion: 2,
   stale: false,

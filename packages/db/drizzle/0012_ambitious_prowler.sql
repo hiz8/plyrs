@@ -6,6 +6,7 @@ CREATE TABLE `proposals` (
 	`state` text DEFAULT 'open' NOT NULL,
 	`input` text,
 	`changed_fields` text DEFAULT '[]' NOT NULL,
+	`request_digest` text DEFAULT '' NOT NULL,
 	`status` text,
 	`base_version` integer NOT NULL,
 	`note` text,

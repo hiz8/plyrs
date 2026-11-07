@@ -235,7 +235,7 @@ M5a の確認(preview、所有者。マージ・デプロイ後。結果はロ�
 | ツール | スコープ | 内容 |
 | --- | --- | --- |
 | `proposal_create` | `record:propose` | 作成・更新・削除・公開・公開の取り下げの提案を作る。`kind` と `recordId`、更新・作成なら `input`(Markdown 文字列もよい)、任意の `note`(提案者の説明)。`proposalId` はクライアント生成の UUIDv7 |
-| `proposal_list` | `record:read` | 提案の一覧(`state` / `recordId` で絞る) |
+| `proposal_list` | `record:read` | 提案の一覧(`state` / `recordId` で絞る。`resolved` は処理済み。`openCount` は未処理の総数) |
 | `proposal_get` | `record:read` | 提案の詳細。現在との差分(`fields`)、`stale`、採用・却下の結果と却下の理由 |
 
 `proposal_accept` / `proposal_reject` は MCP には出ない(管理画面だけが REST で呼ぶ)。

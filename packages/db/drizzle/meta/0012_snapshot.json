@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4f7cd651-8fff-4649-91eb-1bfbc3c7b2a5",
+  "id": "ece3c891-c2d5-4347-8ea7-d4e22c7d8b24",
   "prevId": "abc9c0d6-5652-4bbc-8d42-01333206e4c2",
   "tables": {
     "alarm_registry": {
@@ -489,6 +489,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'[]'"
+        },
+        "request_digest": {
+          "name": "request_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "status": {
           "name": "status",

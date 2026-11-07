@@ -415,8 +415,13 @@ export function createAdminApi(
     // 16.8(M5c): 提案。作成は MCP / REST のエージェント側で、管理画面は読み・採用・却下だけ
     listProposals(
       tenantId: string,
-      query: { state?: ProposalState; recordId?: string; cursor?: string; limit?: number },
-    ): Promise<{ items: ProposalSummary[]; nextCursor: string | null }> {
+      query: {
+        state?: ProposalState | "resolved";
+        recordId?: string;
+        cursor?: string;
+        limit?: number;
+      },
+    ): Promise<{ items: ProposalSummary[]; nextCursor: string | null; openCount: number }> {
       return invokeOperation(tenantId, "proposal_list", {
         ...(query.state === undefined ? {} : { state: query.state }),
         ...(query.recordId === undefined ? {} : { recordId: query.recordId }),

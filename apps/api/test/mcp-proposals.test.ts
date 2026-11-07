@@ -147,6 +147,20 @@ describe("提案のツール(M5c)", () => {
     expect(plain.content[0]?.text).not.toContain("proposal_create");
   });
 
+  it("提案で代えられない操作(asset_upload など)のスコープ不足には proposal_create を案内しない", async () => {
+    const result = await call(
+      "asset_upload",
+      { filename: "a.png", contentType: "image/png" },
+      proposePat,
+    );
+    expect(result.structuredContent).toMatchObject({
+      error: { code: "insufficient_scope", details: { required: "record:write" } },
+    });
+    const error = result.structuredContent?.["error"] as Record<string, Record<string, unknown>>;
+    expect(error["details"]?.["alternative"]).toBeUndefined();
+    expect(result.content[0]?.text).not.toContain("proposal_create");
+  });
+
   it("record:propose の PAT で提案を作り、読める。本文は前置きで始まる。record:write だけの PAT は提案できない", async () => {
     const created = await call(
       "proposal_create",

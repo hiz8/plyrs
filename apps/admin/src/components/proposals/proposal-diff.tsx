@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { bg, border, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
 import { formatFieldDiff, type FieldChange } from "../../lib/history";
-import { PROPOSAL_LABELS } from "../../lib/labels";
+import { PROPOSAL_LABELS, WORKFLOW_STATUS_LABELS } from "../../lib/labels";
 import type { ProposalKind } from "../../lib/proposals";
 
 // 16.8(M5c): 提案の差分。フィールドごとに「現在」と「提案」を並べる(履歴の差分と同じ整形)
@@ -50,15 +50,32 @@ export interface ProposalDiffProps {
   kind: ProposalKind;
   fields: readonly FieldChange[];
   definition: ContentTypeDefinition | undefined;
+  /** 提案するワークフロー状態(変えないなら null)。採用で変わるので、フィールドの差分と並べて見せる */
+  status: string | null;
+  currentStatus: string | null;
 }
 
-export function ProposalDiff({ kind, fields, definition }: ProposalDiffProps) {
+function statusLabel(status: string | null): string {
+  if (status === null) {
+    return PROPOSAL_LABELS.noChanges;
+  }
+  return (WORKFLOW_STATUS_LABELS as Record<string, string>)[status] ?? status;
+}
+
+export function ProposalDiff({
+  kind,
+  fields,
+  definition,
+  status,
+  currentStatus,
+}: ProposalDiffProps) {
+  const statusChanges = status !== null && (kind === "create" || kind === "update");
   return (
     <section aria-label={PROPOSAL_LABELS.diffTitle} {...stylex.props(styles.panel)}>
       <h2 {...stylex.props(styles.title)}>{PROPOSAL_LABELS.diffTitle}</h2>
       {kind === "delete" || kind === "publish" || kind === "unpublish" ? (
         <p {...stylex.props(styles.muted)}>{PROPOSAL_LABELS.kindDescription[kind]}</p>
-      ) : fields.length === 0 ? (
+      ) : fields.length === 0 && !statusChanges ? (
         <p {...stylex.props(styles.muted)}>{PROPOSAL_LABELS.noChanges}</p>
       ) : (
         <table {...stylex.props(styles.table)}>
@@ -74,6 +91,19 @@ export function ProposalDiff({ kind, fields, definition }: ProposalDiffProps) {
             </tr>
           </thead>
           <tbody>
+            {statusChanges && (
+              <tr>
+                <th scope="row" {...stylex.props(styles.td, styles.key)}>
+                  {PROPOSAL_LABELS.statusRow}
+                </th>
+                <td {...stylex.props(styles.td)}>
+                  {currentStatus === null
+                    ? PROPOSAL_LABELS.unsetStatus
+                    : statusLabel(currentStatus)}
+                </td>
+                <td {...stylex.props(styles.td)}>{statusLabel(status)}</td>
+              </tr>
+            )}
             {fields.map((change) => {
               const diff = formatFieldDiff(change, definition);
               return (

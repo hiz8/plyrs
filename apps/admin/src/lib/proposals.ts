@@ -23,6 +23,8 @@ export interface ProposalSummary {
   state: ProposalState;
   changedFields: string[];
   status: string | null;
+  /** record の今のワークフロー状態(record が無ければ null)。採用で status に変わる */
+  currentStatus: string | null;
   baseVersion: number;
   currentVersion: number | null;
   /** 提案の後に record が変わった(採用すると提案のフィールドだけが上書きされる) */

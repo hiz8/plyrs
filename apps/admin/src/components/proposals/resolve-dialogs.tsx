@@ -45,6 +45,8 @@ export interface RejectDialogProps {
   onConfirm: (reason: string) => void;
 }
 
+const REASON_MAX = 500;
+
 export function RejectProposalDialog({
   isOpen,
   onOpenChange,
@@ -52,6 +54,7 @@ export function RejectProposalDialog({
   onConfirm,
 }: RejectDialogProps) {
   const [reason, setReason] = useState("");
+  const tooLong = reason.trim().length > REASON_MAX;
   return (
     <ConfirmDialog
       title={PROPOSAL_LABELS.rejectDialog.title}
@@ -60,7 +63,9 @@ export function RejectProposalDialog({
       tone="danger"
       confirmLabel={PROPOSAL_LABELS.rejectDialog.confirm}
       isPending={isPending}
-      onConfirm={() => onConfirm(reason.trim())}
+      onConfirm={() => {
+        if (!tooLong) onConfirm(reason.trim());
+      }}
     >
       <p>{PROPOSAL_LABELS.rejectDialog.body}</p>
       <TextArea
@@ -68,6 +73,8 @@ export function RejectProposalDialog({
         value={reason}
         onChange={setReason}
         rows={3}
+        isInvalid={tooLong}
+        errorMessage={tooLong ? PROPOSAL_LABELS.rejectDialog.reasonTooLong : undefined}
       />
     </ConfirmDialog>
   );

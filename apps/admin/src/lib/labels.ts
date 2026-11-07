@@ -356,6 +356,8 @@ export const PROPOSAL_LABELS = {
   diffTitle: "現在との差分",
   before: "現在",
   after: "提案",
+  statusRow: "状態",
+  unsetStatus: "(なし)",
   noChanges: "現在と同じ内容です",
   kindDescription: {
     delete: `この${TERMS.content}を削除します。削除しても履歴から戻せます`,
@@ -373,8 +375,9 @@ export const PROPOSAL_LABELS = {
   },
   rejectDialog: {
     title: "却下しますか？",
-    body: "却下した提案は書き込まれません。理由は提案者が proposal_get で読めます。",
+    body: "却下した提案は書き込まれません。理由は提案したエージェントが読めます。",
     reason: "理由(任意)",
+    reasonTooLong: "500 文字以内で入力してください",
     confirm: "却下する",
   },
   accepted: "採用しました",
@@ -384,6 +387,7 @@ export const PROPOSAL_LABELS = {
   loadFailed: "提案を読み込めませんでした",
   retry: "再試行",
   loadMore: "さらに表示",
+  loadMoreFailed: "続きを読み込めませんでした",
   empty: "未処理の提案はありません",
   emptyResolved: "処理済みの提案はありません",
   filteredBy: `この${TERMS.content}の提案だけを表示しています`,

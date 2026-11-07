@@ -222,6 +222,9 @@ export const proposals = sqliteTable(
     state: text("state").notNull().default("open"), // 'open' | 'accepted' | 'rejected'
     input: text("input"), // JSON: create / update の提案値(解決済み。変えるフィールドだけ)
     changedFields: text("changed_fields").notNull().default("[]"), // JSON: string[]
+    // 作成要求(kind・recordId・type・生の input・changedFields・status・note)の canonical JSON の指紋。
+    // 同じ proposalId の再送を、record の状態や型定義が変わった後でも同じ要求と判定するため(16.7)
+    requestDigest: text("request_digest").notNull().default(""),
     status: text("status"), // 提案するワークフロー状態(無ければ NULL)
     baseVersion: integer("base_version").notNull(), // 提案時の records.version(create は 0)
     note: text("note"), // 提案者の説明
