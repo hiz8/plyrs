@@ -9,12 +9,13 @@ import { fakeLimiter } from "./rate-limit-helper";
 
 // M1-5(design-spec 16.2): MCP の入口 /mcp/t/:tenantId。POST のみ・Origin 検証・OAuthResourceServer の
 // 401 と PRM・ヘッダと本文の照合(-32020)・Mcp-Name 単位の Rate Limiting(429 / 未構成は 503)。
-// 仕様 2026-07-28 のみ(廃止済みの initialize は送らない)。
+// 2026-07-28 の封筒で送る。2025 年版(initialize から始める)は決定 56 の describe で確かめる。
 
 const ORIGIN = "https://api.example";
 // app.request は ExecutionContext を渡さないと OAuthResourceServer が 500 になる
 const CTX = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
 const PROTOCOL = "2026-07-28";
+const LEGACY_PROTOCOL = "2025-11-25";
 const NOW = new Date();
 
 let tenantId: string;
@@ -109,6 +110,19 @@ async function post(
     testEnv,
     CTX,
   );
+}
+
+// SDK の旧版の経路は SSE(`event: message` + `data:` 1 行)で答える
+async function legacyResult(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  const line = text.split("\n").find((l) => l.startsWith("data:"));
+  expect(line, text).toBeDefined();
+  const json = JSON.parse((line ?? "").slice(5)) as {
+    result?: Record<string, unknown>;
+    error?: unknown;
+  };
+  expect(json.error, JSON.stringify(json)).toBeUndefined();
+  return json.result ?? {};
 }
 
 async function rpcResult(res: Response): Promise<Record<string, unknown>> {
@@ -283,26 +297,123 @@ describe("/mcp/t/:tenantId の入口", () => {
     expect(discover["cacheScope"]).toBe("private");
   });
 
-  it("廃止済みの initialize(封筒なし)は仕様 2026-07-28 の入口では受けない", async () => {
-    const res = await post(
-      "initialize",
-      {},
-      {
-        token: pat,
-        body: {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "initialize",
-          params: {
-            protocolVersion: "2025-11-25",
-            capabilities: {},
-            clientInfo: { name: "x", version: "0" },
+  // 決定 56(M5b): 2025 年版(initialize から始めるクライアント)も stateless で受ける。応答は SDK の
+  // 旧版の経路が SSE で返す。セッションは持たない
+  describe("2025 年版のクライアント(決定 56)", () => {
+    async function legacy(body: unknown, options: CallOptions & { version?: string } = {}) {
+      // 2025 年版は Mcp-Method / Mcp-Name を送らない。initialize は MCP-Protocol-Version も送らない
+      const version = options.version ?? LEGACY_PROTOCOL;
+      const headers: Record<string, string> = {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        ...(version === "" ? {} : { "mcp-protocol-version": version }),
+        ...(options.token === undefined ? {} : { authorization: `Bearer ${options.token}` }),
+      };
+      const limiter = options.limiter ?? fakeLimiter(true);
+      return app.request(
+        `${ORIGIN}/mcp/t/${tenantId}`,
+        { method: "POST", headers, body: JSON.stringify(body) },
+        { ...env, MCP_LIMITER: limiter, MCP_IP_LIMITER: fakeLimiter(true) },
+        CTX,
+      );
+    }
+
+    it("initialize は 2025-11-25 と 2025-03-26 に 200 で答え、Mcp-Session-Id を出さない", async () => {
+      for (const protocolVersion of ["2025-11-25", "2025-03-26"]) {
+        const res = await legacy(
+          {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "initialize",
+            params: {
+              protocolVersion,
+              capabilities: {},
+              clientInfo: { name: "x", version: "0" },
+            },
           },
+          { token: pat, version: "" },
+        );
+        expect(res.status, protocolVersion).toBe(200);
+        expect(res.headers.get("mcp-session-id")).toBeNull();
+        const result = await legacyResult(res);
+        expect(result["protocolVersion"]).toBe(protocolVersion);
+        expect(result["serverInfo"]).toMatchObject({ name: "plyrs" });
+      }
+    });
+
+    it("notifications/initialized は 202", async () => {
+      const res = await legacy(
+        { jsonrpc: "2.0", method: "notifications/initialized" },
+        { token: pat },
+      );
+      expect(res.status).toBe(202);
+    });
+
+    it("封筒なしの tools/list と tools/call が通る", async () => {
+      const list = await legacyResult(
+        await legacy({ jsonrpc: "2.0", id: 2, method: "tools/list" }, { token: pat }),
+      );
+      const names = (list["tools"] as { name: string }[]).map((tool) => tool.name);
+      expect(names.slice(0, 2)).toEqual(["type_list", "type_get"]);
+      const call = await legacyResult(
+        await legacy(
+          {
+            jsonrpc: "2.0",
+            id: 3,
+            method: "tools/call",
+            params: { name: "type_list", arguments: {} },
+          },
+          { token: pat },
+        ),
+      );
+      expect(call["isError"]).toBeUndefined();
+      expect(call["structuredContent"]).toHaveProperty("types");
+    });
+
+    it("PAT のスコープ不足は 2025 年版でも入口の業務エラーで、Rate Limiting の枠を使わない", async () => {
+      const keys: string[] = [];
+      const recording = {
+        limit: async ({ key }: { key: string }) => (keys.push(key), { success: true }),
+      } as RateLimit;
+      const res = await legacy(
+        {
+          jsonrpc: "2.0",
+          id: 4,
+          method: "tools/call",
+          params: { name: "record_create", arguments: {} },
         },
-        headers: { "mcp-protocol-version": "2025-11-25" },
-      },
-    );
-    expect(res.status).toBe(400);
+        { token: pat, limiter: recording },
+      );
+      expect(res.status).toBe(200);
+      const json = await res.json<{ result: Record<string, unknown> }>();
+      expect(json.result["isError"]).toBe(true);
+      expect(json.result["structuredContent"]).toMatchObject({
+        error: { code: "insufficient_scope", details: { required: "record:write" } },
+      });
+      expect(keys).toEqual([]);
+    });
+
+    it("JSON-RPC のバッチ(配列)は SDK に渡さず 400 / -32600", async () => {
+      const keys: string[] = [];
+      const recording = {
+        limit: async ({ key }: { key: string }) => (keys.push(key), { success: true }),
+      } as RateLimit;
+      const res = await legacy(
+        [
+          { jsonrpc: "2.0", id: 5, method: "tools/list" },
+          {
+            jsonrpc: "2.0",
+            id: 6,
+            method: "tools/call",
+            params: { name: "record_create", arguments: {} },
+          },
+        ],
+        { token: pat, limiter: recording, version: "2025-03-26" },
+      );
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ error: { code: -32600 } });
+      expect(keys).toEqual([]);
+    });
   });
 
   // M3-3(決定 49): OAuth の access token は PAT と同じ入口・同じ認可コンテキストに合流する。

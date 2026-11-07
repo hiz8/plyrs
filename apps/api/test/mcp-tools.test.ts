@@ -383,7 +383,7 @@ describe("tools/call", () => {
       tokenKind: "pat",
     };
     const result = await callOperation(
-      { env, tenantId, auth: scopeless, origin: "https://api.example" },
+      { env, tenantId, auth: scopeless, origin: "https://api.example", era: "modern" },
       "record_list",
       {
         type: "article",

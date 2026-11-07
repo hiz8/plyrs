@@ -17,7 +17,7 @@ import type { McpAuth } from "../do/authorize";
 // 攻撃者が操作できる入力なので、SDK の HMAC codec で保護し、テナント・利用者・トークンに束縛し、TTL を付け、
 // 中身(操作名と recordId)を元の要求と照合する。
 // クライアントが elicitation を宣言していなければ、確認できないので拒否して人に回す(所有者の判断。
-// 提案(change set)ができるまでの扱い)。
+// 提案(change set)ができるまでの扱い)。2025 年版の接続(決定 56)も同じ扱い。
 
 export const CONFIRM_OPERATIONS = ["record_publish", "record_unpublish"] as const;
 export type ConfirmOperation = (typeof CONFIRM_OPERATIONS)[number];
@@ -133,6 +133,8 @@ export interface ConfirmArgs {
   recordId: string;
   // record の名前と型は ask のときだけ要る(呼び出し側が record_get で引く)
   describe: () => Promise<RecordDescription | CallToolResult>;
+  // 決定 56(M5b): 2025 年版の接続。stateless の旧版はサーバー発の elicitation を受け取れないので確認できない
+  legacyEra: boolean;
   clientCanElicit: boolean;
   inputResponses: Record<string, unknown> | undefined;
   // SDK の verify を通った requestState の中身(無ければ undefined)
@@ -141,6 +143,17 @@ export interface ConfirmArgs {
 }
 
 export async function confirmOperation(args: ConfirmArgs): Promise<ConfirmOutcome> {
+  // 旧版の接続は、要求に付いた requestState・inputResponses・能力の宣言を見ずに人に回す(確認を経ない
+  // 公開の道を作らない)
+  if (args.legacyEra) {
+    return {
+      kind: "refused",
+      result: refused(
+        "confirmation_unavailable",
+        "このクライアントは旧版(2025 年版)のプロトコルで接続しているため、公開・取り下げの確認(elicitation)を行えません。status を ready にして、管理画面で人が公開してください。クライアントがプロトコル 2026-07-28 に対応していれば、その版で接続し直すと確認を経て公開できます",
+      ),
+    };
+  }
   if (args.state !== undefined) {
     // 署名は正しくても、別の操作・別の record の確認を流用させない
     if (args.state.op !== args.op || args.state.recordId !== args.recordId) {

@@ -25,7 +25,7 @@ import { buildMcpServer } from "./server";
 // D1 の PAT 照会を無制限に起こさないため。/auth と同じ考え方)→ トークン検証 → ヘッダと本文の照合
 // (-32020)→ tools/call のスコープ判定(OAuth は 403 insufficient_scope の step-up、M3-3。PAT は業務エラー、
 // 決定 55)→ ツール名単位の Rate Limiting
-// → SDK(server/discover・tools/list・tools/call)。
+// → SDK(server/discover・tools/list・tools/call。2025 年版の initialize も stateless で受ける。決定 56)。
 
 export const MCP_REQUIRED_SCOPES = ["record:read"];
 
@@ -33,6 +33,8 @@ export const MCP_REQUIRED_SCOPES = ["record:read"];
 const RETRY_AFTER_SECONDS = "60";
 // 仕様 2026-07-28 の予約コード: ヘッダと本文の不一致
 const HEADER_MISMATCH = -32020;
+// JSON-RPC の Invalid Request(バッチの拒否に使う)
+const INVALID_REQUEST = -32600;
 
 function jsonRpcError(status: number, code: number, message: string, id: unknown = null): Response {
   return Response.json({ jsonrpc: "2.0", id, error: { code, message } }, { status });
@@ -178,6 +180,15 @@ async function serveMcp(
   } catch {
     return jsonRpcError(400, -32700, "Parse error: the request body is not valid JSON");
   }
+  // 決定 56(M5b): 2025-03-26 の JSON-RPC バッチ(配列)は受けない。以降のヘッダ照合・スコープ判定・
+  // Rate Limiting のキーは 1 要求を前提にしていて、配列は素通りしてしまう(2025-06-18 以降の版はバッチを廃止)
+  if (Array.isArray(body)) {
+    return jsonRpcError(
+      400,
+      INVALID_REQUEST,
+      "Invalid Request: JSON-RPC batches are not supported",
+    );
+  }
   const rpc = readRpc(body);
   const mismatch = headerMismatch(request, rpc);
   if (mismatch !== null) {
@@ -209,12 +220,17 @@ async function serveMcp(
     res.headers.set("retry-after", RETRY_AFTER_SECONDS);
     return res;
   }
-  // 仕様 2026-07-28 のみ(未決事項「旧版プロトコルのクライアントへの対応」の仮置き)。
-  // 廃止済みの initialize や GET/DELETE のセッション運用は受けない
-  const handler = createMcpHandler(() => buildMcpServer({ env, tenantId, auth, origin }), {
-    legacy: "reject",
-    onerror: (error) => console.warn("mcp", tenantId, error.message),
-  });
+  // 決定 56(M5b): 2026-07-28 の封筒に加え、2025 年版(initialize から始めるクライアント)も SDK の
+  // stateless の経路で受ける。どちらも要求ごとに同じ factory で McpServer を作り、セッションは持たない
+  // (Mcp-Session-Id を出さない。GET / DELETE は入口で 405)。旧版の接続はサーバー発の要求を受け取れないので、
+  // publish / unpublish の確認はできない(server.ts が era を見て人に回す)
+  const handler = createMcpHandler(
+    (ctx) => buildMcpServer({ env, tenantId, auth, origin, era: ctx.era }),
+    {
+      legacy: "stateless",
+      onerror: (error) => console.warn("mcp", tenantId, error.message),
+    },
+  );
   return handler.fetch(request, {
     parsedBody: body,
     authInfo: {
