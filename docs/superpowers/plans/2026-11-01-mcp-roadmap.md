@@ -131,6 +131,16 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | M5a-5 | PAT のスコープ不足をツールの業務エラーにして対処を示す(決定 55) | C3・E2 | S | #91 |
 | M5a-6 | G4 の小さな不具合(取り込みの User-Agent、確認の `default: true`、エンベロープ入力の検査)、/security-review、申し送り | E1・C5 | S | #92 |
 
+#### M5b 旧版プロトコルのクライアントの受け入れ — 詳細計画 `2026-11-07-m5b-legacy-protocol.md`
+
+M5a の確認で、公式の MCP Inspector と SDK v2 のクライアントの既定がまだ 2025 年版と分かったので、4 章の未決事項「旧版プロトコルのクライアントへの対応」を先に片付ける(所有者に範囲を確認、2026-11-07)。PR は 1 本(計画・実装・E2E・文書をコミットに分ける)。
+
+| タスク | 内容 | 論点 | 規模 |
+| --- | --- | --- | --- |
+| Task 1 | 2025 年版を SDK の stateless で受ける(決定 56)。バッチの拒否、2025 年版の publish / unpublish は `confirmation_unavailable`、`mcp.op` に `era` | C5・E4 | S |
+| Task 2 | E2E のスモークに 2025 年版の `initialize` → `tools/list` | — | S |
+| Task 3 | design-spec・deploy.md(VS Code / Cursor の接続例、「M5b の確認」)・申し送り | — | S |
+
 ## 3. 依存関係
 
 書き込み MCP 公開までの最長経路は M0-2 → M2-1 → M2-2 → M4-1(リッチテキストの系列)。M4 は M3 を待たない。
@@ -165,7 +175,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | 変更履歴の保持本数・期間、区切り | — | M0-1 | **決定 41**(M2-3a で実装。本数・期間の妥当性は M4-6 で実測) |
 | DO 側の一覧でフィルタできるフィールドの範囲 | 索引宣言済み + システム列 | M1-2 | 未決 |
 | PAT の有効期限の上限 | 書き込みスコープ付きは短くする | M1-3a | 未決(M1 計画の仮置き: 読み取りのみ 365 日、書き込み付き 90 日) |
-| 旧版プロトコルのクライアントへの対応(廃止済みの `initialize` / `notifications/initialized` を送るクライアントに何を返すか) | 2026-07-28 のみ | M1-5 | 未決 |
+| 旧版プロトコルのクライアントへの対応(廃止済みの `initialize` / `notifications/initialized` を送るクライアントに何を返すか) | 2026-07-28 のみ | M1-5 | **決定 56**(M5b、2026-11-07): SDK の stateless の経路で受ける。2025 年版の接続の publish は確認できないので `confirmation_unavailable` |
 | 同意画面の実装形(api の HTML か admin の SPA 経路か) | api の HTML | M3-2 | **決定済み(2026-11-03)**: api が `hono/html` で描画(M3-2、`apps/api/src/oauth/consent-page.ts`)。管理画面の見た目に揃えたくなったら SPA 経路に移せる |
 | エージェント経路の競合判定の既定(B3 ①) | strict | M2-6 | **決定 42** |
 | 再適用回数の数え方(B3 ③) | `attempt` 引数の自己申告 | M4-1 | **決定済み(2026-11-03)**: `attempt`(1〜3)の自己申告。3 回目の conflict は `giveUp`(M4-1b) |
@@ -198,7 +208,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | M2 | `2026-11-02-m2-data-and-operations.md` | 完了(2026-11-02) |
 | M3 | `2026-11-03-m3-oauth.md` | 完了(2026-11-03)。ゲート G3 通過 |
 | M4 | `2026-11-03-m4-write-mcp.md` | 実装完了(2026-11-03)。ゲート G4 は preview での所有者の確認待ち |
-| M5 | `2026-11-04-m5a-carryovers.md`(M5a。M5b 以降は着手時に作る) | M5a 実装済み(2026-11-04、#87〜#92、スタック PR) |
+| M5 | `2026-11-04-m5a-carryovers.md`(M5a)、`2026-11-07-m5b-legacy-protocol.md`(M5b。M5c 以降は着手時に作る) | M5a 実装済み(2026-11-04、#87〜#92、スタック PR)。M5b 実装済み(2026-11-07) |
 
 ## 7. M1 完了時の申し送り(2026-11-01)
 
@@ -308,3 +318,11 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
   3. `record:publish` の無い PAT の `record_publish` は業務エラー `insufficient_scope` で返り、エージェントは「所有者に `record:publish` 付きのトークンを発行してもらう」と伝えた。接続は切れない
   4. PAT 接続: MCP Inspector(2.14.0、Web 画面)で `tools/list`(読み取りの 7 ツールが先頭)と `type_list` を確かめた。**Inspector は既定で 2025-11-25 の `initialize` を送る**(SDK v2 クライアントの交渉の既定が `legacy`)ので、そのままでは `-32022 Unsupported protocol version` で拒否される。Server Settings › Options の **Protocol Era を Modern**(または Auto)にすると接続できる。VS Code(MCP は Copilot Chat の機能)は未確認、Cursor は所有者が使っていないため未確認
 - **旧版プロトコルのクライアント(4 章の未決事項)の材料**: 公式の Inspector と SDK v2 クライアントの既定がまだ legacy なので、「2026-07-28 のみ」の仮置きでは、設定を変えない利用者は接続できない。拒否の応答(`-32022`、`data.supported`)は SDK の交渉が読む形なので、Auto のクライアントは自動で Modern に切り替わる
+
+## 13. M5b 完了時の申し送り(2026-11-07)
+
+- **2025 年版のクライアント(決定 56)**: `createMcpHandler` の `legacy` を `"stateless"` にした。`initialize`(2025-11-25 / 2025-06-18 / 2025-03-26)・`notifications/initialized`(202)・封筒なしの `tools/list` / `tools/call` / `resources/*` / `prompts/*` に、要求ごとに同じ factory のサーバーが答える。応答は SSE(`event: message` の 1 件)で、`Mcp-Session-Id` は出さない。GET / DELETE は従来どおり入口で 405。入口の順序(Origin → IP の Rate Limiting → トークン検証 → ヘッダ照合 → スコープ判定 → ツール名の Rate Limiting)は 2025 年版でも同じ
+- **バッチの拒否**: 配列の本文は 400 / `-32600`。試作で、SDK の 2025 年版の経路は 2025-03-26 のバッチを受け、配列の中の `tools/call` は入口のスコープ判定と Rate Limiting のキーを素通りしていた(DO の `runOperation` のスコープ判定は残るが、入口で止める)
+- **2025 年版の publish**: stateless の 2025 年版はサーバー発の `elicitation/create` を受け取れない(SDK の互換層も失敗にする)ので、`confirmOperation` は `legacyEra` を最初に見て `confirmation_unavailable`(旧版で接続している旨と、2026-07-28 で接続し直す対処の文面)を返す。試作で、この判定が無いと 2026-07-28 で得た `requestState` と承諾の `inputResponses` を 2025 年版の要求に付け替えたとき公開まで進んだ(同じトークンの持ち主に限られるが、確認のフォームを経ない)。テストで固定した
+- **計測**: `mcp.op` に `era`(`modern` / `legacy`)。どのクライアントが 2025 年版で話しているかは `wrangler tail` で見る
+- **残り**: (1) 2025 年版の接続で publish の確認を出すには、セッションを持つ運用(SSE の GET とサーバー発の要求の置き場)が要る。採らない(決定 56)。M5 の提案(change set)ができたら、確認できない接続の publish を提案に回す案がある(11 章の決定 50 の申し送りと同じ)。(2) `initialize` の応答の `capabilities` は SDK の既定で `listChanged: true` を含むが、stateless なので通知は送らない(GET の SSE は 405)。(3) VS Code / Cursor の接続例(deploy.md 3.5)は各クライアントの文書に沿って書いたもので、実機での確認は所有者の「M5b の確認」による

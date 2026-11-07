@@ -667,7 +667,7 @@ single-writer の DO が競合を判定する。分散マージの難問が「DO
 - **型単位のスコープ（第16章・論点 C3）**: `record:write:article` のような型単位のスコープを採るか。第11.4章「権限マトリクスは JWT に載せない」の見直しが先。M5 で判断。
 - **ブロック単位の競合判定（第16章・論点 B3 ④）**: `field_versions` をブロック単位にするか DO 内 3-way merge にするか。A1 確定後、M5 で判断。
 - **サービスアカウント・公開側 MCP の認証・意味検索（第16章・論点 C4・D4・A4）**: いずれも M5 で設計。
-- **旧版 MCP プロトコルのクライアントへの対応（第16章）**: 2026-07-28 より前の版だけを話すクライアントが公開時点でどれだけ残っているかで、SDK の互換層を使うかを M1-5 で判断。
+- ~~**旧版 MCP プロトコルのクライアントへの対応（第16章）**~~ → 決定 56（M5b、2026-11-07）。2025 年版のクライアントも stateless で受ける。
 
 ---
 
@@ -730,6 +730,7 @@ single-writer の DO が競合を判定する。分散マージの難問が「DO
 | 53 | **履歴の逆差分は、リッチテキストの値を最上位ブロック単位で持つ**（M5a-1、2026-11-04）。古い版の本文を、新しい版の同じ ID のブロックの参照と変わったブロックの実体の列（`blocks`）で表し、作るときに当て直して元に戻ることを確かめる。戻らなければ値全体（`set`）。旧い行は書き換えない | M4-6 の実測で、1 段落の直しでも逆差分に本文全体が入り、差分 1 版が全文 1 版とほぼ同じ大きさだった。最上位ブロックには安定 ID（決定 44・46）があるので参照で表せる。当て直しの確認で、ID の重複などで戻らない文書を壊さない。300 回の編集の実測で逆差分の合計は 976 KB → 112 KB |
 | 54 | **unique のフィールドは indexed でなくても DO 内に引き当て用の生成カラムを持つ**（M5a-2、2026-11-04、所有者の判断「unique なら索引を自動で作る」）。絞り込みには使わない。既存テナントには alarm で足し、足し終えるまでは走査。比較は生成カラムの affinity に従う | M4-6 の実測で、indexed でない unique の重複検査が型の record を全件走査していた。管理画面で indexed を必須にすると利用者の操作が増え、公開 API の絞り込みの意味も変わる。部分インデックスの構築は records を走査するので、起動時にまとめて流すと record の多いテナントで起動の上限を超えうる |
 | 55 | **PAT のスコープ不足は、HTTP 403 ではなくツールの業務エラーで対処を返す**（M5a-5、2026-11-04）。OAuth は従来どおり 403 の step-up。判定の位置（DO と Rate Limiting の前）は変えない | PAT は再認可できないので step-up の 403 は役に立たない。G4 で Claude Code は 403 の説明を表示せず、所有者に発行し直してもらう対処が届かなかった。業務エラーならエージェントが message を読んで利用者に伝えられる |
+| 56 | **2025 年版の MCP クライアントも stateless で受ける**（M5b、2026-11-07）。SDK の `createMcpHandler` の `legacy: "stateless"` で、要求ごとに同じ factory のサーバーが答え、セッションは持たない。入口の順序と判定は 2026-07-28 と同じ。JSON-RPC のバッチは拒否し、2025 年版の接続の publish / unpublish は確認できないので `confirmation_unavailable` | M5a の確認で、公式の MCP Inspector と SDK v2 のクライアントの既定がまだ 2025 年版で、「2026-07-28 のみ」では設定を変えない利用者が接続できなかった。stateless の 2025 年版は単発の要求で完結し、決定 36 の stateless 運用を崩さない。セッションを持つ 2025 年版の運用（SSE の GET、サーバー発の要求）は置き場が要るので採らない |
 
 ---
 
@@ -737,7 +738,7 @@ single-writer の DO が競合を判定する。分散マージの難問が「DO
 
 AI エージェントが管理画面と同じ操作（record の作成・編集・公開など）を行えるようにするため、[Model Context Protocol](https://modelcontextprotocol.io/)（MCP）のサーバーを api Worker に置く。本章は MCP 導入調査レポート（第 3.1 版、2026-11-01）の論点 A〜E と、実装計画（M0〜M5）のレビューで確定した事項を固定する。試作（M0-2・M0-3）で決める事項は本章では「M0-x で決める」と明記し、結果は決定ログに追記する。
 
-準拠する MCP 仕様は **2026-07-28 改訂**。この改訂でセッション（`Mcp-Session-Id`・`initialize`・GET エンドポイント）が廃止され、Streamable HTTP の **stateless 運用が必須**になった。`server/discover` の実装、毎リクエストの `Mcp-Method` / `Mcp-Name` ヘッダ、`tools/list` の `ttlMs` / `cacheScope`、スコープ不足の `403 + insufficient_scope`、サーバー発の問い合わせの MRTR（Multi Round-Trip Requests）化、Client ID Metadata Documents（CIMD）への移行が、本章の前提になる。
+準拠する MCP 仕様は **2026-07-28 改訂**。この改訂でセッション（`Mcp-Session-Id`・`initialize`・GET エンドポイント）が廃止され、Streamable HTTP の **stateless 運用が必須**になった。`server/discover` の実装、毎リクエストの `Mcp-Method` / `Mcp-Name` ヘッダ、`tools/list` の `ttlMs` / `cacheScope`、スコープ不足の `403 + insufficient_scope`、サーバー発の問い合わせの MRTR（Multi Round-Trip Requests）化、Client ID Metadata Documents（CIMD）への移行が、本章の前提になる。2025 年版（`initialize` から始めるクライアント）も、SDK の stateless の経路で受ける（決定 56、M5b）。2025 年版の接続ではサーバー発の問い合わせを送れないので、publish の確認（16.8）は出せない。
 
 ### 16.1 位置づけ: 第三の経路、既存経路の再利用
 
@@ -752,7 +753,7 @@ MCP は、管理画面の同期（第 8・10 章）と REST（`/v1/t/:tenantId/.
 - **テナント別 URL**: `/mcp/t/:tenantId`。Protected Resource Metadata（RFC 9728）もパス付きで出し、`resource` はパス込みの canonical URI としてテナントを運ぶ。トークンは `resource` に束縛されるので、同意画面で選ぶのはスコープだけになる。
 - **配置（論点 D2）**: **api Worker の直接オリジン**で受ける（`https://<api>/mcp/t/:tenantId`、決定 48）。`resource` と PRM はこのオリジンで出す。admin オリジン経由（同一オリジン転送）にはしない: MCP はセッション cookie を使わず、1 ホップ増えるだけで得るものがない。dev で api → admin の逆向き Service Binding は組める（M0-3 で確認）が、認可サーバーを api に置くので不要（16.3）。
 - **認可サーバーの入口**は admin オリジンのテナント別パス `https://<admin>/oauth/t/:tenantId/{authorize,oauth/token,oauth/register}` と `https://<admin>/.well-known/oauth-authorization-server/oauth/t/:tenantId`。admin は既存の同一オリジン転送（`/auth` `/v1` と同じ仕組み）に `/oauth` と `/.well-known/oauth-authorization-server` を足して api へ渡す。ログイン状態（セッション cookie）を見るのは `/authorize` だけで、cookie は admin オリジンのものがそのまま届く。
-- **トランスポート**: stateless Streamable HTTP。POST のみ受け、旧クライアントの GET / DELETE には 405、`Mcp-Session-Id` は無視する。`server/discover` を実装する。
+- **トランスポート**: stateless Streamable HTTP。POST のみ受け、旧クライアントの GET / DELETE には 405、`Mcp-Session-Id` は無視する。`server/discover` を実装する。2025 年版の `initialize` / `notifications/initialized` / 封筒なしの要求も、要求ごとに同じ factory で作るサーバーで答える（セッションは持たず `Mcp-Session-Id` を出さない。決定 56）。JSON-RPC のバッチ（2025-03-26 の配列）は入口で `400` + `-32600` にする（以降のヘッダ照合・スコープ判定・Rate Limiting は 1 要求を前提にする）。
 - **ヘッダと本文の一致検証（論点 E4）**: 入口で `Mcp-Method` / `Mcp-Name` を本文と照合し、不一致は `400` + JSON-RPC `-32020` で拒否する。照合後はヘッダの `Mcp-Name`（ツール名）単位で Rate Limiting を掛ける（公開 write の `ratelimit` binding と同じ仕組み。MCP 用の namespace を別に持つ）。
 - **Origin の検証**: ブラウザからの直接呼び出しを想定しないため、`Origin` ヘッダ付きの要求は許可リストに無ければ拒否する。
 - セッション cookie では通さない（Bearer トークン専用。CSRF を考えずに済む）。
@@ -836,7 +837,7 @@ record の変更履歴を **DO 内**に置く。履歴表のキーは **履歴�
 - `record:publish` は既定の付与から外す（16.3）。所有者が付与した場合に限り、エージェントが publish ツールを呼べる。
 - **publish ツールの出し方（M4-2 で確定）**: 常に `tools/list` に出し、スコープ不足は `403 + insufficient_scope` で step-up させる（publish 権限を後から付与する運用に合う）。ツール説明に PAT 接続の導線（所有者が `record:publish` 付きの PAT を発行する）を書く。
 - **確認は 2 系統**: ① 同じ利用者への確認は MRTR の elicitation で行う（クライアントが能力を宣言していなければ送れない。`requestState` は攻撃者が操作できる入力として扱い、HMAC / AEAD で保護し、principal・TTL・元要求のダイジェストを照合する）。② 別の人（所有者）の承認と、elicitation に対応しないクライアントは **提案（change set）**へ回す。提案ができるまでは拒否して人に回す（決定 50）。
-- **実装（M4-2、`apps/api/src/mcp/confirm.ts`）**: `record_publish` / `record_unpublish` は、要求の `_meta` の `clientCapabilities.elicitation` があれば `input_required`（form の elicitation で「公開しますか」、`requestState`）を返し、承諾を付けた再送で実行する。`requestState` は SDK の `createRequestStateCodec`（HMAC-SHA256、鍵は `JWT_SECRET` から用途の接頭辞で分ける、TTL 300 秒）で保護し、`テナント:利用者:tokenId` に束縛する（改ざん・流用・期限切れは `-32602`）。中身の操作名と `recordId` は元の要求と照合する（`state_mismatch`）。確認文を見せたときの record の版と最新の `history_seq` も入れる。承諾後の実行では、Worker がそれを invoke の `expect` として渡し、DO が publish / unpublish と同じトランザクションの中で照合する。違えば `record_changed` で何もしない（照合と公開の間に書き込みが割り込む窓を作らない。publish / unpublish は履歴を畳み込まずに版を足すので、公開 → 取り下げのように record の版が変わらない往復の後でも、同じ確認を TTL の間に使い回せない）。REST と管理画面は `expect` を渡さない。確認文の record 名は `record_get` で引くので、確認には `record:read` も要る。宣言が無ければ業務エラー `confirmation_unavailable` で、status を ready にして人に回すよう案内する。断れば `declined`。フォームの `requestedSchema` の `confirm` は `default: true` で、クライアントは欄を初期値 true で描く（M5a-6。G4 で Claude Code のフォームが boolean の欄を切り替えられず、Accept が `declined` になったため）。**照合は変えない**: `confirm: true` を明示した Accept だけを確認とし、`confirm` の欠けた Accept（フォームを描かずに自動で返すクライアント）と `false` は `declined`。照合のスキーマは既定値を持たない
+- **実装（M4-2、`apps/api/src/mcp/confirm.ts`）**: `record_publish` / `record_unpublish` は、要求の `_meta` の `clientCapabilities.elicitation` があれば `input_required`（form の elicitation で「公開しますか」、`requestState`）を返し、承諾を付けた再送で実行する。`requestState` は SDK の `createRequestStateCodec`（HMAC-SHA256、鍵は `JWT_SECRET` から用途の接頭辞で分ける、TTL 300 秒）で保護し、`テナント:利用者:tokenId` に束縛する（改ざん・流用・期限切れは `-32602`）。中身の操作名と `recordId` は元の要求と照合する（`state_mismatch`）。確認文を見せたときの record の版と最新の `history_seq` も入れる。承諾後の実行では、Worker がそれを invoke の `expect` として渡し、DO が publish / unpublish と同じトランザクションの中で照合する。違えば `record_changed` で何もしない（照合と公開の間に書き込みが割り込む窓を作らない。publish / unpublish は履歴を畳み込まずに版を足すので、公開 → 取り下げのように record の版が変わらない往復の後でも、同じ確認を TTL の間に使い回せない）。REST と管理画面は `expect` を渡さない。確認文の record 名は `record_get` で引くので、確認には `record:read` も要る。宣言が無ければ業務エラー `confirmation_unavailable` で、status を ready にして人に回すよう案内する。2025 年版の接続（決定 56）は、要求に付いた能力の宣言・`requestState`・`inputResponses` を見ずに `confirmation_unavailable` にする（stateless の 2025 年版はサーバー発の `elicitation/create` を受け取れない。2026-07-28 で得た `requestState` を旧版の要求に付け替えて確認を飛ばす道も塞ぐ）。文面は旧版で接続していることと、2026-07-28 で接続し直す対処を示す。断れば `declined`。フォームの `requestedSchema` の `confirm` は `default: true` で、クライアントは欄を初期値 true で描く（M5a-6。G4 で Claude Code のフォームが boolean の欄を切り替えられず、Accept が `declined` になったため）。**照合は変えない**: `confirm: true` を明示した Accept だけを確認とし、`confirm` の欠けた Accept（フォームを描かずに自動で返すクライアント）と `false` は `declined`。照合のスキーマは既定値を持たない
 - **提案（change set、論点 B4）**: 直接書き込みに加え、変更を「提案」として保存し、管理画面で差分を見て採用・却下する経路を M5 で置く。`record:propose` だけを持つトークンの変更は提案になる。公開状態・ワークフロー状態（第 7 章）に加える 3 本目の軸であり、再適用の打ち切り先（16.6）の受け皿にもなる。
 
 ### 16.9 一覧と検索（論点 A4）
