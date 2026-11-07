@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "ece3c891-c2d5-4347-8ea7-d4e22c7d8b24",
+  "id": "c804508a-bd27-4ece-971a-a5fe60b03066",
   "prevId": "abc9c0d6-5652-4bbc-8d42-01333206e4c2",
   "tables": {
     "alarm_registry": {
@@ -498,6 +498,13 @@
           "autoincrement": false,
           "default": "''"
         },
+        "before": {
+          "name": "before",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -592,6 +599,11 @@
         "idx_proposals_record": {
           "name": "idx_proposals_record",
           "columns": ["record_id", "state"],
+          "isUnique": false
+        },
+        "idx_proposals_resolved": {
+          "name": "idx_proposals_resolved",
+          "columns": ["state", "resolved_at"],
           "isUnique": false
         }
       },

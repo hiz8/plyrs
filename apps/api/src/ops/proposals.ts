@@ -1,6 +1,7 @@
 import {
   buildRecordInputSchema,
   canonicalJson,
+  fingerprint,
   uuidSchema,
   WORKFLOW_STATUSES,
   type ContentTypeDefinition,
@@ -187,10 +188,13 @@ function summaryOf(ctx: OpContext, row: ProposalRow): Summary {
   const record = loadRecord(ctx.sql, row.recordId);
   const currentVersion = record?.version ?? null;
   const currentStatus = record === null || record.deletedAt !== null ? null : record.status;
+  // stale は未処理の提案にだけ意味がある(採用で record が進むのは当然なので、処理済みは false)
   const stale =
-    row.kind === "create"
-      ? record !== null
-      : record === null || record.deletedAt !== null || record.version !== row.baseVersion;
+    row.state !== "open"
+      ? false
+      : row.kind === "create"
+        ? record !== null
+        : record === null || record.deletedAt !== null || record.version !== row.baseVersion;
   return {
     id: row.id,
     recordId: row.recordId,
@@ -221,18 +225,19 @@ function currentInputOf(ctx: OpContext, recordId: string): Record<string, unknow
   return record === null || record.deletedAt !== null ? {} : loadRecordInput(ctx.sql, record);
 }
 
+// changedFields 分の現在値(処理した時点の変更前の値として保存し、処理済みの提案の差分に使う)
+function beforeOf(ctx: OpContext, row: ProposalRow): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(currentInputOf(ctx, row.recordId)).filter(([key]) =>
+      row.changedFields.includes(key),
+    ),
+  );
+}
+
 function detailOf(ctx: OpContext, row: ProposalRow): Detail {
+  // 未処理は現在との比較、処理済みは処理した時点の変更前の値との比較(後から何を採用・却下したか分かる)
   const fields =
-    row.input === null
-      ? []
-      : compareVersions(
-          Object.fromEntries(
-            Object.entries(currentInputOf(ctx, row.recordId)).filter(([key]) =>
-              row.changedFields.includes(key),
-            ),
-          ),
-          row.input,
-        );
+    row.input === null ? [] : compareVersions(row.before ?? beforeOf(ctx, row), row.input);
   return { ...summaryOf(ctx, row), input: row.input, fields };
 }
 
@@ -311,7 +316,11 @@ function prepare(ctx: OpContext, input: CreateInput): Prepared | OpFailure {
     Object.entries(resolved.input).filter(([key]) => changedFields.includes(key)),
   );
   // validate-on-write と同じ検査を提案の時点でも通す(採用のときにも writeRecordCore が見る)
-  const parsed = buildRecordInputSchema(definition).safeParse({ ...current, ...proposed });
+  // 採用時の resolveSyncWrite は changedFields にあって input に無いキーを消去と解釈するので、ここも同じに現在値を外す
+  const kept = Object.fromEntries(
+    Object.entries(current ?? {}).filter(([key]) => !changedFields.includes(key)),
+  );
+  const parsed = buildRecordInputSchema(definition).safeParse({ ...kept, ...proposed });
   if (!parsed.success) {
     return { ok: false, code: "validation_failed", message: issuesToMessage(parsed.error.issues) };
   }
@@ -320,19 +329,7 @@ function prepare(ctx: OpContext, input: CreateInput): Prepared | OpFailure {
 
 // 作成要求そのものの指紋。解決済みの input ではなく生の要求で比べるので、record の状態や型定義が変わった後の
 // 再送(応答が途切れたときの再送)も同じ要求と判定できる(16.7。レビューの指摘で prepare の前に照合する形にした)。
-// DO の invoke は同期なので WebCrypto は使えない。FNV-1a 64bit を seed 違いの 2 系統で回す(同じ proposalId の
-// 要求同士を区別できればよい用途)
-function fnv1a64(input: string, seed: bigint): bigint {
-  const prime = 0x100000001b3n;
-  const mask = 0xffffffffffffffffn;
-  let hash = seed;
-  for (let i = 0; i < input.length; i++) {
-    hash ^= BigInt(input.charCodeAt(i));
-    hash = (hash * prime) & mask;
-  }
-  return hash;
-}
-
+// 指紋は metamodel の fingerprint(FNV-1a 64bit × 2。DO の invoke は同期なので WebCrypto は使えない)
 function requestDigestOf(input: CreateInput): string {
   const json = canonicalJson({
     kind: input.kind,
@@ -343,10 +340,7 @@ function requestDigestOf(input: CreateInput): string {
     status: input.status ?? null,
     note: input.note ?? null,
   });
-  return (
-    fnv1a64(json, 0xcbf29ce484222325n).toString(16).padStart(16, "0") +
-    fnv1a64(json, 0x84222325cbf29ce4n).toString(16).padStart(16, "0")
-  );
+  return fingerprint(json);
 }
 
 // 採用に要る操作(16.8: 採用した人の権限で書く)
@@ -461,6 +455,21 @@ export const PROPOSAL_HANDLERS = {
     const inner: OpContext = { ...ctx, proposalId: row.id };
     const recordId = row.recordId;
     const current = loadRecord(ctx.sql, recordId);
+    // publish / delete / unpublish は「その時点の内容」への提案。提案の後に record が進んでいれば、
+    // 提案者も採用者も見ていない内容を公開・削除しないよう止める(MCP の確認の record_changed と同じ考え)。
+    // update は提案のフィールドだけを上書きするので、stale でも採用できる(差分に現在との比較が出る)
+    if (
+      (row.kind === "publish" || row.kind === "delete" || row.kind === "unpublish") &&
+      (current === null || current.deletedAt !== null || current.version !== row.baseVersion)
+    ) {
+      return {
+        ok: false,
+        code: "proposal_stale",
+        message: `record ${recordId} changed after the proposal; review the current content and ask for a new proposal`,
+      };
+    }
+    const before = beforeOf(ctx, row);
+    const seqBefore = latestHistorySeq(ctx.sql, recordId);
     const result = (() => {
       switch (row.kind) {
         case "create":
@@ -491,11 +500,14 @@ export const PROPOSAL_HANDLERS = {
     if (!result.ok) {
       return result; // 提案は open のまま。人が直すか却下する
     }
+    // 何も書かれなかった採用(現在と同じ内容の update、削除済みへの delete など)は版が増えないので null
+    const seqAfter = latestHistorySeq(ctx.sql, recordId);
     resolveProposal(ctx.sql, row.id, {
       state: "accepted",
+      before,
       resolvedAt: ctx.deps.now(),
       resolvedBy: ctx.auth.userId,
-      resultHistorySeq: latestHistorySeq(ctx.sql, recordId),
+      ...(seqAfter > seqBefore ? { resultHistorySeq: seqAfter } : {}),
     });
     const accepted = loadProposal(ctx.sql, row.id);
     if (accepted === null) {
@@ -523,6 +535,7 @@ export const PROPOSAL_HANDLERS = {
     }
     resolveProposal(ctx.sql, row.id, {
       state: "rejected",
+      before: beforeOf(ctx, row),
       resolvedAt: ctx.deps.now(),
       resolvedBy: ctx.auth.userId,
       resolutionNote: input.reason,

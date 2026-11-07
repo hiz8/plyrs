@@ -21,11 +21,10 @@ import {
   PUBLISH_BOX,
   TOASTS,
 } from "../lib/labels";
-import { openProposalsFor } from "../lib/proposals";
 import { labelForRecord } from "../lib/record-label";
 import { publishBoxView } from "../lib/publish-box";
 import {
-  openProposalsQueryOptions,
+  openProposalCountQueryOptions,
   publicationQueryOptions,
   publicationsQueryKey,
 } from "../lib/queries";
@@ -131,12 +130,12 @@ export function RecordEditor({
   const typeKey = contentType.key;
 
   // M5c: この record への未処理の提案があれば公開ボックスの上で案内する(採用・却下は提案画面)
+  // 件数はサーバーの絞り込み(openCount)で数える(一覧の先頭ページをクライアントで絞ると 100 件を超えたとき漏れる)
   const openProposals = useQuery({
-    ...openProposalsQueryOptions(adminApi, tenant.id),
+    ...openProposalCountQueryOptions(adminApi, tenant.id, record?.id ?? ""),
     enabled: record !== null,
   });
-  const openProposalCount =
-    record === null ? 0 : openProposalsFor(openProposals.data?.items ?? [], record.id).length;
+  const openProposalCount = record === null ? 0 : (openProposals.data?.openCount ?? 0);
   const publication = useQuery({
     ...publicationQueryOptions(adminApi, tenant.id, record?.id ?? ""),
     enabled: record !== null,

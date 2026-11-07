@@ -29,6 +29,8 @@ export type InvokeErrorCode =
   | "not_published"
   // 16.8(M5c): 採用・却下済みの提案への採用・却下
   | "proposal_not_open"
+  // 16.8(M5c): publish / delete / unpublish の提案の採用で、提案の後に record が進んでいた
+  | "proposal_stale"
   | (string & {});
 
 // M4-6: DO の invoke が載せる計測値(操作が読み書きした行数)。Worker で実行する操作には無い

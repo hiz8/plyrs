@@ -19,7 +19,7 @@ import { legacyPathname } from "../../../lib/legacy-redirect";
 import {
   meQueryOptions,
   modulesQueryOptions,
-  openProposalsQueryOptions,
+  openProposalCountQueryOptions,
   tenantsQueryOptions,
 } from "../../../lib/queries";
 import {
@@ -103,7 +103,7 @@ function ShellLayout() {
   const meQuery = useQuery(meQueryOptions(api));
   const modulesQuery = useQuery(modulesQueryOptions(adminApi, tenant.id));
   // M5c: 未処理の提案の数(サイドバーのバッジ)。失敗してもシェルは止めない(数が出ないだけ)
-  const openProposalsQuery = useQuery(openProposalsQueryOptions(adminApi, tenant.id));
+  const openProposalsQuery = useQuery(openProposalCountQueryOptions(adminApi, tenant.id));
 
   useEffect(() => {
     tenantSync.start();

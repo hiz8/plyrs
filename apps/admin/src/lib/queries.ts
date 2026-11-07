@@ -120,19 +120,44 @@ export function modulesQueryOptions(adminApi: AdminApi, tenantId: string) {
   });
 }
 
-// 16.8(M5c): 未処理の提案。サイドバーのバッジ・一覧・編集画面の案内で共用する。エージェントの提案は
-// 同期経路を通らないので、30 秒の定期再取得で届かせる(フォーカス復帰時の再取得は React Query の既定)。
-// 1 ページに収まる 100 件まで(API の上限)。それ以上は一覧の「さらに表示」で辿る
+// 16.8(M5c): 未処理の提案。エージェントの提案は同期経路を通らないので、サイドバーのバッジだけが
+// 30 秒の定期再取得で届かせる(フォーカス復帰時の再取得は React Query の既定)。定期再取得は DO を
+// 起こすので、件数だけが要る場面(バッジ・編集画面の案内)は 1 件だけ取る軽い問い合わせにし、一覧の
+// 先頭ページ(1 ページ = API の既定件数)は開いている間だけ取る。続きは一覧の「さらに表示」で辿る。
+// 採用・却下・提案の作成の後は proposalsQueryKey の前方一致で全部まとめて invalidate する
 export function proposalsQueryKey(tenantId: string) {
   return ["proposals", tenantId] as const;
 }
 
-export function openProposalsQueryOptions(adminApi: AdminApi, tenantId: string) {
+export function openProposalCountQueryOptions(
+  adminApi: AdminApi,
+  tenantId: string,
+  recordId?: string,
+) {
   return queryOptions({
-    queryKey: [...proposalsQueryKey(tenantId), "open"],
-    queryFn: () => adminApi.listProposals(tenantId, { state: "open", limit: 100 }),
+    queryKey: [...proposalsQueryKey(tenantId), "open-count", recordId ?? null],
+    queryFn: () =>
+      adminApi.listProposals(tenantId, {
+        state: "open",
+        ...(recordId === undefined ? {} : { recordId }),
+        limit: 1,
+      }),
     staleTime: 10_000,
-    refetchInterval: 30_000,
+    // テナント全体の件数(サイドバー)だけ定期再取得。record ごとの件数は開いた画面の間だけでよい
+    ...(recordId === undefined ? { refetchInterval: 30_000 } : {}),
+    retry: 1,
+  });
+}
+
+export function openProposalsQueryOptions(adminApi: AdminApi, tenantId: string, recordId?: string) {
+  return queryOptions({
+    queryKey: [...proposalsQueryKey(tenantId), "open", recordId ?? null],
+    queryFn: () =>
+      adminApi.listProposals(tenantId, {
+        state: "open",
+        ...(recordId === undefined ? {} : { recordId }),
+      }),
+    staleTime: 0,
     retry: 1,
   });
 }

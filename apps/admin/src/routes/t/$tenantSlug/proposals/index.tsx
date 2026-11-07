@@ -68,9 +68,9 @@ function ProposalsPage() {
   const types = useSyncTypes(sync);
   const canSeeMembers = useCan("member:manage");
 
-  // 先頭ページ: 未処理は共有のクエリ(バッジ・編集画面と同じ)、処理済みはサーバーで state != open に絞る。
-  // 続き(「さらに表示」)はどちらも API を直接呼んで積む。先頭ページが取り直されたら積んだ続きは捨てる
-  const open = useQuery(openProposalsQueryOptions(adminApi, tenant.id));
+  // 先頭ページ: 未処理・処理済みともサーバーで state と recordId に絞る(クライアントでは絞らない)。
+  // 続き(「さらに表示」)はどちらも API を直接呼んで積む。タブ・絞り込み・先頭ページのどれかが変わったら積んだ続きは捨てる
+  const open = useQuery(openProposalsQueryOptions(adminApi, tenant.id, search.recordId));
   const resolvedFirst = useQuery({
     queryKey: [...proposalsQueryKey(tenant.id), "resolved", search.recordId ?? null],
     queryFn: () =>
@@ -82,18 +82,26 @@ function ProposalsPage() {
   const first = tab === "open" ? open : resolvedFirst;
   const [morePages, setMorePages] = useState<ProposalPage[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [moreBase, setMoreBase] = useState<{ tab: Tab; data: unknown }>({ tab, data: first.data });
-  if (moreBase.tab !== tab || moreBase.data !== first.data) {
-    setMoreBase({ tab, data: first.data });
+  const [moreBase, setMoreBase] = useState<{
+    tab: Tab;
+    recordId: string | undefined;
+    data: unknown;
+  }>({ tab, recordId: search.recordId, data: first.data });
+  if (
+    moreBase.tab !== tab ||
+    moreBase.recordId !== search.recordId ||
+    moreBase.data !== first.data
+  ) {
+    setMoreBase({ tab, recordId: search.recordId, data: first.data });
     setMorePages([]);
   }
 
   const members = useQuery({ ...membersQueryOptions(adminApi, tenant.id), enabled: canSeeMembers });
 
-  const items = useMemo(() => {
-    const all = [...(first.data?.items ?? []), ...morePages.flatMap((p) => p.items)];
-    return search.recordId === undefined ? all : all.filter((p) => p.recordId === search.recordId);
-  }, [first.data, morePages, search.recordId]);
+  const items = useMemo(
+    () => [...(first.data?.items ?? []), ...morePages.flatMap((p) => p.items)],
+    [first.data, morePages],
+  );
   const lastPage = morePages[morePages.length - 1] ?? first.data;
   const nextCursor = lastPage?.nextCursor ?? null;
 
@@ -161,10 +169,7 @@ function ProposalsPage() {
               label: PROPOSAL_LABELS.tabs[id],
               ...(id === "open" && open.data !== undefined
                 ? {
-                    count:
-                      search.recordId === undefined
-                        ? open.data.openCount
-                        : open.data.items.filter((p) => p.recordId === search.recordId).length,
+                    count: open.data.openCount,
                   }
                 : {}),
             }))}

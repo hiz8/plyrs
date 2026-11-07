@@ -7,6 +7,7 @@ CREATE TABLE `proposals` (
 	`input` text,
 	`changed_fields` text DEFAULT '[]' NOT NULL,
 	`request_digest` text DEFAULT '' NOT NULL,
+	`before` text,
 	`status` text,
 	`base_version` integer NOT NULL,
 	`note` text,
@@ -23,4 +24,5 @@ CREATE TABLE `proposals` (
 --> statement-breakpoint
 CREATE INDEX `idx_proposals_state` ON `proposals` (`state`,`created_at`);--> statement-breakpoint
 CREATE INDEX `idx_proposals_record` ON `proposals` (`record_id`,`state`);--> statement-breakpoint
+CREATE INDEX `idx_proposals_resolved` ON `proposals` (`state`,`resolved_at`);--> statement-breakpoint
 ALTER TABLE `record_history` ADD `proposal_id` text;

@@ -225,6 +225,8 @@ export const proposals = sqliteTable(
     // 作成要求(kind・recordId・type・生の input・changedFields・status・note)の canonical JSON の指紋。
     // 同じ proposalId の再送を、record の状態や型定義が変わった後でも同じ要求と判定するため(16.7)
     requestDigest: text("request_digest").notNull().default(""),
+    // JSON: 採用・却下した時点の、changedFields 分の変更前の値(処理済みの提案の差分を残すため。open では NULL)
+    before: text("before"),
     status: text("status"), // 提案するワークフロー状態(無ければ NULL)
     baseVersion: integer("base_version").notNull(), // 提案時の records.version(create は 0)
     note: text("note"), // 提案者の説明
@@ -241,5 +243,7 @@ export const proposals = sqliteTable(
   (table) => [
     index("idx_proposals_state").on(table.state, table.createdAt),
     index("idx_proposals_record").on(table.recordId, table.state),
+    // 90 日の掃除(state != open AND resolved_at < ?)が全走査にならないように
+    index("idx_proposals_resolved").on(table.state, table.resolvedAt),
   ],
 );

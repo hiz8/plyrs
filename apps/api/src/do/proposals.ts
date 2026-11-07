@@ -16,8 +16,10 @@ export interface ProposalRow {
   state: ProposalState;
   input: Record<string, unknown> | null;
   changedFields: string[];
-  /** 作成要求の SHA-256(hex)。同じ proposalId の再送の照合に使う */
+  /** 作成要求の指紋(metamodel の fingerprint)。同じ proposalId の再送の照合に使う */
   requestDigest: string;
+  /** 採用・却下した時点の、changedFields 分の変更前の値(open では null) */
+  before: Record<string, unknown> | null;
   status: WorkflowStatus | null;
   baseVersion: number;
   note: string | null;
@@ -34,7 +36,7 @@ export interface ProposalRow {
 
 export type NewProposal = Omit<
   ProposalRow,
-  "state" | "resolvedAt" | "resolvedBy" | "resolutionNote" | "resultHistorySeq"
+  "state" | "before" | "resolvedAt" | "resolvedBy" | "resolutionNote" | "resultHistorySeq"
 >;
 
 // 採用・却下から数えて、この日数を過ぎた行は次の proposal_create のついでに消す(1 回に消す上限つき)
@@ -50,6 +52,7 @@ interface RawProposalRow extends Record<string, SqlStorageValue> {
   input: string | null;
   changed_fields: string;
   request_digest: string;
+  before: string | null;
   status: string | null;
   base_version: number;
   note: string | null;
@@ -65,7 +68,7 @@ interface RawProposalRow extends Record<string, SqlStorageValue> {
 }
 
 const COLUMNS =
-  "id, record_id, type, kind, state, input, changed_fields, request_digest, status, base_version, note, actor, via, token_id, client_id, created_at, resolved_at, resolved_by, resolution_note, result_history_seq";
+  "id, record_id, type, kind, state, input, changed_fields, request_digest, before, status, base_version, note, actor, via, token_id, client_id, created_at, resolved_at, resolved_by, resolution_note, result_history_seq";
 
 function rowToProposal(row: RawProposalRow): ProposalRow {
   return {
@@ -77,6 +80,7 @@ function rowToProposal(row: RawProposalRow): ProposalRow {
     input: row.input === null ? null : (JSON.parse(row.input) as Record<string, unknown>),
     changedFields: JSON.parse(row.changed_fields) as string[],
     requestDigest: row.request_digest,
+    before: row.before === null ? null : (JSON.parse(row.before) as Record<string, unknown>),
     status: row.status as WorkflowStatus | null,
     baseVersion: row.base_version,
     note: row.note,
@@ -101,7 +105,7 @@ export function loadProposal(sql: SqlStorage, id: string): ProposalRow | null {
 
 export function insertProposal(sql: SqlStorage, row: NewProposal): void {
   sql.exec(
-    `INSERT INTO proposals (${COLUMNS}) VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL)`,
+    `INSERT INTO proposals (${COLUMNS}) VALUES (?, ?, ?, ?, 'open', ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL)`,
     row.id,
     row.recordId,
     row.type,
@@ -125,6 +129,7 @@ export function resolveProposal(
   id: string,
   patch: {
     state: Exclude<ProposalState, "open">;
+    before: Record<string, unknown> | null;
     resolvedAt: string;
     resolvedBy: string;
     resolutionNote?: string;
@@ -132,8 +137,9 @@ export function resolveProposal(
   },
 ): void {
   sql.exec(
-    "UPDATE proposals SET state = ?, resolved_at = ?, resolved_by = ?, resolution_note = ?, result_history_seq = ? WHERE id = ?",
+    "UPDATE proposals SET state = ?, before = ?, resolved_at = ?, resolved_by = ?, resolution_note = ?, result_history_seq = ? WHERE id = ?",
     patch.state,
+    patch.before === null ? null : JSON.stringify(patch.before),
     patch.resolvedAt,
     patch.resolvedBy,
     patch.resolutionNote ?? null,

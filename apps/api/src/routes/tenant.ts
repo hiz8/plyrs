@@ -51,6 +51,7 @@ const ERROR_STATUS: Record<string, ContentfulStatusCode> = {
   unsupported_markdown: 400,
   // M5c: 処理済みの提案への採用・却下
   proposal_not_open: 409,
+  proposal_stale: 409,
 };
 
 function statusFor(code: string): ContentfulStatusCode {

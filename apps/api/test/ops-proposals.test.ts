@@ -354,6 +354,109 @@ describe("提案の操作", () => {
     expect(created).toMatchObject({ status: "ready", currentStatus: "draft" });
   });
 
+  it("何も書かれなかった採用は resultHistorySeq を null にする(所有者レビュー 1)", async () => {
+    // 現在と同じ内容の update は applied=false で版が増えない
+    const current = validArticleInput();
+    output(
+      await stub.invoke(
+        "proposal_create",
+        {
+          proposalId: uuid(790),
+          kind: "update",
+          recordId: RECORD,
+          input: { title: current.title },
+        },
+        agent(),
+      ),
+    );
+    const accepted = output<{ proposal: ProposalOut }>(
+      await stub.invoke("proposal_accept", { proposalId: uuid(790) }, editor, { tenantSlug: SLUG }),
+    );
+    expect(accepted.proposal).toMatchObject({ state: "accepted", resultHistorySeq: null });
+  });
+
+  it("changedFields にあって input に無いキーは消去として検査し、必須なら提案の時点で validation_failed(所有者レビュー 2)", async () => {
+    const result = asInvokeResult(
+      await stub.invoke(
+        "proposal_create",
+        {
+          proposalId: uuid(791),
+          kind: "update",
+          recordId: RECORD,
+          input: {},
+          changedFields: ["title"],
+        },
+        agent(),
+      ),
+    );
+    expect(result).toMatchObject({ ok: false, code: "validation_failed" });
+  });
+
+  it("処理済みの提案は stale にならず、差分は処理した時点の変更前の値との比較のまま残る(所有者レビュー 3・4)", async () => {
+    const before = validArticleInput().title;
+    output(await stub.invoke("proposal_create", updateInput(uuid(792)), agent()));
+    output(
+      await stub.invoke("proposal_accept", { proposalId: uuid(792) }, editor, { tenantSlug: SLUG }),
+    );
+    // 採用の後にさらに人が直しても、提案の差分は採用した時点のまま
+    expect(
+      asWriteResult(
+        await stub.writeRecord(
+          "article",
+          { recordId: RECORD, input: { ...validArticleInput(), title: "さらに直した" } },
+          owner,
+        ),
+      ).ok,
+    ).toBe(true);
+    const got = output<ProposalOut>(
+      await stub.invoke("proposal_get", { proposalId: uuid(792) }, agent()),
+    );
+    expect(got.stale).toBe(false);
+    expect(got.fields.find((f) => f.key === "title")).toMatchObject({
+      before,
+      after: "提案のタイトル",
+    });
+    // 却下も同じく、却下した時点の値と比べる
+    output(await stub.invoke("proposal_create", updateInput(uuid(793)), agent()));
+    output(await stub.invoke("proposal_reject", { proposalId: uuid(793) }, editor));
+    const rejected = output<ProposalOut>(
+      await stub.invoke("proposal_get", { proposalId: uuid(793) }, agent()),
+    );
+    expect(rejected.stale).toBe(false);
+    expect(rejected.fields.find((f) => f.key === "title")).toMatchObject({
+      before: "さらに直した",
+      after: "提案のタイトル",
+    });
+  });
+
+  it("publish / delete / unpublish の提案は、提案の後に record が進んでいれば採用できず open のまま(所有者レビュー 5)", async () => {
+    output(
+      await stub.invoke(
+        "proposal_create",
+        { proposalId: uuid(794), kind: "publish", recordId: RECORD },
+        agent(),
+      ),
+    );
+    expect(
+      asWriteResult(
+        await stub.writeRecord(
+          "article",
+          { recordId: RECORD, input: { ...validArticleInput(), title: "未確認の編集" } },
+          owner,
+        ),
+      ).ok,
+    ).toBe(true);
+    const failed = asInvokeResult(
+      await stub.invoke("proposal_accept", { proposalId: uuid(794) }, owner, { tenantSlug: SLUG }),
+    );
+    expect(failed).toMatchObject({ ok: false, code: "proposal_stale" });
+    expect(asPublicationState(await stub.getPublication(RECORD)).published).toBe(false);
+    expect(
+      output<ProposalOut>(await stub.invoke("proposal_get", { proposalId: uuid(794) }, agent()))
+        .state,
+    ).toBe("open");
+  });
+
   it("処理済みの提案は再び採用・却下できず、却下の理由が残る", async () => {
     output<ProposalOut>(await stub.invoke("proposal_create", updateInput(), agent()));
     const rejected = output<{ proposal: ProposalOut }>(
