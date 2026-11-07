@@ -16,8 +16,8 @@ import type { McpAuth } from "../do/authorize";
 // 送り直す)。stateless なので往復の状態は requestState に入れてクライアントに持たせる。requestState は
 // 攻撃者が操作できる入力なので、SDK の HMAC codec で保護し、テナント・利用者・トークンに束縛し、TTL を付け、
 // 中身(操作名と recordId)を元の要求と照合する。
-// クライアントが elicitation を宣言していなければ、確認できないので拒否して人に回す(所有者の判断。
-// 提案(change set)ができるまでの扱い)。
+// クライアントが elicitation を宣言していなければ、確認できないので拒否して人に回す(所有者の判断)。
+// M5c からは、トークンが record:propose を持てば提案(proposal_create)も案内する。
 
 export const CONFIRM_OPERATIONS = ["record_publish", "record_unpublish"] as const;
 export type ConfirmOperation = (typeof CONFIRM_OPERATIONS)[number];
@@ -115,11 +115,11 @@ function messageOf(op: ConfirmOperation, label: string, type: string, recordId: 
     : `「${label}」(${type} / ${recordId})の公開を取り下げますか。`;
 }
 
-function refused(code: string, message: string): CallToolResult {
+function refused(code: string, message: string, details?: Record<string, unknown>): CallToolResult {
   return {
     isError: true,
     content: [{ type: "text", text: `${code}: ${message}` }],
-    structuredContent: { error: { code, message } },
+    structuredContent: { error: { code, message, ...(details === undefined ? {} : { details }) } },
   };
 }
 
@@ -134,6 +134,8 @@ export interface ConfirmArgs {
   // record の名前と型は ask のときだけ要る(呼び出し側が record_get で引く)
   describe: () => Promise<RecordDescription | CallToolResult>;
   clientCanElicit: boolean;
+  // M5c(決定 57): トークンが record:propose を持つなら、確認できないときの代わりに提案を案内する
+  canPropose: boolean;
   inputResponses: Record<string, unknown> | undefined;
   // SDK の verify を通った requestState の中身(無ければ undefined)
   state: ConfirmState | undefined;
@@ -166,12 +168,18 @@ export async function confirmOperation(args: ConfirmArgs): Promise<ConfirmOutcom
     }
   }
   if (!args.clientCanElicit) {
+    const base =
+      "このクライアントは確認(elicitation)に対応していないため公開・取り下げはできません。status を ready にして、管理画面で人が公開してください";
+    const kind = args.op === "record_publish" ? "publish" : "unpublish";
     return {
       kind: "refused",
-      result: refused(
-        "confirmation_unavailable",
-        "このクライアントは確認(elicitation)に対応していないため公開・取り下げはできません。status を ready にして、管理画面で人が公開してください",
-      ),
+      result: args.canPropose
+        ? refused(
+            "confirmation_unavailable",
+            `${base}。または proposal_create(kind: ${kind})で${kind === "publish" ? "公開" : "取り下げ"}を提案してください`,
+            { alternative: "proposal_create" },
+          )
+        : refused("confirmation_unavailable", base),
     };
   }
   const described = await args.describe();

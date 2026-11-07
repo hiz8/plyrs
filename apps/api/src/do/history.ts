@@ -32,6 +32,8 @@ export interface HistoryActor {
   via: Via;
   tokenId?: string;
   clientId?: string;
+  // 16.8(M5c): 提案の採用で生まれた版。付いた版は畳み込まない(前の版にも畳み込ませない)
+  proposalId?: string;
 }
 
 export interface HistoryEntryInput extends HistoryActor {
@@ -57,6 +59,7 @@ export interface HistoryEntry {
   tokenId: string | null;
   clientId: string | null;
   restoredFrom: number | null;
+  proposalId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -97,12 +100,13 @@ interface RawHistoryRow extends Record<string, SqlStorageValue> {
   token_id: string | null;
   client_id: string | null;
   restored_from: number | null;
+  proposal_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
 const COLUMNS =
-  "record_id, history_seq, kind, version, source_version, status, data, diff, field_versions, changed_fields, actor, via, token_id, client_id, restored_from, created_at, updated_at";
+  "record_id, history_seq, kind, version, source_version, status, data, diff, field_versions, changed_fields, actor, via, token_id, client_id, restored_from, proposal_id, created_at, updated_at";
 
 function rowToEntry(row: RawHistoryRow): HistoryEntry {
   return {
@@ -117,6 +121,7 @@ function rowToEntry(row: RawHistoryRow): HistoryEntry {
     tokenId: row.token_id,
     clientId: row.client_id,
     restoredFrom: row.restored_from,
+    proposalId: row.proposal_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -325,6 +330,9 @@ function shouldFold(latest: RawHistoryRow, entry: HistoryEntryInput, nowMs: numb
   return (
     entry.kind === "write" &&
     latest.kind === "write" &&
+    // 16.8(M5c): 提案の採用の版は畳み込まない。採用された内容がどの提案から来たかを 1 版 1 提案で保つ
+    entry.proposalId === undefined &&
+    latest.proposal_id === null &&
     latest.actor === entry.actor &&
     latest.via === entry.via &&
     latest.status === entry.status &&
@@ -414,7 +422,7 @@ export function recordHistory(sql: SqlStorage, now: string, entry: HistoryEntryI
   const changed =
     entry.kind === "write" || entry.kind === "restore" ? changedKeys(previousData, entry.data) : [];
   sql.exec(
-    `INSERT INTO record_history (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO record_history (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     entry.recordId,
     seq,
     entry.kind,
@@ -429,6 +437,7 @@ export function recordHistory(sql: SqlStorage, now: string, entry: HistoryEntryI
     entry.tokenId ?? null,
     entry.clientId ?? null,
     entry.restoredFrom ?? null,
+    entry.proposalId ?? null,
     now,
     now,
   );

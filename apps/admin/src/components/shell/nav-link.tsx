@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link, type LinkRenderProps } from "react-aria-components";
 import { ICON_SIZE, stylexRenderProps } from "@plyrs/ui";
 import {
@@ -52,7 +53,13 @@ const styles = stylex.create({
     outlineColor: focus.ring,
     outlineOffset: `calc(-1 * ${stroke.focus})`,
   },
-  label: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  label: {
+    minWidth: 0,
+    flex: 1,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
   icon: { flexShrink: 0, display: "inline-flex" },
   heading: {
     paddingBlock: space.xs,
@@ -72,6 +79,8 @@ export interface NavLinkProps {
   isCurrent: boolean | "ancestor";
   /** 押されたときに呼ぶ(ドロワーを閉じる用。同じ URL への遷移でも確実に呼ばれる) */
   onNavigate?: () => void;
+  /** ラベルの右に出す件数など(M5c: 未処理の提案の数) */
+  badge?: ReactNode;
 }
 
 function Item({
@@ -80,6 +89,7 @@ function Item({
   icon: Icon,
   isCurrent,
   onNavigate,
+  badge,
   child,
 }: NavLinkProps & { child: boolean }) {
   return (
@@ -102,6 +112,7 @@ function Item({
         </span>
       )}
       <span {...stylex.props(styles.label)}>{label}</span>
+      {badge}
     </Link>
   );
 }

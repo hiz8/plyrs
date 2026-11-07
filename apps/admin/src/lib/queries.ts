@@ -119,3 +119,29 @@ export function modulesQueryOptions(adminApi: AdminApi, tenantId: string) {
     retry: 1,
   });
 }
+
+// 16.8(M5c): 未処理の提案。サイドバーのバッジ・一覧・編集画面の案内で共用する。エージェントの提案は
+// 同期経路を通らないので、30 秒の定期再取得で届かせる(フォーカス復帰時の再取得は React Query の既定)。
+// 1 ページに収まる 100 件まで(API の上限)。それ以上は一覧の「さらに表示」で辿る
+export function proposalsQueryKey(tenantId: string) {
+  return ["proposals", tenantId] as const;
+}
+
+export function openProposalsQueryOptions(adminApi: AdminApi, tenantId: string) {
+  return queryOptions({
+    queryKey: [...proposalsQueryKey(tenantId), "open"],
+    queryFn: () => adminApi.listProposals(tenantId, { state: "open", limit: 100 }),
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+}
+
+export function proposalQueryOptions(adminApi: AdminApi, tenantId: string, proposalId: string) {
+  return queryOptions({
+    queryKey: [...proposalsQueryKey(tenantId), "detail", proposalId],
+    queryFn: () => adminApi.getProposal(tenantId, proposalId),
+    staleTime: 0,
+    retry: 1,
+  });
+}

@@ -143,6 +143,20 @@ describe("publish の確認(MRTR の elicitation)", () => {
     expect(await published(recordId)).toBe(false);
   });
 
+  it("record:propose も持つ PAT の confirmation_unavailable は proposal_create を案内し、持たなければ案内しない(M5c)", async () => {
+    const recordId = await newRecord(902);
+    const proposePat = await issue(["record:read", "record:publish", "record:propose"]);
+    const json = await call("record_publish", { recordId }, { token: proposePat });
+    expect(json.result?.structuredContent).toMatchObject({
+      error: { code: "confirmation_unavailable", details: { alternative: "proposal_create" } },
+    });
+    const plain = await call("record_publish", { recordId });
+    const error = plain.result?.structuredContent?.["error"] as Record<string, unknown>;
+    expect(error["code"]).toBe("confirmation_unavailable");
+    expect(error["details"]).toBeUndefined();
+    expect(await published(recordId)).toBe(false);
+  });
+
   it("宣言すると input_required で確認を求め、承諾を付けて送り直すと公開される", async () => {
     const recordId = await newRecord(902);
     const first = await call("record_publish", { recordId }, { elicitation: true });

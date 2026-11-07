@@ -16,7 +16,12 @@ import { ApiError } from "../../../lib/api-client";
 import { resetClientSession } from "../../../lib/client-session";
 import { NAV_LABELS } from "../../../lib/labels";
 import { legacyPathname } from "../../../lib/legacy-redirect";
-import { meQueryOptions, modulesQueryOptions, tenantsQueryOptions } from "../../../lib/queries";
+import {
+  meQueryOptions,
+  modulesQueryOptions,
+  openProposalsQueryOptions,
+  tenantsQueryOptions,
+} from "../../../lib/queries";
 import {
   TenantSyncProvider,
   useSyncHasSynced,
@@ -97,6 +102,8 @@ function ShellLayout() {
   // me の失敗でシェルは止めない(email が無いだけ)。modules は届くまで undefined
   const meQuery = useQuery(meQueryOptions(api));
   const modulesQuery = useQuery(modulesQueryOptions(adminApi, tenant.id));
+  // M5c: 未処理の提案の数(サイドバーのバッジ)。失敗してもシェルは止めない(数が出ないだけ)
+  const openProposalsQuery = useQuery(openProposalsQueryOptions(adminApi, tenant.id));
 
   useEffect(() => {
     tenantSync.start();
@@ -147,6 +154,7 @@ function ShellLayout() {
     modules: modulesQuery.data,
     slotItems: slots.get("nav:item"),
     syncState,
+    openProposalCount: openProposalsQuery.data?.openCount ?? null,
     pathname,
     onSwitchTenant: (slug) => void navigate({ to: "/t/$tenantSlug", params: { tenantSlug: slug } }),
     onOpenAccount: () =>

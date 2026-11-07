@@ -54,6 +54,8 @@ export interface OpContext {
   deps: OpDeps;
   // 書き込み操作が変更した record の id。コミット後に tenant-do.ts が同期へ broadcast する
   effects: { changedRecordIds: Set<string> };
+  // 16.8(M5c): 提案の採用(proposal_accept)が書き込みハンドラを呼ぶときに渡す提案の id。履歴の版に刻む
+  proposalId?: string;
 }
 
 // writeRecordCore / restoreRecordCore に渡す発番・時刻(tenant-do.ts の writeRecord RPC と同じ形)
@@ -72,7 +74,7 @@ export function writeDepsOf(ctx: OpContext): WriteDeps {
 // 履歴に刻む actor(16.5)。MCP の認可コンテキストなら tokenId も残す
 export function historyActorOf(ctx: OpContext): HistoryActor {
   const tokenId = "tokenId" in ctx.auth ? ctx.auth.tokenId : undefined;
-  return { actor: ctx.auth.userId, via: ctx.via, tokenId };
+  return { actor: ctx.auth.userId, via: ctx.via, tokenId, proposalId: ctx.proposalId };
 }
 
 export type OpFailure = {

@@ -27,6 +27,11 @@ const SCOPE_LABELS: Record<PatScope, { label: string; description: string }> = {
     label: "読み取り(record:read)",
     description: "コンテンツタイプとコンテンツを読み取ります。下書きも含みます",
   },
+  "record:propose": {
+    label: "提案(record:propose)",
+    description:
+      "コンテンツの作成・編集・削除・公開を提案します。提案は管理画面で人が採用・却下します",
+  },
   "record:write": {
     label: "作成・編集(record:write)",
     description: "コンテンツを作成・編集します",

@@ -32,9 +32,10 @@ function token(overrides: Partial<TokenSummary> = {}): TokenSummary {
 }
 
 describe("スコープの選択肢", () => {
-  it("管理者には record:publish を含む 5 つ、既定は record:read だけ", () => {
+  it("管理者には record:publish を含む 6 つ、既定は record:read だけ", () => {
     expect(scopeOptionsFor("owner").map((o) => o.value)).toEqual([
       "record:read",
+      "record:propose",
       "record:write",
       "record:delete",
       "record:publish",
@@ -50,6 +51,7 @@ describe("スコープの選択肢", () => {
   it("管理者以外には record:publish を出さない(編集者はロールの範囲、閲覧者は読み取りだけ)", () => {
     expect(scopeOptionsFor("editor").map((o) => o.value)).toEqual([
       "record:read",
+      "record:propose",
       "record:write",
       "record:delete",
     ]);
@@ -60,6 +62,8 @@ describe("スコープの選択肢", () => {
 describe("期限の選択肢", () => {
   it("読み取りだけなら 30 / 90 / 365 日で既定 90、書き込み付きなら 7 / 30 / 90 日で既定 30", () => {
     expect(isReadOnlyScopes(["record:read"])).toBe(true);
+    // M5c: 提案はデータを作るので書き込み扱い(期限は 90 日まで)
+    expect(isReadOnlyScopes(["record:read", "record:propose"])).toBe(false);
     expect(isReadOnlyScopes(["record:read", "record:write"])).toBe(false);
     expect(expiryOptionsFor(["record:read"]).map((o) => o.days)).toEqual([30, 90, 365]);
     expect(defaultExpiryFor(["record:read"])).toBe(90);

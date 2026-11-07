@@ -78,12 +78,18 @@ describe("純関数", () => {
   it("allowedScopes: record:publish と type:manage は所有者だけ", () => {
     expect(allowedScopes("owner")).toEqual([
       "record:read",
+      "record:propose",
       "record:write",
       "record:delete",
       "record:publish",
       "type:manage",
     ]);
-    expect(allowedScopes("editor")).toEqual(["record:read", "record:write", "record:delete"]);
+    expect(allowedScopes("editor")).toEqual([
+      "record:read",
+      "record:propose",
+      "record:write",
+      "record:delete",
+    ]);
     expect(allowedScopes("viewer")).toEqual(["record:read"]);
   });
 
@@ -94,6 +100,9 @@ describe("純関数", () => {
       "type:manage",
     ]);
     expect(disallowedScopes("viewer", ["record:write"])).toEqual(["record:write"]);
+    // M5c: 提案のスコープは editor まで。viewer は持てない
+    expect(disallowedScopes("editor", ["record:read", "record:propose"])).toEqual([]);
+    expect(disallowedScopes("viewer", ["record:propose"])).toEqual(["record:propose"]);
   });
 
   it("maxExpiryDays: 読み取りのみは 365 日、書き込みスコープを含めば 90 日", () => {

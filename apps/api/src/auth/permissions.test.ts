@@ -30,4 +30,10 @@ describe("default role permissions (design-spec §11.3/§11.5)", () => {
     expect(can("editor", "record:publish")).toBe(true);
     expect(can("viewer", "record:publish")).toBe(false);
   });
+
+  it("record:propose は owner と editor が持ち、viewer は持たない(M5c)", () => {
+    expect(can("owner", "record:propose")).toBe(true);
+    expect(can("editor", "record:propose")).toBe(true);
+    expect(can("viewer", "record:propose")).toBe(false);
+  });
 });
