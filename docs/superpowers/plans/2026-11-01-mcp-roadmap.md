@@ -139,6 +139,14 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | --- | --- | --- | --- |
 | M5b | 決定 56(2026-07-28 のみ)、JSON-RPC のバッチを入口で拒否、文書と申し送り | E4 | S |
 
+#### M5c 提案(change set)— 詳細計画 `2026-11-07-m5c-change-set.md`
+
+design-spec 16.8 の「提案(change set、論点 B4)」を実装した(決定 57、2026-11-07)。専用ツール `proposal_create` / `proposal_list` / `proposal_get` を MCP と REST に出し、採用・却下は管理画面だけ。採用は採用した人の権限・actor で既存の書き込みハンドラを通し、履歴の版に `proposal_id` を残す。
+
+| PR | 内容 | 論点 | 規模 |
+| --- | --- | --- | --- |
+| M5c | `record:propose` スコープ、`proposals` 表と履歴の `proposal_id`、提案の操作(作成・一覧・詳細・採用・却下)、MCP の導線(スコープ不足と確認不能の案内)、管理画面(一覧・詳細・採用 / 却下・バッジ・編集画面の案内)、E2E、決定 57 と接続ガイド 3.7 | B4・C3・C5 | L |
+
 ## 3. 依存関係
 
 書き込み MCP 公開までの最長経路は M0-2 → M2-1 → M2-2 → M4-1(リッチテキストの系列)。M4 は M3 を待たない。
@@ -179,6 +187,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | 再適用回数の数え方(B3 ③) | `attempt` 引数の自己申告 | M4-1 | **決定済み(2026-11-03)**: `attempt`(1〜3)の自己申告。3 回目の conflict は `giveUp`(M4-1b) |
 | publish ツールの出し方 | 常に出して 403 step-up | M4-2 | **決定済み(2026-11-03)**: 常に出して 403 step-up(design-spec 16.8) |
 | elicitation 非対応クライアントの publish(C5) | B4 までは拒否して人に回す | M4-2 | **決定 50**(所有者の判断、拒否して人に回す) |
+| 提案の実装形(B4。専用ツールか既存ツールの出力に混ぜるか、採用の権限と actor、履歴の `client_id`) | 専用ツール | M5c | **決定 57**(M5c、2026-11-07): 専用ツール `proposal_create` / `proposal_list` / `proposal_get`。採用・却下は管理画面のみ、採用は採用した人の権限・actor で既存の書き込みハンドラを通す。`client_id` は埋めない |
 | 型単位のスコープ(C3) | 初期は採らない | M5 | 未決 |
 | ブロック単位の競合判定の方式(B3 ④) | — | M5 | 未決 |
 | サービスアカウント(C4)、公開側 MCP の認証(D4)、意味検索(A4) | — | M5 | 未決 |
@@ -206,7 +215,7 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 | M2 | `2026-11-02-m2-data-and-operations.md` | 完了(2026-11-02) |
 | M3 | `2026-11-03-m3-oauth.md` | 完了(2026-11-03)。ゲート G3 通過 |
 | M4 | `2026-11-03-m4-write-mcp.md` | 実装完了(2026-11-03)。ゲート G4 は preview での所有者の確認待ち |
-| M5 | `2026-11-04-m5a-carryovers.md`(M5a)、`2026-11-07-m5b-legacy-protocol.md`(M5b。M5c 以降は着手時に作る) | M5a 実装済み(2026-11-04、#87〜#92、スタック PR)。M5b 決定済み(2026-11-07) |
+| M5 | `2026-11-04-m5a-carryovers.md`(M5a)、`2026-11-07-m5b-legacy-protocol.md`(M5b)、`2026-11-07-m5c-change-set.md`(M5c。M5d 以降は着手時に作る) | M5a 実装済み(2026-11-04、#87〜#92、スタック PR)。M5b 決定済み(2026-11-07)。M5c 実装済み(2026-11-07。preview での所有者の確認待ち) |
 
 ## 7. M1 完了時の申し送り(2026-11-01)
 
@@ -323,3 +332,12 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 - **受け入れの試作(#94、閉じた)**: SDK の `createMcpHandler` の `legacy: "stateless"` で受けられることを確かめた(api のテスト 800 件と E2E 全 8 spec が通過)。試作で 2 つの穴を見つけた。(1) SDK の 2025 年版の経路は 2025-03-26 の JSON-RPC バッチを受け、配列の中の `tools/call` が入口のスコープ判定と Rate Limiting のキーを素通りした。(2) 2026-07-28 で得た確認の `requestState` と承諾を 2025 年版の要求に付け替えると、確認のフォームを経ずに公開まで進んだ。受け入れを再検討するときは、#94 のコミット(閉じた PR に残る)の内容(バッチの拒否、2025 年版の接続の publish を `confirmation_unavailable` にする判定、`mcp.op` の `era`)をそのまま使える
 - **残したもの**: バッチ(配列の本文)は入口で 400 / `-32600`。2026-07-28 にバッチは無いが、入口の判定が 1 要求を前提にしているので、SDK に渡す前に止める
 - **再検討の条件**: ChatGPT への対応が必要になったら、ChatGPT から実際に接続して版を確かめる。2025 年版で話すなら #94 の変更を戻す。主要な汎用クライアントの対応状況(2026 年 10 月時点の外部の調査): ChatGPT は通常の接続の版が公表されておらず、OpenAI の案内は 2025 年版の `initialize` を前提にしている
+
+## 14. M5c 完了時の申し送り(2026-11-07)
+
+- **決定 57: 提案は専用ツール、採用・却下は管理画面だけ**: `proposal_create`(`record:propose`)/ `proposal_list` / `proposal_get`(`record:read`)を MCP と REST に出し、`proposal_accept` / `proposal_reject` は REST のみ(管理画面が呼ぶ)。採用は採用した人の権限(`record:write` / `record:delete` / `record:publish`)と actor で既存の書き込みハンドラ(`WRITE_HANDLERS`)を同じトランザクションで通すので、検証・一意性・モジュールフック・履歴・公開用 DB の反映は分岐しない。履歴の版は `proposal_id` を持ち畳み込まない。M5a の申し送り「履歴の `client_id`」は埋めないことにした(認可コンテキストに無く、提案者の表示は利用者と接続トークンで足りる)
+- **保存する形**: `proposals` 表(`packages/db/drizzle/0012_*`)。`input` は作成時に解決した具体値で、更新は変えるフィールドだけ。`base_version` と現在の `records.version` の差で `stale` を出す。採用・却下から 90 日で消す(`proposal_create` のついでに 50 行まで)
+- **導線**: `record:propose` を持つ PAT の `insufficient_scope`(`record:write` / `record:delete` / `record:publish` が足りないとき)と、確認できないクライアントの `confirmation_unavailable` に `proposal_create` の案内と `details.alternative` を付けた。`record_update` の説明は `attempt: 3` の conflict で提案に回すよう書き換えた
+- **管理画面**: `/t/:slug/proposals`(未処理 / 処理済み、`recordId` で絞る)と `/t/:slug/proposals/:id`。サイドバーの「提案」に未処理の数、編集画面の公開ボックスの上に案内。未処理の提案は 30 秒ごとに取り直す(同期経路を通らない)
+- **見送ったもの(次の M5 の項目の候補)**: 提案者による取り下げ(`proposal_withdraw`)、提案へのコメントの往復(却下の理由は 1 回だけ)、ホーム画面の未処理の件数、提案の採用時に本文の一部だけを選んで採る(フィールド単位の採用)、提案からの「編集して採用」(採用者が内容を直してから書き込む)、OAuth の同意画面での `record:propose` の既定(いまは owner / editor のロールが持つスコープをそのまま出す)
+- **所有者の確認(preview)**: 接続ガイド 3.7 の手順。結果はこの章に追記する

@@ -228,6 +228,28 @@ M5a の確認(preview、所有者。マージ・デプロイ後。結果はロ�
 3. `record:publish` の無い PAT で公開を頼むと、エージェントが「所有者に PAT を発行してもらう」旨を伝えること(業務エラー `insufficient_scope`)
 4. M1 から残っている Cursor / VS Code(と、あれば MCP Inspector)からの PAT 接続(手順は 3.5)。**M5b で対象外にした**(決定 56。VS Code と Cursor は 2025 年版しか話さない)
 
+### 3.7 提案(M5c、design-spec 16.8、決定 57)
+
+エージェントが直接書き込めないとき(スコープ不足・確認に対応しないクライアント・conflict が続く)に、変更を「提案」として残し、人が管理画面で採用・却下する。採用は採用した人の名前と権限で書き込まれる(履歴に「提案を採用して」と出る)。
+
+| ツール | スコープ | 内容 |
+| --- | --- | --- |
+| `proposal_create` | `record:propose` | 作成・更新・削除・公開・公開の取り下げの提案を作る。`kind` と `recordId`、更新・作成なら `input`(Markdown 文字列もよい)、任意の `note`(提案者の説明)。`proposalId` はクライアント生成の UUIDv7 |
+| `proposal_list` | `record:read` | 提案の一覧(`state` / `recordId` で絞る) |
+| `proposal_get` | `record:read` | 提案の詳細。現在との差分(`fields`)、`stale`、採用・却下の結果と却下の理由 |
+
+`proposal_accept` / `proposal_reject` は MCP には出ない(管理画面だけが REST で呼ぶ)。
+
+PAT の発行(設定 › 接続中のアプリ): 提案だけさせるなら `record:read` と `record:propose` を付け、`record:write` は付けない。`record:write` を持つトークンも `record:propose` を併せて持てば、`record:publish` の無いときの公開や、conflict が続いたときの更新を提案に回せる。`record:write` の無い PAT で `record_update` などを呼ぶと `insufficient_scope` の message に「提案(`proposal_create`)なら送れる」が付き(`details.alternative`)、エージェントがそれに従う。
+
+管理画面: サイドバーの「提案」に未処理の数が出る。一覧は未処理 / 処理済みのタブ、詳細で「現在との差分」を見て「採用する」か「却下する」(理由は任意)。「提案の後に内容が変わっています」の警告が出ていれば、差分は今の内容との比較で、採用すると提案のフィールドだけが上書きされる。採用・却下した提案は 90 日で消える。
+
+所有者の確認(preview、マージ・デプロイ後。結果はロードマップ 14 章に記録する):
+
+1. `record:read record:propose` の PAT を発行し、Claude Code で記事の更新を頼む。エージェントが `record_update` の `insufficient_scope` の案内に従って `proposal_create` を選ぶこと
+2. 管理画面の「提案」で差分を見て採用する。記事が提案の内容になり、履歴の先頭が「○○ が API から提案を採用して n フィールドを変更」になること
+3. 公開を頼む。確認が出るクライアントでは従来どおり確認から公開される。`record:publish` の無い PAT では `insufficient_scope` の案内から publish の提案になり、管理画面で採用すると公開されること
+
 ## 4. super 管理者の初期化
 
 **デプロイ後は直ちに bootstrap を実行すること** — super_admins が空の間は到達可能な誰でも初期化できる(レート制限のみ)。

@@ -61,7 +61,7 @@ Durable Object 内で、record から relations の行を作り直す処理は�
 | --- | --- |
 | 操作カタログ | record や型に対する操作(作成・更新・公開など)の名前、入出力のスキーマ、必要な権限、説明文、提供する経路を 1 か所で宣言したもの。MCP のツール、REST、CLI はここから生成する。Durable Object への RPC は `invoke(op, input)` の 1 本に集約する |
 | 変更履歴 | record の版の記録。Durable Object 内の履歴表に、表自身の連番をキーとして保存し(`records.version` は属性。publish の版は `source_version` で識別)、誰が(actor)どの経路から(via)変えたかを持つ。管理画面の「履歴」画面と、エージェントの `record_history` / `record_restore` が読む。運営操作の `audit_logs` とは別物 |
-| 提案(change set) | エージェントの変更を record へ直接書かず、採用・却下を待つ形で保存したもの。管理画面で差分を見て人が判断する。`record:propose` スコープだけを持つトークンの変更は提案になる。公開状態・ワークフロー状態に加わる 3 本目の軸 |
+| 提案(change set) | エージェントの変更を record へ直接書かず、採用・却下を待つ形で保存したもの。管理画面で差分を見て人が判断する。`record:propose` スコープを持つトークンが専用ツールで作る。公開状態・ワークフロー状態に加わる 3 本目の軸。コードとツール名では proposal(`proposals` 表、`proposal_create` / `proposal_list` / `proposal_get`)。採用・却下は管理画面の操作(`proposal_accept` / `proposal_reject` は REST のみ)。種別(kind)は作成・更新・削除・公開・公開の取り下げ、状態(state)は未処理(open)・採用(accepted)・却下(rejected)。提案の後に record が変わっていれば stale |
 | スコープ | トークンに付く権限の範囲。名前は Durable Object の `Operation`(`record:read`、`record:write`、`record:publish` など)と同じ。実効権限はスコープとロールの共通部分で、スコープは権限を絞るだけで増やさない |
 | PAT | Personal Access Token。管理画面で所有者が発行する長命の Bearer トークン。ヘッダにトークンを貼れるクライアント(Claude Code、CI など)が MCP に接続するための正式な経路の 1 つ。D1 にはハッシュだけを保存する |
 | 判定モード(strict) | 同期の競合判定の厳しさ。管理画面の経路は現行どおり(別フィールドはマージ、同一スカラーは後勝ち、同一リッチテキストは競合)。エージェントの経路は strict で、変更したフィールドのどれか 1 つでも版が違えばスカラーも競合にする |

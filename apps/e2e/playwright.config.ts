@@ -48,5 +48,7 @@ export default defineConfig({
     { name: "oauth", testMatch: /oauth\.spec\.ts/, dependencies: ["core-journey"] },
     // M4-6: 書き込み MCP(作成・競合・ブロック編集・スコープ不足・確認不能・復元)。テナントは自前(mcpw)
     { name: "mcp-write", testMatch: /mcp-write\.spec\.ts/, dependencies: ["core-journey"] },
+    // M5c: 提案(change set)。record:propose の PAT の提案を管理画面で採用・却下する。テナントは自前(props)
+    { name: "proposals", testMatch: /proposals\.spec\.ts/, dependencies: ["core-journey"] },
   ],
 });
