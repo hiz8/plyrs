@@ -302,4 +302,9 @@ M0 の決定後、M1・M2・M3 は並行で進められる。
 - **PAT のスコープ不足(決定 55)**: HTTP 200 のツールの業務エラー `insufficient_scope`(`details.required`・`tokenKind: "pat"`)。本文は `insufficient_scope: <対処>` で、ほかの業務エラーの表示に揃えた(計画は対処の文だけ)。OAuth は 403 の step-up のまま
 - **G4 の小さな不具合**: URL 取り込みの各ホップに User-Agent(`plyrs-asset-import/1 (+<API_ORIGIN>)`)、publish の確認のフォームの `confirm` に `default: true`(照合は明示の true のみ)、書き込み時のリッチテキストの語彙と属性の検査(`checkRichTextVocabulary`。ProseMirror の内容の規則は見ない)
 - **残り**: (1) 構造の検査はフィールド単位なので、この検査より前に保存された不正なブロックを持つ本文は、別のブロックだけのブロック操作や古い版の `record_restore` でも `validation_failed` になる。(2) 生成カラムの affinity による比較の厳しさ(11 章)は記録のまま。(3) 入れ子の段落の `attrs.id` を replace が落とす件(11 章)は直さない。(4) MCP の書き込みに client_id を残すかは監査の整理(M5b 以降)で決める
-- **M5a の確認**: `docs/deploy.md` 3.6 の「M5a の確認」の手順で所有者が preview で確かめる。結果はここに追記する
+- **M5a の確認**(preview、所有者と Claude Code、2026-11-07。手順は `docs/deploy.md` 3.6 の「M5a の確認」): 4 項目とも期待どおり
+  1. `asset_import_url` で upload.wikimedia.org の画像を取り込めた(M4 の 403 は出ない)。Wikimedia はサムネイルの幅を決まった段階に限っていて、`320px-` のような段階外の幅は 400 を返す(`330px-` と原画は 200)。plyrs の不具合ではないが、`fetch_failed: the URL responded with 400` はこの原因でも出る
+  2. Claude Code の publish の確認は `confirm` 欄が初期値で true になり、欄を触らずに Accept するだけで公開された(`confirm` を欠いた Accept による `declined` は起きない)
+  3. `record:publish` の無い PAT の `record_publish` は業務エラー `insufficient_scope` で返り、エージェントは「所有者に `record:publish` 付きのトークンを発行してもらう」と伝えた。接続は切れない
+  4. PAT 接続: MCP Inspector(2.14.0、Web 画面)で `tools/list`(読み取りの 7 ツールが先頭)と `type_list` を確かめた。**Inspector は既定で 2025-11-25 の `initialize` を送る**(SDK v2 クライアントの交渉の既定が `legacy`)ので、そのままでは `-32022 Unsupported protocol version` で拒否される。Server Settings › Options の **Protocol Era を Modern**(または Auto)にすると接続できる。VS Code(MCP は Copilot Chat の機能)は未確認、Cursor は所有者が使っていないため未確認
+- **旧版プロトコルのクライアント(4 章の未決事項)の材料**: 公式の Inspector と SDK v2 クライアントの既定がまだ legacy なので、「2026-07-28 のみ」の仮置きでは、設定を変えない利用者は接続できない。拒否の応答(`-32022`、`data.supported`)は SDK の交渉が読む形なので、Auto のクライアントは自動で Modern に切り替わる

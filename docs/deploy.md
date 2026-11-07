@@ -126,10 +126,12 @@ claude mcp add --transport http plyrs https://plyrs-api-preview.hiz.workers.dev/
   --header "Authorization: Bearer plyrs_pat_..."
 
 # MCP Inspector(ブラウザの UI から接続する場合も同じ URL と Authorization ヘッダ)
-npx @modelcontextprotocol/inspector --transport http \
+npx @modelcontextprotocol/inspector --transport http --protocol-era modern \
   --server-url https://plyrs-api-preview.hiz.workers.dev/mcp/t/<tenantId> \
   --header "Authorization: Bearer plyrs_pat_..."
 ```
+
+MCP Inspector(v2)は既定で 2025-11-25 の `initialize` を送るので、そのままでは `-32022 Unsupported protocol version` で拒否される。CLI は `--protocol-era modern`、Web 画面は Server Settings › Options の **Protocol Era** を Modern(または Auto)にする(2026-11-07、Inspector 2.14.0 で確認)。
 
 Cursor / VS Code は `mcp.json` の `"type": "http"` で同じ URL と `headers.Authorization` を書く。claude.ai のコネクタは OAuth 必須のため M3 まで接続できない。
 
