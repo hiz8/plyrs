@@ -13,10 +13,22 @@ import type { AssetServices } from "../lib/asset-services";
 import { contentTypeCrumb, currentCrumb, homeCrumb } from "../lib/breadcrumbs";
 import { formatDateTime } from "../lib/datetime";
 import { errorMessage } from "../lib/error-messages";
-import { DIALOGS, EDITOR_LABELS, HISTORY_LABELS, PUBLISH_BOX, TOASTS } from "../lib/labels";
+import {
+  DIALOGS,
+  EDITOR_LABELS,
+  HISTORY_LABELS,
+  PROPOSAL_LABELS,
+  PUBLISH_BOX,
+  TOASTS,
+} from "../lib/labels";
+import { openProposalsFor } from "../lib/proposals";
 import { labelForRecord } from "../lib/record-label";
 import { publishBoxView } from "../lib/publish-box";
-import { publicationQueryOptions, publicationsQueryKey } from "../lib/queries";
+import {
+  openProposalsQueryOptions,
+  publicationQueryOptions,
+  publicationsQueryKey,
+} from "../lib/queries";
 import { useSaveAndPublish } from "../lib/save-and-publish";
 import { useSyncStatus, useTenantSync } from "../lib/sync-context";
 import { useCan } from "../lib/use-can";
@@ -118,6 +130,13 @@ export function RecordEditor({
   const isNew = record === null;
   const typeKey = contentType.key;
 
+  // M5c: この record への未処理の提案があれば公開ボックスの上で案内する(採用・却下は提案画面)
+  const openProposals = useQuery({
+    ...openProposalsQueryOptions(adminApi, tenant.id),
+    enabled: record !== null,
+  });
+  const openProposalCount =
+    record === null ? 0 : openProposalsFor(openProposals.data?.items ?? [], record.id).length;
   const publication = useQuery({
     ...publicationQueryOptions(adminApi, tenant.id, record?.id ?? ""),
     enabled: record !== null,
@@ -431,6 +450,28 @@ export function RecordEditor({
               ref={formRef}
             />
             <aside {...stylex.props(styles.side)}>
+              {record !== null && openProposalCount > 0 && (
+                <Banner
+                  tone="warning"
+                  action={
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onPress={() =>
+                        void navigate({
+                          to: "/t/$tenantSlug/proposals",
+                          params: { tenantSlug },
+                          search: { recordId: record.id },
+                        })
+                      }
+                    >
+                      {PROPOSAL_LABELS.editorBannerLink}
+                    </Button>
+                  }
+                >
+                  {PROPOSAL_LABELS.editorBanner(openProposalCount)}
+                </Banner>
+              )}
               <PublishBox
                 view={view}
                 status={record?.status ?? draftStatus}

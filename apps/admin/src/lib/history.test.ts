@@ -66,6 +66,16 @@ describe("履歴の文言", () => {
       "ai@example.com が管理画面から版 1 に復元",
     );
   });
+
+  it("要約: 提案の採用で生まれた版は「提案を採用して」を挟む(M5c)", () => {
+    const accepted = entry({ via: "sync", proposalId: "018f2b6a-7a0a-7000-8000-0000000000f1" });
+    expect(summarizeEntry(accepted, members)).toBe(
+      "ai@example.com が管理画面から提案を採用して 3 フィールドを変更",
+    );
+    expect(summarizeEntry({ ...accepted, kind: "publish" }, members)).toBe(
+      "ai@example.com が管理画面から提案を採用して公開",
+    );
+  });
 });
 
 describe("差分の整形", () => {
