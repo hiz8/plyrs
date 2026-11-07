@@ -27,6 +27,8 @@ export interface WriteRecordParams {
   clientId?: string;
   // record_restore(M2-4)が復元元の history_seq を刻む。履歴の kind が restore になる
   restoredFrom?: number;
+  // 16.8(M5c): 提案の採用で書くときの提案の id。履歴の版に刻む(採用の版は畳み込まない)
+  proposalId?: string;
 }
 
 export type WriteErrorCode =
@@ -40,7 +42,7 @@ export type WriteErrorCode =
 // RPC 契約: actor・via・tokenId・clientId はクライアント申告ではなく auth と経路から合成する
 export type WriteRecordInput = Omit<
   WriteRecordParams,
-  "actor" | "via" | "tokenId" | "clientId" | "restoredFrom"
+  "actor" | "via" | "tokenId" | "clientId" | "restoredFrom" | "proposalId"
 >;
 
 // Phase 9: モジュールフックの拒否コードは `${moduleId}:${reason}` の名前空間必須

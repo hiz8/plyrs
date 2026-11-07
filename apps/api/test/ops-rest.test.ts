@@ -66,6 +66,35 @@ describe("POST /v1/t/:tenantId/ops/:op", () => {
     expect(body).not.toHaveProperty("meter");
   });
 
+  // M5c: 採用は needsTenantSlug なので、入口が D1 から slug を引いて publish の提案も通る
+  it("proposal_create → proposal_accept(publish)を REST で呼べ、採用で公開される", async () => {
+    const proposalId = uuidv7();
+    const created = await app.request(
+      `/v1/t/${tenantId}/ops/proposal_create`,
+      json({ proposalId, kind: "publish", recordId }, headers),
+      env,
+    );
+    expect(created.status, await created.clone().text()).toBe(200);
+    const accepted = await app.request(
+      `/v1/t/${tenantId}/ops/proposal_accept`,
+      json({ proposalId }, headers),
+      env,
+    );
+    expect(accepted.status, await accepted.clone().text()).toBe(200);
+    const body = (await accepted.json()) as {
+      output: { proposal: { state: string; resultHistorySeq: number | null } };
+    };
+    expect(body.output.proposal.state).toBe("accepted");
+    expect(body.output.proposal.resultHistorySeq).not.toBeNull();
+    const again = await app.request(
+      `/v1/t/${tenantId}/ops/proposal_accept`,
+      json({ proposalId }, headers),
+      env,
+    );
+    expect(again.status).toBe(409);
+    expect(((await again.json()) as { code: string }).code).toBe("proposal_not_open");
+  });
+
   it("type_list(via が mcp のみ)は 404", async () => {
     const response = await app.request(`/v1/t/${tenantId}/ops/type_list`, json({}, headers), env);
     expect(response.status).toBe(404);
