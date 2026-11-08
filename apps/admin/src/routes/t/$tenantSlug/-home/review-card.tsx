@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import { VisuallyHidden } from "react-aria-components";
 import { Button, ICON_SIZE, Skeleton } from "@plyrs/ui";
 import { accent, font, radius, space, status, text } from "@plyrs/ui/semantic.stylex";
-import { listHref, type HomeType, type StatusSummary } from "../../lib/home";
-import { HOME_LABELS } from "../../lib/labels";
-import { PublicationBadge, WorkflowStatusBadge } from "../publication-badge";
+import { listHref, type HomeType, type StatusSummary } from "./home";
+import { HOME_LABELS } from "./home-labels";
+import { PublicationBadge, WorkflowStatusBadge } from "~/components/publication-badge";
 import { CardEmpty, CardLoadingRows, CardRow, HomeCard, TypeLinks } from "./home-card";
 
 // b-home.md 2.3: 件数チップは 24px の角丸

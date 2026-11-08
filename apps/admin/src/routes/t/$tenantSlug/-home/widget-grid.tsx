@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import type { HomeWidgetContribution } from "@plyrs/ui";
 import { space } from "@plyrs/ui/semantic.stylex";
-import { HOME_LABELS } from "../../lib/labels";
+import { HOME_LABELS } from "./home-labels";
 import { HomeCard } from "./home-card";
 
 const NARROW = "@media (max-width: 959px)";

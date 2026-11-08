@@ -2,9 +2,9 @@ import * as stylex from "@stylexjs/stylex";
 import { Pencil, RotateCw } from "lucide-react";
 import { Button, RelativeTime } from "@plyrs/ui";
 import { font, space, status, text } from "@plyrs/ui/semantic.stylex";
-import { formatDateTime } from "../../lib/datetime";
-import { listHref, recordHref, type HomeRecord, type StatusSummary } from "../../lib/home";
-import { HOME_LABELS } from "../../lib/labels";
+import { formatDateTime } from "~/lib/datetime";
+import { listHref, recordHref, type HomeRecord, type StatusSummary } from "./home";
+import { HOME_LABELS } from "./home-labels";
 import {
   CardEmpty,
   CardFooter,

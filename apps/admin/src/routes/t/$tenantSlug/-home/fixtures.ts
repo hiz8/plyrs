@@ -1,5 +1,5 @@
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import type { HomeRecord, HomeType, StatusSummary } from "../../lib/home";
+import type { HomeRecord, HomeType, StatusSummary } from "./home";
 
 // ホーム部品のテスト用の最小データ
 export const NEWS: HomeType = { key: "news", name: "お知らせ", group: "content" };

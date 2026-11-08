@@ -13,7 +13,7 @@ import {
   socketHarness,
   type Handler,
   type SocketHarness,
-} from "./test-utils/records-harness";
+} from "~/test-utils/records-harness";
 
 // b-home.md: ホーム(/t/blog)の配線。部品の見た目は components/home の各テストで担保する
 

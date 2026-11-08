@@ -3,7 +3,7 @@ import { LayoutGrid } from "lucide-react";
 import { useId } from "react";
 import { Button, EmptyState } from "@plyrs/ui";
 import { accent, bg, border, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
-import { HOME_LABELS } from "../../lib/labels";
+import { HOME_LABELS } from "./home-labels";
 
 const NARROW = "@media (max-width: 959px)";
 

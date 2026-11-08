@@ -4,8 +4,8 @@ import { Fragment, useId, type ReactNode } from "react";
 import { Link, type LinkRenderProps } from "react-aria-components";
 import { ICON_SIZE, ICON_STROKE, Skeleton, stylexRenderProps } from "@plyrs/ui";
 import { bg, border, focus, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
-import type { HomeType, StatusSummary, TypeCount } from "../../lib/home";
-import { HOME_LABELS } from "../../lib/labels";
+import type { HomeType, StatusSummary, TypeCount } from "./home";
+import { HOME_LABELS } from "./home-labels";
 
 const NARROW = "@media (max-width: 959px)";
 

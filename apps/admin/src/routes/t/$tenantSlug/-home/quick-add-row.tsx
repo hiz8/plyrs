@@ -3,8 +3,8 @@ import { Plus } from "lucide-react";
 import { Fragment, useId } from "react";
 import { Button, Skeleton } from "@plyrs/ui";
 import { border, font, space, text } from "@plyrs/ui/semantic.stylex";
-import type { HomeType } from "../../lib/home";
-import { HOME_LABELS } from "../../lib/labels";
+import type { HomeType } from "./home";
+import { HOME_LABELS } from "./home-labels";
 
 // b-home.md 2.1: 区切り線は 1px × 24px
 const DIVIDER_HEIGHT = "24px";

@@ -5,12 +5,12 @@ import { Lock } from "lucide-react";
 import { useMemo } from "react";
 import { ICON_SIZE } from "@plyrs/ui";
 import { space } from "@plyrs/ui/semantic.stylex";
-import { DraftsCard, type DraftsState } from "../../../components/home/drafts-card";
-import { GettingStarted, NoTypesNotice } from "../../../components/home/getting-started";
-import { QuickAddRow } from "../../../components/home/quick-add-row";
-import { RecentCard } from "../../../components/home/recent-card";
-import { ReviewCard, type ChangedState } from "../../../components/home/review-card";
-import { WidgetGrid } from "../../../components/home/widget-grid";
+import { DraftsCard, type DraftsState } from "./-home/drafts-card";
+import { GettingStarted, NoTypesNotice } from "./-home/getting-started";
+import { QuickAddRow } from "./-home/quick-add-row";
+import { RecentCard } from "./-home/recent-card";
+import { ReviewCard, type ChangedState } from "./-home/review-card";
+import { WidgetGrid } from "./-home/widget-grid";
 import { PageBody, TenantPageHeader } from "../../../components/tenant-page-header";
 import { currentCrumb } from "../../../lib/breadcrumbs";
 import { errorMessage } from "../../../lib/error-messages";
@@ -23,8 +23,9 @@ import {
   myDrafts,
   recentUpdates,
   type StatusSummary,
-} from "../../../lib/home";
-import { HOME_LABELS, NAV_LABELS, roleLabel } from "../../../lib/labels";
+} from "./-home/home";
+import { NAV_LABELS, roleLabel } from "../../../lib/labels";
+import { HOME_LABELS } from "./-home/home-labels";
 import {
   meQueryOptions,
   modulesQueryOptions,
