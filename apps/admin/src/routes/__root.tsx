@@ -13,7 +13,7 @@ import { I18nProvider, RouterProvider as RacRouterProvider } from "react-aria-co
 import type { ReactNode } from "react";
 import type { RouterContext } from "../lib/router-context";
 import { THEME_BOOT_SCRIPT } from "../lib/theme";
-import appCss from "../styles.css?url";
+import appCss from "~/shared/styles/styles.css?url";
 
 const styles = stylex.create({
   body: {
