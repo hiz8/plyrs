@@ -71,8 +71,9 @@ describe("設定 › 接続中のアプリ", () => {
     await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
     expect(JSON.parse(String(post.mock.calls[0]?.[0]?.body))).toStrictEqual({
       name: "CI",
-      scopes: ["record:read"],
-      expiresInDays: 90,
+      // 既定は record:read + record:propose(M5c の申し送り、2026-11-08)。提案は書き込みの規則で期限 30 日
+      scopes: ["record:read", "record:propose"],
+      expiresInDays: 30,
     });
     expect(await screen.findByText("plyrs_pat_secret")).toBeInTheDocument();
   });

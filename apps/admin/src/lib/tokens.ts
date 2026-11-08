@@ -19,7 +19,16 @@ export const PAT_SCOPES = [
 
 export type PatScope = (typeof PAT_SCOPES)[number];
 
-export const DEFAULT_SCOPES: readonly PatScope[] = ["record:read"];
+// M5c の申し送り(2026-11-08、所有者の判断): record:write は record:propose を内包しない(スコープは
+// 互いに独立のまま)。その代わり、新しく発行するトークンには既定で提案を持たせる。提案は書き込みの
+// 一種なので、期限は書き込みの規則(isReadOnlyScopes は record:read だけを読み取り専用とみなす)
+export const DEFAULT_SCOPES: readonly PatScope[] = ["record:read", "record:propose"];
+
+// record:write を付けて record:propose を外したときの注意(conflict が続くときや確認できない公開で
+// 提案に回れない)
+export function lacksProposeFallback(scopes: readonly string[]): boolean {
+  return scopes.includes("record:write") && !scopes.includes("record:propose");
+}
 
 const READ_ONLY_EXPIRY_DAYS = [30, 90, 365] as const;
 const WRITE_EXPIRY_DAYS = [7, 30, 90] as const;

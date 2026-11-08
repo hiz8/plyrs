@@ -32,7 +32,7 @@ function token(overrides: Partial<TokenSummary> = {}): TokenSummary {
 }
 
 describe("スコープの選択肢", () => {
-  it("管理者には record:publish を含む 6 つ、既定は record:read だけ", () => {
+  it("管理者には record:publish を含む 6 つ、既定は record:read と record:propose", () => {
     expect(scopeOptionsFor("owner").map((o) => o.value)).toEqual([
       "record:read",
       "record:propose",
@@ -41,7 +41,9 @@ describe("スコープの選択肢", () => {
       "record:publish",
       "type:manage",
     ]);
-    expect(DEFAULT_SCOPES).toEqual(["record:read"]);
+    // M5c の申し送り(2026-11-08、所有者の判断): record:write は record:propose を内包しない。
+    // その代わり、新しく発行するトークンには既定で提案を持たせる
+    expect(DEFAULT_SCOPES).toEqual(["record:read", "record:propose"]);
     for (const option of scopeOptionsFor("owner")) {
       expect(option.label).toBeTruthy();
       expect(option.description).toBeTruthy();
