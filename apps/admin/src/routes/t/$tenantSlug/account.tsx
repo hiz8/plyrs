@@ -4,16 +4,16 @@ import * as stylex from "@stylexjs/stylex";
 import { useState } from "react";
 import { toaster } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { PasswordForm, type PasswordFieldErrors } from "../../../components/account/password-form";
-import { SiteList } from "../../../components/account/site-list";
-import { CardError, CardLoading } from "../../../components/settings/card-state";
-import { SettingsCard } from "../../../components/settings/settings-card";
+import { PasswordForm, type PasswordFieldErrors } from "./-account/password-form";
+import { SiteList } from "./-account/site-list";
+import { CardError, CardLoading } from "./-components/card-state";
+import { SettingsCard } from "./-components/settings-card";
 import { PageBody, TenantPageHeader } from "../../../components/tenant-page-header";
-import { ThemeSegment } from "../../../components/theme-segment";
+import { ThemeSegment } from "./-account/theme-segment";
 import { ApiError } from "../../../lib/api-client";
 import { currentCrumb, homeCrumb } from "../../../lib/breadcrumbs";
 import { errorMessage } from "../../../lib/error-messages";
-import { ACCOUNT_LABELS } from "../../../lib/labels";
+import { ACCOUNT_LABELS } from "./-account/account-labels";
 import { meQueryOptions, tenantsQueryOptions } from "../../../lib/queries";
 
 // 設定の各画面と同じ幅(settings-frame.tsx の SETTINGS_MAX_WIDTH)。StyleX は import した定数を解けないので写す

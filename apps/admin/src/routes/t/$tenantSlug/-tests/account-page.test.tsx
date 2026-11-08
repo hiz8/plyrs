@@ -1,8 +1,8 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { baseAuthedRoutes, jsonResponse } from "./test-utils/api-stubs";
-import { authedRoutes, renderAt } from "./test-utils/shell-harness";
+import { baseAuthedRoutes, jsonResponse } from "~/test-utils/api-stubs";
+import { authedRoutes, renderAt } from "~/test-utils/shell-harness";
 
 // 成功のトーストを出すテストは account-password-change.test.tsx に分ける
 // (トーストが残った後の同じファイルの次のテストで jsdom が戻らなくなるため)

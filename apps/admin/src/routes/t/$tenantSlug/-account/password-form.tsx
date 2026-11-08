@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { useState } from "react";
 import { Button, TextField } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { ACCOUNT_LABELS } from "../../lib/labels";
+import { ACCOUNT_LABELS } from "./account-labels";
 
 const NARROW = "@media (max-width: 959px)";
 const MIN_LENGTH = 12;

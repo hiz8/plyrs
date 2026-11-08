@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { RotateCw } from "lucide-react";
 import { Button, Skeleton } from "@plyrs/ui";
 import { font, space, status } from "@plyrs/ui/semantic.stylex";
-import { SETTINGS_LABELS } from "../../lib/labels";
+import { SETTINGS_LABELS } from "~/lib/labels";
 
 const styles = stylex.create({
   loading: { display: "flex", flexDirection: "column", gap: space.sm },

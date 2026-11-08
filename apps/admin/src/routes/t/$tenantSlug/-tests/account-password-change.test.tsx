@@ -2,8 +2,8 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
-import { jsonResponse } from "./test-utils/api-stubs";
-import { authedRoutes, renderAt } from "./test-utils/shell-harness";
+import { jsonResponse } from "~/test-utils/api-stubs";
+import { authedRoutes, renderAt } from "~/test-utils/shell-harness";
 
 it("パスワードを変更すると POST /auth/password を呼び、入力が空に戻ってトーストが出る", async () => {
   const post = vi.fn((_init?: RequestInit) => jsonResponse(200, { ok: true, revokedSessions: 2 }));

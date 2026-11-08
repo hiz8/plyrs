@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button, TextField } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { SETTINGS_LABELS } from "../../lib/labels";
-import { SettingsCard } from "./settings-card";
+import { SettingsCard } from "../../routes/t/$tenantSlug/-components/settings-card";
 
 const NARROW = "@media (max-width: 959px)";
 const MAX_NAME_LENGTH = 100;
