@@ -215,7 +215,7 @@ design-spec 16.8 の「提案(change set、論点 B4)」を実装した(決定 5
 | M2 | `2026-11-02-m2-data-and-operations.md` | 完了(2026-11-02) |
 | M3 | `2026-11-03-m3-oauth.md` | 完了(2026-11-03)。ゲート G3 通過 |
 | M4 | `2026-11-03-m4-write-mcp.md` | 実装完了(2026-11-03)。ゲート G4 は preview での所有者の確認待ち |
-| M5 | `2026-11-04-m5a-carryovers.md`(M5a)、`2026-11-07-m5b-legacy-protocol.md`(M5b)、`2026-11-07-m5c-change-set.md`(M5c。M5d 以降は着手時に作る) | M5a 実装済み(2026-11-04、#87〜#92、スタック PR)。M5b 決定済み(2026-11-07)。M5c 実装済み(2026-11-07。preview での所有者の確認待ち) |
+| M5 | `2026-11-04-m5a-carryovers.md`(M5a)、`2026-11-07-m5b-legacy-protocol.md`(M5b)、`2026-11-07-m5c-change-set.md`(M5c。M5d 以降は着手時に作る) | M5a 実装済み(2026-11-04、#87〜#92、スタック PR)。M5b 決定済み(2026-11-07)。M5c 実装済み(2026-11-07)、所有者の確認済み(2026-11-08) |
 
 ## 7. M1 完了時の申し送り(2026-11-01)
 
@@ -344,4 +344,7 @@ design-spec 16.8 の「提案(change set、論点 B4)」を実装した(決定 5
 - **所有者に判断を仰ぐこと**: `record:write` を持つが `record:propose` を持たないトークン(M5c より前に発行した PAT と OAuth の付与はすべてこれ)は提案できない。conflict が 3 回続いたときや確認できない公開で、提案に回せるのは `record:propose` を併せて持つトークンだけ。代案は「`record:write` を持つトークンは `record:propose` も持つ扱いにする」(提案は直接書くより弱い操作なので権限上は自然。16.3 のスコープの意味を変える)。いまはツールの説明を「record:propose があれば」と条件付きにしてある。**判断(2026-11-08、所有者)**: 内包させない。スコープは互いに独立のまま(`record:write` が `record:read` も内包しないのと同じ規則)で、トークンの一覧がそのトークンにできることを表すことを優先する。その代わり、接続トークンの発行の既定を `record:read` + `record:propose` にし(提案は書き込みの一種なので期限の既定は 30 日になる)、`record:write` を付けて `record:propose` を外したときに注意を出す。M5c より前に発行した `record:write` のトークンは、提案を使うなら発行し直す
 - **レビューで見送った小さな指摘(次の M5 の項目で拾う候補)**: `changedFields` にあって `input` に無いキーの検証が作成時(残る)と採用時(消去)で食い違う。何も書かなかった採用(no-op の update・削除済みへの delete・未公開への unpublish)の `resultHistorySeq` が直前の別人の版を指す。一覧の順序が id(クライアント生成)順なので、未来の時刻の UUIDv7 で先頭に居座れる。stale な create の提案に「提案のフィールドだけが上書き」の説明が出る(採用は必ず `already_exists`)。採用の確定で人が見た版を照合しない(publish の確認の `expect` に相当するものが無い)。サイドバーのバッジの読み上げが「提案 3」だけ。viewer(record:read)が全提案の input と tokenId を読める(record 本体も読めるので問題視せず)。未処理の提案の 30 秒ごとの取り直しが眠っている DO を起こし続ける(16.8 の明記どおり。コストを見て伸ばす)
 - **所有者のレビュー(#96、2026-11-07)で直したもの**: (1) 何も書かれなかった採用の `resultHistorySeq` は null。(2) 作成時の検証は `changedFields` にあって `input` に無いキーを消去として扱う(採用時の解釈と同じ)。(3) 処理済みの提案は `stale` にしない。(4) 採用・却下の時点で変更前の値を `before` に残し、処理済みの差分はそれとの比較。(5) `publish` / `delete` / `unpublish` の採用は record が提案の版のままであることを要し、違えば `proposal_stale`(409)で open のまま。(6) 未処理タブの `recordId` の絞り込みをサーバーに渡し、絞り込みを外したら積んだ続きも捨てる。(7) 編集画面の件数は record ごとのサーバーの絞り込みの `openCount`。(8) 30 秒の定期再取得はサイドバーの件数(1 件だけ取る問い合わせ)だけ。(9) 要求の指紋は metamodel の `fingerprint` を共用。(10) 掃除の `(state, resolved_at)` 索引。上の「見送った小さな指摘」のうち 1・2 件目と 30 秒の取り直しはこれで解消
-- **所有者の確認(preview)**: 接続ガイド 3.7 の手順。結果はこの章に追記する
+- **所有者の確認(preview、所有者と Claude Code、2026-11-08。手順は `docs/deploy.md` 3.7)**: 3 項目とも期待どおり
+  1. `record:read record:propose` の PAT(#97 の既定のまま発行)で `record_update` を頼むと、業務エラー `insufficient_scope` の message に「提案(proposal_create)なら送れます」が付き、エージェントはそれに従って `proposal_create`(kind: update、ブロック操作の insert)を選んだ。提案は `via: mcp` と `tokenId` を持ち、ブロック操作は作成時に具体値へ解決されていた
+  2. 管理画面で差分を見て採用すると、本文だけが提案の内容になった(`body` の版だけが進み、`title` と状態 ready はそのまま)。履歴の先頭は write の版で、`via: rest`・`proposalId` 付き・採用者が actor。管理画面の履歴には「提案を採用して」と出る。提案の `resultHistorySeq` はこの版を指す
+  3. `record_publish` は確認(elicitation)より前に `insufficient_scope`(`record:publish` が無い)で止まり、同じ案内から `proposal_create`(kind: publish、`baseVersion` 2)になった。採用で版 2 の publish の版(`via: rest`・`proposalId` 付き)ができ、公開 API で版 2 の本文が読めた(`publishedAt` は採用の時刻)
