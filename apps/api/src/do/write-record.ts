@@ -294,6 +294,7 @@ export function writeRecordCore(
     tokenId: params.tokenId,
     clientId: params.clientId,
     restoredFrom: params.restoredFrom,
+    proposalId: params.proposalId,
   });
 
   // relations は派生データ: この record の field 由来行を全消しして張り直す（design-spec §6）。

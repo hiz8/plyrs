@@ -12,6 +12,8 @@ export const PAT_PREFIX = "plyrs_pat_";
 // PAT に付けられるスコープ(用語集「スコープ」: 名前は DO の Operation と同じ)
 export const PAT_SCOPES = [
   "record:read",
+  // M5c(決定 57): 変更を提案として置く。直接は書けない
+  "record:propose",
   "record:write",
   "record:delete",
   "record:publish",
@@ -40,7 +42,7 @@ export function allowedScopes(role: Role): PatScope[] {
     case "owner":
       return [...PAT_SCOPES];
     case "editor":
-      return ["record:read", "record:write", "record:delete"];
+      return ["record:read", "record:propose", "record:write", "record:delete"];
     default:
       return ["record:read"];
   }

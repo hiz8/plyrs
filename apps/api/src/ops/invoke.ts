@@ -2,6 +2,7 @@ import type { Operation } from "../auth/permissions";
 import { requireOperation, type AuthContext, type McpAuth } from "../do/authorize";
 import { findOperation, OPERATIONS, type OpSpec } from "./catalog";
 import { HISTORY_HANDLERS } from "./history";
+import { PROPOSAL_HANDLERS } from "./proposals";
 import { READ_HANDLERS, type OpContext, type OpFailure } from "./read";
 import { SEARCH_HANDLERS } from "./search";
 import { WRITE_HANDLERS } from "./write";
@@ -9,7 +10,7 @@ import { WRITE_HANDLERS } from "./write";
 // 操作の失敗はここで表現し、HTTP や JSON-RPC のエラーにしない(design-spec 16.7 の「業務エラー」層)。
 // code は入口の判定(unknown_operation / invalid_input / forbidden / insufficient_scope)と、各操作の
 // 業務エラー(not_found / conflict / already_exists / unsupported_markdown / validation_failed /
-// record_deleted / unique_violation / invalid_status / unknown_type / not_published、モジュール拒否
+// record_deleted / unique_violation / invalid_status / unknown_type / not_published / proposal_not_open、モジュール拒否
 // `${moduleId}:${reason}`)。モジュール拒否を通すため string を含む(WriteErrorCode と同じ扱い)
 export type InvokeErrorCode =
   | "unknown_operation"
@@ -26,6 +27,10 @@ export type InvokeErrorCode =
   | "invalid_status"
   | "unknown_type"
   | "not_published"
+  // 16.8(M5c): 採用・却下済みの提案への採用・却下
+  | "proposal_not_open"
+  // 16.8(M5c): publish / delete / unpublish の提案の採用で、提案の後に record が進んでいた
+  | "proposal_stale"
   | (string & {});
 
 // M4-6: DO の invoke が載せる計測値(操作が読み書きした行数)。Worker で実行する操作には無い
@@ -54,6 +59,7 @@ export const HANDLERS: Readonly<Record<string, OpHandler>> = {
   ...SEARCH_HANDLERS,
   ...HISTORY_HANDLERS,
   ...WRITE_HANDLERS,
+  ...PROPOSAL_HANDLERS,
 };
 
 // Worker で実行する操作(runsIn: "worker")は DO のハンドラを持たない。DO で呼ばれたら unknown_operation

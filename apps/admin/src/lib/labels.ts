@@ -129,6 +129,7 @@ export const NAV_LABELS = {
   home: "ホーム",
   content: "コンテンツ",
   media: "メディア",
+  proposals: "提案",
   settings: "設定",
   accountSettings: "アカウント設定",
   list: "一覧",
@@ -282,14 +283,17 @@ export const HISTORY_LABELS = {
     delete: "削除",
     restore: "復元",
   },
+  // route は「管理画面から」/「管理画面から提案を採用して」(M5c: 提案の採用で生まれた版)
   summary: {
-    write: (who: string, via: string, count: number) =>
-      count === 0 ? `${who} が${via}から編集` : `${who} が${via}から ${count} フィールドを変更`,
-    publish: (who: string, via: string) => `${who} が${via}から公開`,
-    unpublish: (who: string, via: string) => `${who} が${via}から公開を取り下げ`,
-    delete: (who: string, via: string) => `${who} が${via}から削除`,
-    restore: (who: string, via: string, from: number | null) =>
-      from === null ? `${who} が${via}から復元` : `${who} が${via}から版 ${from} に復元`,
+    route: (via: string) => `${via}から`,
+    routeAccepted: (via: string) => `${via}から提案を採用して`,
+    write: (who: string, route: string, count: number) =>
+      count === 0 ? `${who} が${route}編集` : `${who} が${route} ${count} フィールドを変更`,
+    publish: (who: string, route: string) => `${who} が${route}公開`,
+    unpublish: (who: string, route: string) => `${who} が${route}公開を取り下げ`,
+    delete: (who: string, route: string) => `${who} が${route}削除`,
+    restore: (who: string, route: string, from: number | null) =>
+      from === null ? `${who} が${route}復元` : `${who} が${route}版 ${from} に復元`,
   },
   published: "公開版",
   publishedAt: (absolute: string) => `${absolute} に公開`,
@@ -316,6 +320,84 @@ export const HISTORY_LABELS = {
   loadMore: "さらに表示",
   empty: "まだ履歴がありません",
   notFound: "見つかりませんでした",
+} as const;
+
+// 16.8(M5c、決定 57): 提案(change set)。エージェントの変更を人が採用・却下する
+const PROPOSAL_KIND_LABELS = {
+  create: "作成",
+  update: "更新",
+  delete: "削除",
+  publish: "公開",
+  unpublish: "公開の取り下げ",
+} as const;
+
+const PROPOSAL_STATE_LABELS = { open: "未処理", accepted: "採用", rejected: "却下" } as const;
+
+export const PROPOSAL_LABELS = {
+  title: "提案",
+  crumb: "提案",
+  kind: PROPOSAL_KIND_LABELS,
+  state: PROPOSAL_STATE_LABELS,
+  tabs: { open: "未処理", resolved: "処理済み" },
+  tabsName: "提案の状態",
+  listLabel: "提案の一覧",
+  summary: (who: string, via: string, kind: keyof typeof PROPOSAL_KIND_LABELS, count: number) =>
+    kind === "update" || kind === "create"
+      ? `${who} が${via}から ${count} フィールドの${PROPOSAL_KIND_LABELS[kind]}を提案`
+      : `${who} が${via}から${PROPOSAL_KIND_LABELS[kind]}を提案`,
+  stale: "提案の後に内容が変わっています",
+  staleHelp: "差分は現在の内容との比較です。採用すると提案のフィールドだけが上書きされます",
+  note: "提案者の説明",
+  noNote: "(説明なし)",
+  proposer: "提案者",
+  via: "経路",
+  createdAt: "提案日時",
+  stateHeading: "状態",
+  diffTitle: "現在との差分",
+  before: "現在",
+  after: "提案",
+  statusRow: "状態",
+  unsetStatus: "(なし)",
+  noChanges: "現在と同じ内容です",
+  kindDescription: {
+    delete: `この${TERMS.content}を削除します。削除しても履歴から戻せます`,
+    publish: `この${TERMS.content}の現在の内容を公開します。公開すると誰でも読めるようになります`,
+    unpublish: `この${TERMS.content}の公開を取り下げます。内容は下書きとして残ります`,
+  },
+  accept: "採用する",
+  reject: "却下する",
+  acceptDialog: {
+    title: (kind: keyof typeof PROPOSAL_KIND_LABELS) =>
+      `${PROPOSAL_KIND_LABELS[kind]}の提案を採用しますか？`,
+    body: (summary: string) =>
+      `「${summary}」をあなたの名前で実行します。履歴にはこの提案の採用として残ります。`,
+    confirm: "採用する",
+  },
+  rejectDialog: {
+    title: "却下しますか？",
+    body: "却下した提案は書き込まれません。理由は提案したエージェントが読めます。",
+    reason: "理由(任意)",
+    reasonTooLong: "500 文字以内で入力してください",
+    confirm: "却下する",
+  },
+  accepted: "採用しました",
+  rejected: "却下しました",
+  acceptFailed: "採用できませんでした",
+  rejectFailed: "却下できませんでした",
+  loadFailed: "提案を読み込めませんでした",
+  retry: "再試行",
+  loadMore: "さらに表示",
+  loadMoreFailed: "続きを読み込めませんでした",
+  empty: "未処理の提案はありません",
+  emptyResolved: "処理済みの提案はありません",
+  filteredBy: `この${TERMS.content}の提案だけを表示しています`,
+  clearFilter: "すべての提案を表示",
+  openRecord: `${TERMS.content}を開く`,
+  editorBanner: (n: number) => `この${TERMS.content}には未処理の提案が ${n} 件あります`,
+  editorBannerLink: "提案を見る",
+  resolvedBy: (state: "accepted" | "rejected", who: string, at: string) =>
+    `${who} が ${at} に${PROPOSAL_STATE_LABELS[state]}`,
+  notFound: "提案が見つかりませんでした。既に処理されたか、保存期間を過ぎています",
 } as const;
 
 export const RECORD_FORM_LABELS = {
@@ -567,6 +649,7 @@ export const TOKEN_LABELS = {
   },
   scopes: {
     "record:read": "読み取り(record:read)",
+    "record:propose": "提案(record:propose)",
     "record:write": "作成・編集(record:write)",
     "record:delete": "削除(record:delete)",
     "record:publish": "公開(record:publish)",
@@ -574,6 +657,7 @@ export const TOKEN_LABELS = {
   },
   scopeDescriptions: {
     "record:read": `${TERMS.contentType}と${TERMS.content}を読み取ります。下書きも含みます`,
+    "record:propose": `${TERMS.content}の作成・編集・削除・公開を提案します。提案は管理画面で人が採用・却下します`,
     "record:write": `${TERMS.content}を作成・編集します`,
     "record:delete": `${TERMS.content}を削除します`,
     "record:publish": `${TERMS.content}を公開します。既定では外れています。人が公開する運用のままにするなら付けないでください`,

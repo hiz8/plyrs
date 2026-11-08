@@ -3,6 +3,7 @@ import { apiErrorFromBody, throwApiError } from "./api-client";
 import { NetworkError, withNetworkErrors } from "./network-error";
 import type { Role } from "./permissions";
 import type { CompareResult, HistoryEntry } from "./history";
+import type { ProposalDetail, ProposalState, ProposalSummary } from "./proposals";
 import type { TokenManager } from "./token-manager";
 
 // Bearer 付きの管理 API(/v1/t/:tenantId/...)。トークンは token-manager が供給する。
@@ -410,6 +411,42 @@ export function createAdminApi(
       historySeq: number,
     ): Promise<{ id: string; version: number }> {
       return invokeOperation(tenantId, "record_restore", { recordId, historySeq });
+    },
+    // 16.8(M5c): 提案。作成は MCP / REST のエージェント側で、管理画面は読み・採用・却下だけ
+    listProposals(
+      tenantId: string,
+      query: {
+        state?: ProposalState | "resolved";
+        recordId?: string;
+        cursor?: string;
+        limit?: number;
+      },
+    ): Promise<{ items: ProposalSummary[]; nextCursor: string | null; openCount: number }> {
+      return invokeOperation(tenantId, "proposal_list", {
+        ...(query.state === undefined ? {} : { state: query.state }),
+        ...(query.recordId === undefined ? {} : { recordId: query.recordId }),
+        ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
+        ...(query.limit === undefined ? {} : { limit: query.limit }),
+      });
+    },
+    getProposal(tenantId: string, proposalId: string): Promise<ProposalDetail> {
+      return invokeOperation(tenantId, "proposal_get", { proposalId });
+    },
+    acceptProposal(
+      tenantId: string,
+      proposalId: string,
+    ): Promise<{ proposal: ProposalDetail; record: unknown }> {
+      return invokeOperation(tenantId, "proposal_accept", { proposalId });
+    },
+    rejectProposal(
+      tenantId: string,
+      proposalId: string,
+      reason?: string,
+    ): Promise<{ proposal: ProposalDetail }> {
+      return invokeOperation(tenantId, "proposal_reject", {
+        proposalId,
+        ...(reason === undefined || reason === "" ? {} : { reason }),
+      });
     },
   };
 }

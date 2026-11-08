@@ -11,6 +11,7 @@ describe("操作カタログの読み込み順", () => {
     const history = await import("../src/ops/history");
     const search = await import("../src/ops/search");
     const write = await import("../src/ops/write");
+    const proposals = await import("../src/ops/proposals");
     const assets = await import("../src/ops/assets");
     const catalog = await import("../src/ops/catalog");
     expect(read.READ_OPERATIONS.map((op) => op.name)).toEqual([
@@ -32,11 +33,23 @@ describe("操作カタログの読み込み順", () => {
       "record_publish",
       "record_unpublish",
     ]);
+    // M5c: 提案は書き込みの後・アセットの前。採用・却下は REST のみ(MCP には出ない)
+    expect(proposals.PROPOSAL_OPERATIONS.map((op) => op.name)).toEqual([
+      "proposal_create",
+      "proposal_list",
+      "proposal_get",
+      "proposal_accept",
+      "proposal_reject",
+    ]);
+    expect(
+      proposals.PROPOSAL_OPERATIONS.filter((op) => op.via.includes("mcp")).map((op) => op.name),
+    ).toEqual(["proposal_create", "proposal_list", "proposal_get"]);
     expect(catalog.OPERATIONS.map((op) => op.name)).toEqual([
       ...read.READ_OPERATIONS.map((op) => op.name),
       ...search.SEARCH_OPERATIONS.map((op) => op.name),
       ...history.HISTORY_OPERATIONS.map((op) => op.name),
       ...write.WRITE_OPERATIONS.map((op) => op.name),
+      ...proposals.PROPOSAL_OPERATIONS.map((op) => op.name),
       ...assets.ASSET_OPERATIONS.map((op) => op.name),
     ]);
   });

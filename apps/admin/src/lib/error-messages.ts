@@ -34,6 +34,10 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   not_published: "このコンテンツは公開されていません",
   unknown_type:
     "コンテンツタイプが見つかりませんでした。削除された可能性があるため、画面を再読み込みしてください",
+  // 提案(ops/proposals.ts、M5c)
+  proposal_not_open: "この提案は既に処理されています。画面を再読み込みしてください",
+  proposal_stale:
+    "提案の後にコンテンツが変わっているため、この提案は採用できません。内容を確かめて、再提案を依頼してください",
   // コンテンツタイプ(do/content-types.ts)
   id_mismatch:
     "同じ識別名のコンテンツタイプが既にあります。画面を再読み込みしてから、もう一度お試しください",

@@ -10,6 +10,7 @@ const OPERATIONS = [
   "record:delete",
   "record:read",
   "record:publish",
+  "record:propose",
   "projection:rebuild",
   "module:manage",
   "site:manage",

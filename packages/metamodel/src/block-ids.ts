@@ -61,6 +61,15 @@ function fnv1a64(input: string, seed: bigint): bigint {
   return hash;
 }
 
+// 任意の文字列の指紋(FNV-1a 64bit × seed 2 系統 = 32 桁の hex)。同期で WebCrypto に依存しない。
+// 用途は「同じ ID の要求同士を区別する」程度の衝突耐性でよいもの(提案の再送の照合など)
+export function fingerprint(input: string): string {
+  return (
+    fnv1a64(input, 0xcbf29ce484222325n).toString(16).padStart(16, "0") +
+    fnv1a64(input, 0x84222325cbf29ce4n).toString(16).padStart(16, "0")
+  );
+}
+
 function stripId(block: RichTextNode): RichTextNode {
   if (block.attrs === undefined || !(BLOCK_ID_ATTR in block.attrs)) {
     return block;

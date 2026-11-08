@@ -24,6 +24,7 @@ export interface HistoryEntry {
   tokenId: string | null;
   clientId: string | null;
   restoredFrom: number | null;
+  proposalId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -74,7 +75,11 @@ export function actorLabel(actor: string, members: readonly MemberName[] = []): 
 // 「○○ が MCP から 3 フィールドを変更」のような 1 行の要約
 export function summarizeEntry(entry: HistoryEntry, members: readonly MemberName[] = []): string {
   const who = actorLabel(entry.actor, members);
-  const via = viaLabel(entry.via);
+  // M5c: 提案の採用で生まれた版は「提案を採用して」を挟む(採用した人の名前で記録される。決定 57)
+  const via =
+    entry.proposalId === null
+      ? HISTORY_LABELS.summary.route(viaLabel(entry.via))
+      : HISTORY_LABELS.summary.routeAccepted(viaLabel(entry.via));
   switch (entry.kind) {
     case "publish":
       return HISTORY_LABELS.summary.publish(who, via);

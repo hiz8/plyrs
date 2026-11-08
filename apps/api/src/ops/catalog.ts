@@ -1,5 +1,6 @@
 import { ASSET_OPERATIONS } from "./assets";
 import { HISTORY_OPERATIONS } from "./history";
+import { PROPOSAL_OPERATIONS } from "./proposals";
 import { READ_OPERATIONS } from "./read";
 import { SEARCH_OPERATIONS } from "./search";
 import { WRITE_OPERATIONS } from "./write";
@@ -19,6 +20,8 @@ export const OPERATIONS: readonly OpSpec[] = [
   ...SEARCH_OPERATIONS,
   ...HISTORY_OPERATIONS,
   ...WRITE_OPERATIONS,
+  // 16.8(M5c): 提案は書き込みの後・アセットの前
+  ...PROPOSAL_OPERATIONS,
   ...ASSET_OPERATIONS,
 ];
 

@@ -70,6 +70,7 @@ export {
   canonicalJson,
   ensureRecordBlockIds,
   ensureTopLevelBlockIds,
+  fingerprint,
   hashBlock,
   type BlockIdsResult,
   type RecordBlockIdsResult,

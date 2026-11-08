@@ -32,6 +32,7 @@ function renderSidebar(overrides: Partial<SidebarProps> = {}) {
     modules,
     slotItems: [],
     syncState: "ready",
+    openProposalCount: 0,
     pathname: "/t/blog/content/news",
     onSwitchTenant: vi.fn(),
     onOpenAccount: vi.fn(),
@@ -57,6 +58,7 @@ describe("Sidebar", () => {
       "新規追加",
       "ブログ",
       "メディア",
+      "提案",
       "予約枠",
     ]);
     expect(within(nav).getByRole("link", { name: "お知らせ" })).toHaveAttribute(
@@ -168,6 +170,19 @@ describe("Sidebar", () => {
     expect(screen.getByRole("status")).toHaveTextContent("再接続しています…");
   });
 
+  it("未処理の提案の数をバッジで出し、0 件や未取得なら数を出さない(M5c)", () => {
+    renderSidebar({ openProposalCount: 3 });
+    const link = screen.getByRole("link", { name: /提案/ });
+    expect(link).toHaveAttribute("href", "/t/blog/proposals");
+    expect(link).toHaveTextContent("3");
+    cleanup();
+    renderSidebar({ openProposalCount: 0 });
+    expect(screen.getByRole("link", { name: "提案" })).not.toHaveTextContent("0");
+    cleanup();
+    renderSidebar({ openProposalCount: null, pathname: "/t/blog/proposals/x" });
+    expect(screen.getByRole("link", { name: "提案" })).toHaveAttribute("aria-current", "page");
+  });
+
   it("設定の下位ページでは「設定」が現在地になる", () => {
     renderSidebar({ pathname: "/t/blog/settings/modules" });
     expect(screen.getByRole("link", { name: "設定" })).toHaveAttribute("aria-current", "page");
@@ -232,6 +247,7 @@ describe("Sidebar", () => {
       "新規追加",
       "ブログ",
       "メディア",
+      "提案",
       "予約枠",
       "予約カレンダー",
       "追加画面",

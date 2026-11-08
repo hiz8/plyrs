@@ -5,9 +5,10 @@ import { consentScopes, renderConsentPage } from "./consent-page";
 // record:publish は所有者にだけ出し、要求されていても既定で外す。クライアント由来の文字列はエスケープする。
 
 describe("consentScopes", () => {
-  it("所有者には 5 つ出し、要求された record:read だけ checked、record:publish は要求されても unchecked", () => {
+  it("所有者には 6 つ出し、要求された record:read だけ checked、record:publish は要求されても unchecked", () => {
     expect(consentScopes("owner", ["record:read", "record:publish"])).toEqual([
       { value: "record:read", checked: true },
+      { value: "record:propose", checked: false },
       { value: "record:write", checked: false },
       { value: "record:delete", checked: false },
       { value: "record:publish", checked: false },
@@ -18,6 +19,7 @@ describe("consentScopes", () => {
   it("編集者には record:publish と type:manage を出さない(要求されても落とす)", () => {
     expect(consentScopes("editor", ["record:read", "type:manage"])).toEqual([
       { value: "record:read", checked: true },
+      { value: "record:propose", checked: false },
       { value: "record:write", checked: false },
       { value: "record:delete", checked: false },
     ]);
@@ -41,6 +43,7 @@ function page(overrides: Partial<Parameters<typeof renderConsentPage>[0]> = {}):
     handle: "h-1",
     scopes: [
       { value: "record:read", checked: true },
+      { value: "record:propose", checked: false },
       { value: "record:write", checked: false },
     ],
     tenantName: "ブログ",

@@ -1,8 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
-import { FileText, House, Image, Plus, Settings } from "lucide-react";
+import { FileText, House, Image, Inbox, Plus, Settings } from "lucide-react";
 import { useId } from "react";
 import { Link } from "react-aria-components";
-import { ICON_SIZE, Skeleton, stylexRenderProps, type NavItemContribution } from "@plyrs/ui";
+import { Badge, ICON_SIZE, Skeleton, stylexRenderProps, type NavItemContribution } from "@plyrs/ui";
 import {
   accent,
   bg,
@@ -123,6 +123,8 @@ export interface SidebarProps {
   modules: readonly ModuleSummary[] | undefined;
   slotItems: readonly NavItemContribution[];
   syncState: SyncIndicatorState;
+  /** 未処理の提案の数(M5c)。null は未取得 */
+  openProposalCount: number | null;
   pathname: string;
   onSwitchTenant: (slug: string) => void;
   onOpenAccount: () => void;
@@ -175,6 +177,7 @@ export function Sidebar(props: SidebarProps) {
     { key: "home", href: base, exact: true },
     ...contentTypes.map((t) => typeEntry(t.key)),
     { key: "media", href: `${base}/media` },
+    { key: "proposals", href: `${base}/proposals` },
     ...groups.flatMap((g) => g.types.map((t) => typeEntry(t.key))),
     ...[
       ...groups.flatMap((g) => moduleSlots(g.moduleId)),
@@ -285,6 +288,18 @@ export function Sidebar(props: SidebarProps) {
             icon={Image}
             isCurrent={active === "media"}
             onNavigate={onNavigate}
+          />
+          <NavLink
+            href={`${base}/proposals`}
+            label={NAV_LABELS.proposals}
+            icon={Inbox}
+            isCurrent={active === "proposals"}
+            onNavigate={onNavigate}
+            badge={
+              props.openProposalCount !== null && props.openProposalCount > 0 ? (
+                <Badge tone="accent">{props.openProposalCount}</Badge>
+              ) : undefined
+            }
           />
         </div>
         {groups.map((group) => {

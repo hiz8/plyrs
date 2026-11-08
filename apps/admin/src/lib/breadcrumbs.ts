@@ -22,6 +22,12 @@ export const mediaCrumb = (slug: string): BreadcrumbItem => ({
   href: `/t/${slug}/media`,
 });
 
+export const proposalsCrumb = (slug: string): BreadcrumbItem => ({
+  id: "proposals",
+  label: NAV_LABELS.proposals,
+  href: `/t/${slug}/proposals`,
+});
+
 export const settingsCrumb = (slug: string): BreadcrumbItem => ({
   id: "settings",
   label: NAV_LABELS.settings,

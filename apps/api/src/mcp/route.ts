@@ -124,8 +124,36 @@ export function patScopeRemedy(scope: Operation): string {
 // 決定 55(M5a-5): PAT は再認可できないので、step-up の 403 は役に立たない(G4 で Claude Code は
 // 「Insufficient scope」とだけ表示し、対処が届かなかった)。tools/call の結果の業務エラーで対処を返す。
 // SDK の手前で JSON-RPC の応答を組むので、buildMcpServer も DO も起こさず、ツール単位の枠も消費しない
-export function patScopeFailure(id: unknown, scope: Operation): Response {
-  const message = patScopeRemedy(scope);
+// M5c(決定 57): 足りないのが書き込み系で、トークンが record:propose を持つなら、提案(proposal_create)へ
+// 導く。再認可を待たずにエージェントが変更を提案の形で残せる
+// 提案の kind で代えられる操作だけ(asset_upload や record_restore も record:write だが、提案には無い)
+const PROPOSABLE_OPERATIONS: readonly string[] = [
+  "record_create",
+  "record_update",
+  "record_delete",
+  "record_publish",
+  "record_unpublish",
+];
+
+export function canProposeInstead(
+  scopes: readonly Operation[],
+  operation: string,
+  missing: Operation,
+): boolean {
+  return (
+    scopes.includes("record:propose") &&
+    PROPOSABLE_OPERATIONS.includes(operation) &&
+    missing !== "record:read"
+  );
+}
+
+export const PROPOSE_INSTEAD_NOTE =
+  "このトークンは提案(proposal_create)なら送れます。変更を提案にして、人に採用を依頼してください";
+
+export function patScopeFailure(id: unknown, scope: Operation, canPropose = false): Response {
+  const message = canPropose
+    ? `${patScopeRemedy(scope)}。${PROPOSE_INSTEAD_NOTE}`
+    : patScopeRemedy(scope);
   return Response.json({
     jsonrpc: "2.0",
     id,
@@ -135,7 +163,11 @@ export function patScopeFailure(id: unknown, scope: Operation): Response {
         error: {
           code: "insufficient_scope",
           message,
-          details: { required: scope, tokenKind: "pat" },
+          details: {
+            required: scope,
+            tokenKind: "pat",
+            ...(canPropose ? { alternative: "proposal_create" } : {}),
+          },
         },
       },
       isError: true,
@@ -204,7 +236,11 @@ async function serveMcp(
   const missing = spec === undefined ? null : missingScope(auth, spec);
   if (missing !== null) {
     return auth.tokenKind === "pat"
-      ? patScopeFailure(rpc.id, missing)
+      ? patScopeFailure(
+          rpc.id,
+          missing,
+          spec !== undefined && canProposeInstead(auth.scopes, spec.name, missing),
+        )
       : await insufficientScopeFor(resourceAuth, missing);
   }
   // 16.1 / 16.2: 読み取りも DO を起こすのでツール名単位で制限する。未構成は fail-closed

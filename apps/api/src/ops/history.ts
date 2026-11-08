@@ -50,6 +50,7 @@ export const historyEntrySchema = z.object({
   tokenId: z.string().nullable(),
   clientId: z.string().nullable(),
   restoredFrom: z.number().int().nullable(),
+  proposalId: z.string().nullable().describe("提案の採用で生まれた版だけ: 提案の id"),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
