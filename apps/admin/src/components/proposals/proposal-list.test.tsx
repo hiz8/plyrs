@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { ProposalSummary } from "../../lib/proposals";
+import type { ProposalSummary } from "../../lib/api-contracts";
 import { ProposalList } from "./proposal-list";
 
 // 16.8(M5c): 提案の一覧の行

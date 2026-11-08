@@ -1,7 +1,7 @@
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import type { ResolvedUsage } from "./media";
-import { normalizeForSearch, searchText } from "./content-list";
-import { MEDIA_LABELS } from "./labels";
+import { normalizeForSearch, searchText } from "./search";
+import { MEDIA_LABELS } from "./media-labels";
 
 // 案 F 3 章: メディアライブラリの一覧の絞り込み・並べ替えと URL クエリとの相互変換。
 // 一覧のデータは同期で手元にあるため、すべて画面側の純関数で行う(content-list.ts と同じ方針)。

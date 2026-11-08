@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { TriangleAlert } from "lucide-react";
 import { ConfirmDialog } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { CONTENT_TYPE_LABELS } from "../../lib/labels";
+import { CONTENT_TYPE_LABELS } from "../../lib/content-type-labels";
 import { DialogNote } from "../settings/dialog-note";
 
 const styles = stylex.create({

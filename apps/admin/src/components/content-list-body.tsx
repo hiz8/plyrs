@@ -13,7 +13,8 @@ import {
   type ListView,
 } from "../lib/content-list";
 import { errorMessage } from "../lib/error-messages";
-import { LIST_LABELS, LOADING_LABEL, WORKFLOW_STATUS_LABELS } from "../lib/labels";
+import { LOADING_LABEL, WORKFLOW_STATUS_LABELS } from "../lib/labels";
+import { LIST_LABELS } from "../lib/content-list-labels";
 import { ContentTable } from "./content-table";
 import { ListFilters } from "./list-filters";
 import { ListPagination } from "./list-pagination";

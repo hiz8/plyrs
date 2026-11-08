@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { createRef } from "react";
 import { expect, it, vi } from "vitest";
 import { emptyFieldDraft, type FieldDraft } from "../../lib/content-type-form";
-import { FIELD_KIND_LABELS, FIELD_PANEL_LABELS, TERMS } from "../../lib/labels";
+import { TERMS } from "../../lib/labels";
+import { FIELD_KIND_LABELS, FIELD_PANEL_LABELS } from "../../lib/content-type-labels";
 import { FieldPanel, type FieldPanelProps } from "./field-panel";
 
 const P = FIELD_PANEL_LABELS;

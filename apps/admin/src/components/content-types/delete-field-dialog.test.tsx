@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import { FIELD_PANEL_LABELS } from "../../lib/labels";
+import { FIELD_PANEL_LABELS } from "../../lib/content-type-labels";
 import { DeleteFieldDialog } from "./delete-field-dialog";
 
 it("題・本文(API 名入り)・公開 API の注記・危険色の「削除する」、初期フォーカスはキャンセル", async () => {

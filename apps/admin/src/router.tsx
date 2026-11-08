@@ -1,27 +1,16 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter, type RouterHistory } from "@tanstack/react-router";
-import { createSlotRegistry, type SlotRegistry } from "@plyrs/ui";
+import { createSlotRegistry } from "@plyrs/ui";
 import type { ConnectFn } from "@plyrs/sync-client";
 import { createBrowserConnect } from "@plyrs/sync-client/browser";
 import { ErrorScreen } from "./components/error-screen";
-import { createAdminApi, type AdminApi } from "./lib/admin-api";
-import { createApiClient, type ApiClient } from "./lib/api-client";
-import { createSuperApi, type SuperApi } from "./lib/super-api";
-import { createTenantSync, type TenantSync } from "./lib/sync";
+import { createAdminApi } from "./lib/admin-api";
+import { createApiClient } from "./lib/api-client";
+import { createSuperApi } from "./lib/super-api";
+import { createTenantSync } from "./lib/sync";
 import { createTokenManager, type TokenManager } from "./lib/token-manager";
+import type { RouterContext, SyncFactory } from "./lib/router-context";
 import { routeTree } from "./routeTree.gen";
-
-export type SyncFactory = (tenantId: string) => TenantSync;
-
-export interface RouterContext {
-  queryClient: QueryClient;
-  api: ApiClient;
-  adminApi: AdminApi;
-  superApi: SuperApi;
-  tokens: TokenManager;
-  slots: SlotRegistry;
-  sync: SyncFactory;
-}
 
 export interface AppContextOptions {
   /** テスト用: tenantId ごとの ConnectFn を差し替える(既定はブラウザ WS) */

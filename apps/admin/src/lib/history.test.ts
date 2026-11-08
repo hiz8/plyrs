@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
-import {
-  actorLabel,
-  formatFieldDiff,
-  formatFieldValue,
-  summarizeEntry,
-  viaLabel,
-  type HistoryEntry,
-} from "./history";
+import { actorLabel, formatFieldDiff, formatFieldValue, summarizeEntry, viaLabel } from "./history";
+import { type HistoryEntry } from "./api-contracts";
 
 const entry = (overrides: Partial<HistoryEntry> = {}): HistoryEntry => ({
   historySeq: 3,

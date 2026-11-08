@@ -5,8 +5,8 @@ import {
   openProposalsFor,
   proposalTitle,
   summarizeProposal,
-  type ProposalSummary,
 } from "./proposals";
+import { type ProposalSummary } from "./api-contracts";
 
 // 16.8(M5c): 提案画面の純関数
 

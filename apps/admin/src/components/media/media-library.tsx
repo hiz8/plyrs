@@ -8,7 +8,8 @@ import { ASSET_TYPE_KEY } from "@plyrs/metamodel";
 import { createAssetServices } from "../../lib/asset-services";
 import { currentCrumb, homeCrumb } from "../../lib/breadcrumbs";
 import { errorMessage } from "../../lib/error-messages";
-import { MEDIA_LABELS, TERMS, TOASTS } from "../../lib/labels";
+import { TERMS, TOASTS } from "../../lib/labels";
+import { MEDIA_LABELS } from "../../lib/media-labels";
 import {
   applyMediaQuery,
   buildMediaRows,

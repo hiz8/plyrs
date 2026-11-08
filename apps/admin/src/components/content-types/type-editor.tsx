@@ -30,7 +30,8 @@ import {
   type TypeDraft,
 } from "../../lib/content-type-form";
 import { referenceCandidates } from "../../lib/content-types";
-import { CONTENT_TYPE_LABELS, DIALOGS } from "../../lib/labels";
+import { DIALOGS } from "../../lib/labels";
+import { CONTENT_TYPE_LABELS } from "../../lib/content-type-labels";
 import { useLeaveGuard } from "../../lib/use-leave-guard";
 import { LeaveGuardDialog } from "../leave-guard-dialog";
 import { PageBody, TenantPageHeader } from "../tenant-page-header";

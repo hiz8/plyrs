@@ -1,7 +1,8 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
-import { CONTENT_TYPE_LABELS, DIALOGS } from "./lib/labels";
+import { DIALOGS } from "./lib/labels";
+import { CONTENT_TYPE_LABELS } from "./lib/content-type-labels";
 import { ListColumnsSelectMock } from "./test-utils/list-columns-select-mock";
 import {
   articleType,

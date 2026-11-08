@@ -2,7 +2,8 @@ import * as stylex from "@stylexjs/stylex";
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { Banner, Button, Skeleton } from "@plyrs/ui";
 import { bg, border, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
-import { formatFieldDiff, type CompareResult } from "../../lib/history";
+import { formatFieldDiff } from "../../lib/history";
+import { type CompareResult } from "../../lib/api-contracts";
 import { HISTORY_LABELS } from "../../lib/labels";
 
 const styles = stylex.create({

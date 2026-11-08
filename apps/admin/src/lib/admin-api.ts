@@ -2,8 +2,13 @@ import type { ContentTypeDefinition, FieldDefinition } from "@plyrs/metamodel";
 import { apiErrorFromBody, throwApiError } from "./api-client";
 import { NetworkError, withNetworkErrors } from "./network-error";
 import type { Role } from "./permissions";
-import type { CompareResult, HistoryEntry } from "./history";
-import type { ProposalDetail, ProposalState, ProposalSummary } from "./proposals";
+import type {
+  CompareResult,
+  HistoryEntry,
+  ProposalDetail,
+  ProposalState,
+  ProposalSummary,
+} from "./api-contracts";
 import type { TokenManager } from "./token-manager";
 
 // Bearer 付きの管理 API(/v1/t/:tenantId/...)。トークンは token-manager が供給する。

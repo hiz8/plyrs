@@ -9,7 +9,7 @@ import {
   DEFAULT_MEDIA_QUERY,
 } from "../../lib/media-list";
 import type { MediaQuery, MediaSort, MediaView } from "../../lib/media-list";
-import { MEDIA_LABELS } from "../../lib/labels";
+import { MEDIA_LABELS } from "../../lib/media-labels";
 import { MediaFilterSelect } from "./media-filter-select";
 
 const styles = stylex.create({

@@ -3,7 +3,7 @@ import { Badge, ICON_SIZE, TileGrid, UploadTile, type UploadTileState } from "@p
 import { border, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
 import { Upload } from "lucide-react";
 import { ERROR_MESSAGES, errorMessage } from "../../lib/error-messages";
-import { MEDIA_LABELS } from "../../lib/labels";
+import { MEDIA_LABELS } from "../../lib/media-labels";
 import { formatBytes, type MediaRow } from "../../lib/media-list";
 import type { UploadEntry } from "../../lib/use-uploads";
 import { MediaThumb, type MediaThumbProps } from "./media-thumb";

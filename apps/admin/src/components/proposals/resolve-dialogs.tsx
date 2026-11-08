@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ConfirmDialog, TextArea } from "@plyrs/ui";
 import { PROPOSAL_LABELS } from "../../lib/labels";
-import type { ProposalKind } from "../../lib/proposals";
+import type { ProposalKind } from "../../lib/api-contracts";
 
 // 16.8(M5c): 採用・却下の確認。採用は自分の名前で書き込むので説明を見せ、却下は理由を添えられる
 

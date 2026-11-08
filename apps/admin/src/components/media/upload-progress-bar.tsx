@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { Button, ProgressBar } from "@plyrs/ui";
 import { space } from "@plyrs/ui/semantic.stylex";
-import { MEDIA_LABELS } from "../../lib/labels";
+import { MEDIA_LABELS } from "../../lib/media-labels";
 import { bulkBarStyles } from "../bulk-bar-styles";
 
 const styles = stylex.create({

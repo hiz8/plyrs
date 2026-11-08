@@ -30,7 +30,8 @@ import {
 } from "@plyrs/ui";
 import { border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "../lib/asset-services";
-import { MEDIA_PICKER_LABELS, RECORD_FORM_LABELS } from "../lib/labels";
+import { RECORD_FORM_LABELS } from "../lib/labels";
+import { MEDIA_PICKER_LABELS } from "../lib/media-labels";
 import { labelForRecord } from "../lib/record-label";
 import {
   asEditorRichTextValue,
