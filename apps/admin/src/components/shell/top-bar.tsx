@@ -12,7 +12,8 @@ import {
   stroke,
   text,
 } from "@plyrs/ui/semantic.stylex";
-import { NAV_LABELS, SYNC_INDICATOR_LABELS } from "../../lib/labels";
+import { NAV_LABELS } from "../../lib/labels";
+import { SYNC_INDICATOR_LABELS } from "../../lib/sync-indicator";
 import type { SyncIndicatorState } from "../../lib/sync-indicator";
 
 // a-navigation.md 3.4: 狭い画面だけに出る高さ 48px の上部バー。同期の点は 8px(3.5 と同じ)

@@ -19,7 +19,7 @@ import type { IssuedToken, IssueTokenInput } from "../../../../lib/admin-api";
 import { ApiError } from "../../../../lib/api-client";
 import { errorMessage } from "../../../../lib/error-messages";
 import { TOKEN_LABELS } from "../../../../lib/labels";
-import { isRole } from "../../../../lib/permissions";
+import { isRole } from "../../../../lib/api-contracts";
 import { resolvePublicOrigin } from "../../../../lib/public-api";
 import {
   configQueryOptions,

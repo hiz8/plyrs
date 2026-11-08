@@ -1,7 +1,7 @@
 import { WORKFLOW_STATUSES } from "@plyrs/metamodel";
 import { describe, expect, it } from "vitest";
 import { BULK_LABELS, ROLE_LABELS, WORKFLOW_STATUS_LABELS, roleLabel } from "./labels";
-import { ROLES } from "./permissions";
+import { ROLES } from "./api-contracts";
 
 describe("labels", () => {
   it("ワークフローの全ステータスに表示名がある", () => {

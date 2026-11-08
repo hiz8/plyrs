@@ -15,7 +15,7 @@ export type FieldKind =
   | "json";
 export const SLUG_KEY = "slug";
 
-// E12: 読む側(record-form)の判定と同じ
+// E12: 読む側(record-form)も、この判定で asset フィールドを見分ける
 export function kindOf(field: FieldDefinition): FieldKind {
   switch (field.type) {
     case "text":

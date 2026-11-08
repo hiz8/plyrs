@@ -1,4 +1,4 @@
-import type { ListTab } from "./content-list";
+import type { ListTab } from "./list-tab";
 import { COMMON_LABELS } from "./labels";
 
 // コンテンツの一覧(タブ・絞り込み・表・ページ送り)の文言

@@ -23,7 +23,7 @@ import {
   validateFieldKey,
   type FieldDraft,
 } from "../../lib/content-type-form";
-import { type FieldKind } from "../../lib/field-kind";
+import type { FieldKind } from "../../lib/field-kind";
 import { TERMS } from "../../lib/labels";
 import {
   ADD_FIELD_LABELS,

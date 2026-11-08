@@ -1,4 +1,4 @@
-import type { MediaKind } from "./media-list";
+import type { MediaKind } from "./media-kind";
 import { BULK_LABELS, COMMON_LABELS, DIALOGS } from "./labels";
 
 // 案 F 3〜7 章・F25: メディアライブラリ(一覧・詳細・削除・アップロード)の文言

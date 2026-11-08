@@ -3,7 +3,8 @@ import { ICON_SIZE, ICON_STROKE } from "@plyrs/ui";
 import { bg, border, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
 import { File, FileText, Film, Image, Music, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { MediaKind, MediaRow } from "../../lib/media-list";
+import type { MediaRow } from "../../lib/media-list";
+import type { MediaKind } from "../../lib/media-kind";
 
 // F18: 一覧の寸法は部品の size で決める(tile は TileGrid の枠いっぱい)
 const styles = stylex.create({

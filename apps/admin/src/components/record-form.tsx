@@ -45,6 +45,7 @@ import {
 } from "../lib/record-form-values";
 import { richTextPlainText } from "@plyrs/richtext";
 import { useRecordsOfTypes } from "../lib/use-collection";
+import { kindOf } from "../lib/field-kind";
 import { AssetRelationPicker } from "./asset-picker";
 import { MediaPickerDialog, type PickedMedia } from "./media/media-picker-dialog";
 import { ConflictDialog } from "./conflict-dialog";
@@ -654,11 +655,7 @@ function FieldInput({
     case "relation":
       // Phase 8 決定: メディアフィールド = allowedTypes ["asset"] の関係フィールド。
       // assets(アップロード経路)が配線されているときだけ専用 UI に切り替える。
-      if (
-        assets !== undefined &&
-        field.config.allowedTypes.length === 1 &&
-        field.config.allowedTypes[0] === ASSET_TYPE_KEY
-      ) {
+      if (assets !== undefined && kindOf(field) === "asset") {
         return (
           <WithDescription description={description}>
             <AssetRelationPicker

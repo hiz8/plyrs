@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { bg, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "../../lib/labels";
-import { ROLES } from "../../lib/permissions";
+import { ROLES } from "../../lib/api-contracts";
 
 const NARROW = "@media (max-width: 959px)";
 

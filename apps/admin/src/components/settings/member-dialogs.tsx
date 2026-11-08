@@ -4,7 +4,7 @@ import { ConfirmDialog } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { MEMBER_LABELS, roleLabel } from "../../lib/labels";
 import { demoteBody } from "../../lib/members";
-import type { Role } from "../../lib/permissions";
+import type { Role } from "../../lib/api-contracts";
 import { DialogNote } from "./dialog-note";
 
 const styles = stylex.create({

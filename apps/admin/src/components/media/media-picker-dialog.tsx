@@ -28,9 +28,9 @@ import {
   extensionOf,
   formatBytes,
   mediaKindOf,
-  type MediaKind,
   type MediaRow,
 } from "../../lib/media-list";
+import type { MediaKind } from "../../lib/media-kind";
 import { useFileDropGuard } from "../../lib/use-file-drop-guard";
 import { createUploadStore, DONE_HOLD_MS, useUploads } from "../../lib/use-uploads";
 import { useRecordsOfTypes } from "../../lib/use-collection";

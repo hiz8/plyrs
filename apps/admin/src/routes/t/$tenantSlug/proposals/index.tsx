@@ -9,7 +9,7 @@ import { PageBody, TenantPageHeader } from "../../../../components/tenant-page-h
 import { currentCrumb, homeCrumb } from "../../../../lib/breadcrumbs";
 import { PROPOSAL_LABELS } from "../../../../lib/labels";
 import { proposalTitle } from "../../../../lib/proposals";
-import { type ProposalSummary } from "../../../../lib/api-contracts";
+import type { ProposalSummary } from "../../../../lib/api-contracts";
 import {
   membersQueryOptions,
   openProposalsQueryOptions,

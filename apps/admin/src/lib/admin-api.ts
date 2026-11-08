@@ -1,13 +1,13 @@
 import type { ContentTypeDefinition, FieldDefinition } from "@plyrs/metamodel";
 import { apiErrorFromBody, throwApiError } from "./api-client";
 import { NetworkError, withNetworkErrors } from "./network-error";
-import type { Role } from "./permissions";
 import type {
   CompareResult,
   HistoryEntry,
   ProposalDetail,
   ProposalState,
   ProposalSummary,
+  Role,
 } from "./api-contracts";
 import type { TokenManager } from "./token-manager";
 

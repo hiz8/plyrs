@@ -1,19 +1,10 @@
 import type { WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
+import { LIST_TABS, type ListTab } from "./list-tab";
 import { normalizeForSearch, searchText } from "./search";
 
 // 案 D 3〜8 章: コンテンツの一覧の絞り込み・並べ替え・ページ送りと、URL クエリとの相互変換。
 // 一覧のデータは同期で手元にあるため、すべて画面側の純関数で行う(サーバーへの問い合わせは不要)。
-
-// URL の値をそのまま使う(例: ?tab=unpublished-changes)
-export const LIST_TABS = [
-  "all",
-  "published",
-  "unpublished-changes",
-  "unpublished",
-  "archived",
-] as const;
-export type ListTab = (typeof LIST_TABS)[number];
 
 // ステータスの絞り込み(アーカイブはタブで扱う)。ステータスが増えたら satisfies で気付ける
 export const LIST_STATUSES = ["draft", "in_review", "ready"] as const satisfies readonly Exclude<

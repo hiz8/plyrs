@@ -1,7 +1,10 @@
 import type { WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncStatus } from "@plyrs/sync-client";
-import { isRole, type Role } from "./permissions";
-import type { SyncIndicatorState } from "./sync-indicator";
+import { isRole, type Role } from "./api-contracts";
+
+// このファイルには、複数の画面(機能)で使う文言だけを置く。1 つの機能でしか使わない文言は、その機能の
+// 文言のファイル(content-list-labels.ts など)に置く。HISTORY_LABELS などの 1 機能専用の文言がまだ残っているが、
+// ADR 0001 の移行手順 3・4 で、使う側のファイルと一緒に移す。
 
 // 案 H 4.1: 画面に出す用語の唯一の基準。画面ごとに対応表を持たず、ここから引く。
 // 「テナント」は運営者・開発者の言葉のため、利用者の画面では「サイト」と呼ぶ(2026-10-17 決定)。
@@ -142,12 +145,6 @@ export const NAV_LABELS = {
   mainNav: "メインナビゲーション",
   account: "アカウント",
 } as const;
-
-export const SYNC_INDICATOR_LABELS: Record<SyncIndicatorState, string> = {
-  syncing: "同期中…",
-  ready: "同期済み",
-  disconnected: "再接続しています…",
-};
 
 export const CONNECTION_BANNER = {
   message:

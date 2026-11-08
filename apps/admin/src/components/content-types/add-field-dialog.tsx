@@ -24,7 +24,7 @@ import {
   validateFieldKey,
   type KindGroup,
 } from "../../lib/content-type-form";
-import { type FieldKind } from "../../lib/field-kind";
+import type { FieldKind } from "../../lib/field-kind";
 import { TERMS } from "../../lib/labels";
 import { ADD_FIELD_LABELS, FIELD_KIND_LABELS } from "../../lib/content-type-labels";
 

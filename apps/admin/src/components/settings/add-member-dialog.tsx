@@ -5,7 +5,7 @@ import { Button, ModalDialog, TextField } from "@plyrs/ui";
 import { border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
 import { copyText } from "../../lib/clipboard";
 import { DIALOGS, MEMBER_LABELS, ROLE_DESCRIPTIONS } from "../../lib/labels";
-import type { Role } from "../../lib/permissions";
+import type { Role } from "../../lib/api-contracts";
 import { DialogNote } from "./dialog-note";
 import { RoleSelect } from "./role-select";
 

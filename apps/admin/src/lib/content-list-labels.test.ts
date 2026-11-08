@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LIST_TABS } from "./content-list";
+import { LIST_TABS } from "./list-tab";
 import { LIST_LABELS } from "./content-list-labels";
 
 describe("content-list-labels", () => {

@@ -72,3 +72,11 @@ export interface ProposalDetail extends ProposalSummary {
   /** 現在の内容との差分(create は空からの差分) */
   fields: FieldChange[];
 }
+
+// apps/api の auth/permissions.ts の ROLES と同じ値(HTTP 契約。メンバーの API がこの値を返す)
+export const ROLES = ["owner", "editor", "viewer"] as const;
+export type Role = (typeof ROLES)[number];
+
+export function isRole(value: string): value is Role {
+  return (ROLES as readonly string[]).includes(value);
+}
