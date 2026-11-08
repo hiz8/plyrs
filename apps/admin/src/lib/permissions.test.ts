@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as api from "../../../api/src/auth/permissions";
-import { ROLES, can, type Operation } from "./permissions";
+import { can, type Operation } from "./permissions";
+import { ROLES } from "./api-contracts";
 
 // 網羅リストは ROLE_PERMISSIONS から導かない(表から操作が抜けると検査対象からも消えるため)。
 // Operation に操作が増えたら下の「操作の集合」テストで tsc が落ちる。

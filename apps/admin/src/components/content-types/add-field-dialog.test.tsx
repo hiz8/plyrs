@@ -2,7 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { FIELD_KINDS } from "../../lib/content-type-form";
-import { ADD_FIELD_LABELS, FIELD_KIND_LABELS, TERMS } from "../../lib/labels";
+import { TERMS } from "../../lib/labels";
+import { ADD_FIELD_LABELS, FIELD_KIND_LABELS } from "../../lib/content-type-labels";
 import { AddFieldDialog } from "./add-field-dialog";
 
 function renderDialog(

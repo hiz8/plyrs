@@ -18,7 +18,8 @@ import { Check, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AssetServices } from "../../lib/asset-services";
 import { errorMessage } from "../../lib/error-messages";
-import { MEDIA_LABELS, MEDIA_PICKER_LABELS, TOASTS } from "../../lib/labels";
+import { TOASTS } from "../../lib/labels";
+import { MEDIA_LABELS, MEDIA_PICKER_LABELS } from "../../lib/media-labels";
 import {
   MEDIA_KIND_OPTIONS,
   isMediaKindOrAll,
@@ -27,9 +28,9 @@ import {
   extensionOf,
   formatBytes,
   mediaKindOf,
-  type MediaKind,
   type MediaRow,
 } from "../../lib/media-list";
+import type { MediaKind } from "../../lib/media-kind";
 import { useFileDropGuard } from "../../lib/use-file-drop-guard";
 import { createUploadStore, DONE_HOLD_MS, useUploads } from "../../lib/use-uploads";
 import { useRecordsOfTypes } from "../../lib/use-collection";

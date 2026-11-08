@@ -16,7 +16,7 @@ import {
   type TypeRow,
 } from "../../../../../lib/content-types";
 import { errorMessage } from "../../../../../lib/error-messages";
-import { CONTENT_TYPE_LABELS } from "../../../../../lib/labels";
+import { CONTENT_TYPE_LABELS } from "../../../../../lib/content-type-labels";
 import { contentTypesQueryOptions, modulesQueryOptions } from "../../../../../lib/queries";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
 import { useCan } from "../../../../../lib/use-can";

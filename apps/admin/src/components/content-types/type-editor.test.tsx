@@ -3,13 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import type { FieldDefinition } from "@plyrs/metamodel";
 import { emptyTypeDraft, toTypeDraft } from "../../lib/content-type-form";
+import { DIALOGS } from "../../lib/labels";
 import {
   ADD_FIELD_LABELS,
   CONTENT_TYPE_LABELS,
-  DIALOGS,
   FIELD_KIND_LABELS,
   FIELD_PANEL_LABELS,
-} from "../../lib/labels";
+} from "../../lib/content-type-labels";
 import type { TenantSync } from "../../lib/sync";
 import { useLeaveGuard } from "../../lib/use-leave-guard";
 import { TenantSyncProvider } from "../../lib/sync-context";

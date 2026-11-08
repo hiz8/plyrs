@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { LIST_COLUMNS_MAX } from "@plyrs/metamodel";
 import { Badge, IconButton } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { CONTENT_TYPE_LABELS } from "../../lib/labels";
+import { CONTENT_TYPE_LABELS } from "../../lib/content-type-labels";
 import { ListColumnsSelect } from "./list-columns-select";
 
 const styles = stylex.create({

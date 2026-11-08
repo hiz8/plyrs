@@ -22,9 +22,14 @@ import {
   keyErrorMessage,
   validateFieldKey,
   type FieldDraft,
-  type FieldKind,
 } from "../../lib/content-type-form";
-import { ADD_FIELD_LABELS, FIELD_KIND_LABELS, FIELD_PANEL_LABELS, TERMS } from "../../lib/labels";
+import type { FieldKind } from "../../lib/field-kind";
+import { TERMS } from "../../lib/labels";
+import {
+  ADD_FIELD_LABELS,
+  FIELD_KIND_LABELS,
+  FIELD_PANEL_LABELS,
+} from "../../lib/content-type-labels";
 
 const NARROW = "@media (max-width: 959px)";
 const P = FIELD_PANEL_LABELS;

@@ -5,7 +5,7 @@ import type { MemberSummary } from "../../lib/admin-api";
 import { formatDate } from "../../lib/datetime";
 import { MEMBER_LABELS } from "../../lib/labels";
 import type { MemberRow } from "../../lib/members";
-import { isRole, type Role } from "../../lib/permissions";
+import { isRole, type Role } from "../../lib/api-contracts";
 import { RoleSelect } from "./role-select";
 
 const styles = stylex.create({

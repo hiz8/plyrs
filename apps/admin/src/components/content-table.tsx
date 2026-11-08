@@ -18,7 +18,7 @@ import { Link, type Selection } from "react-aria-components";
 import { LIST_SORTS, type ListRow, type ListSort, type SortOrder } from "../lib/content-list";
 import { formatDateTime } from "../lib/datetime";
 import { listColumnsOf, rowCells, type ListColumn } from "../lib/list-cells";
-import { LIST_LABELS } from "../lib/labels";
+import { LIST_LABELS } from "../lib/content-list-labels";
 import { PublicationBadge, WorkflowStatusBadge } from "./publication-badge";
 
 const styles = stylex.create({

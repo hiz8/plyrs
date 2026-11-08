@@ -10,21 +10,11 @@ import {
 } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import type { ContentTypeSummary } from "./admin-api";
-import { ADD_FIELD_LABELS, CONTENT_TYPE_LABELS, FIELD_PANEL_LABELS } from "./labels";
+import { ADD_FIELD_LABELS, CONTENT_TYPE_LABELS, FIELD_PANEL_LABELS } from "./content-type-labels";
+import { SLUG_KEY, kindOf, type FieldKind } from "./field-kind";
 
 // 案 E: 型設計の下書き。画面の判断はここに寄せ、部品は描くだけにする。
 
-export type FieldKind =
-  | "text"
-  | "richtext"
-  | "number"
-  | "datetime"
-  | "boolean"
-  | "select"
-  | "asset"
-  | "reference"
-  | "slug"
-  | "json";
 export type KindGroup = "basic" | "link" | "advanced";
 
 export const FIELD_KINDS: readonly { kind: FieldKind; group: KindGroup }[] = [
@@ -39,22 +29,6 @@ export const FIELD_KINDS: readonly { kind: FieldKind; group: KindGroup }[] = [
   { kind: "slug", group: "link" },
   { kind: "json", group: "advanced" },
 ];
-
-const SLUG_KEY = "slug";
-
-// E12: 読む側(record-form)の判定と同じ
-export function kindOf(field: FieldDefinition): FieldKind {
-  switch (field.type) {
-    case "text":
-      return field.key === SLUG_KEY && field.config?.unique === true ? "slug" : "text";
-    case "relation": {
-      const allowed = field.config.allowedTypes;
-      return allowed.length === 1 && allowed[0] === ASSET_TYPE_KEY ? "asset" : "reference";
-    }
-    default:
-      return field.type;
-  }
-}
 
 export interface SelectOptionDraft {
   value: string;

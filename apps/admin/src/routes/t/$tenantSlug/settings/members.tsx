@@ -19,7 +19,7 @@ import { ApiError } from "../../../../lib/api-client";
 import { errorMessage } from "../../../../lib/error-messages";
 import { MEMBER_LABELS, roleLabel } from "../../../../lib/labels";
 import { isDowngrade, memberRows, otherOwnerEmails } from "../../../../lib/members";
-import type { Role } from "../../../../lib/permissions";
+import type { Role } from "../../../../lib/api-contracts";
 import { membersQueryOptions, meQueryOptions } from "../../../../lib/queries";
 
 export const Route = createFileRoute("/t/$tenantSlug/settings/members")({

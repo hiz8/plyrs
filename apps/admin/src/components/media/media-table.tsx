@@ -3,7 +3,7 @@ import { Badge, Cell, Column, RelativeTime, Row, Table, TableBody, TableHeader }
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { Link, type Selection } from "react-aria-components";
 import { formatDateTime } from "../../lib/datetime";
-import { MEDIA_LABELS } from "../../lib/labels";
+import { MEDIA_LABELS } from "../../lib/media-labels";
 import { formatBytes } from "../../lib/media-list";
 import { MediaThumb } from "./media-thumb";
 import type { MediaGridProps } from "./media-grid";

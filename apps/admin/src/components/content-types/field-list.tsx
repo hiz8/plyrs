@@ -11,7 +11,7 @@ import {
   fieldTags,
   type FieldDraft,
 } from "../../lib/content-type-form";
-import { CONTENT_TYPE_LABELS, FIELD_KIND_LABELS } from "../../lib/labels";
+import { CONTENT_TYPE_LABELS, FIELD_KIND_LABELS } from "../../lib/content-type-labels";
 import { DialogNote } from "../settings/dialog-note";
 
 const NARROW = "@media (max-width: 959px)";

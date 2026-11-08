@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import type { FieldDefinition } from "@plyrs/metamodel";
 import { emptyFieldDraft, toFieldDraft, type FieldDraft } from "../../lib/content-type-form";
-import { CONTENT_TYPE_LABELS, FIELD_KIND_LABELS } from "../../lib/labels";
+import { CONTENT_TYPE_LABELS, FIELD_KIND_LABELS } from "../../lib/content-type-labels";
 import { article } from "../../test-utils/records-harness";
 import { FieldList, type FieldListProps } from "./field-list";
 

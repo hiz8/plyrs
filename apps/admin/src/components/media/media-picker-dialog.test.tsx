@@ -5,7 +5,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import type { AssetServices } from "../../lib/asset-services";
-import type { MediaKind } from "../../lib/media-list";
+import type { MediaKind } from "../../lib/media-kind";
 import { ASSET_1, ASSET_2, ASSET_3, assetRecord } from "../../test-utils/media-harness";
 import { pendingConnect } from "../../test-utils/fake-socket";
 import { AssetRelationPicker } from "../asset-picker";

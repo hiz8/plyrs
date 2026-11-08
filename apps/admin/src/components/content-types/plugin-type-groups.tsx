@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Badge } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import type { PluginTypeGroup } from "../../lib/content-types";
-import { CONTENT_TYPE_LABELS } from "../../lib/labels";
+import { CONTENT_TYPE_LABELS } from "../../lib/content-type-labels";
 import { TypeTable } from "./type-table";
 
 const styles = stylex.create({

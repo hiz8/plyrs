@@ -1,50 +1,10 @@
 import { titleFieldKey, type ContentTypeDefinition } from "@plyrs/metamodel";
-import {
-  actorLabel,
-  viaLabel,
-  type FieldChange,
-  type HistoryVia,
-  type MemberName,
-} from "./history";
+import type { ProposalKind, ProposalState, ProposalSummary } from "./api-contracts";
+import { actorLabel, viaLabel, type MemberName } from "./history";
 import { PROPOSAL_LABELS } from "./labels";
 import type { Operation } from "./permissions";
 
 // 16.8(M5c、決定 57): 提案画面の純関数。表示の文言と見出し(router と React に依存しない)
-
-export type ProposalKind = "create" | "update" | "delete" | "publish" | "unpublish";
-export type ProposalState = "open" | "accepted" | "rejected";
-
-// apps/api の ops/proposals.ts の proposalSummarySchema と同じ形(HTTP 契約)
-export interface ProposalSummary {
-  id: string;
-  recordId: string;
-  type: string;
-  kind: ProposalKind;
-  state: ProposalState;
-  changedFields: string[];
-  status: string | null;
-  /** record の今のワークフロー状態(record が無ければ null)。採用で status に変わる */
-  currentStatus: string | null;
-  baseVersion: number;
-  currentVersion: number | null;
-  /** 提案の後に record が変わった(採用すると提案のフィールドだけが上書きされる) */
-  stale: boolean;
-  note: string | null;
-  actor: string;
-  via: HistoryVia;
-  tokenId: string | null;
-  createdAt: string;
-  resolvedAt: string | null;
-  resolvedBy: string | null;
-  resolutionNote: string | null;
-  resultHistorySeq: number | null;
-}
-
-export interface ProposalDetail extends ProposalSummary {
-  input: Record<string, unknown> | null;
-  /** 現在の内容との差分(create は空からの差分) */
-  fields: FieldChange[];
-}
 
 export function kindLabel(kind: ProposalKind): string {
   return PROPOSAL_LABELS.kind[kind];

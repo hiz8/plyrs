@@ -8,7 +8,8 @@ import { ProposalList } from "../../../../components/proposals/proposal-list";
 import { PageBody, TenantPageHeader } from "../../../../components/tenant-page-header";
 import { currentCrumb, homeCrumb } from "../../../../lib/breadcrumbs";
 import { PROPOSAL_LABELS } from "../../../../lib/labels";
-import { proposalTitle, type ProposalSummary } from "../../../../lib/proposals";
+import { proposalTitle } from "../../../../lib/proposals";
+import type { ProposalSummary } from "../../../../lib/api-contracts";
 import {
   membersQueryOptions,
   openProposalsQueryOptions,

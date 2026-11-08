@@ -4,47 +4,10 @@ import {
   type FieldDefinition,
 } from "@plyrs/metamodel";
 import { richTextPlainText } from "@plyrs/richtext";
+import type { FieldChange, HistoryEntry, HistoryKind, HistoryVia } from "./api-contracts";
 import { HISTORY_LABELS } from "./labels";
 
 // 16.5(M2-5): 履歴画面の純関数。表示の文言と差分の整形(router と React に依存しない)
-
-export type HistoryKind = "write" | "publish" | "unpublish" | "delete" | "restore";
-export type HistoryVia = "sync" | "mcp" | "rest";
-
-// apps/api の ops/history.ts の historyEntrySchema と同じ形(HTTP 契約)
-export interface HistoryEntry {
-  historySeq: number;
-  kind: HistoryKind;
-  version: number;
-  sourceVersion: number | null;
-  status: string;
-  changedFields: string[];
-  actor: string;
-  via: HistoryVia;
-  tokenId: string | null;
-  clientId: string | null;
-  restoredFrom: number | null;
-  proposalId: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type VersionRef =
-  | { ref: "history"; historySeq: number; version: number; at: string }
-  | { ref: "published"; sourceVersion: number; at: string }
-  | { ref: "current"; version: number; at: string };
-
-export interface FieldChange {
-  key: string;
-  before: unknown;
-  after: unknown;
-}
-
-export interface CompareResult {
-  from: VersionRef;
-  to: VersionRef;
-  fields: FieldChange[];
-}
 
 // 履歴画面で選べる版: 履歴の 1 行か、公開版の疑似行
 export type HistorySelection = { kind: "history"; historySeq: number } | { kind: "published" };

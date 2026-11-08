@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import { CONTENT_TYPE_LABELS } from "../../lib/labels";
+import { CONTENT_TYPE_LABELS } from "../../lib/content-type-labels";
 import { DeleteTypeDialog } from "./delete-type-dialog";
 
 it("題・本文・オフラインの注記・危険色の「削除する」を出し、初期フォーカスはキャンセル", async () => {

@@ -1,6 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 import { ConfirmDialog } from "@plyrs/ui";
-import { MEDIA_LABELS } from "../../lib/labels";
+import { MEDIA_LABELS } from "../../lib/media-labels";
 import { countUsingRecords, type ResolvedUsage } from "../../lib/media";
 import { usageTitles, type MediaRow } from "../../lib/media-list";
 import { DialogNote } from "../settings/dialog-note";

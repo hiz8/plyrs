@@ -18,7 +18,6 @@ import {
   hasSlugField,
   isTypeDraftDirty,
   isTypeDraftEmpty,
-  kindOf,
   suggestKey,
   summaryToDefinition,
   toFieldDraft,
@@ -29,7 +28,7 @@ import {
   type FieldDraft,
   type TypeDraft,
 } from "./content-type-form";
-import { CONTENT_TYPE_LABELS, FIELD_PANEL_LABELS } from "./labels";
+import { CONTENT_TYPE_LABELS, FIELD_PANEL_LABELS } from "./content-type-labels";
 
 const uuid = "018f2b6a-7a0a-7000-8000-000000000001";
 
@@ -100,27 +99,6 @@ const fields: FieldDefinition[] = [
     config: { allowedTypes: ["author", "team"], cardinality: "many", ordered: true },
   },
 ];
-
-describe("kindOf", () => {
-  it("slug / asset / reference を設定から見分ける", () => {
-    expect(kindOf({ key: "slug", type: "text", config: { unique: true } })).toBe("slug");
-    expect(kindOf({ key: "slug", type: "text" })).toBe("text");
-    expect(
-      kindOf({
-        key: "eyecatch",
-        type: "relation",
-        config: { allowedTypes: ["asset"], cardinality: "one", snapshotEmbed: "value" },
-      }),
-    ).toBe("asset");
-    expect(
-      kindOf({
-        key: "authors",
-        type: "relation",
-        config: { allowedTypes: ["author"], cardinality: "many" },
-      }),
-    ).toBe("reference");
-  });
-});
 
 describe("toTypeDraft / buildDefinition round-trip", () => {
   it("全種類の round-trip で定義が保たれる", () => {

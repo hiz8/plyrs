@@ -13,7 +13,7 @@ import {
   text,
 } from "@plyrs/ui/semantic.stylex";
 import type { TypeRow } from "../../lib/content-types";
-import { CONTENT_TYPE_LABELS } from "../../lib/labels";
+import { CONTENT_TYPE_LABELS } from "../../lib/content-type-labels";
 
 const NARROW = "@media (max-width: 959px)";
 

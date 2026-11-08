@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { expect, it } from "vitest";
-import { CONTENT_TYPE_LABELS } from "../../lib/labels";
+import { CONTENT_TYPE_LABELS } from "../../lib/content-type-labels";
 import { typeRow } from "../../test-utils/type-rows";
 import { PluginTypeGroups } from "./plugin-type-groups";
 

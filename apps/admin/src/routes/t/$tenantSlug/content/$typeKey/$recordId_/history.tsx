@@ -15,11 +15,8 @@ import {
 } from "../../../../../../components/tenant-page-header";
 import { contentTypeCrumb, currentCrumb, homeCrumb } from "../../../../../../lib/breadcrumbs";
 import { errorMessage } from "../../../../../../lib/error-messages";
-import {
-  summarizeEntry,
-  type HistoryEntry,
-  type HistorySelection,
-} from "../../../../../../lib/history";
+import { summarizeEntry, type HistorySelection } from "../../../../../../lib/history";
+import type { HistoryEntry } from "../../../../../../lib/api-contracts";
 import { EDITOR_LABELS, HISTORY_LABELS } from "../../../../../../lib/labels";
 import { membersQueryOptions, publicationQueryOptions } from "../../../../../../lib/queries";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../../lib/sync-context";

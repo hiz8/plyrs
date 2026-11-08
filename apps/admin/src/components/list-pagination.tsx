@@ -3,7 +3,7 @@ import { Button, IconButton, Select } from "@plyrs/ui";
 import { accent, font, space, text } from "@plyrs/ui/semantic.stylex";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { PER_PAGE_OPTIONS, pageWindow, type PerPage } from "../lib/content-list";
-import { LIST_LABELS } from "../lib/labels";
+import { LIST_LABELS } from "../lib/content-list-labels";
 
 const styles = stylex.create({
   root: {

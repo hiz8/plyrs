@@ -1,18 +1,10 @@
 import type { WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
+import { LIST_TABS, type ListTab } from "./list-tab";
+import { normalizeForSearch, searchText } from "./search";
 
 // 案 D 3〜8 章: コンテンツの一覧の絞り込み・並べ替え・ページ送りと、URL クエリとの相互変換。
 // 一覧のデータは同期で手元にあるため、すべて画面側の純関数で行う(サーバーへの問い合わせは不要)。
-
-// URL の値をそのまま使う(例: ?tab=unpublished-changes)
-export const LIST_TABS = [
-  "all",
-  "published",
-  "unpublished-changes",
-  "unpublished",
-  "archived",
-] as const;
-export type ListTab = (typeof LIST_TABS)[number];
 
 // ステータスの絞り込み(アーカイブはタブで扱う)。ステータスが増えたら satisfies で気付ける
 export const LIST_STATUSES = ["draft", "in_review", "ready"] as const satisfies readonly Exclude<
@@ -59,15 +51,6 @@ function positiveInt(value: unknown): number | undefined {
   const parsed =
     typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
   return Number.isInteger(parsed) && parsed >= 1 ? parsed : undefined;
-}
-
-// TanStack Router の既定の search パーサは値を JSON として読むため、手書きのリンクの ?q=2026 は
-// number、?q=true は boolean で届く。検索語としては文字列に戻す
-export function searchText(value: unknown): string {
-  if (typeof value === "string") {
-    return value;
-  }
-  return typeof value === "number" || typeof value === "boolean" ? String(value) : "";
 }
 
 // URL クエリ(TanStack Router の validateSearch に渡る値)から。手で書き換えられた不正な値は既定に戻す
@@ -170,11 +153,6 @@ function matchesTab(row: ListRow, tab: ListTab): boolean {
     case "archived":
       return archived;
   }
-}
-
-// 全角・半角や大文字・小文字の違いを無視して部分一致させる
-export function normalizeForSearch(text: string): string {
-  return text.normalize("NFKC").toLocaleLowerCase("ja");
 }
 
 export function tabCounts(rows: readonly ListRow[]): Record<ListTab, number> {

@@ -2,7 +2,8 @@ import * as stylex from "@stylexjs/stylex";
 import { SearchField, Select } from "@plyrs/ui";
 import { space } from "@plyrs/ui/semantic.stylex";
 import { LIST_STATUSES, type ListStatus } from "../lib/content-list";
-import { LIST_LABELS, WORKFLOW_STATUS_LABELS } from "../lib/labels";
+import { WORKFLOW_STATUS_LABELS } from "../lib/labels";
+import { LIST_LABELS } from "../lib/content-list-labels";
 
 const NARROW = "@media (max-width: 959px)";
 

@@ -7,8 +7,8 @@ import {
 } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { formatDateTime } from "./datetime";
-import { kindOf } from "./content-type-form";
-import { LIST_LABELS } from "./labels";
+import { kindOf } from "./field-kind";
+import { LIST_LABELS } from "./content-list-labels";
 
 // 一覧の追加列(Phase V4 持ち越し K2・K3 / 案 D 5 章 / 案 E 2.2)。純関数だけを置く
 

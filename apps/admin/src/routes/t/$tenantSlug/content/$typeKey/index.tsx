@@ -23,13 +23,8 @@ import {
   type ListRow,
 } from "../../../../../lib/content-list";
 import { errorMessage } from "../../../../../lib/error-messages";
-import {
-  BULK_LABELS,
-  DIALOGS,
-  EDITOR_LABELS,
-  LIST_LABELS,
-  TOASTS,
-} from "../../../../../lib/labels";
+import { BULK_LABELS, DIALOGS, EDITOR_LABELS, TOASTS } from "../../../../../lib/labels";
+import { LIST_LABELS } from "../../../../../lib/content-list-labels";
 import { publicationsQueryKey, publicationsQueryOptions } from "../../../../../lib/queries";
 import { labelForRecord } from "../../../../../lib/record-label";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";

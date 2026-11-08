@@ -22,10 +22,11 @@ import {
   autoFill,
   keyErrorMessage,
   validateFieldKey,
-  type FieldKind,
   type KindGroup,
 } from "../../lib/content-type-form";
-import { ADD_FIELD_LABELS, FIELD_KIND_LABELS, TERMS } from "../../lib/labels";
+import type { FieldKind } from "../../lib/field-kind";
+import { TERMS } from "../../lib/labels";
+import { ADD_FIELD_LABELS, FIELD_KIND_LABELS } from "../../lib/content-type-labels";
 
 const NARROW = "@media (max-width: 959px)";
 

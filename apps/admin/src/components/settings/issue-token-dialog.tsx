@@ -6,7 +6,7 @@ import { border, font, radius, space, status, stroke, text } from "@plyrs/ui/sem
 import type { IssueTokenInput, IssuedToken } from "../../lib/admin-api";
 import { copyText } from "../../lib/clipboard";
 import { DIALOGS, TOKEN_LABELS } from "../../lib/labels";
-import type { Role } from "../../lib/permissions";
+import type { Role } from "../../lib/api-contracts";
 import {
   DEFAULT_SCOPES,
   defaultExpiryFor,

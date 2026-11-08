@@ -7,7 +7,7 @@ import type { SyncRecord } from "@plyrs/sync-protocol";
 import { Button } from "@plyrs/ui";
 import { font, space, status, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "../lib/asset-services";
-import { MEDIA_LABELS, MEDIA_PICKER_LABELS } from "../lib/labels";
+import { MEDIA_LABELS, MEDIA_PICKER_LABELS } from "../lib/media-labels";
 import { labelForRecord } from "../lib/record-label";
 import { parseRelationDraftKey, relationDraftKey } from "../lib/record-form-values";
 import { useRecordsOfTypes } from "../lib/use-collection";
