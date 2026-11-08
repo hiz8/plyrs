@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - tools/*
 
 catalog:
   "@cloudflare/vite-plugin": ^1.62.5

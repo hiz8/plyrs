@@ -1,0 +1,15 @@
+{
+  "name": "@plyrs/lint-rules",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node check.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "oxlint": "^1.86.0",
+    "typescript": "catalog:"
+  }
+}

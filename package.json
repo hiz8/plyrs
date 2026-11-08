@@ -1,6 +1,7 @@
 {
   "name": "plyrs",
   "private": true,
+  "type": "module",
   "scripts": {
     "lint": "oxlint . --no-error-on-unmatched-pattern",
     "format": "oxfmt --ignore-path=.gitignore --ignore-path=.oxfmtignore .",

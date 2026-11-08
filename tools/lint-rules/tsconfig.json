@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "allowImportingTsExtensions": true
+  },
+  // ルートの oxlint.config.ts もここで型チェックする(どのパッケージの tsconfig にも含まれないため)
+  "include": ["check.ts", "fixtures/fixture.config.ts", "../../oxlint.config.ts"]
+}
