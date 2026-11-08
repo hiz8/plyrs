@@ -6,8 +6,8 @@ import type { Collection } from "@tanstack/db";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { Banner, Button, ConfirmDialog, toaster } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { HistoryDiff } from "../../../../../../components/history/history-diff";
-import { HistoryList } from "../../../../../../components/history/history-list";
+import { HistoryDiff } from "./-components/history-diff";
+import { HistoryList } from "./-components/history-list";
 import {
   PageBody,
   PageLoading,

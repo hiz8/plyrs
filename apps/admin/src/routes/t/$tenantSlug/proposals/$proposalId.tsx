@@ -4,12 +4,9 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Badge, Banner, Button, toaster } from "@plyrs/ui";
 import { bg, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
-import { ProposalDiff } from "../../../../components/proposals/proposal-diff";
-import { kindTone } from "../../../../components/proposals/proposal-list";
-import {
-  AcceptProposalDialog,
-  RejectProposalDialog,
-} from "../../../../components/proposals/resolve-dialogs";
+import { ProposalDiff } from "./-components/proposal-diff";
+import { kindTone } from "./-components/proposal-list";
+import { AcceptProposalDialog, RejectProposalDialog } from "./-components/resolve-dialogs";
 import { PageBody, PageLoading, TenantPageHeader } from "../../../../components/tenant-page-header";
 import { currentCrumb, homeCrumb, proposalsCrumb } from "../../../../lib/breadcrumbs";
 import { formatDateTime } from "../../../../lib/datetime";
@@ -22,7 +19,7 @@ import {
   proposalTitle,
   stateLabel,
   summarizeProposal,
-} from "../../../../lib/proposals";
+} from "./-lib/proposals";
 import {
   membersQueryOptions,
   proposalQueryOptions,

@@ -1,11 +1,10 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
+import { Banner, Button, Skeleton } from "@plyrs/ui";
 import { bg, border, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
-import { formatFieldDiff } from "../../lib/history";
-import type { FieldChange, ProposalKind } from "../../lib/api-contracts";
-import { PROPOSAL_LABELS, WORKFLOW_STATUS_LABELS } from "../../lib/labels";
-
-// 16.8(M5c): 提案の差分。フィールドごとに「現在」と「提案」を並べる(履歴の差分と同じ整形)
+import { formatFieldDiff } from "~/lib/history";
+import type { CompareResult } from "~/lib/api-contracts";
+import { HISTORY_LABELS } from "~/lib/labels";
 
 const styles = stylex.create({
   panel: {
@@ -16,6 +15,7 @@ const styles = stylex.create({
     borderRadius: radius.container,
     backgroundColor: bg.surface,
   },
+  head: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: space.sm },
   title: {
     margin: 0,
     fontFamily: font.family,
@@ -44,67 +44,73 @@ const styles = stylex.create({
     overflowWrap: "anywhere",
   },
   key: { color: text.default, fontWeight: font.weightMedium, whiteSpace: "nowrap" },
+  loading: { display: "flex", flexDirection: "column", gap: space.sm },
 });
 
-export interface ProposalDiffProps {
-  kind: ProposalKind;
-  fields: readonly FieldChange[];
+export interface HistoryDiffProps {
+  compare: CompareResult | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
   definition: ContentTypeDefinition | undefined;
-  /** 提案するワークフロー状態(変えないなら null)。採用で変わるので、フィールドの差分と並べて見せる */
-  status: string | null;
-  currentStatus: string | null;
+  /** record:write が無い(viewer)か、公開版の疑似行を選んでいるときは出さない */
+  canRestore: boolean;
+  onRestore: () => void;
+  hasSelection: boolean;
 }
 
-function statusLabel(status: string | null): string {
-  if (status === null) {
-    return PROPOSAL_LABELS.noChanges;
-  }
-  return (WORKFLOW_STATUS_LABELS as Record<string, string>)[status] ?? status;
-}
-
-export function ProposalDiff({
-  kind,
-  fields,
+// 選んだ版と現在の差分(右列)。フィールドごとに「この版」と「現在」を並べる
+export function HistoryDiff({
+  compare,
+  isLoading,
+  isError,
+  onRetry,
   definition,
-  status,
-  currentStatus,
-}: ProposalDiffProps) {
-  const statusChanges = status !== null && (kind === "create" || kind === "update");
+  canRestore,
+  onRestore,
+  hasSelection,
+}: HistoryDiffProps) {
   return (
-    <section aria-label={PROPOSAL_LABELS.diffTitle} {...stylex.props(styles.panel)}>
-      <h2 {...stylex.props(styles.title)}>{PROPOSAL_LABELS.diffTitle}</h2>
-      {kind === "delete" || kind === "publish" || kind === "unpublish" ? (
-        <p {...stylex.props(styles.muted)}>{PROPOSAL_LABELS.kindDescription[kind]}</p>
-      ) : fields.length === 0 && !statusChanges ? (
-        <p {...stylex.props(styles.muted)}>{PROPOSAL_LABELS.noChanges}</p>
+    <section aria-label={HISTORY_LABELS.compareTitle} {...stylex.props(styles.panel)}>
+      <div {...stylex.props(styles.head)}>
+        <h2 {...stylex.props(styles.title)}>{HISTORY_LABELS.compareTitle}</h2>
+        {canRestore && compare !== undefined && (
+          <Button variant="secondary" size="sm" onPress={onRestore}>
+            {HISTORY_LABELS.restore}
+          </Button>
+        )}
+      </div>
+      {!hasSelection ? (
+        <p {...stylex.props(styles.muted)}>{HISTORY_LABELS.noSelection}</p>
+      ) : isError ? (
+        <Banner tone="danger">
+          {HISTORY_LABELS.compareFailed}{" "}
+          <Button variant="link" size="sm" onPress={onRetry}>
+            {HISTORY_LABELS.retry}
+          </Button>
+        </Banner>
+      ) : isLoading || compare === undefined ? (
+        <div aria-hidden="true" {...stylex.props(styles.loading)}>
+          <Skeleton height={14} width="100%" />
+          <Skeleton height={14} width="70%" />
+        </div>
+      ) : compare.fields.length === 0 ? (
+        <p {...stylex.props(styles.muted)}>{HISTORY_LABELS.noChanges}</p>
       ) : (
         <table {...stylex.props(styles.table)}>
           <thead>
             <tr>
               <th scope="col" {...stylex.props(styles.th)} />
               <th scope="col" {...stylex.props(styles.th)}>
-                {PROPOSAL_LABELS.before}
+                {HISTORY_LABELS.before}
               </th>
               <th scope="col" {...stylex.props(styles.th)}>
-                {PROPOSAL_LABELS.after}
+                {HISTORY_LABELS.after}
               </th>
             </tr>
           </thead>
           <tbody>
-            {statusChanges && (
-              <tr>
-                <th scope="row" {...stylex.props(styles.td, styles.key)}>
-                  {PROPOSAL_LABELS.statusRow}
-                </th>
-                <td {...stylex.props(styles.td)}>
-                  {currentStatus === null
-                    ? PROPOSAL_LABELS.unsetStatus
-                    : statusLabel(currentStatus)}
-                </td>
-                <td {...stylex.props(styles.td)}>{statusLabel(status)}</td>
-              </tr>
-            )}
-            {fields.map((change) => {
+            {compare.fields.map((change) => {
               const diff = formatFieldDiff(change, definition);
               return (
                 <tr key={diff.key}>

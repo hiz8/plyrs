@@ -4,11 +4,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Banner, Button, Tabs, toaster } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { ProposalList } from "../../../../components/proposals/proposal-list";
+import { ProposalList } from "./-components/proposal-list";
 import { PageBody, TenantPageHeader } from "../../../../components/tenant-page-header";
 import { currentCrumb, homeCrumb } from "../../../../lib/breadcrumbs";
 import { PROPOSAL_LABELS } from "../../../../lib/labels";
-import { proposalTitle } from "../../../../lib/proposals";
+import { proposalTitle } from "./-lib/proposals";
 import type { ProposalSummary } from "../../../../lib/api-contracts";
 import {
   membersQueryOptions,

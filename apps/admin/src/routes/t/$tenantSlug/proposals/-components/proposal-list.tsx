@@ -2,11 +2,11 @@ import * as stylex from "@stylexjs/stylex";
 import { Link, type LinkRenderProps } from "react-aria-components";
 import { Badge, RelativeTime, stylexRenderProps, type BadgeTone } from "@plyrs/ui";
 import { bg, border, focus, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
-import { formatDateTime } from "../../lib/datetime";
-import type { MemberName } from "../../lib/history";
-import { PROPOSAL_LABELS } from "../../lib/labels";
-import { kindLabel, stateLabel, summarizeProposal } from "../../lib/proposals";
-import type { ProposalKind, ProposalSummary } from "../../lib/api-contracts";
+import { formatDateTime } from "~/lib/datetime";
+import type { MemberName } from "~/lib/history";
+import { PROPOSAL_LABELS } from "~/lib/labels";
+import { kindLabel, stateLabel, summarizeProposal } from "../-lib/proposals";
+import type { ProposalKind, ProposalSummary } from "~/lib/api-contracts";
 
 // 16.8(M5c): 提案の一覧の行。行全体が詳細へのリンク
 

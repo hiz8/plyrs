@@ -10,7 +10,7 @@ import {
   RECORD_1,
   renderAt,
   socketHarness,
-} from "./test-utils/records-harness";
+} from "~/test-utils/records-harness";
 
 // 16.5(M2-5): record の履歴画面。一覧(経路のバッジ)・現在との差分・復元の確認とロール
 
