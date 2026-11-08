@@ -11,9 +11,9 @@ import { QuickAddRow } from "./-home/quick-add-row";
 import { RecentCard } from "./-home/recent-card";
 import { ReviewCard, type ChangedState } from "./-home/review-card";
 import { WidgetGrid } from "./-home/widget-grid";
-import { PageBody, TenantPageHeader } from "../../../components/tenant-page-header";
-import { currentCrumb } from "../../../lib/breadcrumbs";
-import { errorMessage } from "../../../lib/error-messages";
+import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
+import { currentCrumb } from "~/lib/breadcrumbs";
+import { errorMessage } from "~/lib/error-messages";
 import {
   countByStatus,
   countChanged,
@@ -24,17 +24,13 @@ import {
   recentUpdates,
   type StatusSummary,
 } from "./-home/home";
-import { NAV_LABELS, roleLabel } from "../../../lib/labels";
+import { NAV_LABELS, roleLabel } from "~/lib/labels";
 import { HOME_LABELS } from "./-home/home-labels";
-import {
-  meQueryOptions,
-  modulesQueryOptions,
-  publicationsQueryOptions,
-} from "../../../lib/queries";
-import { labelForRecord } from "../../../lib/record-label";
-import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../lib/sync-context";
-import { useCan } from "../../../lib/use-can";
-import { useRecordsOfTypes } from "../../../lib/use-collection";
+import { meQueryOptions, modulesQueryOptions, publicationsQueryOptions } from "~/lib/queries";
+import { labelForRecord } from "~/lib/record-label";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
+import { useCan } from "~/lib/use-can";
+import { useRecordsOfTypes } from "~/lib/use-collection";
 
 const NARROW = "@media (max-width: 959px)";
 

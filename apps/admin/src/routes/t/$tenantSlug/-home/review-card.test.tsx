@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
-import { BLOG, NEWS, summary } from "./fixtures";
+import { BLOG, NEWS, summary } from "./-tests/fixtures";
 import { ReviewCard } from "./review-card";
 
 const none = summary();

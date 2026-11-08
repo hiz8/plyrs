@@ -10,4 +10,5 @@ import { i } from "@plyrs/db"; // NG
 import { j } from "~/test-utils/x"; // NG
 import { k } from "./-inner/x"; // OK
 import { l } from "../-shell/sidebar"; // OK
+import { r } from "~/router"; // NG
 export const v = [a, b, c, d, e, f, g, h, i, j, k, l];

@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { describe, expect, it, vi } from "vitest";
-import { createAppContext, getRouter } from "~/test-utils/app-router";
+import { createAppContext, getRouter } from "~/router";
 import { FakeSocket, pendingConnect } from "~/test-utils/fake-socket";
 import {
   authedRoutes,

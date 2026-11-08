@@ -8,12 +8,12 @@ import { CopyField } from "./-components/copy-field";
 import { SettingsCard } from "../-components/settings-card";
 import { SettingsFrame } from "./-components/settings-frame";
 import { SiteNameForm } from "./-components/site-name-form";
-import { errorMessage } from "../../../../lib/error-messages";
-import { SETTINGS_LABELS } from "../../../../lib/labels";
-import { sidebarContentTypes } from "../../../../lib/navigation";
-import { publicApiBase, publicRecordsUrl, resolvePublicOrigin } from "../../../../lib/public-api";
-import { configQueryOptions } from "../../../../lib/queries";
-import { useSyncTypes, useTenantSync } from "../../../../lib/sync-context";
+import { errorMessage } from "~/lib/error-messages";
+import { SETTINGS_LABELS } from "./-lib/settings-labels";
+import { sidebarContentTypes } from "~/lib/navigation";
+import { publicApiBase, publicRecordsUrl, resolvePublicOrigin } from "~/lib/public-api";
+import { configQueryOptions } from "~/lib/queries";
+import { useSyncTypes, useTenantSync } from "~/lib/sync-context";
 
 const styles = stylex.create({
   stack: { display: "flex", flexDirection: "column", gap: space.md },

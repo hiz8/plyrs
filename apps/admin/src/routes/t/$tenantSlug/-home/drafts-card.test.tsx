@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { DraftsCard } from "./drafts-card";
-import { BLOG, NEWS, homeRecord, summary } from "./fixtures";
+import { BLOG, NEWS, homeRecord, summary } from "./-tests/fixtures";
 
 it("自分の下書きを行に出し、フッターの「下書きをすべて見る」はその型の下書き一覧へ", () => {
   render(

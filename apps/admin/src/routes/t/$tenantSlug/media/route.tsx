@@ -1,6 +1,6 @@
 import { createFileRoute, useParams } from "@tanstack/react-router";
-import { MediaLibrary } from "../../../../components/media/media-library";
-import { parseMediaQuery, toMediaSearch, type MediaQuery } from "../../../../lib/media-list";
+import { MediaLibrary } from "~/components/media/media-library";
+import { parseMediaQuery, toMediaSearch, type MediaQuery } from "~/lib/media-list";
 
 // F5: /media(一覧)と /media/:assetId(詳細パネル付き)は同じ MediaLibrary を描く。
 // 子ルート(index / $assetId)は component を持たず、URL の違いだけをここで読む

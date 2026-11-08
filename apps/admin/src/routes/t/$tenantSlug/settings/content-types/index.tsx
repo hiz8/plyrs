@@ -5,22 +5,22 @@ import { LayoutGrid, Plus } from "lucide-react";
 import { useState } from "react";
 import { Button, EmptyState, toaster } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { DeleteTypeDialog } from "../../../../../components/content-types/delete-type-dialog";
-import { PluginTypeGroups } from "../../../../../components/content-types/plugin-type-groups";
-import { TypeTable } from "../../../../../components/content-types/type-table";
+import { DeleteTypeDialog } from "~/components/content-types/delete-type-dialog";
+import { PluginTypeGroups } from "~/components/content-types/plugin-type-groups";
+import { TypeTable } from "~/components/content-types/type-table";
 import { SettingsFrame } from "../-components/settings-frame";
 import {
   menuOrderUpdates,
   pluginTypeGroups,
   userTypeRows,
   type TypeRow,
-} from "../../../../../lib/content-types";
-import { errorMessage } from "../../../../../lib/error-messages";
-import { CONTENT_TYPE_LABELS } from "../../../../../lib/content-type-labels";
-import { contentTypesQueryOptions, modulesQueryOptions } from "../../../../../lib/queries";
-import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
-import { useCan } from "../../../../../lib/use-can";
-import { useRecordsOfTypes } from "../../../../../lib/use-collection";
+} from "~/lib/content-types";
+import { errorMessage } from "~/lib/error-messages";
+import { CONTENT_TYPE_LABELS } from "~/lib/content-type-labels";
+import { contentTypesQueryOptions, modulesQueryOptions } from "~/lib/queries";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
+import { useCan } from "~/lib/use-can";
+import { useRecordsOfTypes } from "~/lib/use-collection";
 
 const styles = stylex.create({
   description: { margin: 0, fontSize: font.caption, color: text.muted },

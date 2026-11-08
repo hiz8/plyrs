@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import { Button } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
-import { SuperApiError } from "../../lib/super-api";
+import { SuperApiError } from "~/lib/super-api";
 
 const styles = stylex.create({
   shell: {

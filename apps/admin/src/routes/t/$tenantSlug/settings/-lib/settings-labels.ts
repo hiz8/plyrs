@@ -166,3 +166,40 @@ export const MODULE_LABELS = {
   count: (name: string, n: number) => `${name} ${n} 件`,
   countJoin: "、",
 } as const;
+
+// 案 G(設定とアカウント)の文言
+export const SETTINGS_LABELS = {
+  title: "設定",
+  tabsName: "設定の項目",
+  tabs: {
+    general: "一般",
+    "content-types": TERMS.contentType,
+    members: "メンバー",
+    modules: TERMS.module,
+    tokens: "接続中のアプリ",
+  },
+  loadFailed: "設定を読み込めませんでした",
+  retry: "再試行",
+  site: {
+    title: "サイト",
+    name: "サイト名",
+    nameHelp: "サイドバーとサイト選択に表示します",
+    nameRequired: "サイト名を入力してください",
+    nameTooLong: "サイト名は 100 文字以内で入力してください",
+    slug: "サイトの識別子",
+    slugHelp:
+      "公開 API の URL に含まれるため変更できません。公開済みのページに埋め込まれた URL が壊れるのを防ぐためです",
+    save: "保存",
+    saved: "保存しました",
+    saveFailed: "保存できませんでした",
+  },
+  publicApi: {
+    title: "公開 API",
+    description:
+      "サイトを作るフロントエンドの開発者に伝える URL です。公開したコンテンツだけが返ります",
+    baseUrl: "ベース URL",
+    example: (type: string) => `例: ${type}の一覧`,
+    exampleHelp: "型の API 名は設定 › コンテンツタイプで確認できます",
+    copy: "コピー",
+  },
+} as const;

@@ -8,14 +8,14 @@ import { DemoteMemberDialog, RemoveMemberDialog } from "./-components/member-dia
 import { MembersTable } from "./-components/members-table";
 import { RoleCards } from "./-components/role-cards";
 import { SettingsFrame } from "./-components/settings-frame";
-import type { MemberSummary } from "../../../../lib/admin-api";
-import { ApiError } from "../../../../lib/api-client";
-import { errorMessage } from "../../../../lib/error-messages";
-import { roleLabel } from "../../../../lib/labels";
+import type { MemberSummary } from "~/lib/admin-api";
+import { ApiError } from "~/lib/api-client";
+import { errorMessage } from "~/lib/error-messages";
+import { roleLabel } from "~/lib/labels";
 import { MEMBER_LABELS } from "./-lib/settings-labels";
 import { isDowngrade, memberRows, otherOwnerEmails } from "./-lib/members";
-import type { Role } from "../../../../lib/api-contracts";
-import { membersQueryOptions, meQueryOptions } from "../../../../lib/queries";
+import type { Role } from "~/lib/api-contracts";
+import { membersQueryOptions, meQueryOptions } from "~/lib/queries";
 
 export const Route = createFileRoute("/t/$tenantSlug/settings/members")({
   component: MembersPage,

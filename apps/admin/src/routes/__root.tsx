@@ -11,8 +11,8 @@ import {
 import * as stylex from "@stylexjs/stylex";
 import { I18nProvider, RouterProvider as RacRouterProvider } from "react-aria-components";
 import type { ReactNode } from "react";
-import type { RouterContext } from "../lib/router-context";
-import { THEME_BOOT_SCRIPT } from "../lib/theme";
+import type { RouterContext } from "~/lib/router-context";
+import { THEME_BOOT_SCRIPT } from "~/lib/theme";
 import appCss from "~/shared/styles/styles.css?url";
 
 const styles = stylex.create({

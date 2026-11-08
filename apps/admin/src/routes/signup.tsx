@@ -4,8 +4,8 @@ import { useRef, useState } from "react";
 import { Button, TextField } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { TurnstileWidget } from "./-auth/turnstile-widget";
-import { ApiError } from "../lib/api-client";
-import { resetClientSession } from "../lib/client-session";
+import { ApiError } from "~/lib/api-client";
+import { resetClientSession } from "~/lib/client-session";
 
 const styles = stylex.create({
   page: {

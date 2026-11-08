@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { CardRow, HomeCard, SummaryLink } from "./home-card";
-import { BLOG, NEWS, summary } from "./fixtures";
+import { BLOG, NEWS, summary } from "./-tests/fixtures";
 
 it("HomeCard は h2 の題で名前が付いた section になる", () => {
   render(

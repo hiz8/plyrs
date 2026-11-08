@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
-import { BLOG, NEWS, SLOT } from "./fixtures";
+import { BLOG, NEWS, SLOT } from "./-tests/fixtures";
 import { QuickAddRow } from "./quick-add-row";
 
 it("型ごとのボタンをサイドバーの順に並べ、押すと onAdd に key を渡す", async () => {

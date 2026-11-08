@@ -5,14 +5,10 @@ import { Lock, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Banner, Button, ConfirmDialog, ICON_SIZE, toaster } from "@plyrs/ui";
 import { space, text } from "@plyrs/ui/semantic.stylex";
-import { BulkBar, type BulkMenuAction } from "../../../../../components/bulk-bar";
-import { ContentListBody } from "../../../../../components/content-list-body";
-import {
-  PageBody,
-  PageLoading,
-  TenantPageHeader,
-} from "../../../../../components/tenant-page-header";
-import { currentCrumb, homeCrumb } from "../../../../../lib/breadcrumbs";
+import { BulkBar, type BulkMenuAction } from "~/components/bulk-bar";
+import { ContentListBody } from "~/components/content-list-body";
+import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
+import { currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
 import {
   applyListQuery,
   buildListRows,
@@ -21,20 +17,16 @@ import {
   type BulkResult,
   type ListQuery,
   type ListRow,
-} from "../../../../../lib/content-list";
-import { errorMessage } from "../../../../../lib/error-messages";
-import { BULK_LABELS, DIALOGS, EDITOR_LABELS, TOASTS } from "../../../../../lib/labels";
-import { LIST_LABELS } from "../../../../../lib/content-list-labels";
-import { publicationsQueryKey, publicationsQueryOptions } from "../../../../../lib/queries";
-import { labelForRecord } from "../../../../../lib/record-label";
-import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
-import { useCan } from "../../../../../lib/use-can";
-import {
-  bulkResultMessage,
-  useBulkAction,
-  type BulkKind,
-} from "../../../../../lib/use-bulk-action";
-import { useCollectionRows } from "../../../../../lib/use-collection";
+} from "~/lib/content-list";
+import { errorMessage } from "~/lib/error-messages";
+import { BULK_LABELS, DIALOGS, EDITOR_LABELS, TOASTS } from "~/lib/labels";
+import { LIST_LABELS } from "~/lib/content-list-labels";
+import { publicationsQueryKey, publicationsQueryOptions } from "~/lib/queries";
+import { labelForRecord } from "~/lib/record-label";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
+import { useCan } from "~/lib/use-can";
+import { bulkResultMessage, useBulkAction, type BulkKind } from "~/lib/use-bulk-action";
+import { useCollectionRows } from "~/lib/use-collection";
 
 const styles = stylex.create({
   muted: { color: text.muted },

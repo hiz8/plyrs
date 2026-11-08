@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button, TextField } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
-import { SuperApiError } from "../lib/super-api";
+import { SuperApiError } from "~/lib/super-api";
 
 const styles = stylex.create({
   page: {

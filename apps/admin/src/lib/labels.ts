@@ -3,8 +3,8 @@ import type { SyncStatus } from "@plyrs/sync-client";
 import { isRole, type Role } from "./api-contracts";
 
 // このファイルには、複数の画面(機能)で使う文言だけを置く。1 つの機能でしか使わない文言は、その機能の
-// 文言のファイル(content-list-labels.ts など)に置く。HISTORY_LABELS などの 1 機能専用の文言がまだ残っているが、
-// ADR 0001 の移行手順 3・4 で、使う側のファイルと一緒に移す。
+// 文言のファイル(content-list-labels.ts など)に置く。HISTORY_LABELS・PROPOSAL_LABELS は、履歴と提案の画面のほかに
+// components/record-editor.tsx からも使うのでここに残している。ADR 0001 の移行手順 4 で、records の feature と一緒に移す。
 
 // 案 H 4.1: 画面に出す用語の唯一の基準。画面ごとに対応表を持たず、ここから引く。
 // 「テナント」は運営者・開発者の言葉のため、利用者の画面では「サイト」と呼ぶ(2026-10-17 決定)。
@@ -406,43 +406,6 @@ export const ERROR_SCREEN = {
   fallback:
     "ページを表示できませんでした。再読み込みしても直らない場合は、時間をおいてお試しください",
   reload: "再読み込み",
-} as const;
-
-// 案 G(設定とアカウント)の文言
-export const SETTINGS_LABELS = {
-  title: "設定",
-  tabsName: "設定の項目",
-  tabs: {
-    general: "一般",
-    "content-types": TERMS.contentType,
-    members: "メンバー",
-    modules: TERMS.module,
-    tokens: "接続中のアプリ",
-  },
-  loadFailed: "設定を読み込めませんでした",
-  retry: "再試行",
-  site: {
-    title: "サイト",
-    name: "サイト名",
-    nameHelp: "サイドバーとサイト選択に表示します",
-    nameRequired: "サイト名を入力してください",
-    nameTooLong: "サイト名は 100 文字以内で入力してください",
-    slug: "サイトの識別子",
-    slugHelp:
-      "公開 API の URL に含まれるため変更できません。公開済みのページに埋め込まれた URL が壊れるのを防ぐためです",
-    save: "保存",
-    saved: "保存しました",
-    saveFailed: "保存できませんでした",
-  },
-  publicApi: {
-    title: "公開 API",
-    description:
-      "サイトを作るフロントエンドの開発者に伝える URL です。公開したコンテンツだけが返ります",
-    baseUrl: "ベース URL",
-    example: (type: string) => `例: ${type}の一覧`,
-    exampleHelp: "型の API 名は設定 › コンテンツタイプで確認できます",
-    copy: "コピー",
-  },
 } as const;
 
 export const CLIPBOARD_LABELS = {

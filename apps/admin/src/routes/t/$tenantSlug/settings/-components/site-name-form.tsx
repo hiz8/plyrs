@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { useState } from "react";
 import { Button, TextField } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { SETTINGS_LABELS } from "~/lib/labels";
+import { SETTINGS_LABELS } from "../-lib/settings-labels";
 import { SettingsCard } from "../../-components/settings-card";
 
 const NARROW = "@media (max-width: 959px)";

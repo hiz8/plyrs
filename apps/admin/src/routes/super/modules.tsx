@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@plyrs/ui";
 import { superStyles } from "./-styles";
-import { LOADING_LABEL } from "../../lib/labels";
+import { LOADING_LABEL } from "~/lib/labels";
 
 interface ModuleRow {
   moduleId: string;

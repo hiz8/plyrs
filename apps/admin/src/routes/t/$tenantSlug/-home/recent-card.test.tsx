@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
-import { BLOG, NEWS, homeRecord } from "./fixtures";
+import { BLOG, NEWS, homeRecord } from "./-tests/fixtures";
 import { RecentCard } from "./recent-card";
 
 it("更新日時の新しい順に型名・ステータス・相対時刻を出し、アーカイブは取り消し線", () => {

@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { superStyles } from "./-styles";
-import { LOADING_LABEL } from "../../lib/labels";
+import { LOADING_LABEL } from "~/lib/labels";
 
 interface AuditLogRow {
   id: string;

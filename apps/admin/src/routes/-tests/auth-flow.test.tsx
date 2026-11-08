@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi, type Mock } from "vitest";
 import type { TurnstileApi, TurnstileRenderParams } from "../-auth/turnstile";
-import { createAppContext, getRouter } from "~/test-utils/app-router";
+import { createAppContext, getRouter } from "~/router";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {

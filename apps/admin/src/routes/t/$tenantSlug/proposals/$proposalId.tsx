@@ -7,12 +7,12 @@ import { bg, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
 import { ProposalDiff } from "./-components/proposal-diff";
 import { kindTone } from "./-components/proposal-list";
 import { AcceptProposalDialog, RejectProposalDialog } from "./-components/resolve-dialogs";
-import { PageBody, PageLoading, TenantPageHeader } from "../../../../components/tenant-page-header";
-import { currentCrumb, homeCrumb, proposalsCrumb } from "../../../../lib/breadcrumbs";
-import { formatDateTime } from "../../../../lib/datetime";
-import { errorCodeOf, errorMessage } from "../../../../lib/error-messages";
-import { actorLabel, viaLabel } from "../../../../lib/history";
-import { PROPOSAL_LABELS } from "../../../../lib/labels";
+import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
+import { currentCrumb, homeCrumb, proposalsCrumb } from "~/lib/breadcrumbs";
+import { formatDateTime } from "~/lib/datetime";
+import { errorCodeOf, errorMessage } from "~/lib/error-messages";
+import { actorLabel, viaLabel } from "~/lib/history";
+import { PROPOSAL_LABELS } from "~/lib/labels";
 import {
   acceptOperationFor,
   kindLabel,
@@ -26,11 +26,11 @@ import {
   proposalsQueryKey,
   publicationQueryOptions,
   publicationsQueryKey,
-} from "../../../../lib/queries";
-import { labelForRecord } from "../../../../lib/record-label";
-import { useSyncTypes, useTenantSync } from "../../../../lib/sync-context";
-import { useCan } from "../../../../lib/use-can";
-import { useCollectionRows } from "../../../../lib/use-collection";
+} from "~/lib/queries";
+import { labelForRecord } from "~/lib/record-label";
+import { useSyncTypes, useTenantSync } from "~/lib/sync-context";
+import { useCan } from "~/lib/use-can";
+import { useCollectionRows } from "~/lib/use-collection";
 
 // 16.8(M5c、決定 57): 提案の詳細。差分を見て採用・却下する。採用は自分(採用する人)の名前で書き込まれる
 
