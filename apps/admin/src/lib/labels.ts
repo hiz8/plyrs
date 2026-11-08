@@ -673,6 +673,8 @@ export const TOKEN_LABELS = {
     expiry: "有効期限",
     writeExpiryNote:
       "書き込みを含むトークンは漏えい時の影響を抑えるため、有効期限が最長 90 日になります",
+    noProposeNote:
+      "提案(record:propose)が無いと、他の人の編集と重なり続けたときや、確認に対応していないクライアントからの公開で、エージェントが変更を提案に回せません",
     submit: "発行する",
     failed: "トークンを発行できませんでした",
     expiryTooLong: "この有効期限はスコープに対して長すぎます",

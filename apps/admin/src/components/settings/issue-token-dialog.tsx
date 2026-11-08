@@ -12,6 +12,7 @@ import {
   defaultExpiryFor,
   expiryOptionsFor,
   isReadOnlyScopes,
+  lacksProposeFallback,
   PAT_SCOPES,
   scopeOptionsFor,
   type PatScope,
@@ -139,6 +140,9 @@ function IssueTokenForm({
             </Checkbox>
           ))}
           <p {...stylex.props(styles.help)}>{labels.scopesHelp}</p>
+          {lacksProposeFallback(scopes) ? (
+            <p {...stylex.props(styles.help)}>{labels.noProposeNote}</p>
+          ) : null}
         </div>
         <Select
           label={labels.expiry}

@@ -31,25 +31,60 @@ it("管理者には record:publish の箱が出るが既定では外れていて
   const publish = screen.getByRole("checkbox", { name: TOKEN_LABELS.scopes["record:publish"] });
   expect(publish).not.toBeChecked();
   expect(screen.getByRole("checkbox", { name: TOKEN_LABELS.scopes["record:read"] })).toBeChecked();
+  // M5c の申し送り(2026-11-08): 提案は既定で付ける。提案は書き込みの一種なので期限は書き込みの規則(既定 30 日)
+  expect(
+    screen.getByRole("checkbox", { name: TOKEN_LABELS.scopes["record:propose"] }),
+  ).toBeChecked();
   const submit = screen.getByRole("button", { name: TOKEN_LABELS.issueDialog.submit });
   expect(submit).toBeDisabled();
   await user.type(screen.getByRole("textbox", { name: TOKEN_LABELS.issueDialog.name }), "CI");
   await user.click(submit);
-  expect(onSubmit).toHaveBeenCalledWith({ name: "CI", scopes: ["record:read"], expiresInDays: 90 });
+  expect(onSubmit).toHaveBeenCalledWith({
+    name: "CI",
+    scopes: ["record:read", "record:propose"],
+    expiresInDays: 30,
+  });
 });
 
-it("書き込みのスコープを足すと期限の選択肢が短くなり、既定が 30 日になる", async () => {
+it("読み取りだけに絞ると期限の既定が 90 日になり、書き込みを足すと 30 日に戻る", async () => {
   const user = userEvent.setup();
   const onSubmit = renderDialog("owner");
   await user.type(screen.getByRole("textbox", { name: TOKEN_LABELS.issueDialog.name }), "bot");
+  await user.click(screen.getByRole("checkbox", { name: TOKEN_LABELS.scopes["record:propose"] }));
+  expect(screen.queryByText(TOKEN_LABELS.issueDialog.writeExpiryNote)).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: TOKEN_LABELS.issueDialog.submit }));
+  expect(onSubmit).toHaveBeenLastCalledWith({
+    name: "bot",
+    scopes: ["record:read"],
+    expiresInDays: 90,
+  });
   await user.click(screen.getByRole("checkbox", { name: TOKEN_LABELS.scopes["record:write"] }));
   expect(screen.getByText(TOKEN_LABELS.issueDialog.writeExpiryNote)).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: TOKEN_LABELS.issueDialog.submit }));
-  expect(onSubmit).toHaveBeenCalledWith({
+  expect(onSubmit).toHaveBeenLastCalledWith({
     name: "bot",
     scopes: ["record:read", "record:write"],
     expiresInDays: 30,
   });
+});
+
+it("record:write を付けて record:propose を外すと、提案に回れなくなる旨を出す(付け直すと消える)", async () => {
+  const user = userEvent.setup();
+  renderDialog("owner");
+  const propose = screen.getByRole("checkbox", { name: TOKEN_LABELS.scopes["record:propose"] });
+  await user.click(screen.getByRole("checkbox", { name: TOKEN_LABELS.scopes["record:write"] }));
+  expect(screen.queryByText(TOKEN_LABELS.issueDialog.noProposeNote)).not.toBeInTheDocument();
+  await user.click(propose);
+  expect(screen.getByText(TOKEN_LABELS.issueDialog.noProposeNote)).toBeInTheDocument();
+  await user.click(propose);
+  expect(screen.queryByText(TOKEN_LABELS.issueDialog.noProposeNote)).not.toBeInTheDocument();
+});
+
+it("record:write が無ければ record:propose を外しても注意は出ない", async () => {
+  const user = userEvent.setup();
+  renderDialog("owner");
+  await user.click(screen.getByRole("checkbox", { name: TOKEN_LABELS.scopes["record:propose"] }));
+  expect(screen.queryByText(TOKEN_LABELS.issueDialog.noProposeNote)).not.toBeInTheDocument();
 });
 
 it("管理者以外には record:publish の箱を出さない", () => {
