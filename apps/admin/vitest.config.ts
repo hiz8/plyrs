@@ -3,6 +3,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [stylex.vite()],
+  // ADR 0001: ~/ を解決する。vite.config.ts とは設定を共有していないので、ここにも書く
+  resolve: { tsconfigPaths: true },
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],

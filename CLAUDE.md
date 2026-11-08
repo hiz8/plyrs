@@ -25,6 +25,7 @@ pnpm format          # oxfmt(書き込み)/ pnpm format:check
 pnpm typecheck       # 全パッケージ tsc --noEmit(TypeScript 7 / strict + noUncheckedIndexedAccess)
 pnpm test            # e2e 以外の全 vitest
 pnpm --filter @plyrs/api check:deploy  # 本番と同じバンドルを wrangler dev で起動し、トップレベルのエラーを検出
+pnpm --filter @plyrs/lint-rules test    # 依存ルール(oxlint.config.ts)の fixture 検査。ルールを変えたら fixture も足す
 ```
 
 CI(`.github/workflows/ci.yml`)は lint → format:check → typecheck → test → check:deploy と e2e を実行する。
@@ -59,6 +60,7 @@ pnpm --filter @plyrs/db generate:projection  # 公開用 DB(drizzle-projection/)
 - `packages/sync-client` — 同期エンジン(outbox / store / transport)と TanStack DB 連携(`./tanstack`)
 - `packages/db` — Drizzle スキーマ 3 系統: `schema.ts`(DO 内)/ `control-plane.ts`(D1)/ `projection.ts`(公開用 DB)
 - `packages/ui` — react-aria-components + StyleX のコンポーネント、Tiptap リッチテキストエディタ
+- `tools/lint-rules` — `oxlint.config.ts` の依存ルール(ADR 0001)が意図どおり検出するかを、fixture で確かめる。`pnpm test` で実行され、`oxlint.config.ts` の型チェックもここで行う
 
 ### データの置き場(物理分離が背骨)
 

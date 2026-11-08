@@ -65,7 +65,7 @@ describe("テーマの選択(h-design-tokens.md 4 章)", () => {
 
   it("styles.css が自動(light dark)を既定に宣言している", () => {
     // light-dark() は color-scheme が無いと常にライトを選ぶ。宣言が消えると OS がダークの人がライトになる
-    const css = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
+    const css = readFileSync(join(process.cwd(), "src/shared/styles/styles.css"), "utf8");
     expect(css).toMatch(/:root\s*\{[^}]*color-scheme:\s*light dark;/);
   });
 });

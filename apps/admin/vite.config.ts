@@ -17,6 +17,8 @@ export default defineConfig(({ command }) => ({
   // Vite 自身の CSS 最小化(lightningcss)も styles.css の color-scheme を同じ処理で書き換えるため、
   // stylex 側と同じ除外を渡す
   css: { lightningcss: { exclude: Features.LightDark } },
+  // ADR 0001: 層をまたぐ import は ~/(src)で書く。対応は tsconfig.json の paths にあり、vitest.config.ts にも同じ設定がある
+  resolve: { tsconfigPaths: true },
   plugins: [
     cloudflare({
       viteEnvironment: { name: "ssr" },
