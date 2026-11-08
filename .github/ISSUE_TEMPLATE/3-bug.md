@@ -1,5 +1,5 @@
 ---
-name: 不具合
+name: 不具合の報告
 about: 期待どおりに動かない、エラーになる、データが壊れる
 title: ""
 labels: bug
