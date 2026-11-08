@@ -1,6 +1,6 @@
 import { render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import type { TurnstileApi, TurnstileRenderParams } from "../lib/turnstile";
+import type { TurnstileApi, TurnstileRenderParams } from "./turnstile";
 
 type RenderMock = Mock<(el: HTMLElement, params: TurnstileRenderParams) => string>;
 
@@ -10,7 +10,7 @@ function fakeApi(): { api: TurnstileApi; render: RenderMock } {
   return { api, render: renderMock };
 }
 
-// lib/turnstile.ts の loadTurnstile はモジュールスコープの Promise を使い回す。テストごとに
+// turnstile.ts の loadTurnstile はモジュールスコープの Promise を使い回す。テストごとに
 // window.turnstile を差し替えても前のテストの Promise が残っていると古い偽装が解決値として
 // 返ってしまうため、毎回モジュールをリセットしてコンポーネントを動的 import し直す。
 beforeEach(() => {

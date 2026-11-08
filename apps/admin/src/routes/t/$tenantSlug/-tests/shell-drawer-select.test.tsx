@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { authedRoutes, renderAt } from "./test-utils/shell-harness";
+import { authedRoutes, renderAt } from "~/test-utils/shell-harness";
 
 // ドロワー(RAC Modal)を開くテストは 1 ファイルに 1 本だけ置く。
 // shell.test.tsx に置くと、後続の「旧 URL のリダイレクト」が autoFocus 付きの型作成画面を描いた

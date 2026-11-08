@@ -16,9 +16,9 @@ import {
   size,
 } from "@plyrs/ui/semantic.stylex";
 import type { LinkRenderProps } from "react-aria-components";
-import type { ModuleSummary } from "../../lib/admin-api";
-import type { TenantSummary } from "../../lib/api-client";
-import { NAV_LABELS } from "../../lib/labels";
+import type { ModuleSummary } from "~/lib/admin-api";
+import type { TenantSummary } from "~/lib/api-client";
+import { NAV_LABELS } from "~/lib/labels";
 import {
   activeNavKey,
   moduleNavGroups,
@@ -26,9 +26,9 @@ import {
   sidebarContentTypes,
   type NavEntry,
   type NavType,
-} from "../../lib/navigation";
-import { can } from "../../lib/permissions";
-import type { SyncIndicatorState } from "../../lib/sync-indicator";
+} from "~/lib/navigation";
+import { can } from "~/lib/permissions";
+import type { SyncIndicatorState } from "~/lib/sync-indicator";
 import { AccountMenu } from "./account-menu";
 import { NavChildLink, NavHeading, NavLink } from "./nav-link";
 import { SiteSwitcher } from "./site-switcher";

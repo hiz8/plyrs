@@ -2,8 +2,8 @@ import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi, type Mock } from "vitest";
-import type { TurnstileApi, TurnstileRenderParams } from "./lib/turnstile";
-import { createAppContext, getRouter } from "./router";
+import type { TurnstileApi, TurnstileRenderParams } from "../-auth/turnstile";
+import { createAppContext, getRouter } from "~/test-utils/app-router";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -229,7 +229,7 @@ function findTurnstileScript(): HTMLScriptElement | null {
 }
 
 // window.turnstile を stub していない状態でロード失敗を再現する(実 script 注入が必要なため)。
-// このファイルは静的 import のみで vi.resetModules で状態を戻せず、lib/turnstile.ts の
+// このファイルは静的 import のみで vi.resetModules で状態を戻せず、-auth/turnstile.ts の
 // loadPromise はファイル内で共有される。以降の describe(window.turnstile を stub する)を
 // 汚染しないよう、残った script は failure させて loadPromise を null に戻しておく。
 describe("Turnstile ロード失敗", () => {
@@ -324,7 +324,7 @@ describe("Turnstile ロード失敗", () => {
   });
 });
 
-// window.turnstile を偽装(vi.stubGlobal)。lib/turnstile.ts の loadTurnstile はモジュール
+// window.turnstile を偽装(vi.stubGlobal)。-auth/turnstile.ts の loadTurnstile はモジュール
 // スコープの Promise を使い回す(idempotent)ため、このファイル内で最初にウィジェットが
 // マウントされた時点の window.turnstile が全テストで使い回される — describe 内で 1 個の
 // フェイクを共有し、render の呼び出しは「毎回最後の call」を見ることで各テストの

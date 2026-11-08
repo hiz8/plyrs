@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useRef } from "react";
-import { loadTurnstile, type TurnstileApi } from "../lib/turnstile";
+import { loadTurnstile, type TurnstileApi } from "./turnstile";
 
 const styles = stylex.create({
   root: {},

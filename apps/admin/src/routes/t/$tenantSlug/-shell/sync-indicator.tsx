@@ -2,8 +2,8 @@ import * as stylex from "@stylexjs/stylex";
 import { TriangleAlert } from "lucide-react";
 import { ICON_SIZE } from "@plyrs/ui";
 import { font, radius, space, status, text } from "@plyrs/ui/semantic.stylex";
-import { SYNC_INDICATOR_LABELS } from "../../lib/sync-indicator";
-import type { SyncIndicatorState } from "../../lib/sync-indicator";
+import { SYNC_INDICATOR_LABELS } from "~/lib/sync-indicator";
+import type { SyncIndicatorState } from "~/lib/sync-indicator";
 
 // a-navigation.md 3.5: 高さ 28px、点は 8px
 const styles = stylex.create({

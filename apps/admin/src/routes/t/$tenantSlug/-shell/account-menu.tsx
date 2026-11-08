@@ -11,7 +11,7 @@ import {
   stylexRenderProps,
 } from "@plyrs/ui";
 import { bg, focus, font, radius, size, space, stroke, text } from "@plyrs/ui/semantic.stylex";
-import { NAV_LABELS } from "../../lib/labels";
+import { NAV_LABELS } from "~/lib/labels";
 
 // a-navigation.md 3.5: 下段のアカウント。Avatar + メール(1 行省略)+ chevron-up
 const styles = stylex.create({

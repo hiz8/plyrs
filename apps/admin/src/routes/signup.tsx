@@ -3,7 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Button, TextField } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
-import { TurnstileWidget } from "../components/turnstile-widget";
+import { TurnstileWidget } from "./-auth/turnstile-widget";
 import { ApiError } from "../lib/api-client";
 import { resetClientSession } from "../lib/client-session";
 

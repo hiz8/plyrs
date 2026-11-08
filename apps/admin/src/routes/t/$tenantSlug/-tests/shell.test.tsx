@@ -3,15 +3,15 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { describe, expect, it, vi } from "vitest";
-import { createAppContext, getRouter } from "./router";
-import { FakeSocket, pendingConnect } from "./test-utils/fake-socket";
+import { createAppContext, getRouter } from "~/test-utils/app-router";
+import { FakeSocket, pendingConnect } from "~/test-utils/fake-socket";
 import {
   authedRoutes,
   blogTenant,
   jsonResponse,
   renderAt,
   stubFetch,
-} from "./test-utils/shell-harness";
+} from "~/test-utils/shell-harness";
 
 const articleType: ContentTypeDefinition = {
   id: "018f2b6a-7a0a-7000-8000-000000000001",
@@ -25,7 +25,7 @@ const articleType: ContentTypeDefinition = {
 // jsdom では RootShell の <html> が div の中に入り、RAC の Popover を開くと user-event が
 // 戻らないため(2 本目以降の role クエリも戻らなくなる)。メニュー自体は sidebar.test が担保する。
 // ここではシェルの配線(onLogout が呼ばれること)だけを確かめるので、同じ操作名の代替に差し替える
-vi.mock("./components/shell/account-menu", async () => {
+vi.mock("../-shell/account-menu", async () => {
   const { useState } = await import("react");
   return {
     AccountMenu: ({ email, onLogout }: { email: string | undefined; onLogout: () => void }) => {

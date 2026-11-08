@@ -10,12 +10,12 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Drawer } from "@plyrs/ui";
 import { bg, text } from "@plyrs/ui/semantic.stylex";
-import { Sidebar, type SidebarProps } from "../../../components/shell/sidebar";
-import { TopBar } from "../../../components/shell/top-bar";
+import { Sidebar, type SidebarProps } from "./-shell/sidebar";
+import { TopBar } from "./-shell/top-bar";
 import { ApiError } from "../../../lib/api-client";
 import { resetClientSession } from "../../../lib/client-session";
 import { NAV_LABELS } from "../../../lib/labels";
-import { legacyPathname } from "../../../lib/legacy-redirect";
+import { legacyPathname } from "./-lib/legacy-redirect";
 import {
   meQueryOptions,
   modulesQueryOptions,
