@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 import { VisuallyHidden } from "react-aria-components";
 import { PageHeader, Skeleton, type PageHeaderProps } from "@plyrs/ui";
 import { space } from "@plyrs/ui/semantic.stylex";
-import { LOADING_LABEL } from "../lib/labels";
-import { syncIndicatorState } from "../lib/sync-indicator";
-import { useSyncHasSynced, useSyncStatus, useTenantSync } from "../lib/sync-context";
+import { LOADING_LABEL } from "~/shared/lib/labels";
+import { syncIndicatorState } from "~/shared/lib/sync-indicator";
+import { useSyncHasSynced, useSyncStatus, useTenantSync } from "~/shared/lib/sync-context";
 import { ConnectionBanner } from "./connection-banner";
 
 // 幅 960px 未満では余白を詰める(StyleX 0.19.1 に defineConsts が無いのでファイルごとの定数)

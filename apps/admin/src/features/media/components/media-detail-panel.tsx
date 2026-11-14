@@ -4,9 +4,9 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from "rea
 import { Link } from "react-aria-components";
 import { Badge, Button, SidePanel, Skeleton, TextField } from "@plyrs/ui";
 import { accent, border, font, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
-import { copyText } from "~/lib/clipboard";
-import { formatDateTime } from "~/lib/datetime";
-import { TERMS } from "~/lib/labels";
+import { copyText } from "~/shared/lib/clipboard";
+import { formatDateTime } from "~/shared/lib/datetime";
+import { TERMS } from "~/shared/lib/labels";
 import { MEDIA_LABELS } from "../lib/media-labels";
 import type { ResolvedUsage } from "../lib/media";
 import { formatBytes, type MediaRow } from "../lib/media-list";

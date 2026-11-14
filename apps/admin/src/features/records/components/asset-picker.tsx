@@ -14,9 +14,9 @@ import {
   type AssetServices,
   type PickedMedia,
 } from "~/features/media";
-import { labelForRecord } from "~/lib/record-label";
+import { labelForRecord } from "~/shared/lib/record-label";
 import { parseRelationDraftKey, relationDraftKey } from "../lib/record-form-values";
-import { useRecordsOfTypes } from "~/lib/use-collection";
+import { useRecordsOfTypes } from "~/shared/lib/use-collection";
 
 const styles = stylex.create({
   error: { color: status.danger, fontSize: font.caption },

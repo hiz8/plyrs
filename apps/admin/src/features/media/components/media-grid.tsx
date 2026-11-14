@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Badge, ICON_SIZE, TileGrid, UploadTile, type UploadTileState } from "@plyrs/ui";
 import { border, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
 import { Upload } from "lucide-react";
-import { ERROR_MESSAGES, errorMessage } from "~/lib/error-messages";
+import { ERROR_MESSAGES, errorMessage } from "~/shared/api/error-messages";
 import { MEDIA_LABELS } from "../lib/media-labels";
 import { formatBytes, type MediaRow } from "../lib/media-list";
 import type { UploadEntry } from "../lib/use-uploads";

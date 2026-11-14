@@ -155,7 +155,7 @@ export interface RichTextValue {
 
 // M2-1(決定 44): 版 2 = 最上位ブロックの attrs.id に安定 ID を持つ。正本は @plyrs/metamodel の
 // RICH_TEXT_SCHEMA_VERSION / BLOCK_ID_ATTR で、ui は metamodel に依存しない方針のため値を写し、
-// 一致は apps/admin/src/lib/mention-contract.test.ts が固定する。
+// 一致は apps/admin/src/shared/lib/mention-contract.test.ts が固定する。
 export const RICH_TEXT_SCHEMA_VERSION = 2;
 export const BLOCK_ID_ATTR_NAME = "id";
 // 見出しのレベル。@plyrs/richtext の HEADING_LEVELS(Worker 側の語彙)と一致する(mention-contract.test.ts)

@@ -1,8 +1,8 @@
 import { ASSET_TYPE_KEY, type ContentTypeDefinition } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import type { ContentTypeSummary, ModuleSummary } from "~/lib/admin-api";
+import type { ContentTypeSummary, ModuleSummary } from "~/shared/api/admin-api";
 import { summaryToDefinition } from "./content-type-form";
-import { sidebarContentTypes } from "~/lib/navigation";
+import { sidebarContentTypes } from "~/shared/lib/navigation";
 
 // 案 E 5.1: コンテンツタイプ一覧の行とグループ分け。
 

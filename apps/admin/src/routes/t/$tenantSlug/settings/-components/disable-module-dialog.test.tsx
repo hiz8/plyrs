@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { ModuleSummary } from "~/lib/admin-api";
+import type { ModuleSummary } from "~/shared/api/admin-api";
 import { MODULE_LABELS } from "../-lib/settings-labels";
 import { DisableModuleDialog } from "./disable-module-dialog";
 

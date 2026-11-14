@@ -2,11 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
 import { useMemo } from "react";
 import { text } from "@plyrs/ui/semantic.stylex";
-import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
+import { PageBody, PageLoading, TenantPageHeader } from "~/shared/ui/tenant-page-header";
 import { EDITOR_LABELS, RecordEditor } from "~/features/records";
 import { createAssetServices } from "~/features/media";
-import { homeCrumb } from "~/lib/breadcrumbs";
-import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
+import { homeCrumb } from "~/shared/lib/breadcrumbs";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/shared/lib/sync-context";
 
 const styles = stylex.create({
   muted: { color: text.muted },

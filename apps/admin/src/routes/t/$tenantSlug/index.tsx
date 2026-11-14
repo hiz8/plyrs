@@ -11,9 +11,9 @@ import { QuickAddRow } from "./-home/quick-add-row";
 import { RecentCard } from "./-home/recent-card";
 import { ReviewCard, type ChangedState } from "./-home/review-card";
 import { WidgetGrid } from "./-home/widget-grid";
-import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
-import { currentCrumb } from "~/lib/breadcrumbs";
-import { errorMessage } from "~/lib/error-messages";
+import { PageBody, TenantPageHeader } from "~/shared/ui/tenant-page-header";
+import { currentCrumb } from "~/shared/lib/breadcrumbs";
+import { errorMessage } from "~/shared/api/error-messages";
 import {
   countByStatus,
   countChanged,
@@ -24,13 +24,17 @@ import {
   recentUpdates,
   type StatusSummary,
 } from "./-home/home";
-import { NAV_LABELS, roleLabel } from "~/lib/labels";
+import { NAV_LABELS, roleLabel } from "~/shared/lib/labels";
 import { HOME_LABELS } from "./-home/home-labels";
-import { meQueryOptions, modulesQueryOptions, publicationsQueryOptions } from "~/lib/queries";
-import { labelForRecord } from "~/lib/record-label";
-import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
-import { useCan } from "~/lib/use-can";
-import { useRecordsOfTypes } from "~/lib/use-collection";
+import {
+  meQueryOptions,
+  modulesQueryOptions,
+  publicationsQueryOptions,
+} from "~/shared/api/queries";
+import { labelForRecord } from "~/shared/lib/record-label";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/shared/lib/sync-context";
+import { useCan } from "~/shared/lib/use-can";
+import { useRecordsOfTypes } from "~/shared/lib/use-collection";
 
 const NARROW = "@media (max-width: 959px)";
 
@@ -46,7 +50,7 @@ const styles = stylex.create({
   meta: { display: "inline-flex", alignItems: "center", gap: space.xs },
 });
 
-// b-home.md: ホーム。データの配線とレイアウトだけを持ち、見た目は components/home に置く
+// b-home.md: ホーム。データの配線とレイアウトだけを持ち、見た目は -home/ に置く
 export const Route = createFileRoute("/t/$tenantSlug/")({
   component: HomePage,
 });

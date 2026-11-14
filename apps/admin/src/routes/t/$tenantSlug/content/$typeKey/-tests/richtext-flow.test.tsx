@@ -4,10 +4,10 @@ import { createMemoryHistory } from "@tanstack/react-router";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, type Mock } from "vitest";
-import { DIALOGS } from "~/lib/labels";
 import { createAppContext, getRouter } from "~/router";
 import { FakeSocket } from "~/test-utils/fake-socket";
 import { renderRouter } from "~/test-utils/records-harness";
+import { RECORD_DIALOGS } from "~/features/records";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -299,7 +299,7 @@ describe("本文競合の手動解決(決定 3)", () => {
   it("adopting the server version resets the editor without a second push", async () => {
     const harness = socketHarness();
     const { user } = await conflictSetup(harness);
-    const dialog = await screen.findByRole("dialog", { name: DIALOGS.conflict.title });
+    const dialog = await screen.findByRole("dialog", { name: RECORD_DIALOGS.conflict.title });
     expect(dialog).toHaveTextContent("他者の本文");
     await user.click(screen.getByRole("button", { name: "ほかの人の編集を取り込む" }));
     await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
@@ -310,7 +310,7 @@ describe("本文競合の手動解決(決定 3)", () => {
   it("keeping mine re-pushes with the advanced base version and wins", async () => {
     const harness = socketHarness();
     const { user, change } = await conflictSetup(harness);
-    await screen.findByRole("dialog", { name: DIALOGS.conflict.title });
+    await screen.findByRole("dialog", { name: RECORD_DIALOGS.conflict.title });
     await user.click(screen.getByRole("button", { name: "あなたの編集を残す" }));
     await vi.waitFor(() => expect(pushes(harness.latest()).length).toBe(2));
     const second = pushes(harness.latest())[1];

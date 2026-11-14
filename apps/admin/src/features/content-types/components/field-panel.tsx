@@ -23,8 +23,8 @@ import {
   validateFieldKey,
   type FieldDraft,
 } from "../lib/content-type-form";
-import type { FieldKind } from "~/lib/field-kind";
-import { TERMS } from "~/lib/labels";
+import type { FieldKind } from "~/shared/lib/field-kind";
+import { TERMS } from "~/shared/lib/labels";
 import {
   ADD_FIELD_LABELS,
   FIELD_KIND_LABELS,

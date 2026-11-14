@@ -1,7 +1,7 @@
 import { Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
 import { SegmentedControl } from "@plyrs/ui";
 import { ACCOUNT_LABELS } from "./account-labels";
-import { type ThemePreference, useThemePreference } from "~/lib/theme";
+import { type ThemePreference, useThemePreference } from "~/shared/lib/theme";
 
 // h-design-tokens.md 4 章の切り替え。置き場所はアカウント設定(案 G 6.2)
 const labels = ACCOUNT_LABELS.theme;

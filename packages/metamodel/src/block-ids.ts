@@ -19,7 +19,7 @@ export const DERIVED_ID_PREFIX = "v1-";
 
 // 管理画面のエディタ(UniqueID)が attrs.id を付けるノード種。契約は最上位ブロックだけだが、types は
 // ノード種の指定なので箇条書きの中の段落にも付く。ui は metamodel に依存しないので同じ値を写して持ち、
-// 一致は apps/admin/src/lib/mention-contract.test.ts が固定する。書き込み時の構造の検査(M5a-6)は、
+// 一致は apps/admin/src/shared/lib/mention-contract.test.ts が固定する。書き込み時の構造の検査(M5a-6)は、
 // この種類のノードにだけ attrs.id を許す
 export const BLOCK_ID_NODE_TYPES = [
   "paragraph",

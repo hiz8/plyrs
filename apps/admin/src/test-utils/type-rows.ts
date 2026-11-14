@@ -1,4 +1,4 @@
-import type { ContentTypeSummary } from "../lib/admin-api";
+import type { ContentTypeSummary } from "~/shared/api/admin-api";
 import type { TypeRow } from "~/features/content-types/lib/content-types";
 
 // コンテンツタイプの一覧の部品テスト用の行

@@ -1,6 +1,6 @@
-import type { MemberSummary } from "~/lib/admin-api";
+import type { MemberSummary } from "~/shared/api/admin-api";
 import { MEMBER_LABELS } from "./settings-labels";
-import { isRole, type Role } from "~/lib/api-contracts";
+import { isRole, type Role } from "~/shared/api/api-contracts";
 
 // メンバー管理の純関数(案 G 4 章、決定 G11〜G13・G26・G30)
 export const ROLE_RANK: Record<Role, number> = { viewer: 0, editor: 1, owner: 2 };

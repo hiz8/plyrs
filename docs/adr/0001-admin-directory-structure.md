@@ -69,10 +69,19 @@ import 関係を洗い出すと、次の問題が見つかった。
    - `oxlint.config.ts` の `FEATURES` に載せた機能(records・media・content-types)の部品は、使うルートが 1 つのサブツリーだけでも feature に置く。機能の関数・文言・部品を 1 か所にまとめ、ルートのファイルは公開 API を組み立てるだけにする。それ以外の画面(ホーム・アカウント・設定・提案・履歴)は 1 に従う。
    - 画面の流れを確かめるテストは、feature ではなくルートの `-tests/` に置く(ルーターを組み立ててよいのは routes のテストだけ)。部品を差し替えるときは、`vi.mock("~/features/<機能>/components/x", …)` と書く。`vi.mock` の文字列は lint の対象外である。feature の単体テストが、許可された他 feature の部品を差し替えるときも同じ書き方をする(records の `asset-picker.test.tsx` が、media のフィルターの部品を差し替えている)。
    - 上の `vi.mock` の factory では、差し替え先を factory の中で `await import(…)` する。`index.ts` 経由の import は feature の部品をまとめて読み込むので、ファイルの先頭で import した変数を factory から参照すると、初期化の前に触ってテストの読み込みが失敗する。
-   - 2 つ以上の feature から使うものは feature に入れず、`shared/` に置く(`record-label.ts`、一括操作の `bulk.ts`・`use-bulk-action.ts` など。手順 5 で移すまでは `lib/` にある)。feature 間の許可を増やすより先に、こちらを検討する。
+   - 2 つ以上の feature から使うものは feature に入れず、`shared/` に置く(`record-label.ts`、一括操作の `bulk.ts`・`use-bulk-action.ts` など)。feature 間の許可を増やすより先に、こちらを検討する。
    - `test-utils/` から feature を import するときは、`index.ts` を通さず深いパスで書く(単体テストが feature 全体を読み込まないようにする)。
 3. **機能に依存しないもの**: `shared/` へ置く。
+   - `shared/` の中は、次の区画に分ける(手順 5 で決めた)。区画をまたぐ import は `~/shared/<区画>/x` と書く。
+     - `api/`: API クライアント、API の契約の型、トークンとセッション、クエリの定義、API のエラーの文言。
+     - `ui/`: 2 つ以上の機能かルートで使う部品と、そのスタイル。
+     - `lib/`: それ以外の純関数・フック・文言(`labels.ts`)・同期の Context。
+     - `styles/`: 全体の CSS。
+   - `labels.ts` には、2 つ以上の機能かルートで使う文言だけを置く。
+   - admin の権限表(`shared/lib/permissions.ts`)は api の写しで、単体テストが api のソースと突き合わせる。shared のテストは区画の外へ相対 import で出られないので、`test-utils/api-permissions.ts` の再 export を通して import する。
 4. **アプリの起動と全体の配線**: app 層へ置く。app 層は、`src/` 直下のフレームワークのエントリと `app/` ディレクトリからなる。
+   - `app/` のうち、`server.ts` から読み込むファイル(`server-routing.ts`・`api-paths.ts`)は、`~/` を使わず相対 import だけで書く。`server.ts` は `tsconfig.worker.json` で型チェックしており、そこには `paths` がない。
+   - `src/` 直下に置くテストは、エントリのテスト(`router.test.tsx`)だけにする。
 
 フレームワークのエントリ(`router.tsx`・`start.ts`・`server.ts`)と生成物の `routeTree.gen.ts` は、`src/` 直下に残す。TanStack Start のプラグインは、エントリを `srcDirectory`(既定 `src`)の直下で探す。`app/` へ移すには `tanstackStart` に `router.entry`・`server.entry`・`start.entry` を渡す必要がある。また `srcDirectory` 自体を `src/app` に変えると、`routesDirectory` と `generatedRouteTree` の解決位置もずれる。エントリの配置は、dev や E2E のテストが通っても実環境で壊れうる領域なので(`CLAUDE.md` の SPA シェル配信の注意を参照)、動かさない。`tsconfig.json` の `exclude: ["src/server.ts"]` と、lint の `ignorePatterns` の `**/routeTree.gen.ts` もそのまま維持する。
 
@@ -114,7 +123,7 @@ feature 間の依存は、既定ですべて禁止する。初期の許可リス
 ### import の書き方の規則
 
 - 層やスライスをまたぐ import は、エイリアス `~/`(`apps/admin/src` を指す)で書く。
-- 相対 import は、同じ feature の中と、同じルートのサブツリーの中だけで使う。
+- 相対 import は、同じ feature の中、同じルートのサブツリーの中、shared の同じ区画の中、app 層の中だけで使う。
 - エイリアスは tsconfig の `paths` で定義し、Vite 8 の組み込みオプション `resolve.tsconfigPaths` で解決する(追加の依存は不要)。`vitest.config.ts` は `vite.config.ts` とは別のファイルで設定を共有していないので、`resolve.tsconfigPaths` は両方に設定する。
 
 この規則も lint で強制できる。直接「エイリアスを使え」と指示するルールはないが、区画の外へ出る相対 import をすべてエラーにすれば、層をまたぐ import を書く方法はエイリアスしか残らない。
@@ -266,7 +275,7 @@ oxlint 1.86.0(リポジトリに入っている版)で検証した。oxlint に�
 - 複数の override が同じファイルに当たると、後のものがルールの設定全体を置き換える(設定はマージされない)。そのため、override ごとにパターンをすべて書く必要がある。`oxlint.config.ts` で自動生成するのはこのためである。
 - サブディレクトリに置いた `.oxlintrc.json` も同様で、一番近い設定だけが使われ、ルートの設定とマージされない。
 - `regex` パターンは Rust の正規表現で、先読み・後読みは使えない。
-- 1 つのルールの `patterns` にある `group` の否定(`!` で始まるパターン)は、同じルールのほかのパターンにも効く。たとえば相対 import を対象にするつもりで `!~/**` を書くと、同じルールにある `~/routes/**` などの `~/` のパターンまで一致しなくなる(手順 2 の実装で判明)。そのため、相対 import だけを対象にするパターンは、否定を使わずに `regex` で書く(`^(\.\./)+…`)。
+- 1 つのルールの `patterns` にある `group` の否定(`!` で始まるパターン)は、同じルールのほかのパターンにも作用する。たとえば相対 import を対象にするつもりで `!~/**` を書くと、同じルールにある `~/routes/**` などの `~/` のパターンまで一致しなくなる(手順 2 の実装で判明)。そのため、相対 import だけを対象にするパターンは、否定を使わずに `regex` で書く(`^(\.\./)+…`)。
 - エイリアスに `package.json` の `imports`(`#/*`、`#src/*`)は使えない。`#/` は Node 22 と TypeScript 7 で不正な指定として拒否される。`#src/*` は拡張子を補完しないので、TypeScript が解決できない。
 
 ### 公開 API のファイルとコード分割
@@ -284,6 +293,8 @@ oxlint 1.86.0(リポジトリに入っている版)で検証した。oxlint に�
 この指定はビルドだけに関わり、dev サーバーと vitest には影響しない。そのため、分割が崩れてもテストと E2E では分からない。feature を足したときと、`index.ts` に再 export 以外のコードを書いたときは、ビルド結果で、エントリが静的に読み込む JS の合計が増えていないことを確かめる。
 
 ### `oxlint.config.ts` の骨子
+
+方式を示すための骨子で、定数の名前と値は実装と異なる(`MAX_DEPTH` は 6)。正は `oxlint.config.ts`。
 
 ```ts
 // 依存ルールの生成元。feature を追加・削除するときと、feature 間の依存を許可するときはここを変える。
@@ -349,6 +360,8 @@ routes・shared・パッケージの override も、同じファイルに同じ�
 | 3. **ルート単位のコロケーション**: home、account、proposals、settings、history の順に移す。依存がルート内で完結しているものから始める。1 つの機能でしか使わない文言(`TOKEN_LABELS`・`SETTINGS_LABELS` など)も、`labels.ts` から使う側と一緒に移す。ただし、`components/record-editor.tsx` からも使う `HISTORY_LABELS`・`PROPOSAL_LABELS` は、ルートの `-lib/` に移すと record-editor からルートへの逆向きの依存になるので、手順 4 で records の feature と一緒に移す                                                                                          | なし(手順 2 の routes のルールが、移した部品にもそのまま適用される)                                                           |
 | 4. **features の作成**: `features/records`・`features/media`・`features/content-types` を作り、`index.ts` で公開 API を固める。機能の文言のファイル(`content-list-labels.ts`・`content-type-labels.ts`・`media-labels.ts`)も、その feature へ移す                                                                                                  | feature のルール。`FEATURES` に追加した feature から順に有効になる                                                            |
 | 5. **残りを `shared/` と `app/` へ移す**: `sync-context.tsx` を含む `lib/` の残りを `shared/lib/` へ、`server-routing.ts`・`api-paths.ts`・`error-screen.tsx` を `app/` へ移す。`components/settings/` に残る `dialog-note`(メディアと型定義からも使う)も `shared/ui/` へ移す。`components/` と `lib/` を空にして削除する     | なし(手順 2 と 4 で全ルールが有効になっている)                                                                                |
+
+手順 1〜5 は完了した(手順 1 は #112、手順 2 は #113、手順 3 は #114、手順 4 は #115、手順 5 は #116)。`components/` と `lib/` は無くなった。
 
 ## 未確認の事項
 

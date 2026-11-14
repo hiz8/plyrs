@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GrantSummary, TokenSummary } from "~/lib/admin-api";
+import type { GrantSummary, TokenSummary } from "~/shared/api/admin-api";
 import {
   canManageTokens,
   connectionRows,

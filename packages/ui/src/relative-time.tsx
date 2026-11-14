@@ -3,7 +3,7 @@ import { Focusable } from "react-aria-components";
 import { focus, font, radius, stroke, text } from "./semantic.stylex";
 import { Tooltip } from "./tooltip";
 
-// h-common-surface.md 5 章 / D1 ボード 3e。書式は admin の lib/datetime.ts(formatDateTime)が作り、
+// h-common-surface.md 5 章 / D1 ボード 3e。書式は admin の shared/lib/datetime.ts(formatDateTime)が作り、
 // ここは表示だけを持つ。相対表記のときだけ点線の下線とツールチップで日時を添える
 const styles = stylex.create({
   time: { fontFamily: font.family, fontSize: font.body, color: text.muted },

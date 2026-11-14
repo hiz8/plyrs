@@ -9,13 +9,13 @@ import {
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { Button, EmptyState, TextArea, TextField } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import type { ContentTypeSummary } from "~/lib/admin-api";
+import type { ContentTypeSummary } from "~/shared/api/admin-api";
 import {
   currentCrumb,
   homeCrumb,
   settingsContentTypesCrumb,
   settingsCrumb,
-} from "~/lib/breadcrumbs";
+} from "~/shared/lib/breadcrumbs";
 import {
   autoFill,
   effectiveTitleField,
@@ -30,11 +30,10 @@ import {
   type TypeDraft,
 } from "../lib/content-type-form";
 import { referenceCandidates } from "../lib/content-types";
-import { DIALOGS } from "~/lib/labels";
 import { CONTENT_TYPE_LABELS } from "../lib/content-type-labels";
-import { useLeaveGuard } from "~/lib/use-leave-guard";
-import { LeaveGuardDialog } from "~/components/leave-guard-dialog";
-import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
+import { useLeaveGuard } from "~/shared/lib/use-leave-guard";
+import { LeaveGuardDialog } from "~/shared/ui/leave-guard-dialog";
+import { PageBody, TenantPageHeader } from "~/shared/ui/tenant-page-header";
 import { AddFieldDialog } from "./add-field-dialog";
 import { DeleteFieldDialog } from "./delete-field-dialog";
 import { FieldList } from "./field-list";
@@ -403,7 +402,7 @@ export function TypeEditor({
         }}
         onCancel={() => setDeleteTarget(null)}
       />
-      <LeaveGuardDialog blocker={blocker} body={DIALOGS.leaveType.body} />
+      <LeaveGuardDialog blocker={blocker} body={CONTENT_TYPE_LABELS.leaveBody} />
     </>
   );
 }

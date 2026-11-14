@@ -1,4 +1,4 @@
-import { TERMS } from "~/lib/labels";
+import { TERMS } from "~/shared/lib/labels";
 
 // record の一覧・編集・履歴・提案の文言。record の feature だけが使うものと、履歴・提案のルートが
 // index.ts 経由で使うものを置く。複数の機能で使う文言(TERMS・TOASTS・DIALOGS など)は ~/lib/labels にある
@@ -189,4 +189,32 @@ export const RECORD_FORM_LABELS = {
   noCandidates: "参照できるコンテンツがありません",
   adoptedNotice:
     "サーバー版を反映しました。他に未保存の変更が残っている場合は改めて保存してください。",
+} as const;
+
+// record の確認ダイアログの文言。削除(delete)はメディアも使うので ~/shared/lib/labels の DIALOGS にある
+export const RECORD_DIALOGS = {
+  unpublish: {
+    title: "公開を取り下げますか？",
+    body: (title: string) =>
+      `「${title}」がサイトから見えなくなります。内容は下書きとして残り、あとから再び公開できます。`,
+    confirm: "公開を取り下げる",
+  },
+  archivePublished: {
+    title: "公開したままアーカイブしますか？",
+    body: (type: string) =>
+      `この${type}はまだ公開中です。アーカイブしても公開は維持されます。先に「公開を取り下げ」を行うことをおすすめします。`,
+    confirm: "公開したままアーカイブする",
+  },
+  conflict: {
+    title: "本文が他の人の編集と重なりました",
+    body: (savedAgo: string) =>
+      `ほかの人が ${savedAgo} に同じ本文を保存しました。どちらを残すか選んでください。他のフィールドは自動で統合済みです。公開はまだ行っていません。`,
+    mine: "あなたの編集(この端末)",
+    mineNote: "未保存",
+    theirs: "ほかの人の編集",
+    theirsNote: (savedAgo: string) => `${savedAgo} に保存`,
+    keepMine: "あなたの編集を残す",
+    adoptTheirs: "ほかの人の編集を取り込む",
+    later: "あとで決める",
+  },
 } as const;

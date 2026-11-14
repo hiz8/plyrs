@@ -2,11 +2,11 @@ import * as stylex from "@stylexjs/stylex";
 import { Clock, TriangleAlert } from "lucide-react";
 import { ConfirmDialog } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { roleLabel } from "~/lib/labels";
+import { roleLabel } from "~/shared/lib/labels";
 import { MEMBER_LABELS } from "../-lib/settings-labels";
 import { demoteBody } from "../-lib/members";
-import type { Role } from "~/lib/api-contracts";
-import { DialogNote } from "~/components/settings/dialog-note";
+import type { Role } from "~/shared/api/api-contracts";
+import { DialogNote } from "~/shared/ui/dialog-note";
 
 const styles = stylex.create({
   body: { display: "flex", flexDirection: "column", gap: space.sm },

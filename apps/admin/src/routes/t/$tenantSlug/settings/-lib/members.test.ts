@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { MemberSummary } from "~/lib/admin-api";
+import type { MemberSummary } from "~/shared/api/admin-api";
 import { MEMBER_LABELS } from "./settings-labels";
 import { demoteBody, isDowngrade, lastOwnerId, memberRows, otherOwnerEmails } from "./members";
 

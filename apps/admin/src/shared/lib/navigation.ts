@@ -1,4 +1,4 @@
-import type { ModuleSummary } from "./admin-api";
+import type { ModuleSummary } from "~/shared/api/admin-api";
 
 // 同期の ContentTypeDefinition(menuOrder?: number)と HTTP の ContentTypeSummary
 // (menuOrder: number | null)の両方が満たす最小形。

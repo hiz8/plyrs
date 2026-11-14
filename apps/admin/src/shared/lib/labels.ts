@@ -1,6 +1,5 @@
 import type { WorkflowStatus } from "@plyrs/metamodel";
-import type { SyncStatus } from "@plyrs/sync-client";
-import { isRole, type Role } from "./api-contracts";
+import { isRole, type Role } from "~/shared/api/api-contracts";
 
 // このファイルには、複数の画面(機能)で使う文言だけを置く。1 つの機能でしか使わない文言は、その機能の
 // 文言のファイル(features/records/lib/record-labels.ts など)に置く。
@@ -29,25 +28,10 @@ export const ROLE_LABELS: Record<Role, string> = {
   viewer: "閲覧者",
 };
 
-// 案 G 4 章(G10): ロールごとにできることの説明
-export const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  owner: "すべての操作に加えて、設定(コンテンツタイプ・メンバー・モジュール)を変更できます",
-  editor: "コンテンツとメディアの作成・編集・公開ができます。設定は変更できません",
-  viewer: "コンテンツとメディアを見るだけです。作成・編集・公開はできません",
-};
-
 // TenantSummary.role などサーバーから文字列で届く値向け。未知のロールは値をそのまま出す。
 export function roleLabel(role: string): string {
   return isRole(role) ? ROLE_LABELS[role] : role;
 }
-
-export const SYNC_STATUS_LABELS: Record<SyncStatus, string> = {
-  idle: "待機",
-  connecting: "接続中",
-  syncing: "同期中",
-  ready: "同期済み",
-  closed: "切断",
-};
 
 // 案 A: シェル(サイドバー・ヘッダー)の文言
 export const NAV_LABELS = {
@@ -69,21 +53,6 @@ export const NAV_LABELS = {
   logout: "ログアウト",
   mainNav: "メインナビゲーション",
   account: "アカウント",
-} as const;
-
-export const CONNECTION_BANNER = {
-  message:
-    "サーバーとの接続が切れています。再接続しています… 編集内容はこの端末に保存され、再接続後に送信されます",
-  reconnect: "今すぐ再接続",
-} as const;
-
-export const SITE_SELECT = {
-  title: "サイトを選択",
-  description: (email: string, count: number) =>
-    `${email} として ${count} つのサイトに所属しています`,
-  descriptionWithoutEmail: (count: number) => `${count} つのサイトに所属しています`,
-  none: "サイトは運営者が発行します",
-  otherAccount: "別のアカウントでログイン",
 } as const;
 
 // 初回同期前などの読み込み中の読み上げ
@@ -119,46 +88,18 @@ export const DIALOGS = {
       `この${type}は公開中です。削除するとサイトからも消え、公開ページは表示できなくなります`,
     confirm: "削除する",
   },
-  unpublish: {
-    title: "公開を取り下げますか？",
-    body: (title: string) =>
-      `「${title}」がサイトから見えなくなります。内容は下書きとして残り、あとから再び公開できます。`,
-    confirm: "公開を取り下げる",
-  },
-  archivePublished: {
-    title: "公開したままアーカイブしますか？",
-    body: (type: string) =>
-      `この${type}はまだ公開中です。アーカイブしても公開は維持されます。先に「公開を取り下げ」を行うことをおすすめします。`,
-    confirm: "公開したままアーカイブする",
-  },
   leave: {
     title: "保存していない変更があります",
     body: "このまま移動すると、本文とタイトルの変更は失われます。",
     stay: "編集を続ける",
     discard: "破棄して移動",
   },
-  // 型設計の離脱ガード(E26)。title / stay / discard は leave と共通
-  leaveType: {
-    body: "このまま移動すると、コンテンツタイプの変更は失われます。",
-  },
-  conflict: {
-    title: "本文が他の人の編集と重なりました",
-    body: (savedAgo: string) =>
-      `ほかの人が ${savedAgo} に同じ本文を保存しました。どちらを残すか選んでください。他のフィールドは自動で統合済みです。公開はまだ行っていません。`,
-    mine: "あなたの編集(この端末)",
-    mineNote: "未保存",
-    theirs: "ほかの人の編集",
-    theirsNote: (savedAgo: string) => `${savedAgo} に保存`,
-    keepMine: "あなたの編集を残す",
-    adoptTheirs: "ほかの人の編集を取り込む",
-    later: "あとで決める",
-  },
   cancel: "キャンセル",
 } as const;
 
 type BulkKindKey = "publish" | "unpublish" | "status" | "delete";
 
-// running / retry / done / failed のキーは BulkKind(lib/use-bulk-action.ts)と揃える
+// running / retry / done / failed のキーは BulkKind(shared/lib/use-bulk-action.ts)と揃える
 export const BULK_LABELS = {
   region: "一括操作",
   menu: "一括操作",
@@ -209,14 +150,6 @@ export const BULK_LABELS = {
     title: (n: number) => `${n} 件の公開を取り下げますか？`,
     body: "サイトから見えなくなります。内容は下書きとして残り、あとから再び公開できます。",
   },
-} as const;
-
-// router の defaultErrorComponent(最終防衛線)
-export const ERROR_SCREEN = {
-  title: "エラーが発生しました",
-  fallback:
-    "ページを表示できませんでした。再読み込みしても直らない場合は、時間をおいてお試しください",
-  reload: "再読み込み",
 } as const;
 
 export const CLIPBOARD_LABELS = {

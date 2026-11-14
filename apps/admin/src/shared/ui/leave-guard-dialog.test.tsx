@@ -1,8 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
-import { DIALOGS } from "../lib/labels";
-import type { useLeaveGuard } from "../lib/use-leave-guard";
+import { DIALOGS } from "~/shared/lib/labels";
+import type { useLeaveGuard } from "~/shared/lib/use-leave-guard";
 import { LeaveGuardDialog } from "./leave-guard-dialog";
 
 it("blocked のとき確認が出て、破棄して移動は proceed、編集を続けるは reset を呼ぶ", async () => {

@@ -12,7 +12,7 @@ import {
   type FieldDraft,
 } from "../lib/content-type-form";
 import { CONTENT_TYPE_LABELS, FIELD_KIND_LABELS } from "../lib/content-type-labels";
-import { DialogNote } from "~/components/settings/dialog-note";
+import { DialogNote } from "~/shared/ui/dialog-note";
 
 const NARROW = "@media (max-width: 959px)";
 

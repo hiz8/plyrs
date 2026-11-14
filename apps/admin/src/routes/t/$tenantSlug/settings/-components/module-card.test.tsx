@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { ModuleSummary } from "~/lib/admin-api";
+import type { ModuleSummary } from "~/shared/api/admin-api";
 import { ModuleCard } from "./module-card";
 
 const booking: ModuleSummary = {

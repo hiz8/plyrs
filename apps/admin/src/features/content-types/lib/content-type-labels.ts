@@ -1,4 +1,4 @@
-import type { FieldKind } from "~/lib/field-kind";
+import type { FieldKind } from "~/shared/lib/field-kind";
 
 // 案 E(型設計): フィールドの種類の呼称と説明(E 3 章)
 export const FIELD_KIND_LABELS: Record<FieldKind, { name: string; description: string }> = {
@@ -113,6 +113,8 @@ export const CONTENT_TYPE_LABELS = {
     duplicate: (key: string, label: string) => `「${key}」は「${label}」で既に使われています`,
     reserved: (key: string) => `「${key}」はシステムが使う名前のため使えません`,
   },
+  // 型設計の離脱ガード(E26)。title / stay / discard は leave と共通
+  leaveBody: "このまま移動すると、コンテンツタイプの変更は失われます。",
 } as const;
 
 export const ADD_FIELD_LABELS = {

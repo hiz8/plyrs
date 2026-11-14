@@ -1,6 +1,6 @@
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { MODULE_LABELS } from "./settings-labels";
-import type { NavType } from "~/lib/navigation";
+import type { NavType } from "~/shared/lib/navigation";
 
 // モジュール画面の純関数(案 G 5 章、決定 G3・G15)
 export interface TypeCount {

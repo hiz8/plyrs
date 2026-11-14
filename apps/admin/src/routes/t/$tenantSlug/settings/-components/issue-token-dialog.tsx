@@ -3,11 +3,11 @@ import { Copy, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { Button, Checkbox, ModalDialog, Select, TextField } from "@plyrs/ui";
 import { border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
-import type { IssueTokenInput, IssuedToken } from "~/lib/admin-api";
-import { copyText } from "~/lib/clipboard";
-import { DIALOGS } from "~/lib/labels";
+import type { IssueTokenInput, IssuedToken } from "~/shared/api/admin-api";
+import { copyText } from "~/shared/lib/clipboard";
+import { DIALOGS } from "~/shared/lib/labels";
 import { TOKEN_LABELS } from "../-lib/settings-labels";
-import type { Role } from "~/lib/api-contracts";
+import type { Role } from "~/shared/api/api-contracts";
 import {
   DEFAULT_SCOPES,
   defaultExpiryFor,
@@ -18,7 +18,7 @@ import {
   scopeOptionsFor,
   type PatScope,
 } from "../-lib/tokens";
-import { DialogNote } from "~/components/settings/dialog-note";
+import { DialogNote } from "~/shared/ui/dialog-note";
 
 const styles = stylex.create({
   form: { display: "flex", flexDirection: "column", gap: space.inset },

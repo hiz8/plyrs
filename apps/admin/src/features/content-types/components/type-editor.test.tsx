@@ -3,22 +3,22 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import type { FieldDefinition } from "@plyrs/metamodel";
 import { emptyTypeDraft, toTypeDraft } from "../lib/content-type-form";
-import { DIALOGS } from "~/lib/labels";
+import { DIALOGS } from "~/shared/lib/labels";
 import {
   ADD_FIELD_LABELS,
   CONTENT_TYPE_LABELS,
   FIELD_KIND_LABELS,
   FIELD_PANEL_LABELS,
 } from "../lib/content-type-labels";
-import type { TenantSync } from "~/lib/sync";
-import { useLeaveGuard } from "~/lib/use-leave-guard";
-import { TenantSyncProvider } from "~/lib/sync-context";
+import type { TenantSync } from "~/shared/lib/sync";
+import { useLeaveGuard } from "~/shared/lib/use-leave-guard";
+import { TenantSyncProvider } from "~/shared/lib/sync-context";
 import { ListColumnsSelectMock } from "~/test-utils/list-columns-select-mock";
 import { summary } from "~/test-utils/type-rows";
 import { TypeEditor, type TypeEditorProps } from "./type-editor";
 
 // router の外で描くので useBlocker は使えない。既定は「止めない」で、離脱の確認だけ個別に差し替える
-vi.mock("~/lib/use-leave-guard", () => ({
+vi.mock("~/shared/lib/use-leave-guard", () => ({
   useLeaveGuard: vi.fn(() => ({ status: "idle" })),
 }));
 
@@ -292,7 +292,7 @@ it("変更があるときに離脱しようとすると確認が出て、編集�
   );
   setup();
   const dialog = await screen.findByRole("alertdialog", { name: DIALOGS.leave.title });
-  expect(within(dialog).getByText(DIALOGS.leaveType.body)).toBeInTheDocument();
+  expect(within(dialog).getByText(CONTENT_TYPE_LABELS.leaveBody)).toBeInTheDocument();
   await user.click(within(dialog).getByRole("button", { name: DIALOGS.leave.stay }));
   expect(reset).toHaveBeenCalled();
   expect(proceed).not.toHaveBeenCalled();

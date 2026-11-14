@@ -6,9 +6,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, DropZone, EmptyState, FileButton, FileDropTarget, toaster } from "@plyrs/ui";
 import { ASSET_TYPE_KEY } from "@plyrs/metamodel";
 import { createAssetServices } from "../lib/asset-services";
-import { currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
-import { errorMessage } from "~/lib/error-messages";
-import { TERMS, TOASTS } from "~/lib/labels";
+import { currentCrumb, homeCrumb } from "~/shared/lib/breadcrumbs";
+import { errorMessage } from "~/shared/api/error-messages";
+import { TERMS, TOASTS } from "~/shared/lib/labels";
 import { MEDIA_LABELS } from "../lib/media-labels";
 import {
   applyMediaQuery,
@@ -25,14 +25,14 @@ import {
   type MediaView,
 } from "../lib/media-list";
 import { uploadSummaryMessage } from "../lib/media";
-import { orphanAssetsQueryOptions, publicationsQueryKey } from "~/lib/queries";
-import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
-import { bulkResultMessage, useBulkAction } from "~/lib/use-bulk-action";
-import { useCan } from "~/lib/use-can";
-import { useRecordsOfTypes } from "~/lib/use-collection";
+import { orphanAssetsQueryOptions, publicationsQueryKey } from "~/shared/api/queries";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/shared/lib/sync-context";
+import { bulkResultMessage, useBulkAction } from "~/shared/lib/use-bulk-action";
+import { useCan } from "~/shared/lib/use-can";
+import { useRecordsOfTypes } from "~/shared/lib/use-collection";
 import { uploadStoreFor, useUploads } from "../lib/use-uploads";
 import { useFileDropGuard } from "../lib/use-file-drop-guard";
-import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
+import { PageBody, PageLoading, TenantPageHeader } from "~/shared/ui/tenant-page-header";
 import { DeleteMediaDialog, type DeleteMediaTarget } from "./delete-media-dialog";
 import { MediaBulkBar } from "./media-bulk-bar";
 import { MediaDetailPanel } from "./media-detail-panel";

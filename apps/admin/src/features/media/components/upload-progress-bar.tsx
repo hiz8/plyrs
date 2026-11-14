@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Button, ProgressBar } from "@plyrs/ui";
 import { space } from "@plyrs/ui/semantic.stylex";
 import { MEDIA_LABELS } from "../lib/media-labels";
-import { bulkBarStyles } from "~/components/bulk-bar-styles";
+import { bulkBarStyles } from "~/shared/ui/bulk-bar-styles";
 
 const styles = stylex.create({
   // 共有の root は横並び。この帯は文と進捗バーを縦に積む

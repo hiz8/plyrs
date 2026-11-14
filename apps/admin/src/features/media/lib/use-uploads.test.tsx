@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { UploadOptions } from "~/lib/admin-api";
+import type { UploadOptions } from "~/shared/api/admin-api";
 import { MAX_UPLOAD_BYTES } from "./media";
 import { DONE_HOLD_MS, createUploadStore, uploadStoreFor, useUploads } from "./use-uploads";
 

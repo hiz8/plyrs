@@ -3,7 +3,7 @@ import { ConfirmDialog } from "@plyrs/ui";
 import { MEDIA_LABELS } from "../lib/media-labels";
 import { countUsingRecords, type ResolvedUsage } from "../lib/media";
 import { usageTitles, type MediaRow } from "../lib/media-list";
-import { DialogNote } from "~/components/settings/dialog-note";
+import { DialogNote } from "~/shared/ui/dialog-note";
 
 const L = MEDIA_LABELS.deleteDialog;
 

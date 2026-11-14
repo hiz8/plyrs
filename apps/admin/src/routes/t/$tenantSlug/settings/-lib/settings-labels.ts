@@ -1,4 +1,5 @@
-import { TERMS } from "~/lib/labels";
+import { TERMS } from "~/shared/lib/labels";
+import type { Role } from "~/shared/api/api-contracts";
 
 export const MEMBER_LABELS = {
   add: "メンバーを追加",
@@ -203,3 +204,10 @@ export const SETTINGS_LABELS = {
     copy: "コピー",
   },
 } as const;
+
+// 案 G 4 章(G10): ロールごとにできることの説明
+export const ROLE_DESCRIPTIONS: Record<Role, string> = {
+  owner: "すべての操作に加えて、設定(コンテンツタイプ・メンバー・モジュール)を変更できます",
+  editor: "コンテンツとメディアの作成・編集・公開ができます。設定は変更できません",
+  viewer: "コンテンツとメディアを見るだけです。作成・編集・公開はできません",
+};

@@ -24,8 +24,8 @@ import {
   validateFieldKey,
   type KindGroup,
 } from "../lib/content-type-form";
-import type { FieldKind } from "~/lib/field-kind";
-import { TERMS } from "~/lib/labels";
+import type { FieldKind } from "~/shared/lib/field-kind";
+import { TERMS } from "~/shared/lib/labels";
 import { ADD_FIELD_LABELS, FIELD_KIND_LABELS } from "../lib/content-type-labels";
 
 const NARROW = "@media (max-width: 959px)";

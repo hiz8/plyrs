@@ -1,4 +1,4 @@
-import { isRole, type Role } from "./api-contracts";
+import { isRole, type Role } from "~/shared/api/api-contracts";
 
 // 案 H 7 章: 画面の出し分けの判定はここに集約する。対応表は api の auth/permissions.ts と同じもの
 // (api は管理画面の依存に無いため複製し、一致を permissions.test.ts で確かめる)。

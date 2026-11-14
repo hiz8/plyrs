@@ -3,7 +3,7 @@ import { primitives as p } from "./primitives.stylex";
 
 // h-design-tokens.md 3 章: 用途の名前。値は必ずプリミティブを参照し、ライト / ダークの対は
 // light-dark(ライト, ダーク) で持つ(4 章)。どちらを使うかはルートの color-scheme が決める
-// (admin の styles.css が既定の `light dark` を宣言し、lib/theme.ts が上書きする)。
+// (admin の styles.css が既定の `light dark` を宣言し、shared/lib/theme.ts が上書きする)。
 // 部品と画面はこのファイルだけを参照する。消費側は index.ts を経由せず直接 import する。
 
 export const bg = stylex.defineVars({

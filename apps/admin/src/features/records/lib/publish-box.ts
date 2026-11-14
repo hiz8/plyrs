@@ -1,4 +1,4 @@
-import type { PublicationState } from "~/lib/admin-api";
+import type { PublicationState } from "~/shared/api/admin-api";
 import { PUBLISH_BOX } from "./record-labels";
 import type { SaveAndPublishPhase } from "./save-and-publish";
 

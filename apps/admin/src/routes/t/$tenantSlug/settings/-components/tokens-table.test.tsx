@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
-import type { GrantSummary, TokenSummary } from "~/lib/admin-api";
+import type { GrantSummary, TokenSummary } from "~/shared/api/admin-api";
 import { TOKEN_LABELS } from "../-lib/settings-labels";
 import { connectionRows } from "../-lib/tokens";
 import { RevokeTokenDialog } from "./revoke-token-dialog";

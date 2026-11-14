@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { FieldDefinition } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import type { ContentTypeSummary } from "~/lib/admin-api";
+import type { ContentTypeSummary } from "~/shared/api/admin-api";
 import {
   autoFill,
   availableKinds,

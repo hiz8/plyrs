@@ -1,6 +1,6 @@
 import handler, { createServerEntry } from "@tanstack/react-start/server-entry";
 import { env } from "cloudflare:workers";
-import { resolveServerRoute } from "./lib/server-routing";
+import { resolveServerRoute } from "./app/server-routing";
 
 // SPA シェル配信(防御 A): TanStack Start の SPA モードは「404 を _shell.html へ
 // リライトする」静的ホスティング前提(Netlify _redirects 等)。Workers にはこのリライト層が

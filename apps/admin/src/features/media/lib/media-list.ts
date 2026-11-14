@@ -1,6 +1,6 @@
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import type { ResolvedUsage } from "./media";
-import { normalizeForSearch, searchText } from "~/lib/search";
+import { normalizeForSearch, searchText } from "~/shared/lib/search";
 import { MEDIA_LABELS } from "./media-labels";
 import { MEDIA_KINDS, type MediaKind } from "./media-kind";
 

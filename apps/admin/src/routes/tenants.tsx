@@ -13,13 +13,24 @@ import {
   stroke,
   text,
 } from "@plyrs/ui/semantic.stylex";
-import { ApiError } from "~/lib/api-client";
-import { resetClientSession } from "~/lib/client-session";
-import { roleLabel, SITE_SELECT } from "~/lib/labels";
-import { can } from "~/lib/permissions";
-import { meQueryOptions, tenantsQueryOptions } from "~/lib/queries";
+import { ApiError } from "~/shared/api/api-client";
+import { resetClientSession } from "~/shared/api/client-session";
+import { roleLabel } from "~/shared/lib/labels";
+import { can } from "~/shared/lib/permissions";
+import { meQueryOptions, tenantsQueryOptions } from "~/shared/api/queries";
 
 // サイト選択画面(a-navigation.md 8 章 / D2 S8)。所属が 1 件なら選ぶ余地が無いので転送する。
+
+// この画面だけで使う文言
+const SITE_SELECT = {
+  title: "サイトを選択",
+  description: (email: string, count: number) =>
+    `${email} として ${count} つのサイトに所属しています`,
+  descriptionWithoutEmail: (count: number) => `${count} つのサイトに所属しています`,
+  none: "サイトは運営者が発行します",
+  otherAccount: "別のアカウントでログイン",
+} as const;
+
 const styles = stylex.create({
   page: {
     minHeight: "100vh",

@@ -34,7 +34,7 @@ CI(`.github/workflows/ci.yml`)は lint → format:check → typecheck → test �
 
 ```bash
 pnpm --filter @plyrs/api exec vitest run --no-isolate --max-workers=1 test/publish.test.ts
-pnpm --filter @plyrs/admin exec vitest run src/lib/sync.test.ts -t "<テスト名>"
+pnpm --filter @plyrs/admin exec vitest run src/shared/lib/sync.test.ts -t "<テスト名>"
 pnpm --filter @plyrs/e2e test        # Playwright(.wrangler を削除してから dev サーバー起動)
 pnpm --filter @plyrs/admin dev       # 管理画面 + api を auxiliary worker として同一 dev サーバーで起動
 pnpm --filter @plyrs/admin build     # routeTree.gen.ts の再生成もこれで行う
@@ -53,7 +53,7 @@ pnpm --filter @plyrs/db generate:projection  # 公開用 DB(drizzle-projection/)
 ### デプロイ単位とパッケージ
 
 - `apps/api` — Hono の Worker。テナント DO(`TenantDO`)、Queues consumer、cron もこの 1 Worker に同居する。エントリは `src/index.ts`
-- `apps/admin` — TanStack Start(SPA モード)の管理画面。**独立 Worker** で、`/auth`・`/v1` などの API パスは service binding `API` で api Worker へ同一オリジン転送する(`src/server.ts` + `src/lib/server-routing.ts`)
+- `apps/admin` — TanStack Start(SPA モード)の管理画面。**独立 Worker** で、`/auth`・`/v1` などの API パスは service binding `API` で api Worker へ同一オリジン転送する(`src/server.ts` + `src/app/server-routing.ts`)。`src/` の中は `routes/`(ルートと、その隣の `-` 付きディレクトリ)・`features/`・`shared/`・`app/` に分かれる。置き場所と依存の向きは `docs/adr/0001-admin-directory-structure.md` に従い、oxlint が強制する
 - `apps/e2e` — Playwright。3 spec は共有 dev サーバー・共有ローカル D1 前提で順序依存(`playwright.config.ts` の projects/dependencies で固定)
 - `packages/metamodel` — フィールド型パレット・content type 定義・Zod スキーマ生成・tolerant read(純関数、クライアントと DO で共用)
 - `packages/sync-protocol` — 同期メッセージ型とフィールド単位の競合解決(`resolve.ts`)

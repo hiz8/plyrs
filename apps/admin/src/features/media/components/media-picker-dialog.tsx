@@ -17,8 +17,8 @@ import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
 import { Check, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AssetServices } from "../lib/asset-services";
-import { errorMessage } from "~/lib/error-messages";
-import { TOASTS } from "~/lib/labels";
+import { errorMessage } from "~/shared/api/error-messages";
+import { TOASTS } from "~/shared/lib/labels";
 import { MEDIA_LABELS, MEDIA_PICKER_LABELS } from "../lib/media-labels";
 import {
   MEDIA_KIND_OPTIONS,
@@ -33,7 +33,7 @@ import {
 import type { MediaKind } from "../lib/media-kind";
 import { useFileDropGuard } from "../lib/use-file-drop-guard";
 import { createUploadStore, DONE_HOLD_MS, useUploads } from "../lib/use-uploads";
-import { useRecordsOfTypes } from "~/lib/use-collection";
+import { useRecordsOfTypes } from "~/shared/lib/use-collection";
 import { uploadTileState } from "./media-grid";
 import { MediaFilterSelect } from "./media-filter-select";
 import { MediaThumb } from "./media-thumb";

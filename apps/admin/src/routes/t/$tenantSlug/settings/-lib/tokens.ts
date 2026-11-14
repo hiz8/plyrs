@@ -1,8 +1,8 @@
-import type { GrantSummary, TokenSummary } from "~/lib/admin-api";
-import { formatDateTime } from "~/lib/datetime";
+import type { GrantSummary, TokenSummary } from "~/shared/api/admin-api";
+import { formatDateTime } from "~/shared/lib/datetime";
 import { TOKEN_LABELS } from "./settings-labels";
-import { can, type Operation } from "~/lib/permissions";
-import type { Role } from "~/lib/api-contracts";
+import { can, type Operation } from "~/shared/lib/permissions";
+import type { Role } from "~/shared/api/api-contracts";
 
 // M1-4(design-spec 16.3、論点 C5): 接続トークン(PAT)画面の純関数。
 // スコープの選択肢と期限の規則は api の auth/pat.ts と同じ(一致はそれぞれのテストで固定する):

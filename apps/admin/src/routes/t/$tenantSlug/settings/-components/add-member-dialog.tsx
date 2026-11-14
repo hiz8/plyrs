@@ -3,11 +3,11 @@ import { CircleAlert, Copy } from "lucide-react";
 import { useState } from "react";
 import { Button, ModalDialog, TextField } from "@plyrs/ui";
 import { border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
-import { copyText } from "~/lib/clipboard";
-import { DIALOGS, ROLE_DESCRIPTIONS } from "~/lib/labels";
-import { MEMBER_LABELS } from "../-lib/settings-labels";
-import type { Role } from "~/lib/api-contracts";
-import { DialogNote } from "~/components/settings/dialog-note";
+import { copyText } from "~/shared/lib/clipboard";
+import { DIALOGS } from "~/shared/lib/labels";
+import { MEMBER_LABELS, ROLE_DESCRIPTIONS } from "../-lib/settings-labels";
+import type { Role } from "~/shared/api/api-contracts";
+import { DialogNote } from "~/shared/ui/dialog-note";
 import { RoleSelect } from "./role-select";
 
 const styles = stylex.create({

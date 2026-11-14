@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Badge, Cell, Column, RelativeTime, Row, Table, TableBody, TableHeader } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { Link, type Selection } from "react-aria-components";
-import { formatDateTime } from "~/lib/datetime";
+import { formatDateTime } from "~/shared/lib/datetime";
 import { MEDIA_LABELS } from "../lib/media-labels";
 import { formatBytes, type MediaRow } from "../lib/media-list";
 import { MediaThumb, type MediaThumbProps } from "./media-thumb";

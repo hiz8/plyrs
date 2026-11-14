@@ -1,6 +1,6 @@
 import { Button, ModalDialog } from "@plyrs/ui";
-import { DIALOGS } from "../lib/labels";
-import type { useLeaveGuard } from "../lib/use-leave-guard";
+import { DIALOGS } from "~/shared/lib/labels";
+import type { useLeaveGuard } from "~/shared/lib/use-leave-guard";
 
 // 未保存の変更を残して画面を離れようとしたときの確認(案 C 7 章)。
 // 本文だけ画面ごとに違う(レコードは本文とタイトル、型設計はコンテンツタイプ)

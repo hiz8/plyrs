@@ -1,7 +1,7 @@
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { describe, expect, it, vi } from "vitest";
-import { FakeSocket } from "../test-utils/fake-socket";
+import { FakeSocket } from "~/test-utils/fake-socket";
 import { createTenantSync } from "./sync";
 
 const articleType: ContentTypeDefinition = {

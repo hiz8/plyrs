@@ -13,22 +13,23 @@ import {
   EDITOR_LABELS,
   LIST_LABELS,
   parseListQuery,
+  RECORD_DIALOGS,
   toListSearch,
   type BulkMenuAction,
   type ListQuery,
   type ListRow,
 } from "~/features/records";
-import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
-import { currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
-import type { BulkResult } from "~/lib/bulk";
-import { errorMessage } from "~/lib/error-messages";
-import { BULK_LABELS, DIALOGS, TOASTS } from "~/lib/labels";
-import { publicationsQueryKey, publicationsQueryOptions } from "~/lib/queries";
-import { labelForRecord } from "~/lib/record-label";
-import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
-import { useCan } from "~/lib/use-can";
-import { bulkResultMessage, useBulkAction, type BulkKind } from "~/lib/use-bulk-action";
-import { useCollectionRows } from "~/lib/use-collection";
+import { PageBody, PageLoading, TenantPageHeader } from "~/shared/ui/tenant-page-header";
+import { currentCrumb, homeCrumb } from "~/shared/lib/breadcrumbs";
+import type { BulkResult } from "~/shared/lib/bulk";
+import { errorMessage } from "~/shared/api/error-messages";
+import { BULK_LABELS, DIALOGS, TOASTS } from "~/shared/lib/labels";
+import { publicationsQueryKey, publicationsQueryOptions } from "~/shared/api/queries";
+import { labelForRecord } from "~/shared/lib/record-label";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/shared/lib/sync-context";
+import { useCan } from "~/shared/lib/use-can";
+import { bulkResultMessage, useBulkAction, type BulkKind } from "~/shared/lib/use-bulk-action";
+import { useCollectionRows } from "~/shared/lib/use-collection";
 
 const styles = stylex.create({
   muted: { color: text.muted },
@@ -288,7 +289,7 @@ function RecordListPage() {
         isOpen={confirm === "unpublish"}
         onOpenChange={(open) => setConfirm(open ? "unpublish" : null)}
         tone="danger"
-        confirmLabel={DIALOGS.unpublish.confirm}
+        confirmLabel={RECORD_DIALOGS.unpublish.confirm}
         onConfirm={() => void runConfirmed("unpublish")}
       >
         <p>{BULK_LABELS.confirmUnpublish.body}</p>

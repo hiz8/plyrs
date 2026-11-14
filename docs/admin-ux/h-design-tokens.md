@@ -210,7 +210,7 @@ shadow1 と shadow3、shadow2 と shadow4 は形(オフセットとぼかし)が
 
 ### 5.1 変数の参照の検証結果(2026-10-17、ロードマップ T1)
 
-`@stylexjs/stylex` / `@stylexjs/unplugin` 0.19.1 で確認した。検証に使った最小のトークン構成を `apps/admin/src/test-utils/stylex-tokens/` に残し、`apps/admin/src/stylex-tokens.test.ts` がそれを Vite でビルドして出力の CSS を確かめる。StyleX の版を上げたときは、このテストが通ることで同じ書き方が使えると判断できる。
+`@stylexjs/stylex` / `@stylexjs/unplugin` 0.19.1 で確認した。検証に使った最小のトークン構成を `apps/admin/src/test-utils/stylex-tokens/` に残し、`apps/admin/src/test-utils/stylex-tokens/stylex-tokens.test.ts` がそれを Vite でビルドして出力の CSS を確かめる。StyleX の版を上げたときは、このテストが通ることで同じ書き方が使えると判断できる。
 
 フィクスチャのソース(抜粋):
 

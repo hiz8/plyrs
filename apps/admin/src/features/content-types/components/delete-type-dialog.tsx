@@ -3,7 +3,7 @@ import { TriangleAlert } from "lucide-react";
 import { ConfirmDialog } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { CONTENT_TYPE_LABELS } from "../lib/content-type-labels";
-import { DialogNote } from "~/components/settings/dialog-note";
+import { DialogNote } from "~/shared/ui/dialog-note";
 
 const styles = stylex.create({
   body: { display: "flex", flexDirection: "column", gap: space.sm },

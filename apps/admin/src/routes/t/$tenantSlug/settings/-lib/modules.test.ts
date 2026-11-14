@@ -1,7 +1,7 @@
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { describe, expect, it } from "vitest";
 import { formatCounts, moduleAddLinks, moduleContentCounts } from "./modules";
-import type { NavType } from "~/lib/navigation";
+import type { NavType } from "~/shared/lib/navigation";
 
 let seq = 0;
 function rec(type: string, deletedAt: string | null = null): SyncRecord {

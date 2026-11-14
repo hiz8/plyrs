@@ -1,10 +1,17 @@
 import * as stylex from "@stylexjs/stylex";
 import { Button } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { ApiError } from "../lib/api-client";
-import { SuperApiError } from "../lib/super-api";
-import { errorMessage } from "../lib/error-messages";
-import { ERROR_SCREEN } from "../lib/labels";
+import { ApiError } from "~/shared/api/api-client";
+import { SuperApiError } from "~/shared/api/super-api";
+import { errorMessage } from "~/shared/api/error-messages";
+
+// router の defaultErrorComponent(最終防衛線)
+const ERROR_SCREEN = {
+  title: "エラーが発生しました",
+  fallback:
+    "ページを表示できませんでした。再読み込みしても直らない場合は、時間をおいてお試しください",
+  reload: "再読み込み",
+} as const;
 
 const styles = stylex.create({
   screen: {

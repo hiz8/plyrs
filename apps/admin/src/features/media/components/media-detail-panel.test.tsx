@@ -7,7 +7,7 @@ import { assetRecord, ASSET_1, ASSET_2 } from "~/test-utils/media-harness";
 import { MediaDetailPanel, type MediaDetailPanelProps } from "./media-detail-panel";
 
 const copyText = vi.hoisted(() => vi.fn());
-vi.mock("~/lib/clipboard", () => ({ copyText }));
+vi.mock("~/shared/lib/clipboard", () => ({ copyText }));
 
 function deferred() {
   const state: { resolve: () => void } = { resolve: () => undefined };
