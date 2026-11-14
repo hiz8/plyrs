@@ -1,19 +1,22 @@
 import * as stylex from "@stylexjs/stylex";
 import { useMemo, useState } from "react";
-import type { ContentTypeDefinition, FieldDefinition } from "@plyrs/metamodel";
-import { ASSET_TYPE_KEY } from "@plyrs/metamodel";
+import { ASSET_TYPE_KEY, type ContentTypeDefinition, type FieldDefinition } from "@plyrs/metamodel";
 import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { Button } from "@plyrs/ui";
 import { font, space, status, text } from "@plyrs/ui/semantic.stylex";
-import type { AssetServices } from "../lib/asset-services";
-import { MEDIA_LABELS, MEDIA_PICKER_LABELS } from "../lib/media-labels";
+import {
+  buildMediaRows,
+  MEDIA_LABELS,
+  MEDIA_PICKER_LABELS,
+  MediaPickerDialog,
+  MediaThumb,
+  type AssetServices,
+  type PickedMedia,
+} from "~/features/media";
 import { labelForRecord } from "../lib/record-label";
 import { parseRelationDraftKey, relationDraftKey } from "../lib/record-form-values";
 import { useRecordsOfTypes } from "../lib/use-collection";
-import { buildMediaRows } from "../lib/media-list";
-import { MediaThumb } from "./media/media-thumb";
-import { MediaPickerDialog, type PickedMedia } from "./media/media-picker-dialog";
 
 const styles = stylex.create({
   error: { color: status.danger, fontSize: font.caption },

@@ -16,7 +16,7 @@ export interface FeatureOptions {
   allowCross: Record<string, string[]>;
 }
 
-const FEATURES: FeatureOptions = { features: [], allowCross: {} };
+const FEATURES: FeatureOptions = { features: ["media"], allowCross: {} };
 
 const ADMIN = "apps/admin/src";
 

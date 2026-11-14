@@ -9,7 +9,7 @@ import type { ContentTypeDefinition, WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { Banner, Button, ConfirmDialog, ICON_SIZE, RelativeTime, toaster } from "@plyrs/ui";
 import { bg, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
-import type { AssetServices } from "../lib/asset-services";
+import type { AssetServices } from "~/features/media";
 import { contentTypeCrumb, currentCrumb, homeCrumb } from "../lib/breadcrumbs";
 import { formatDateTime } from "../lib/datetime";
 import { errorMessage } from "../lib/error-messages";

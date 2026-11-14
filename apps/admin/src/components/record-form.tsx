@@ -29,9 +29,13 @@ import {
   type RichTextMentionItem,
 } from "@plyrs/ui";
 import { border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
-import type { AssetServices } from "../lib/asset-services";
+import {
+  MEDIA_PICKER_LABELS,
+  MediaPickerDialog,
+  type AssetServices,
+  type PickedMedia,
+} from "~/features/media";
 import { RECORD_FORM_LABELS } from "../lib/labels";
-import { MEDIA_PICKER_LABELS } from "../lib/media-labels";
 import { labelForRecord } from "../lib/record-label";
 import {
   asEditorRichTextValue,
@@ -47,7 +51,6 @@ import { richTextPlainText } from "@plyrs/richtext";
 import { useRecordsOfTypes } from "../lib/use-collection";
 import { kindOf } from "../lib/field-kind";
 import { AssetRelationPicker } from "./asset-picker";
-import { MediaPickerDialog, type PickedMedia } from "./media/media-picker-dialog";
 import { ConflictDialog } from "./conflict-dialog";
 
 // サーバー版採用でサーバー側に本文が無い場合に使う明示的な空ドキュメント。

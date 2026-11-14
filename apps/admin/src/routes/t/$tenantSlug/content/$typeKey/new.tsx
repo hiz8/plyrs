@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { text } from "@plyrs/ui/semantic.stylex";
 import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
 import { RecordEditor } from "~/components/record-editor";
-import { createAssetServices } from "~/lib/asset-services";
+import { createAssetServices } from "~/features/media";
 import { homeCrumb } from "~/lib/breadcrumbs";
 import { EDITOR_LABELS } from "~/lib/labels";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";

@@ -6,7 +6,7 @@ import type { FakeSocket } from "./test-utils/fake-socket";
 import { ASSET_1, assetRecord, mediaRoutes } from "./test-utils/media-harness";
 import { bootstrapped, renderAt, socketHarness } from "./test-utils/records-harness";
 
-vi.mock("./components/media/media-filter-select", async () => {
+vi.mock("~/features/media/components/media-filter-select", async () => {
   const mock = await import("./test-utils/media-filter-select-mock");
   return { MediaFilterSelect: mock.MediaFilterSelectMock };
 });

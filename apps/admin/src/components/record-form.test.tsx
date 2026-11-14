@@ -6,7 +6,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
-import type { AssetServices } from "../lib/asset-services";
+import type { AssetServices } from "~/features/media";
 import { labelForRecord } from "../lib/record-label";
 import { pendingConnect } from "../test-utils/fake-socket";
 import { RecordForm, SaveDeferredError, type RecordFormHandle } from "./record-form";
