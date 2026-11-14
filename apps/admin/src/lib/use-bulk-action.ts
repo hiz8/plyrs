@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { runBulk, type BulkResult } from "./content-list";
+import { runBulk, type BulkResult } from "./bulk";
 import { BULK_LABELS } from "./labels";
 
 export type BulkKind = "publish" | "unpublish" | "status" | "delete";

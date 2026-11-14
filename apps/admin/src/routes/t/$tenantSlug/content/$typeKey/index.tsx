@@ -9,12 +9,12 @@ import { BulkBar, type BulkMenuAction } from "~/components/bulk-bar";
 import { ContentListBody } from "~/components/content-list-body";
 import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
 import { currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
+import type { BulkResult } from "~/lib/bulk";
 import {
   applyListQuery,
   buildListRows,
   parseListQuery,
   toListSearch,
-  type BulkResult,
   type ListQuery,
   type ListRow,
 } from "~/lib/content-list";
