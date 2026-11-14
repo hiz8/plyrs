@@ -15,7 +15,7 @@ import {
   type SocketHarness,
 } from "~/test-utils/records-harness";
 
-// b-home.md: ホーム(/t/blog)の配線。部品の見た目は components/home の各テストで担保する
+// b-home.md: ホーム(/t/blog)の配線。部品の見た目は -home/ の各テストで担保する
 
 const noticeType: ContentTypeDefinition = {
   id: "018f2b6a-7a0a-7000-8000-000000000002",

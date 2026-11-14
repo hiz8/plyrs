@@ -3,7 +3,7 @@ import Mention from "@tiptap/extension-mention";
 import type { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion";
 
 // 本文中の record 参照ノード。type 名と attrs 形は @plyrs/metamodel の
-// extractBodyRelations との契約(apps/admin/src/lib/mention-contract.test.ts が一致を固定)。
+// extractBodyRelations との契約(apps/admin/src/shared/lib/mention-contract.test.ts が一致を固定)。
 export const RECORD_MENTION_NODE_NAME = "recordMention";
 
 export interface RichTextMentionItem {

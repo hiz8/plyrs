@@ -52,7 +52,7 @@
 - V3(2026-10-20): 入力部品に `isReadOnly`(閲覧者の読み取り専用表示。枠線なし・下罫線だけ、`RichTextEditor` はツールバー無し)(R2)、`Select` に `size="sm"`、`PageHeader` に `meta`(見出しの右の補足)を足した。表の中のリンクは RAC の `Link` を admin から直接使う(R23)
 - V4-B(2026-10-20): ホームの枠の中のリンクも RAC の `Link` を admin から直接使う(B10)。枠内の 0 件表示は `EmptyState` を使わない(B8)。`ProgressBar` に `isLabelHidden`、`Toaster` に `clear()` を足した
 - V4-G(2026-10-20): `SegmentedControl`(3 択の pill)を足した(G2)。所属サイトの「切り替える」と有効化直後の「{型名}を追加 ›」も RAC の `Link` を admin から直接使う(G28)
-- V4-G(2026-10-20、実行中の決定): ダイアログ内の注記は admin の `DialogNote`(Banner はページ用)、`Select` に `isLabelHidden`、`Tabs` に `keyboardActivation`、クリップボードは `lib/clipboard.ts` の `copyText` に集約
+- V4-G(2026-10-20、実行中の決定): ダイアログ内の注記は admin の `DialogNote`(Banner はページ用)、`Select` に `isLabelHidden`、`Tabs` に `keyboardActivation`、クリップボードは `shared/lib/clipboard.ts` の `copyText` に集約
 - V4-E(2026-10-20): 並べ替えの `SortableList`(RAC GridList + useDragAndDrop)と非モーダルの右パネル `SidePanel` を足した(E1・E2)。`ModalDialog` に `size="lg"`(E23)。`Button variant="card"`(縦に積む選択肢のカード。種類のカード、E33)を足した。型の一覧の中のリンクも RAC の `Link` を admin から直接使う(E6)
 - V4-F(2026-10-21): タイルのグリッド `TileGrid`(RAC GridList layout="grid")、アップロードの仮タイル `UploadTile`、画面全体のドロップ `FileDropTarget`、ファイル選択の `FileButton` を足した(F17・F10・F35・F39)。`SidePanel` に `width` / `narrowLayout`(F1)、`ModalDialog` に `size="xl"`(F15)、`DropZone` に `isFill`(F16)。`Column` に `isLabelHidden`(見出しを sr-only に)、`PageBody` に `isFill`(本文に高さを通す)を足し、シェルの `main` を縦 flex にした(F16 のため。各画面の root は幅 stretch で見た目は変わらない。以上 2026-10-24 の決定)。詳細パネルの使用箇所のリンクも RAC の `Link` を admin から直接使う(F14)
 - (2026-10-24、持ち越し) `Checkbox` に `description`(箱の下の補足。`aria-describedby` で結ぶ)、`SegmentedControl` に `isReadOnly`(選択は変えられないが読み上げと焦点は保つ)を足すと決めた(持ち越しの計画 Task 4 で実装。K5)。`TextField.isLabelHidden` は消費者が無いため見送り
@@ -62,7 +62,7 @@
 
 ### 4.1 用語の対応表
 
-画面に出す言葉は次の表を唯一の基準とし、管理画面の中に 1 か所(例: `lib/labels.ts`)で定義する。現在は `STATUS_LABELS` が一覧画面とステータス切替で別々に定義されている(`routes/t/$tenantSlug/records/$typeKey/index.tsx` と `components/status-control.tsx`)。
+画面に出す言葉は次の表を唯一の基準とし、管理画面の中に 1 か所(例: `shared/lib/labels.ts`)で定義する。現在は `STATUS_LABELS` が一覧画面とステータス切替で別々に定義されている(`routes/t/$tenantSlug/records/$typeKey/index.tsx` と `components/status-control.tsx`)。
 
 | 内部の値                                   | 画面の表示                                      |
 | ------------------------------------------ | ----------------------------------------------- |
@@ -89,7 +89,7 @@
 
 - 7 日以内は相対表記(「たった今」「10 分前」「3 時間前」「昨日」「3 日前」)、それより前は「2026/10/17 10:00」
 - 相対表記にはツールチップで日時を添える
-- タイムゾーンはブラウザの設定に従い、書式は画面全体が日本語のため `ja` に固定する(`Intl.DateTimeFormat`、`Intl.RelativeTimeFormat` を使う。`apps/admin/src/lib/datetime.ts`)
+- タイムゾーンはブラウザの設定に従い、書式は画面全体が日本語のため `ja` に固定する(`Intl.DateTimeFormat`、`Intl.RelativeTimeFormat` を使う。`apps/admin/src/shared/lib/datetime.ts`)
 - 現在 ISO 形式のまま表示している箇所(一覧の更新日時、公開状態パネルの公開日時)はすべて置き換える
 
 ## 6. 状態の表示
@@ -108,7 +108,7 @@
 
 ## 7. 権限による出し分け
 
-- 権限の判定は 1 つのフックにまとめる: `useCan("record:publish")`(`apps/admin/src/lib/use-can.ts`)。対応表は API の `apps/api/src/auth/permissions.ts` と同じものを管理画面側に複製して持ち(`apps/admin/src/lib/permissions.ts`)、一致は単体テストで確かめる。共有パッケージ化は、API 側の `z.enum(ROLES)` などの参照を動かすことになるため見送った。公開ボタン・ステータス切替・レコードの削除はこのフックで判定している
+- 権限の判定は 1 つのフックにまとめる: `useCan("record:publish")`(`apps/admin/src/shared/lib/use-can.ts`)。対応表は API の `apps/api/src/auth/permissions.ts` と同じものを管理画面側に複製して持ち(`apps/admin/src/shared/lib/permissions.ts`)、一致は単体テストで確かめる。共有パッケージ化は、API 側の `z.enum(ROLES)` などの参照を動かすことになるため見送った。公開ボタン・ステータス切替・レコードの削除はこのフックで判定している
 - モジュールが宣言する権限を出し分けるときは、ロールの直書きに戻さず、`${moduleId}.${key}` の形の操作を受けられるよう対応表とフックを拡張する
 - **隠す**: そのロールでは常に使えない機能(viewer の新規追加、editor 以下の設定)
 - **無効にして理由を添える**: 状況によって使えない操作(切断中の公開など)。ツールチップで理由を出す。部品の `Button` / `IconButton` の `disabledReason` を使う(フォーカスを受けたまま `aria-disabled` で無効にし、理由をツールチップと `aria-describedby` で伝える)

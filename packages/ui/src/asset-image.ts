@@ -1,7 +1,7 @@
 import { Node } from "@tiptap/core";
 
 // 本文中の画像埋め込みノード。type 名と attrs 形は @plyrs/metamodel の ASSET_IMAGE_NODE_TYPE /
-// extractBodyRelations との契約(apps/admin/src/lib/mention-contract.test.ts が一致を固定)。
+// extractBodyRelations との契約(apps/admin/src/shared/lib/mention-contract.test.ts が一致を固定)。
 // attrs は mention と同じ形 {recordType, recordId, label} — label は挿入時点の filename
 // スナップショット(エディタ表示専用。正本は asset record — design-spec §5)。
 export const ASSET_IMAGE_NODE_NAME = "assetImage";

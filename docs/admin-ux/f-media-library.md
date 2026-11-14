@@ -44,7 +44,7 @@ WordPress のメディアライブラリ(グリッド表示、ドラッグ&ド�
 - **リスト表示**: 列はサムネイル(40px)・ファイル名(下に代替テキスト。未設定なら薄く「代替テキストなし」)・種類・サイズ・アップロード日時・使用状況(「2 件で使用」は成功色、「未使用」は警告色)。現在の表を整理したもの
 - 絞り込みの行の右端に、グリッド / リストの切り替え(pill の 2 ボタン)と件数を置く
 - どちらの表示も、手元の同期データ(asset 型のレコード)を使う。表示の切り替えは利用者ごとにブラウザに記憶する
-- (2026-10-21、V4-F) 表示の切り替えの記憶は `localStorage` のキー `plyrs.media.view`(値 `grid` | `list`、既定 `grid`、サイト共通。`lib/theme.ts` と同じ書き方。URL には載せない。F2)。未使用一覧 API は画面を開いている間は常に取得し(グリッドの「未使用」バッジとリストの使用状況の列に要る。F7)、リストの使用状況は「使用中」/「未使用」の 2 値で件数は出さない(件数は詳細パネルで出す)。グリッドは ui の `TileGrid`(RAC GridList layout="grid"、F17)、リストは ui `Table`(列と挙動は F20。並べ替えは列見出しではなく絞り込み行の「並び順」)。絞り込みの行は左から種類・使用状況・並び順の `Select`、`SearchField`、右端に件数と文字付きの `SegmentedControl`(アイコンだけの pill より a11y を優先。F21)。「新しい順」の鍵はアップロード日時で、asset の ID(UUIDv7)の時刻部から得る(`updatedAt` は代替テキストの保存で動くため使わない。F23)。ファイル名順は数字を数として比べる自然順(`Intl.Collator("ja", { numeric: true })`)の昇順、同点は ID 降順(F23、2026-10-24 の決定)。一覧のデータは asset 型の同期データ(`deletedAt === null` のみ)で、同期前は読み込み表示(F34)。幅 960px 未満はメディアクエリだけで切り替え、グリッドのタイルが伸び、絞り込みの行は折り返し、リストは種類・サイズ・アップロードの列を隠し、見出しの主操作は「ファイルを追加」のまま(F33)
+- (2026-10-21、V4-F) 表示の切り替えの記憶は `localStorage` のキー `plyrs.media.view`(値 `grid` | `list`、既定 `grid`、サイト共通。`shared/lib/theme.ts` と同じ書き方。URL には載せない。F2)。未使用一覧 API は画面を開いている間は常に取得し(グリッドの「未使用」バッジとリストの使用状況の列に要る。F7)、リストの使用状況は「使用中」/「未使用」の 2 値で件数は出さない(件数は詳細パネルで出す)。グリッドは ui の `TileGrid`(RAC GridList layout="grid"、F17)、リストは ui `Table`(列と挙動は F20。並べ替えは列見出しではなく絞り込み行の「並び順」)。絞り込みの行は左から種類・使用状況・並び順の `Select`、`SearchField`、右端に件数と文字付きの `SegmentedControl`(アイコンだけの pill より a11y を優先。F21)。「新しい順」の鍵はアップロード日時で、asset の ID(UUIDv7)の時刻部から得る(`updatedAt` は代替テキストの保存で動くため使わない。F23)。ファイル名順は数字を数として比べる自然順(`Intl.Collator("ja", { numeric: true })`)の昇順、同点は ID 降順(F23、2026-10-24 の決定)。一覧のデータは asset 型の同期データ(`deletedAt === null` のみ)で、同期前は読み込み表示(F34)。幅 960px 未満はメディアクエリだけで切り替え、グリッドのタイルが伸び、絞り込みの行は折り返し、リストは種類・サイズ・アップロードの列を隠し、見出しの主操作は「ファイルを追加」のまま(F33)
 
 ### 3.2 絞り込みと検索
 
@@ -130,7 +130,7 @@ WordPress のメディアライブラリ(グリッド表示、ドラッグ&ド�
 
 - asset 型のレコードは、汎用のコンテンツ編集画面では開かない。旧 URL(`/t/:slug/records/asset/:id` と、案 A の `/t/:slug/content/asset/:id`)は、詳細パネルを開いた状態のメディア画面(`/t/:slug/media/:assetId`)へリダイレクトする
 - これにより、[案 C](./c-publish-box.md) 10 章で暫定とした「メディアの編集画面では公開関連の操作を外す」対応は、案 F の実装後に不要になる
-- (2026-10-21、V4-F) `lib/legacy-redirect.ts` の `legacyPathname` を拡張し、`/t/:slug/content/asset`・`/content/asset/new` は `/t/:slug/media` へ、`/content/asset/:id`(旧 `/records/asset/:id` も)は `/t/:slug/media/:id` へ転送する。`features/records/lib/publish-box.ts` の `isAsset` / `kind: "asset"` と `features/records/components/publish-box.tsx` の分岐、`record-editor.tsx` の `isAsset` 渡しは整理して消す(`record-form.tsx` の `locked` は残す。F26)。asset 型は `sidebarContentTypes`(`source === "user"`)で既にサイドバーに出ない(F27)
+- (2026-10-21、V4-F) `routes/t/$tenantSlug/-shell/legacy-redirect.ts` の `legacyPathname` を拡張し、`/t/:slug/content/asset`・`/content/asset/new` は `/t/:slug/media` へ、`/content/asset/:id`(旧 `/records/asset/:id` も)は `/t/:slug/media/:id` へ転送する。`features/records/lib/publish-box.ts` の `isAsset` / `kind: "asset"` と `features/records/components/publish-box.tsx` の分岐、`record-editor.tsx` の `isAsset` 渡しは整理して消す(`record-form.tsx` の `locked` は残す。F26)。asset 型は `sidebarContentTypes`(`source === "user"`)で既にサイドバーに出ない(F27)
 
 ## 7. 表示性能
 

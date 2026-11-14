@@ -4,11 +4,11 @@ import { uuidSchema } from "./ids";
 import { richTextEnvelopeSchema, type RelationRef, type RichTextNode } from "./record-schema";
 
 // 本文中の record 参照ノードの型名。packages/ui の RECORD_MENTION_NODE_NAME と一致する
-// こと(apps/admin/src/lib/mention-contract.test.ts が両者の一致を固定する)。
+// こと(apps/admin/src/shared/lib/mention-contract.test.ts が両者の一致を固定する)。
 export const RECORD_MENTION_NODE_TYPE = "recordMention";
 
 // 本文中の画像埋め込みノードの型名。packages/ui の ASSET_IMAGE_NODE_NAME と一致すること
-// (apps/admin/src/lib/mention-contract.test.ts が両者の一致を固定する)。attrs は mention と
+// (apps/admin/src/shared/lib/mention-contract.test.ts が両者の一致を固定する)。attrs は mention と
 // 同じ形 {recordType, recordId, label} — 抽出経路を 1 本に保つための Phase 8 決定 5。
 export const ASSET_IMAGE_NODE_TYPE = "assetImage";
 

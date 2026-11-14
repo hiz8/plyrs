@@ -50,7 +50,7 @@ const styles = stylex.create({
   meta: { display: "inline-flex", alignItems: "center", gap: space.xs },
 });
 
-// b-home.md: ホーム。データの配線とレイアウトだけを持ち、見た目は components/home に置く
+// b-home.md: ホーム。データの配線とレイアウトだけを持ち、見た目は -home/ に置く
 export const Route = createFileRoute("/t/$tenantSlug/")({
   component: HomePage,
 });
