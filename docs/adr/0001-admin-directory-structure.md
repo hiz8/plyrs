@@ -361,7 +361,7 @@ routes・shared・パッケージの override も、同じファイルに同じ�
 | 4. **features の作成**: `features/records`・`features/media`・`features/content-types` を作り、`index.ts` で公開 API を固める。機能の文言のファイル(`content-list-labels.ts`・`content-type-labels.ts`・`media-labels.ts`)も、その feature へ移す                                                                                                  | feature のルール。`FEATURES` に追加した feature から順に有効になる                                                            |
 | 5. **残りを `shared/` と `app/` へ移す**: `sync-context.tsx` を含む `lib/` の残りを `shared/lib/` へ、`server-routing.ts`・`api-paths.ts`・`error-screen.tsx` を `app/` へ移す。`components/settings/` に残る `dialog-note`(メディアと型定義からも使う)も `shared/ui/` へ移す。`components/` と `lib/` を空にして削除する     | なし(手順 2 と 4 で全ルールが有効になっている)                                                                                |
 
-手順 1〜5 は完了した(手順 1 は #112、手順 2 は #113、手順 3 は #114、手順 4 は #115)。`components/` と `lib/` は無くなった。
+手順 1〜5 は完了した(手順 1 は #112、手順 2 は #113、手順 3 は #114、手順 4 は #115、手順 5 は #116)。`components/` と `lib/` は無くなった。
 
 ## 未確認の事項
 
