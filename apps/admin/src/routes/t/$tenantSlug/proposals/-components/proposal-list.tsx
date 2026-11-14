@@ -3,8 +3,7 @@ import { Link, type LinkRenderProps } from "react-aria-components";
 import { Badge, RelativeTime, stylexRenderProps, type BadgeTone } from "@plyrs/ui";
 import { bg, border, focus, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
 import { formatDateTime } from "~/lib/datetime";
-import type { MemberName } from "~/features/records";
-import { PROPOSAL_LABELS } from "~/lib/labels";
+import { PROPOSAL_LABELS, type MemberName } from "~/features/records";
 import { kindLabel, stateLabel, summarizeProposal } from "../-lib/proposals";
 import type { ProposalKind, ProposalSummary } from "~/lib/api-contracts";
 

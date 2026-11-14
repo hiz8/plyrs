@@ -22,3 +22,4 @@ export {
   type HistorySelection,
   type MemberName,
 } from "./lib/history";
+export { EDITOR_LABELS, HISTORY_LABELS, PROPOSAL_LABELS } from "./lib/record-labels";

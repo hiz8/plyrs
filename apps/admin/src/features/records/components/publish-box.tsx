@@ -16,7 +16,8 @@ import {
   text,
 } from "@plyrs/ui/semantic.stylex";
 import { formatAbsolute } from "~/lib/datetime";
-import { PUBLISH_BOX, WORKFLOW_STATUS_LABELS } from "~/lib/labels";
+import { WORKFLOW_STATUS_LABELS } from "~/lib/labels";
+import { PUBLISH_BOX } from "../lib/record-labels";
 import type { PublishBoxButton, PublishBoxView } from "../lib/publish-box";
 import { PublicationBadge } from "./publication-badge";
 

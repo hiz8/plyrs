@@ -13,14 +13,8 @@ import type { AssetServices } from "~/features/media";
 import { contentTypeCrumb, currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
 import { formatDateTime } from "~/lib/datetime";
 import { errorMessage } from "~/lib/error-messages";
-import {
-  DIALOGS,
-  EDITOR_LABELS,
-  HISTORY_LABELS,
-  PROPOSAL_LABELS,
-  PUBLISH_BOX,
-  TOASTS,
-} from "~/lib/labels";
+import { DIALOGS, TOASTS } from "~/lib/labels";
+import { EDITOR_LABELS, HISTORY_LABELS, PROPOSAL_LABELS, PUBLISH_BOX } from "../lib/record-labels";
 import { labelForRecord } from "~/lib/record-label";
 import { publishBoxView } from "../lib/publish-box";
 import {

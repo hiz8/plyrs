@@ -1,5 +1,5 @@
 import type { PublicationState } from "~/lib/admin-api";
-import { PUBLISH_BOX } from "~/lib/labels";
+import { PUBLISH_BOX } from "./record-labels";
 import type { SaveAndPublishPhase } from "./save-and-publish";
 
 // 編集画面の公開ボックス(案 C 3 章)で、どのボタンを出し、どれを無効にし、

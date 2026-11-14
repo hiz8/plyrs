@@ -5,7 +5,7 @@ import {
 } from "@plyrs/metamodel";
 import { richTextPlainText } from "@plyrs/richtext";
 import type { FieldChange, HistoryEntry, HistoryKind, HistoryVia } from "~/lib/api-contracts";
-import { HISTORY_LABELS } from "~/lib/labels";
+import { HISTORY_LABELS } from "./record-labels";
 
 // 16.5(M2-5): 履歴画面の純関数。表示の文言と差分の整形(router と React に依存しない)
 

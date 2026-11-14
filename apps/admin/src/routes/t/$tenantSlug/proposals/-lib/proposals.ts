@@ -1,7 +1,6 @@
 import { titleFieldKey, type ContentTypeDefinition } from "@plyrs/metamodel";
 import type { ProposalKind, ProposalState, ProposalSummary } from "~/lib/api-contracts";
-import { actorLabel, viaLabel, type MemberName } from "~/features/records";
-import { PROPOSAL_LABELS } from "~/lib/labels";
+import { actorLabel, PROPOSAL_LABELS, viaLabel, type MemberName } from "~/features/records";
 import type { Operation } from "~/lib/permissions";
 
 // 16.8(M5c、決定 57): 提案画面の純関数。表示の文言と見出し(router と React に依存しない)

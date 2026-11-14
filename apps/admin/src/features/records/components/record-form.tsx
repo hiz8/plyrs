@@ -35,7 +35,7 @@ import {
   type AssetServices,
   type PickedMedia,
 } from "~/features/media";
-import { RECORD_FORM_LABELS } from "~/lib/labels";
+import { RECORD_FORM_LABELS } from "../lib/record-labels";
 import { labelForRecord } from "~/lib/record-label";
 import {
   asEditorRichTextValue,

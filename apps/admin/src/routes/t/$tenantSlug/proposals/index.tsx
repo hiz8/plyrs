@@ -7,7 +7,7 @@ import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { ProposalList } from "./-components/proposal-list";
 import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
 import { currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
-import { PROPOSAL_LABELS } from "~/lib/labels";
+import { PROPOSAL_LABELS } from "~/features/records";
 import { proposalTitle } from "./-lib/proposals";
 import type { ProposalSummary } from "~/lib/api-contracts";
 import { membersQueryOptions, openProposalsQueryOptions, proposalsQueryKey } from "~/lib/queries";

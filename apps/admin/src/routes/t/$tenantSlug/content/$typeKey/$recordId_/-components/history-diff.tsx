@@ -2,9 +2,8 @@ import * as stylex from "@stylexjs/stylex";
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { Banner, Button, Skeleton } from "@plyrs/ui";
 import { bg, border, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
-import { formatFieldDiff } from "~/features/records";
+import { formatFieldDiff, HISTORY_LABELS } from "~/features/records";
 import type { CompareResult } from "~/lib/api-contracts";
-import { HISTORY_LABELS } from "~/lib/labels";
 
 const styles = stylex.create({
   panel: {

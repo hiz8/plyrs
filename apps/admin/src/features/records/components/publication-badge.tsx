@@ -2,7 +2,8 @@ import * as stylex from "@stylexjs/stylex";
 import type { WorkflowStatus } from "@plyrs/metamodel";
 import { Badge } from "@plyrs/ui";
 import type { ListPublicationState } from "../lib/content-list";
-import { PUBLICATION_STATE_LABELS, WORKFLOW_STATUS_LABELS } from "~/lib/labels";
+import { WORKFLOW_STATUS_LABELS } from "~/lib/labels";
+import { PUBLICATION_STATE_LABELS } from "../lib/record-labels";
 import { LIST_LABELS } from "../lib/content-list-labels";
 
 const NARROW = "@media (max-width: 959px)";

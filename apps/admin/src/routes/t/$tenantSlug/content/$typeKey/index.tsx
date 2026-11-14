@@ -10,6 +10,7 @@ import {
   buildListRows,
   BulkBar,
   ContentListBody,
+  EDITOR_LABELS,
   LIST_LABELS,
   parseListQuery,
   toListSearch,
@@ -21,7 +22,7 @@ import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-pag
 import { currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
 import type { BulkResult } from "~/lib/bulk";
 import { errorMessage } from "~/lib/error-messages";
-import { BULK_LABELS, DIALOGS, EDITOR_LABELS, TOASTS } from "~/lib/labels";
+import { BULK_LABELS, DIALOGS, TOASTS } from "~/lib/labels";
 import { publicationsQueryKey, publicationsQueryOptions } from "~/lib/queries";
 import { labelForRecord } from "~/lib/record-label";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";

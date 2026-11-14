@@ -1,6 +1,6 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { EDITOR_LABELS } from "~/lib/labels";
+import { EDITOR_LABELS } from "~/features/records";
 import {
   article,
   authedRoutes,
