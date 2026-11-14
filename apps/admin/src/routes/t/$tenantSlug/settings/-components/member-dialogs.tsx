@@ -6,7 +6,7 @@ import { roleLabel } from "~/shared/lib/labels";
 import { MEMBER_LABELS } from "../-lib/settings-labels";
 import { demoteBody } from "../-lib/members";
 import type { Role } from "~/shared/api/api-contracts";
-import { DialogNote } from "~/components/settings/dialog-note";
+import { DialogNote } from "~/shared/ui/dialog-note";
 
 const styles = stylex.create({
   body: { display: "flex", flexDirection: "column", gap: space.sm },

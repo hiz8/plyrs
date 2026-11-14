@@ -18,7 +18,7 @@ import {
   type ListQuery,
   type ListRow,
 } from "~/features/records";
-import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
+import { PageBody, PageLoading, TenantPageHeader } from "~/shared/ui/tenant-page-header";
 import { currentCrumb, homeCrumb } from "~/shared/lib/breadcrumbs";
 import type { BulkResult } from "~/shared/lib/bulk";
 import { errorMessage } from "~/shared/api/error-messages";

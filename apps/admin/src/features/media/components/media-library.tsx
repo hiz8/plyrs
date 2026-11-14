@@ -32,7 +32,7 @@ import { useCan } from "~/shared/lib/use-can";
 import { useRecordsOfTypes } from "~/shared/lib/use-collection";
 import { uploadStoreFor, useUploads } from "../lib/use-uploads";
 import { useFileDropGuard } from "../lib/use-file-drop-guard";
-import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
+import { PageBody, PageLoading, TenantPageHeader } from "~/shared/ui/tenant-page-header";
 import { DeleteMediaDialog, type DeleteMediaTarget } from "./delete-media-dialog";
 import { MediaBulkBar } from "./media-bulk-bar";
 import { MediaDetailPanel } from "./media-detail-panel";

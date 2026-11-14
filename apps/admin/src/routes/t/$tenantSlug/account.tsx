@@ -8,7 +8,7 @@ import { PasswordForm, type PasswordFieldErrors } from "./-account/password-form
 import { SiteList } from "./-account/site-list";
 import { CardError, CardLoading } from "./-components/card-state";
 import { SettingsCard } from "./-components/settings-card";
-import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
+import { PageBody, TenantPageHeader } from "~/shared/ui/tenant-page-header";
 import { ThemeSegment } from "./-account/theme-segment";
 import { ApiError } from "~/shared/api/api-client";
 import { currentCrumb, homeCrumb } from "~/shared/lib/breadcrumbs";

@@ -4,7 +4,7 @@ import { status } from "@plyrs/ui/semantic.stylex";
 import { RotateCw, Trash2 } from "lucide-react";
 import { BULK_LABELS } from "~/shared/lib/labels";
 import { MEDIA_LABELS } from "../lib/media-labels";
-import { bulkBarStyles } from "~/components/bulk-bar-styles";
+import { bulkBarStyles } from "~/shared/ui/bulk-bar-styles";
 
 const styles = stylex.create({
   danger: { color: status.danger },

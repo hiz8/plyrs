@@ -10,7 +10,7 @@ import {
   TypeEditor,
   type TypeDraft,
 } from "~/features/content-types";
-import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
+import { PageBody, TenantPageHeader } from "~/shared/ui/tenant-page-header";
 import {
   currentCrumb,
   homeCrumb,

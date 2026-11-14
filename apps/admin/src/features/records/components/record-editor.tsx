@@ -26,10 +26,10 @@ import { useSaveAndPublish } from "../lib/save-and-publish";
 import { useSyncStatus, useTenantSync } from "~/shared/lib/sync-context";
 import { useCan } from "~/shared/lib/use-can";
 import { useLeaveGuard } from "~/shared/lib/use-leave-guard";
-import { LeaveGuardDialog } from "~/components/leave-guard-dialog";
+import { LeaveGuardDialog } from "~/shared/ui/leave-guard-dialog";
 import { PublishBar, PublishBox } from "./publish-box";
 import { RecordForm, SaveDeferredError, type RecordFormHandle } from "./record-form";
-import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
+import { PageBody, TenantPageHeader } from "~/shared/ui/tenant-page-header";
 
 // 幅 960px 未満では 1 列にし、公開の操作は下部固定バー(PublishBar)に移す
 const NARROW = "@media (max-width: 959px)";

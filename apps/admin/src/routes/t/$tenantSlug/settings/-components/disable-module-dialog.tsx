@@ -4,7 +4,7 @@ import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import type { ModuleSummary } from "~/shared/api/admin-api";
 import { MODULE_LABELS } from "../-lib/settings-labels";
 import { formatCounts, type TypeCount } from "../-lib/modules";
-import { DialogNote } from "~/components/settings/dialog-note";
+import { DialogNote } from "~/shared/ui/dialog-note";
 
 const styles = stylex.create({
   body: { display: "flex", flexDirection: "column", gap: space.sm },

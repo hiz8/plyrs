@@ -11,7 +11,7 @@ import { QuickAddRow } from "./-home/quick-add-row";
 import { RecentCard } from "./-home/recent-card";
 import { ReviewCard, type ChangedState } from "./-home/review-card";
 import { WidgetGrid } from "./-home/widget-grid";
-import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
+import { PageBody, TenantPageHeader } from "~/shared/ui/tenant-page-header";
 import { currentCrumb } from "~/shared/lib/breadcrumbs";
 import { errorMessage } from "~/shared/api/error-messages";
 import {

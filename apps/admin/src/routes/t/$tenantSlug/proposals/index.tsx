@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Banner, Button, Tabs, toaster } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { ProposalList } from "./-components/proposal-list";
-import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
+import { PageBody, TenantPageHeader } from "~/shared/ui/tenant-page-header";
 import { currentCrumb, homeCrumb } from "~/shared/lib/breadcrumbs";
 import { PROPOSAL_LABELS } from "~/features/records";
 import { proposalTitle } from "./-lib/proposals";

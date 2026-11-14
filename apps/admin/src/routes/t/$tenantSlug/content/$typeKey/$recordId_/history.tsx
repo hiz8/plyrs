@@ -8,7 +8,7 @@ import { Banner, Button, ConfirmDialog, toaster } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { HistoryDiff } from "./-components/history-diff";
 import { HistoryList } from "./-components/history-list";
-import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
+import { PageBody, PageLoading, TenantPageHeader } from "~/shared/ui/tenant-page-header";
 import { contentTypeCrumb, currentCrumb, homeCrumb } from "~/shared/lib/breadcrumbs";
 import { errorMessage } from "~/shared/api/error-messages";
 import {

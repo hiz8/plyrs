@@ -5,7 +5,7 @@ import { Tabs } from "@plyrs/ui";
 import { space } from "@plyrs/ui/semantic.stylex";
 import { currentCrumb, homeCrumb, settingsCrumb } from "~/shared/lib/breadcrumbs";
 import { SETTINGS_LABELS } from "../-lib/settings-labels";
-import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
+import { PageBody, TenantPageHeader } from "~/shared/ui/tenant-page-header";
 import { CardError, CardLoading } from "../../-components/card-state";
 
 export type SettingsTab = "general" | "content-types" | "members" | "modules" | "tokens";

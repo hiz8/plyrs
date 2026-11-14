@@ -18,7 +18,7 @@ import {
   scopeOptionsFor,
   type PatScope,
 } from "../-lib/tokens";
-import { DialogNote } from "~/components/settings/dialog-note";
+import { DialogNote } from "~/shared/ui/dialog-note";
 
 const styles = stylex.create({
   form: { display: "flex", flexDirection: "column", gap: space.inset },

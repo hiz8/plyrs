@@ -7,7 +7,7 @@ import { bg, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
 import { ProposalDiff } from "./-components/proposal-diff";
 import { kindTone } from "./-components/proposal-list";
 import { AcceptProposalDialog, RejectProposalDialog } from "./-components/resolve-dialogs";
-import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
+import { PageBody, PageLoading, TenantPageHeader } from "~/shared/ui/tenant-page-header";
 import { currentCrumb, homeCrumb, proposalsCrumb } from "~/shared/lib/breadcrumbs";
 import { formatDateTime } from "~/shared/lib/datetime";
 import { errorCodeOf, errorMessage } from "~/shared/api/error-messages";

@@ -7,7 +7,7 @@ import { copyText } from "~/shared/lib/clipboard";
 import { DIALOGS, ROLE_DESCRIPTIONS } from "~/shared/lib/labels";
 import { MEMBER_LABELS } from "../-lib/settings-labels";
 import type { Role } from "~/shared/api/api-contracts";
-import { DialogNote } from "~/components/settings/dialog-note";
+import { DialogNote } from "~/shared/ui/dialog-note";
 import { RoleSelect } from "./role-select";
 
 const styles = stylex.create({
