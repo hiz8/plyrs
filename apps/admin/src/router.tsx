@@ -3,7 +3,7 @@ import { createRouter, type RouterHistory } from "@tanstack/react-router";
 import { createSlotRegistry } from "@plyrs/ui";
 import type { ConnectFn } from "@plyrs/sync-client";
 import { createBrowserConnect } from "@plyrs/sync-client/browser";
-import { ErrorScreen } from "./components/error-screen";
+import { ErrorScreen } from "./app/error-screen";
 import { createAdminApi } from "~/shared/api/admin-api";
 import { createApiClient } from "~/shared/api/api-client";
 import { createSuperApi } from "~/shared/api/super-api";
