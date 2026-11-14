@@ -2,17 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
 import { useMemo } from "react";
 import { text } from "@plyrs/ui/semantic.stylex";
-import {
-  PageBody,
-  PageLoading,
-  TenantPageHeader,
-} from "../../../../../components/tenant-page-header";
-import { RecordEditor } from "../../../../../components/record-editor";
-import { createAssetServices } from "../../../../../lib/asset-services";
-import { contentTypeCrumb, homeCrumb } from "../../../../../lib/breadcrumbs";
-import { EDITOR_LABELS } from "../../../../../lib/labels";
-import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
-import { useCollectionRows } from "../../../../../lib/use-collection";
+import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
+import { RecordEditor } from "~/components/record-editor";
+import { createAssetServices } from "~/lib/asset-services";
+import { contentTypeCrumb, homeCrumb } from "~/lib/breadcrumbs";
+import { EDITOR_LABELS } from "~/lib/labels";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
+import { useCollectionRows } from "~/lib/use-collection";
 
 const styles = stylex.create({
   muted: { color: text.muted },

@@ -3,16 +3,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { v7 as uuidv7 } from "uuid";
 import { toaster } from "@plyrs/ui";
-import { TypeEditor } from "../../../../../components/content-types/type-editor";
-import {
-  buildDefinition,
-  emptyTypeDraft,
-  type TypeDraft,
-} from "../../../../../lib/content-type-form";
-import { errorMessage } from "../../../../../lib/error-messages";
-import { CONTENT_TYPE_LABELS } from "../../../../../lib/content-type-labels";
-import { contentTypesQueryOptions } from "../../../../../lib/queries";
-import { useCan } from "../../../../../lib/use-can";
+import { TypeEditor } from "~/components/content-types/type-editor";
+import { buildDefinition, emptyTypeDraft, type TypeDraft } from "~/lib/content-type-form";
+import { errorMessage } from "~/lib/error-messages";
+import { CONTENT_TYPE_LABELS } from "~/lib/content-type-labels";
+import { contentTypesQueryOptions } from "~/lib/queries";
+import { useCan } from "~/lib/use-can";
 
 export const Route = createFileRoute("/t/$tenantSlug/settings/content-types/new")({
   // 重複の検証に使う型の一覧は常に最新から取る(§11)

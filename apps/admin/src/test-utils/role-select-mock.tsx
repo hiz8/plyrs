@@ -1,6 +1,6 @@
 import type { Role } from "../lib/api-contracts";
 
-// vi.mock("./components/settings/role-select", ...) の差し替え先。RAC のセレクトは jsdom で扱いにくいので
+// vi.mock("routes/t/$tenantSlug/settings/-components/role-select", ...) の差し替え先。RAC のセレクトは jsdom で扱いにくいので
 // ネイティブの select にする(実物と違い isRole の絞り込みはしない。テストの値は有効なロールだけ)
 export function RoleSelectMock(props: {
   label: string;

@@ -5,16 +5,16 @@ import { Puzzle } from "lucide-react";
 import { useState } from "react";
 import { EmptyState, toaster } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { DisableModuleDialog } from "../../../../../components/settings/disable-module-dialog";
-import { ModuleCard } from "../../../../../components/settings/module-card";
-import { SettingsFrame } from "../../../../../components/settings/settings-frame";
-import type { ModuleSummary } from "../../../../../lib/admin-api";
-import { errorMessage } from "../../../../../lib/error-messages";
-import { MODULE_LABELS } from "../../../../../lib/labels";
-import { moduleAddLinks, moduleContentCounts } from "../../../../../lib/modules";
-import { modulesQueryOptions } from "../../../../../lib/queries";
-import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../lib/sync-context";
-import { useRecordsOfTypes } from "../../../../../lib/use-collection";
+import { DisableModuleDialog } from "../-components/disable-module-dialog";
+import { ModuleCard } from "../-components/module-card";
+import { SettingsFrame } from "../-components/settings-frame";
+import type { ModuleSummary } from "~/lib/admin-api";
+import { errorMessage } from "~/lib/error-messages";
+import { MODULE_LABELS } from "../-lib/settings-labels";
+import { moduleAddLinks, moduleContentCounts } from "../-lib/modules";
+import { modulesQueryOptions } from "~/lib/queries";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
+import { useRecordsOfTypes } from "~/lib/use-collection";
 
 const styles = stylex.create({
   list: { display: "flex", flexDirection: "column", gap: space.md },

@@ -13,11 +13,11 @@ import {
   stroke,
   text,
 } from "@plyrs/ui/semantic.stylex";
-import { ApiError } from "../lib/api-client";
-import { resetClientSession } from "../lib/client-session";
-import { roleLabel, SITE_SELECT } from "../lib/labels";
-import { can } from "../lib/permissions";
-import { meQueryOptions, tenantsQueryOptions } from "../lib/queries";
+import { ApiError } from "~/lib/api-client";
+import { resetClientSession } from "~/lib/client-session";
+import { roleLabel, SITE_SELECT } from "~/lib/labels";
+import { can } from "~/lib/permissions";
+import { meQueryOptions, tenantsQueryOptions } from "~/lib/queries";
 
 // サイト選択画面(a-navigation.md 8 章 / D2 S8)。所属が 1 件なら選ぶ余地が無いので転送する。
 const styles = stylex.create({

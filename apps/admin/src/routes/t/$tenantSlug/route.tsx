@@ -10,25 +10,25 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Drawer } from "@plyrs/ui";
 import { bg, text } from "@plyrs/ui/semantic.stylex";
-import { Sidebar, type SidebarProps } from "../../../components/shell/sidebar";
-import { TopBar } from "../../../components/shell/top-bar";
-import { ApiError } from "../../../lib/api-client";
-import { resetClientSession } from "../../../lib/client-session";
-import { NAV_LABELS } from "../../../lib/labels";
-import { legacyPathname } from "../../../lib/legacy-redirect";
+import { Sidebar, type SidebarProps } from "./-shell/sidebar";
+import { TopBar } from "./-shell/top-bar";
+import { ApiError } from "~/lib/api-client";
+import { resetClientSession } from "~/lib/client-session";
+import { NAV_LABELS } from "~/lib/labels";
+import { legacyPathname } from "./-shell/legacy-redirect";
 import {
   meQueryOptions,
   modulesQueryOptions,
   openProposalCountQueryOptions,
   tenantsQueryOptions,
-} from "../../../lib/queries";
+} from "~/lib/queries";
 import {
   TenantSyncProvider,
   useSyncHasSynced,
   useSyncStatus,
   useSyncTypes,
-} from "../../../lib/sync-context";
-import { syncIndicatorState } from "../../../lib/sync-indicator";
+} from "~/lib/sync-context";
+import { syncIndicatorState } from "~/lib/sync-indicator";
 
 // a-navigation.md 3.4: 960px 未満でサイドバーをドロワーへ切り替え、上部バーを出す
 const NARROW = "@media (max-width: 959px)";

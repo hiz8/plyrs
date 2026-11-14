@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button, Checkbox } from "@plyrs/ui";
 import { colors, spacing, typography } from "@plyrs/ui/tokens.stylex";
 import { superStyles } from "./-styles";
-import { LOADING_LABEL } from "../../lib/labels";
+import { LOADING_LABEL } from "~/lib/labels";
 
 const styles = stylex.create({
   // タイトルだけ marginBottom: 0 を足す独自版(超一覧ページなどの title とは異なる)。

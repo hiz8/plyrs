@@ -3,24 +3,19 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { Button, toaster } from "@plyrs/ui";
-import {
-  AddMemberDialog,
-  type AddMemberFailure,
-} from "../../../../components/settings/add-member-dialog";
-import {
-  DemoteMemberDialog,
-  RemoveMemberDialog,
-} from "../../../../components/settings/member-dialogs";
-import { MembersTable } from "../../../../components/settings/members-table";
-import { RoleCards } from "../../../../components/settings/role-cards";
-import { SettingsFrame } from "../../../../components/settings/settings-frame";
-import type { MemberSummary } from "../../../../lib/admin-api";
-import { ApiError } from "../../../../lib/api-client";
-import { errorMessage } from "../../../../lib/error-messages";
-import { MEMBER_LABELS, roleLabel } from "../../../../lib/labels";
-import { isDowngrade, memberRows, otherOwnerEmails } from "../../../../lib/members";
-import type { Role } from "../../../../lib/api-contracts";
-import { membersQueryOptions, meQueryOptions } from "../../../../lib/queries";
+import { AddMemberDialog, type AddMemberFailure } from "./-components/add-member-dialog";
+import { DemoteMemberDialog, RemoveMemberDialog } from "./-components/member-dialogs";
+import { MembersTable } from "./-components/members-table";
+import { RoleCards } from "./-components/role-cards";
+import { SettingsFrame } from "./-components/settings-frame";
+import type { MemberSummary } from "~/lib/admin-api";
+import { ApiError } from "~/lib/api-client";
+import { errorMessage } from "~/lib/error-messages";
+import { roleLabel } from "~/lib/labels";
+import { MEMBER_LABELS } from "./-lib/settings-labels";
+import { isDowngrade, memberRows, otherOwnerEmails } from "./-lib/members";
+import type { Role } from "~/lib/api-contracts";
+import { membersQueryOptions, meQueryOptions } from "~/lib/queries";
 
 export const Route = createFileRoute("/t/$tenantSlug/settings/members")({
   component: MembersPage,

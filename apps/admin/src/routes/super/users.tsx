@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button, TextField } from "@plyrs/ui";
 import { spacing } from "@plyrs/ui/tokens.stylex";
 import { superStyles } from "./-styles";
-import { LOADING_LABEL } from "../../lib/labels";
+import { LOADING_LABEL } from "~/lib/labels";
 
 const styles = stylex.create({
   form: {

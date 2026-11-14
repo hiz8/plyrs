@@ -34,17 +34,23 @@ const TEST_UTILS_BAN: Pattern = {
   message: "test-utils はテストからだけ import する",
 };
 
-// app 層(src 直下のフレームワークのエントリと app/)
-const APP_LAYER_BANS: Pattern[] = [
-  {
-    group: ["~/app/**", "~/router", "~/start", "~/server", "~/routeTree.gen"],
-    message: "app 層(エントリと app/)へは依存できない",
-  },
-  {
-    regex: "^(\\.\\./)+(app/.*|router|start|server|routeTree\\.gen)$",
-    message: "app 層(エントリと app/)へは依存できない",
-  },
-];
+// app 層(src 直下のフレームワークのエントリと app/)。allowRouter は、ルーターの組み立て(router.tsx)だけを許すとき
+function appLayerBans({ allowRouter = false }: { allowRouter?: boolean } = {}): Pattern[] {
+  const entries = ["router", "start", "server", "routeTree.gen"].filter(
+    (e) => !(allowRouter && e === "router"),
+  );
+  return [
+    {
+      group: ["~/app/**", ...entries.map((e) => `~/${e}`)],
+      message: "app 層(エントリと app/)へは依存できない",
+    },
+    {
+      regex: "^(\\.\\./)+(app/.*|router|start|server|routeTree\\.gen)$",
+      message: "app 層(エントリと app/)へは依存できない(テストで許すときも ~/router で書く)",
+    },
+  ];
+}
+const APP_LAYER_BANS = appLayerBans();
 
 // 相対 import で、区画のルートより上へ出るもの。up は区画のルートまでに遡る段数
 function relativeEscapeBan(up: number, message: string): Pattern {
@@ -162,7 +168,8 @@ export function createConfig({ features, allowCross }: FeatureOptions): OxlintCo
   ];
 
   // 3. routes: 自分のサブツリーと祖先の - 付きディレクトリ、features(index.ts のみ)、shared に依存してよい
-  const routes = regionOverrides(`${ADMIN}/routes`, () => [
+  // routes のテストだけは、画面の流れを確かめるためにルーターを組み立ててよい(~/router の import を許す)
+  const routes = regionOverrides(`${ADMIN}/routes`, ({ test }) => [
     {
       // 相対 import だけに当てる。group の否定(!~/**)は同じルールの ~/ のパターンまで打ち消すので使わない
       regex: "^(\\.\\./)+(.*/)?(features|shared|app)(/|$)",
@@ -174,7 +181,7 @@ export function createConfig({ features, allowCross }: FeatureOptions): OxlintCo
     },
     { group: ["~/routes/**"], message: "routes の中は相対 import で書く" },
     { group: ["~/features/*/**"], message: "feature は公開 API(index.ts)経由で import する" },
-    ...APP_LAYER_BANS,
+    ...appLayerBans({ allowRouter: test }),
   ]);
 
   // 4. shared: shared の中だけに依存してよい。区画(shared/<区画>/)の外へは ~/shared/ で出る。

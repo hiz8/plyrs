@@ -6,21 +6,17 @@ import type { Collection } from "@tanstack/db";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { Banner, Button, ConfirmDialog, toaster } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { HistoryDiff } from "../../../../../../components/history/history-diff";
-import { HistoryList } from "../../../../../../components/history/history-list";
-import {
-  PageBody,
-  PageLoading,
-  TenantPageHeader,
-} from "../../../../../../components/tenant-page-header";
-import { contentTypeCrumb, currentCrumb, homeCrumb } from "../../../../../../lib/breadcrumbs";
-import { errorMessage } from "../../../../../../lib/error-messages";
-import { summarizeEntry, type HistorySelection } from "../../../../../../lib/history";
-import type { HistoryEntry } from "../../../../../../lib/api-contracts";
-import { EDITOR_LABELS, HISTORY_LABELS } from "../../../../../../lib/labels";
-import { membersQueryOptions, publicationQueryOptions } from "../../../../../../lib/queries";
-import { useSyncHasSynced, useSyncTypes, useTenantSync } from "../../../../../../lib/sync-context";
-import { useCan } from "../../../../../../lib/use-can";
+import { HistoryDiff } from "./-components/history-diff";
+import { HistoryList } from "./-components/history-list";
+import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
+import { contentTypeCrumb, currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
+import { errorMessage } from "~/lib/error-messages";
+import { summarizeEntry, type HistorySelection } from "~/lib/history";
+import type { HistoryEntry } from "~/lib/api-contracts";
+import { EDITOR_LABELS, HISTORY_LABELS } from "~/lib/labels";
+import { membersQueryOptions, publicationQueryOptions } from "~/lib/queries";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
+import { useCan } from "~/lib/use-can";
 
 // 幅 960px 未満では 1 列にする(record-editor.tsx と同じ境界)
 const NARROW = "@media (max-width: 959px)";

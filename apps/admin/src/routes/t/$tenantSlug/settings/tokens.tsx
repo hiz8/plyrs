@@ -5,33 +5,21 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { Button, toaster } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { CardError, CardLoading } from "../../../../components/settings/card-state";
-import { CopyField } from "../../../../components/settings/copy-field";
-import {
-  IssueTokenDialog,
-  type IssueTokenFailure,
-} from "../../../../components/settings/issue-token-dialog";
-import { RevokeTokenDialog } from "../../../../components/settings/revoke-token-dialog";
-import { SettingsCard } from "../../../../components/settings/settings-card";
-import { SettingsFrame } from "../../../../components/settings/settings-frame";
-import { TokensTable } from "../../../../components/settings/tokens-table";
-import type { IssuedToken, IssueTokenInput } from "../../../../lib/admin-api";
-import { ApiError } from "../../../../lib/api-client";
-import { errorMessage } from "../../../../lib/error-messages";
-import { TOKEN_LABELS } from "../../../../lib/labels";
-import { isRole } from "../../../../lib/api-contracts";
-import { resolvePublicOrigin } from "../../../../lib/public-api";
-import {
-  configQueryOptions,
-  grantsQueryOptions,
-  tokensQueryOptions,
-} from "../../../../lib/queries";
-import {
-  canManageTokens,
-  type ConnectionRow,
-  connectionRows,
-  mcpEndpoint,
-} from "../../../../lib/tokens";
+import { CardError, CardLoading } from "../-components/card-state";
+import { CopyField } from "./-components/copy-field";
+import { IssueTokenDialog, type IssueTokenFailure } from "./-components/issue-token-dialog";
+import { RevokeTokenDialog } from "./-components/revoke-token-dialog";
+import { SettingsCard } from "../-components/settings-card";
+import { SettingsFrame } from "./-components/settings-frame";
+import { TokensTable } from "./-components/tokens-table";
+import type { IssuedToken, IssueTokenInput } from "~/lib/admin-api";
+import { ApiError } from "~/lib/api-client";
+import { errorMessage } from "~/lib/error-messages";
+import { TOKEN_LABELS } from "./-lib/settings-labels";
+import { isRole } from "~/lib/api-contracts";
+import { resolvePublicOrigin } from "~/lib/public-api";
+import { configQueryOptions, grantsQueryOptions, tokensQueryOptions } from "~/lib/queries";
+import { canManageTokens, type ConnectionRow, connectionRows, mcpEndpoint } from "./-lib/tokens";
 
 const styles = stylex.create({
   stack: { display: "flex", flexDirection: "column", gap: space.md },

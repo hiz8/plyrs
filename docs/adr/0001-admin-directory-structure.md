@@ -58,6 +58,11 @@ import 関係を洗い出すと、次の問題が見つかった。
 上から順に判定する。
 
 1. **1 つのルートのサブツリー内だけで使うもの**: そのルートたちに共通する、最も近い親ディレクトリの `-` 付きディレクトリへ置く(`-components/`、`-tests/` など)。TanStack Router は、`-` で始まるファイルとディレクトリをルートとして扱わない。
+   - `-` 付きディレクトリの名前は次のとおり(手順 3 で決めた)。
+     - `-components/`: 画面の部品。
+     - `-lib/`: 純関数や、その画面だけで使う文言(`settings/-lib/settings-labels.ts` など)。
+     - `-tests/`: 画面の流れを確かめるテスト。部品や関数の単体テストは、対象のファイルの隣に置く。
+   - 同じディレクトリに、別々の画面の部品が並ぶ場合は、画面の名前を付けたディレクトリに分ける。たとえば `routes/t/$tenantSlug/` には、ホーム(`index.tsx`)とアカウント(`account.tsx`)があるので、`-home/` と `-account/` に分ける。その中には部品・純関数・文言をまとめて置く。両方から使うものは `-components/` に置く。
 2. **ルートのサブツリーをまたいで使い、特定の機能に属するもの**: `features/<機能>/` へ置く。外へ公開するものは `index.ts` から export する。
 3. **機能に依存しないもの**: `shared/` へ置く。
 4. **アプリの起動と全体の配線**: app 層へ置く。app 層は、`src/` 直下のフレームワークのエントリと `app/` ディレクトリからなる。
@@ -84,7 +89,7 @@ apps/admin/src/
 | `shared/`                    | `shared/` のみ                                                                                      |
 | `test-utils/`                | すべて(層の依存ルールの対象外)                                                                      |
 
-`test-utils/` を import してよいのはテスト(`*.test.{ts,tsx}` と `-tests/` の中)だけとする。テスト以外のファイルから `test-utils/` への import は禁止する(現状、テスト以外からの import は無い)。テストのファイル自体には、置かれた場所の層の依存ルールをそのまま適用する。
+`test-utils/` を import してよいのはテスト(`*.test.{ts,tsx}` と `-tests/` の中)だけとする。テスト以外のファイルから `test-utils/` への import は禁止する(現状、テスト以外からの import は無い)。テストのファイル自体には、置かれた場所の層の依存ルールをそのまま適用する。例外は 1 つだけで、routes のテストは、画面の流れを確かめるためにルーターを組み立ててよい(`~/router` の import を許す)。この例外は `oxlint.config.ts` の routes のテスト用の設定だけにあり、shared や features のテストには許さない。
 
 既存のコードのうち、この表と食い違うものは次のように扱う。
 
@@ -319,9 +324,9 @@ routes・shared・パッケージの override も、同じファイルに同じ�
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | 1. **ファイル移動を伴わない準備**: `labels.ts` と `admin-api.ts` から機能固有の型を外す。`search`(`normalizeForSearch` など)と `kindOf` を共通の場所へ切り出す。`RouterContext` 型を `shared/lib/router-context.ts` へ切り出す | なし                                                                                                                          |
 | 2. **エイリアスと lint の導入**: tsconfig の `paths` と、`vite.config.ts`・`vitest.config.ts` の両方の `resolve.tsconfigPaths` を設定し、`oxlint.config.ts` を追加する。`styles.css` を `shared/styles/` へ移す                | shared、routes、test-utils、パッケージのルール。routes のルールは現在のコードで違反 0 件を確認済み(「lint の検証結果」を参照) |
-| 3. **ルート単位のコロケーション**: home、account、proposals、settings、history の順に移す。依存がルート内で完結しているものから始める。1 つの機能でしか使わない文言(`HISTORY_LABELS`・`PROPOSAL_LABELS`・`TOKEN_LABELS` など)も、`labels.ts` から使う側と一緒に移す                                                                                          | なし(手順 2 の routes のルールが、移した部品にもそのまま適用される)                                                           |
+| 3. **ルート単位のコロケーション**: home、account、proposals、settings、history の順に移す。依存がルート内で完結しているものから始める。1 つの機能でしか使わない文言(`TOKEN_LABELS`・`SETTINGS_LABELS` など)も、`labels.ts` から使う側と一緒に移す。ただし、`components/record-editor.tsx` からも使う `HISTORY_LABELS`・`PROPOSAL_LABELS` は、ルートの `-lib/` に移すと record-editor からルートへの逆向きの依存になるので、手順 4 で records の feature と一緒に移す                                                                                          | なし(手順 2 の routes のルールが、移した部品にもそのまま適用される)                                                           |
 | 4. **features の作成**: `features/records`・`features/media`・`features/content-types` を作り、`index.ts` で公開 API を固める。機能の文言のファイル(`content-list-labels.ts`・`content-type-labels.ts`・`media-labels.ts`)も、その feature へ移す                                                                                                  | feature のルール。`FEATURES` に追加した feature から順に有効になる                                                            |
-| 5. **残りを `shared/` と `app/` へ移す**: `sync-context.tsx` を含む `lib/` の残りを `shared/lib/` へ、`server-routing.ts`・`api-paths.ts`・`error-screen.tsx` を `app/` へ移す。`components/` と `lib/` を空にして削除する     | なし(手順 2 と 4 で全ルールが有効になっている)                                                                                |
+| 5. **残りを `shared/` と `app/` へ移す**: `sync-context.tsx` を含む `lib/` の残りを `shared/lib/` へ、`server-routing.ts`・`api-paths.ts`・`error-screen.tsx` を `app/` へ移す。`components/settings/` に残る `dialog-note`(メディアと型定義からも使う)も `shared/ui/` へ移す。`components/` と `lib/` を空にして削除する     | なし(手順 2 と 4 で全ルールが有効になっている)                                                                                |
 
 ## 未確認の事項
 
