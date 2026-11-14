@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { UploadOptions } from "~/lib/admin-api";
+import type { UploadOptions } from "~/shared/api/admin-api";
 import { uploadFiles, type UploadItem, type UploadSummary } from "./media";
 
 // F10: アップロードの進行を画面(React)の外に持つ。ルートが unmount されても uploadFiles は続き、

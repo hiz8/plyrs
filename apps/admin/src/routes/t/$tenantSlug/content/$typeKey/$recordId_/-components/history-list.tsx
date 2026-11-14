@@ -10,7 +10,7 @@ import {
   type HistorySelection,
   type MemberName,
 } from "~/features/records";
-import type { HistoryEntry } from "~/lib/api-contracts";
+import type { HistoryEntry } from "~/shared/api/api-contracts";
 
 const styles = stylex.create({
   list: {

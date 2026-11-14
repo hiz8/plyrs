@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { ConfirmDialog } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import type { ModuleSummary } from "~/lib/admin-api";
+import type { ModuleSummary } from "~/shared/api/admin-api";
 import { MODULE_LABELS } from "../-lib/settings-labels";
 import { formatCounts, type TypeCount } from "../-lib/modules";
 import { DialogNote } from "~/components/settings/dialog-note";

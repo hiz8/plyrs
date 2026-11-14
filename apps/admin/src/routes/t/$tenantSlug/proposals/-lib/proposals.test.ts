@@ -6,7 +6,7 @@ import {
   proposalTitle,
   summarizeProposal,
 } from "./proposals";
-import type { ProposalSummary } from "~/lib/api-contracts";
+import type { ProposalSummary } from "~/shared/api/api-contracts";
 
 // 16.8(M5c): 提案画面の純関数
 

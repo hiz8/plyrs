@@ -1,6 +1,6 @@
 import type { ContentTypeDefinition, WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import type { ModuleSummary } from "~/lib/admin-api";
+import type { ModuleSummary } from "~/shared/api/admin-api";
 import { publicationStateOf, toListSearch, type ListQuery } from "~/features/records";
 import { moduleNavGroups, sidebarContentTypes } from "~/lib/navigation";
 

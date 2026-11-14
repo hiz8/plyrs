@@ -9,8 +9,12 @@ import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
 import { currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
 import { PROPOSAL_LABELS } from "~/features/records";
 import { proposalTitle } from "./-lib/proposals";
-import type { ProposalSummary } from "~/lib/api-contracts";
-import { membersQueryOptions, openProposalsQueryOptions, proposalsQueryKey } from "~/lib/queries";
+import type { ProposalSummary } from "~/shared/api/api-contracts";
+import {
+  membersQueryOptions,
+  openProposalsQueryOptions,
+  proposalsQueryKey,
+} from "~/shared/api/queries";
 import { labelForRecord } from "~/lib/record-label";
 import { useSyncTypes, useTenantSync } from "~/lib/sync-context";
 import { useRecordsOfTypes } from "~/lib/use-collection";

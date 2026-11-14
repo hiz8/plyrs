@@ -1,15 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
-import type { AdminApi } from "~/lib/admin-api";
-import type { ApiClient } from "~/lib/api-client";
+import type { AdminApi } from "~/shared/api/admin-api";
+import type { ApiClient } from "~/shared/api/api-client";
 import { resolveUsage } from "../lib/media";
-import { publicAssetUrl, resolvePublicOrigin } from "~/lib/public-api";
+import { publicAssetUrl, resolvePublicOrigin } from "~/shared/api/public-api";
 import {
   assetUsageQueryOptions,
   configQueryOptions,
   publicationsQueryOptions,
-} from "~/lib/queries";
+} from "~/shared/api/queries";
 import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
 import { useRecordsOfTypes } from "~/lib/use-collection";
 import type { DeleteMediaTarget } from "./delete-media-dialog";

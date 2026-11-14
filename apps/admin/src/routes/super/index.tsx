@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button, TextField } from "@plyrs/ui";
 import { colors, spacing } from "@plyrs/ui/tokens.stylex";
-import { SuperApiError } from "~/lib/super-api";
+import { SuperApiError } from "~/shared/api/super-api";
 import { superStyles } from "./-styles";
 import { LOADING_LABEL } from "~/lib/labels";
 

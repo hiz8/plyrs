@@ -5,7 +5,7 @@ import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { roleLabel } from "~/lib/labels";
 import { MEMBER_LABELS } from "../-lib/settings-labels";
 import { demoteBody } from "../-lib/members";
-import type { Role } from "~/lib/api-contracts";
+import type { Role } from "~/shared/api/api-contracts";
 import { DialogNote } from "~/components/settings/dialog-note";
 
 const styles = stylex.create({

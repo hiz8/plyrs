@@ -17,8 +17,8 @@ import {
   settingsContentTypesCrumb,
   settingsCrumb,
 } from "~/lib/breadcrumbs";
-import { errorMessage } from "~/lib/error-messages";
-import { contentTypesQueryOptions } from "~/lib/queries";
+import { errorMessage } from "~/shared/api/error-messages";
+import { contentTypesQueryOptions } from "~/shared/api/queries";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
 import { useCan } from "~/lib/use-can";
 import { useRecordsOfTypes } from "~/lib/use-collection";

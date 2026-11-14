@@ -17,7 +17,7 @@ import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
 import { Check, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AssetServices } from "../lib/asset-services";
-import { errorMessage } from "~/lib/error-messages";
+import { errorMessage } from "~/shared/api/error-messages";
 import { TOASTS } from "~/lib/labels";
 import { MEDIA_LABELS, MEDIA_PICKER_LABELS } from "../lib/media-labels";
 import {

@@ -1,4 +1,4 @@
-import type { AdminApi, UploadOptions } from "~/lib/admin-api";
+import type { AdminApi, UploadOptions } from "~/shared/api/admin-api";
 
 // アセットのプレビューは認証付き /v1 経路でしか取れない(<img src> は Authorization ヘッダを
 // 付けられない)ため、blob を fetch して objectURL に変換する。record-form / asset 一覧 /

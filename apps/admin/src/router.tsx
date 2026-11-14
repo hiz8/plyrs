@@ -4,11 +4,11 @@ import { createSlotRegistry } from "@plyrs/ui";
 import type { ConnectFn } from "@plyrs/sync-client";
 import { createBrowserConnect } from "@plyrs/sync-client/browser";
 import { ErrorScreen } from "./components/error-screen";
-import { createAdminApi } from "./lib/admin-api";
-import { createApiClient } from "./lib/api-client";
-import { createSuperApi } from "./lib/super-api";
+import { createAdminApi } from "~/shared/api/admin-api";
+import { createApiClient } from "~/shared/api/api-client";
+import { createSuperApi } from "~/shared/api/super-api";
 import { createTenantSync } from "./lib/sync";
-import { createTokenManager, type TokenManager } from "./lib/token-manager";
+import { createTokenManager, type TokenManager } from "~/shared/api/token-manager";
 import type { RouterContext, SyncFactory } from "./lib/router-context";
 import { routeTree } from "./routeTree.gen";
 

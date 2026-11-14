@@ -10,11 +10,11 @@ import { CardError, CardLoading } from "./-components/card-state";
 import { SettingsCard } from "./-components/settings-card";
 import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
 import { ThemeSegment } from "./-account/theme-segment";
-import { ApiError } from "~/lib/api-client";
+import { ApiError } from "~/shared/api/api-client";
 import { currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
-import { errorMessage } from "~/lib/error-messages";
+import { errorMessage } from "~/shared/api/error-messages";
 import { ACCOUNT_LABELS } from "./-account/account-labels";
-import { meQueryOptions, tenantsQueryOptions } from "~/lib/queries";
+import { meQueryOptions, tenantsQueryOptions } from "~/shared/api/queries";
 
 // 設定の各画面と同じ幅(settings-frame.tsx の SETTINGS_MAX_WIDTH)。StyleX は import した定数を解けないので写す
 const MAX_WIDTH = "880px";

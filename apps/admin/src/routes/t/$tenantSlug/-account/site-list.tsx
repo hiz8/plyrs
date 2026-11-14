@@ -3,7 +3,7 @@ import { ArrowRightLeft } from "lucide-react";
 import { Link, type LinkRenderProps } from "react-aria-components";
 import { Avatar, Badge, ICON_SIZE, stylexRenderProps } from "@plyrs/ui";
 import { border, focus, font, radius, size, space, stroke, text } from "@plyrs/ui/semantic.stylex";
-import type { TenantSummary } from "~/lib/api-client";
+import type { TenantSummary } from "~/shared/api/api-client";
 import { roleLabel } from "~/lib/labels";
 import { ACCOUNT_LABELS } from "./account-labels";
 import { can } from "~/lib/permissions";

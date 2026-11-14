@@ -1,11 +1,11 @@
 import * as stylex from "@stylexjs/stylex";
 import { Avatar, Badge, Button, Cell, Column, Row, Table, TableBody, TableHeader } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import type { MemberSummary } from "~/lib/admin-api";
+import type { MemberSummary } from "~/shared/api/admin-api";
 import { formatDate } from "~/lib/datetime";
 import { MEMBER_LABELS } from "../-lib/settings-labels";
 import type { MemberRow } from "../-lib/members";
-import { isRole, type Role } from "~/lib/api-contracts";
+import { isRole, type Role } from "~/shared/api/api-contracts";
 import { RoleSelect } from "./role-select";
 
 const styles = stylex.create({

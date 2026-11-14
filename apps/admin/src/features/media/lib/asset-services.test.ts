@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createAssetServices } from "./asset-services";
-import type { AdminApi } from "~/lib/admin-api";
+import type { AdminApi } from "~/shared/api/admin-api";
 
 // AssetServices が触るメソッド以外が呼ばれたら落ちる guard。
 const rejectUnexpectedCall = () => Promise.reject(new Error("unexpected call"));

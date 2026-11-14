@@ -8,11 +8,11 @@ import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { DisableModuleDialog } from "../-components/disable-module-dialog";
 import { ModuleCard } from "../-components/module-card";
 import { SettingsFrame } from "../-components/settings-frame";
-import type { ModuleSummary } from "~/lib/admin-api";
-import { errorMessage } from "~/lib/error-messages";
+import type { ModuleSummary } from "~/shared/api/admin-api";
+import { errorMessage } from "~/shared/api/error-messages";
 import { MODULE_LABELS } from "../-lib/settings-labels";
 import { moduleAddLinks, moduleContentCounts } from "../-lib/modules";
-import { modulesQueryOptions } from "~/lib/queries";
+import { modulesQueryOptions } from "~/shared/api/queries";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
 import { useRecordsOfTypes } from "~/lib/use-collection";
 

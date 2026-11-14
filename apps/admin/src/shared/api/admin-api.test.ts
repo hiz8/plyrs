@@ -1,7 +1,7 @@
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "./api-client";
-import { createFakeXhr } from "../test-utils/fake-xhr";
+import { createFakeXhr } from "~/test-utils/fake-xhr";
 import { createAdminApi, type UploadProgress } from "./admin-api";
 import { NetworkError } from "./network-error";
 import { createTokenManager } from "./token-manager";

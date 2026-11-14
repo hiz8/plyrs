@@ -12,9 +12,9 @@ import {
   UPLOAD_TOO_LARGE_MESSAGE,
   type UploadItem,
 } from "./media";
-import { ApiError } from "~/lib/api-client";
-import { errorMessage } from "~/lib/error-messages";
-import { NetworkError } from "~/lib/network-error";
+import { ApiError } from "~/shared/api/api-client";
+import { errorMessage } from "~/shared/api/error-messages";
+import { NetworkError } from "~/shared/api/network-error";
 
 function fileOf(name: string, size = 3): File {
   const file = new File([new Uint8Array(1)], name);

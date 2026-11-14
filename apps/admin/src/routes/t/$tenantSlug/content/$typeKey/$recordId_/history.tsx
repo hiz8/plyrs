@@ -10,15 +10,15 @@ import { HistoryDiff } from "./-components/history-diff";
 import { HistoryList } from "./-components/history-list";
 import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
 import { contentTypeCrumb, currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
-import { errorMessage } from "~/lib/error-messages";
+import { errorMessage } from "~/shared/api/error-messages";
 import {
   EDITOR_LABELS,
   HISTORY_LABELS,
   summarizeEntry,
   type HistorySelection,
 } from "~/features/records";
-import type { HistoryEntry } from "~/lib/api-contracts";
-import { membersQueryOptions, publicationQueryOptions } from "~/lib/queries";
+import type { HistoryEntry } from "~/shared/api/api-contracts";
+import { membersQueryOptions, publicationQueryOptions } from "~/shared/api/queries";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
 import { useCan } from "~/lib/use-can";
 

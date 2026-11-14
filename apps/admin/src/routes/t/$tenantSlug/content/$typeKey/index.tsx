@@ -21,9 +21,9 @@ import {
 import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
 import { currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
 import type { BulkResult } from "~/lib/bulk";
-import { errorMessage } from "~/lib/error-messages";
+import { errorMessage } from "~/shared/api/error-messages";
 import { BULK_LABELS, DIALOGS, TOASTS } from "~/lib/labels";
-import { publicationsQueryKey, publicationsQueryOptions } from "~/lib/queries";
+import { publicationsQueryKey, publicationsQueryOptions } from "~/shared/api/queries";
 import { labelForRecord } from "~/lib/record-label";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
 import { useCan } from "~/lib/use-can";

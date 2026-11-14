@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { FileText, House, Image, Inbox, Plus, Settings } from "lucide-react";
 import { useId } from "react";
-import { Link } from "react-aria-components";
+import { Link, type LinkRenderProps } from "react-aria-components";
 import { Badge, ICON_SIZE, Skeleton, stylexRenderProps, type NavItemContribution } from "@plyrs/ui";
 import {
   accent,
@@ -15,9 +15,8 @@ import {
   radius,
   size,
 } from "@plyrs/ui/semantic.stylex";
-import type { LinkRenderProps } from "react-aria-components";
-import type { ModuleSummary } from "~/lib/admin-api";
-import type { TenantSummary } from "~/lib/api-client";
+import type { ModuleSummary } from "~/shared/api/admin-api";
+import type { TenantSummary } from "~/shared/api/api-client";
 import { NAV_LABELS } from "~/lib/labels";
 import {
   activeNavKey,

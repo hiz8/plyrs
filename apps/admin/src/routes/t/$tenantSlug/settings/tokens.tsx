@@ -12,13 +12,13 @@ import { RevokeTokenDialog } from "./-components/revoke-token-dialog";
 import { SettingsCard } from "../-components/settings-card";
 import { SettingsFrame } from "./-components/settings-frame";
 import { TokensTable } from "./-components/tokens-table";
-import type { IssuedToken, IssueTokenInput } from "~/lib/admin-api";
-import { ApiError } from "~/lib/api-client";
-import { errorMessage } from "~/lib/error-messages";
+import type { IssuedToken, IssueTokenInput } from "~/shared/api/admin-api";
+import { ApiError } from "~/shared/api/api-client";
+import { errorMessage } from "~/shared/api/error-messages";
 import { TOKEN_LABELS } from "./-lib/settings-labels";
-import { isRole } from "~/lib/api-contracts";
-import { resolvePublicOrigin } from "~/lib/public-api";
-import { configQueryOptions, grantsQueryOptions, tokensQueryOptions } from "~/lib/queries";
+import { isRole } from "~/shared/api/api-contracts";
+import { resolvePublicOrigin } from "~/shared/api/public-api";
+import { configQueryOptions, grantsQueryOptions, tokensQueryOptions } from "~/shared/api/queries";
 import { canManageTokens, type ConnectionRow, connectionRows, mcpEndpoint } from "./-lib/tokens";
 
 const styles = stylex.create({

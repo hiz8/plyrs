@@ -12,7 +12,7 @@ import {
   type ListView,
 } from "../lib/content-list";
 import { LIST_TABS } from "../lib/list-tab";
-import { errorMessage } from "~/lib/error-messages";
+import { errorMessage } from "~/shared/api/error-messages";
 import { LOADING_LABEL, WORKFLOW_STATUS_LABELS } from "~/lib/labels";
 import { LIST_LABELS } from "../lib/content-list-labels";
 import { ContentTable } from "./content-table";

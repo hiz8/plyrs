@@ -7,7 +7,7 @@ import { Button, DropZone, EmptyState, FileButton, FileDropTarget, toaster } fro
 import { ASSET_TYPE_KEY } from "@plyrs/metamodel";
 import { createAssetServices } from "../lib/asset-services";
 import { currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
-import { errorMessage } from "~/lib/error-messages";
+import { errorMessage } from "~/shared/api/error-messages";
 import { TERMS, TOASTS } from "~/lib/labels";
 import { MEDIA_LABELS } from "../lib/media-labels";
 import {
@@ -25,7 +25,7 @@ import {
   type MediaView,
 } from "../lib/media-list";
 import { uploadSummaryMessage } from "../lib/media";
-import { orphanAssetsQueryOptions, publicationsQueryKey } from "~/lib/queries";
+import { orphanAssetsQueryOptions, publicationsQueryKey } from "~/shared/api/queries";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
 import { bulkResultMessage, useBulkAction } from "~/lib/use-bulk-action";
 import { useCan } from "~/lib/use-can";

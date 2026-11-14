@@ -1,9 +1,9 @@
 import * as stylex from "@stylexjs/stylex";
 import { Button } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { ApiError } from "../lib/api-client";
-import { SuperApiError } from "../lib/super-api";
-import { errorMessage } from "../lib/error-messages";
+import { ApiError } from "~/shared/api/api-client";
+import { SuperApiError } from "~/shared/api/super-api";
+import { errorMessage } from "~/shared/api/error-messages";
 import { ERROR_SCREEN } from "../lib/labels";
 
 const styles = stylex.create({

@@ -15,7 +15,7 @@ import {
   stroke,
   text,
 } from "@plyrs/ui/semantic.stylex";
-import type { ModuleSummary } from "~/lib/admin-api";
+import type { ModuleSummary } from "~/shared/api/admin-api";
 import { MODULE_LABELS } from "../-lib/settings-labels";
 
 const NARROW = "@media (max-width: 959px)";

@@ -6,7 +6,7 @@ import { border, font, radius, space, status, stroke, text } from "@plyrs/ui/sem
 import { copyText } from "~/lib/clipboard";
 import { DIALOGS, ROLE_DESCRIPTIONS } from "~/lib/labels";
 import { MEMBER_LABELS } from "../-lib/settings-labels";
-import type { Role } from "~/lib/api-contracts";
+import type { Role } from "~/shared/api/api-contracts";
 import { DialogNote } from "~/components/settings/dialog-note";
 import { RoleSelect } from "./role-select";
 

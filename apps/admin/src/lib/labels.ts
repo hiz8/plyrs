@@ -1,6 +1,6 @@
 import type { WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncStatus } from "@plyrs/sync-client";
-import { isRole, type Role } from "./api-contracts";
+import { isRole, type Role } from "~/shared/api/api-contracts";
 
 // このファイルには、複数の画面(機能)で使う文言だけを置く。1 つの機能でしか使わない文言は、その機能の
 // 文言のファイル(features/records/lib/record-labels.ts など)に置く。

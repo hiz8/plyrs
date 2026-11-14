@@ -1,7 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
-import type { MemberSummary } from "~/lib/admin-api";
+import type { MemberSummary } from "~/shared/api/admin-api";
 import { MEMBER_LABELS } from "../-lib/settings-labels";
 import type { MemberRow } from "../-lib/members";
 import { MembersTable } from "./members-table";

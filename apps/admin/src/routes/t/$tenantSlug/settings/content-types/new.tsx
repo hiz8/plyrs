@@ -10,8 +10,8 @@ import {
   TypeEditor,
   type TypeDraft,
 } from "~/features/content-types";
-import { errorMessage } from "~/lib/error-messages";
-import { contentTypesQueryOptions } from "~/lib/queries";
+import { errorMessage } from "~/shared/api/error-messages";
+import { contentTypesQueryOptions } from "~/shared/api/queries";
 import { useCan } from "~/lib/use-can";
 
 export const Route = createFileRoute("/t/$tenantSlug/settings/content-types/new")({

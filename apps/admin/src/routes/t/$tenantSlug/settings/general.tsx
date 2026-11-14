@@ -8,11 +8,11 @@ import { CopyField } from "./-components/copy-field";
 import { SettingsCard } from "../-components/settings-card";
 import { SettingsFrame } from "./-components/settings-frame";
 import { SiteNameForm } from "./-components/site-name-form";
-import { errorMessage } from "~/lib/error-messages";
+import { errorMessage } from "~/shared/api/error-messages";
 import { SETTINGS_LABELS } from "./-lib/settings-labels";
 import { sidebarContentTypes } from "~/lib/navigation";
-import { publicApiBase, publicRecordsUrl, resolvePublicOrigin } from "~/lib/public-api";
-import { configQueryOptions } from "~/lib/queries";
+import { publicApiBase, publicRecordsUrl, resolvePublicOrigin } from "~/shared/api/public-api";
+import { configQueryOptions } from "~/shared/api/queries";
 import { useSyncTypes, useTenantSync } from "~/lib/sync-context";
 
 const styles = stylex.create({

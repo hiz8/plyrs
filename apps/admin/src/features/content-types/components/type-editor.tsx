@@ -9,7 +9,7 @@ import {
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import { Button, EmptyState, TextArea, TextField } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import type { ContentTypeSummary } from "~/lib/admin-api";
+import type { ContentTypeSummary } from "~/shared/api/admin-api";
 import {
   currentCrumb,
   homeCrumb,

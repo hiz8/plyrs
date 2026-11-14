@@ -13,7 +13,7 @@ import { ReviewCard, type ChangedState } from "./-home/review-card";
 import { WidgetGrid } from "./-home/widget-grid";
 import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
 import { currentCrumb } from "~/lib/breadcrumbs";
-import { errorMessage } from "~/lib/error-messages";
+import { errorMessage } from "~/shared/api/error-messages";
 import {
   countByStatus,
   countChanged,
@@ -26,7 +26,11 @@ import {
 } from "./-home/home";
 import { NAV_LABELS, roleLabel } from "~/lib/labels";
 import { HOME_LABELS } from "./-home/home-labels";
-import { meQueryOptions, modulesQueryOptions, publicationsQueryOptions } from "~/lib/queries";
+import {
+  meQueryOptions,
+  modulesQueryOptions,
+  publicationsQueryOptions,
+} from "~/shared/api/queries";
 import { labelForRecord } from "~/lib/record-label";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
 import { useCan } from "~/lib/use-can";

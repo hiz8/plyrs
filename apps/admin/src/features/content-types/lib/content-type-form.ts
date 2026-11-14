@@ -9,7 +9,7 @@ import {
   type FieldDefinition,
 } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import type { ContentTypeSummary } from "~/lib/admin-api";
+import type { ContentTypeSummary } from "~/shared/api/admin-api";
 import { ADD_FIELD_LABELS, CONTENT_TYPE_LABELS, FIELD_PANEL_LABELS } from "./content-type-labels";
 import { SLUG_KEY, kindOf, type FieldKind } from "~/lib/field-kind";
 

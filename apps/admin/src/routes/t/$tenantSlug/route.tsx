@@ -12,8 +12,8 @@ import { Drawer } from "@plyrs/ui";
 import { bg, text } from "@plyrs/ui/semantic.stylex";
 import { Sidebar, type SidebarProps } from "./-shell/sidebar";
 import { TopBar } from "./-shell/top-bar";
-import { ApiError } from "~/lib/api-client";
-import { resetClientSession } from "~/lib/client-session";
+import { ApiError } from "~/shared/api/api-client";
+import { resetClientSession } from "~/shared/api/client-session";
 import { NAV_LABELS } from "~/lib/labels";
 import { legacyPathname } from "./-shell/legacy-redirect";
 import {
@@ -21,7 +21,7 @@ import {
   modulesQueryOptions,
   openProposalCountQueryOptions,
   tenantsQueryOptions,
-} from "~/lib/queries";
+} from "~/shared/api/queries";
 import {
   TenantSyncProvider,
   useSyncHasSynced,

@@ -12,7 +12,7 @@ import { bg, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "~/features/media";
 import { contentTypeCrumb, currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
 import { formatDateTime } from "~/lib/datetime";
-import { errorMessage } from "~/lib/error-messages";
+import { errorMessage } from "~/shared/api/error-messages";
 import { DIALOGS, TOASTS } from "~/lib/labels";
 import { EDITOR_LABELS, HISTORY_LABELS, PROPOSAL_LABELS, PUBLISH_BOX } from "../lib/record-labels";
 import { labelForRecord } from "~/lib/record-label";
@@ -21,7 +21,7 @@ import {
   openProposalCountQueryOptions,
   publicationQueryOptions,
   publicationsQueryKey,
-} from "~/lib/queries";
+} from "~/shared/api/queries";
 import { useSaveAndPublish } from "../lib/save-and-publish";
 import { useSyncStatus, useTenantSync } from "~/lib/sync-context";
 import { useCan } from "~/lib/use-can";

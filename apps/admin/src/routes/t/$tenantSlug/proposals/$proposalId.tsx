@@ -10,7 +10,7 @@ import { AcceptProposalDialog, RejectProposalDialog } from "./-components/resolv
 import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
 import { currentCrumb, homeCrumb, proposalsCrumb } from "~/lib/breadcrumbs";
 import { formatDateTime } from "~/lib/datetime";
-import { errorCodeOf, errorMessage } from "~/lib/error-messages";
+import { errorCodeOf, errorMessage } from "~/shared/api/error-messages";
 import { actorLabel, PROPOSAL_LABELS, viaLabel } from "~/features/records";
 import {
   acceptOperationFor,
@@ -25,7 +25,7 @@ import {
   proposalsQueryKey,
   publicationQueryOptions,
   publicationsQueryKey,
-} from "~/lib/queries";
+} from "~/shared/api/queries";
 import { labelForRecord } from "~/lib/record-label";
 import { useSyncTypes, useTenantSync } from "~/lib/sync-context";
 import { useCan } from "~/lib/use-can";

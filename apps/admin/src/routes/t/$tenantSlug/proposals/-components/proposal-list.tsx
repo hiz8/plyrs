@@ -5,7 +5,7 @@ import { bg, border, focus, font, radius, space, stroke, text } from "@plyrs/ui/
 import { formatDateTime } from "~/lib/datetime";
 import { PROPOSAL_LABELS, type MemberName } from "~/features/records";
 import { kindLabel, stateLabel, summarizeProposal } from "../-lib/proposals";
-import type { ProposalKind, ProposalSummary } from "~/lib/api-contracts";
+import type { ProposalKind, ProposalSummary } from "~/shared/api/api-contracts";
 
 // 16.8(M5c): 提案の一覧の行。行全体が詳細へのリンク
 
