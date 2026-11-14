@@ -55,12 +55,6 @@ export const NAV_LABELS = {
   account: "アカウント",
 } as const;
 
-export const CONNECTION_BANNER = {
-  message:
-    "サーバーとの接続が切れています。再接続しています… 編集内容はこの端末に保存され、再接続後に送信されます",
-  reconnect: "今すぐ再接続",
-} as const;
-
 // 初回同期前などの読み込み中の読み上げ
 export const LOADING_LABEL = "読み込み中";
 

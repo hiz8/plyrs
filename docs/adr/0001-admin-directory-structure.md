@@ -123,7 +123,7 @@ feature 間の依存は、既定ですべて禁止する。初期の許可リス
 ### import の書き方の規則
 
 - 層やスライスをまたぐ import は、エイリアス `~/`(`apps/admin/src` を指す)で書く。
-- 相対 import は、同じ feature の中と、同じルートのサブツリーの中だけで使う。
+- 相対 import は、同じ feature の中、同じルートのサブツリーの中、shared の同じ区画の中、app 層の中だけで使う。
 - エイリアスは tsconfig の `paths` で定義し、Vite 8 の組み込みオプション `resolve.tsconfigPaths` で解決する(追加の依存は不要)。`vitest.config.ts` は `vite.config.ts` とは別のファイルで設定を共有していないので、`resolve.tsconfigPaths` は両方に設定する。
 
 この規則も lint で強制できる。直接「エイリアスを使え」と指示するルールはないが、区画の外へ出る相対 import をすべてエラーにすれば、層をまたぐ import を書く方法はエイリアスしか残らない。

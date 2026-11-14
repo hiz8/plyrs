@@ -19,6 +19,9 @@ import { roleLabel } from "~/shared/lib/labels";
 import { can } from "~/shared/lib/permissions";
 import { meQueryOptions, tenantsQueryOptions } from "~/shared/api/queries";
 
+// サイト選択画面(a-navigation.md 8 章 / D2 S8)。所属が 1 件なら選ぶ余地が無いので転送する。
+
+// この画面だけで使う文言
 const SITE_SELECT = {
   title: "サイトを選択",
   description: (email: string, count: number) =>
@@ -28,7 +31,6 @@ const SITE_SELECT = {
   otherAccount: "別のアカウントでログイン",
 } as const;
 
-// サイト選択画面(a-navigation.md 8 章 / D2 S8)。所属が 1 件なら選ぶ余地が無いので転送する。
 const styles = stylex.create({
   page: {
     minHeight: "100vh",
