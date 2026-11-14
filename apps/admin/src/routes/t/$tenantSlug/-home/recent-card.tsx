@@ -5,7 +5,7 @@ import { font, text } from "@plyrs/ui/semantic.stylex";
 import { formatDateTime } from "~/lib/datetime";
 import { recordHref, type HomeRecord } from "./home";
 import { HOME_LABELS } from "./home-labels";
-import { WorkflowStatusBadge } from "~/components/publication-badge";
+import { WorkflowStatusBadge } from "~/features/records";
 import { CardEmpty, CardLoadingRows, CardRow, HomeCard, RowTitleLink } from "./home-card";
 
 const NARROW = "@media (max-width: 959px)";

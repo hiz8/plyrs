@@ -8,7 +8,7 @@ import {
   viaLabel,
   type HistorySelection,
   type MemberName,
-} from "~/lib/history";
+} from "~/features/records";
 import type { HistoryEntry } from "~/lib/api-contracts";
 import { HISTORY_LABELS } from "~/lib/labels";
 

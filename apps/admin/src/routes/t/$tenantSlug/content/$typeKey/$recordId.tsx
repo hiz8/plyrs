@@ -3,7 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { useMemo } from "react";
 import { text } from "@plyrs/ui/semantic.stylex";
 import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
-import { RecordEditor } from "~/components/record-editor";
+import { RecordEditor } from "~/features/records";
 import { createAssetServices } from "~/features/media";
 import { contentTypeCrumb, homeCrumb } from "~/lib/breadcrumbs";
 import { EDITOR_LABELS } from "~/lib/labels";

@@ -11,7 +11,7 @@ import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-pag
 import { currentCrumb, homeCrumb, proposalsCrumb } from "~/lib/breadcrumbs";
 import { formatDateTime } from "~/lib/datetime";
 import { errorCodeOf, errorMessage } from "~/lib/error-messages";
-import { actorLabel, viaLabel } from "~/lib/history";
+import { actorLabel, viaLabel } from "~/features/records";
 import { PROPOSAL_LABELS } from "~/lib/labels";
 import {
   acceptOperationFor,

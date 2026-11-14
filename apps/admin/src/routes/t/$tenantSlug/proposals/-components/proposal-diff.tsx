@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { bg, border, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
-import { formatFieldDiff } from "~/lib/history";
+import { formatFieldDiff } from "~/features/records";
 import type { FieldChange, ProposalKind } from "~/lib/api-contracts";
 import { PROPOSAL_LABELS, WORKFLOW_STATUS_LABELS } from "~/lib/labels";
 

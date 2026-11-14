@@ -1,6 +1,6 @@
 import { titleFieldKey, type ContentTypeDefinition } from "@plyrs/metamodel";
 import type { ProposalKind, ProposalState, ProposalSummary } from "~/lib/api-contracts";
-import { actorLabel, viaLabel, type MemberName } from "~/lib/history";
+import { actorLabel, viaLabel, type MemberName } from "~/features/records";
 import { PROPOSAL_LABELS } from "~/lib/labels";
 import type { Operation } from "~/lib/permissions";
 
