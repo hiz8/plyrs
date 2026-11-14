@@ -4,9 +4,9 @@ import { Link, type LinkRenderProps } from "react-aria-components";
 import { Avatar, Badge, ICON_SIZE, stylexRenderProps } from "@plyrs/ui";
 import { border, focus, font, radius, size, space, stroke, text } from "@plyrs/ui/semantic.stylex";
 import type { TenantSummary } from "~/shared/api/api-client";
-import { roleLabel } from "~/lib/labels";
+import { roleLabel } from "~/shared/lib/labels";
 import { ACCOUNT_LABELS } from "./account-labels";
-import { can } from "~/lib/permissions";
+import { can } from "~/shared/lib/permissions";
 
 const styles = stylex.create({
   list: { display: "flex", flexDirection: "column", margin: 0, padding: 0, listStyle: "none" },

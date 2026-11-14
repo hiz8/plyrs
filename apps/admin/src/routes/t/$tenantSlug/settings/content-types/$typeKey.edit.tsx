@@ -16,12 +16,12 @@ import {
   homeCrumb,
   settingsContentTypesCrumb,
   settingsCrumb,
-} from "~/lib/breadcrumbs";
+} from "~/shared/lib/breadcrumbs";
 import { errorMessage } from "~/shared/api/error-messages";
 import { contentTypesQueryOptions } from "~/shared/api/queries";
-import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
-import { useCan } from "~/lib/use-can";
-import { useRecordsOfTypes } from "~/lib/use-collection";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/shared/lib/sync-context";
+import { useCan } from "~/shared/lib/use-can";
+import { useRecordsOfTypes } from "~/shared/lib/use-collection";
 
 const styles = stylex.create({
   muted: { color: text.muted },

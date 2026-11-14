@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Button, Checkbox, ModalDialog, Select, TextField } from "@plyrs/ui";
 import { border, font, radius, space, status, stroke, text } from "@plyrs/ui/semantic.stylex";
 import type { IssueTokenInput, IssuedToken } from "~/shared/api/admin-api";
-import { copyText } from "~/lib/clipboard";
-import { DIALOGS } from "~/lib/labels";
+import { copyText } from "~/shared/lib/clipboard";
+import { DIALOGS } from "~/shared/lib/labels";
 import { TOKEN_LABELS } from "../-lib/settings-labels";
 import type { Role } from "~/shared/api/api-contracts";
 import {

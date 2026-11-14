@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, type ReactNode } from "react";
 import { Tabs } from "@plyrs/ui";
 import { space } from "@plyrs/ui/semantic.stylex";
-import { currentCrumb, homeCrumb, settingsCrumb } from "~/lib/breadcrumbs";
+import { currentCrumb, homeCrumb, settingsCrumb } from "~/shared/lib/breadcrumbs";
 import { SETTINGS_LABELS } from "../-lib/settings-labels";
 import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
 import { CardError, CardLoading } from "../../-components/card-state";

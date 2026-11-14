@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Inbox } from "lucide-react";
 import { RelativeTime } from "@plyrs/ui";
 import { font, text } from "@plyrs/ui/semantic.stylex";
-import { formatDateTime } from "~/lib/datetime";
+import { formatDateTime } from "~/shared/lib/datetime";
 import { recordHref, type HomeRecord } from "./home";
 import { HOME_LABELS } from "./home-labels";
 import { WorkflowStatusBadge } from "~/features/records";

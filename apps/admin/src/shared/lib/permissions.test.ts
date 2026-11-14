@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import * as api from "../../../api/src/auth/permissions";
+import * as api from "~/test-utils/api-permissions";
 import { can, type Operation } from "./permissions";
 import { ROLES } from "~/shared/api/api-contracts";
 

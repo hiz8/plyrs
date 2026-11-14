@@ -1,5 +1,5 @@
 import { Banner, Button } from "@plyrs/ui";
-import { CONNECTION_BANNER } from "../lib/labels";
+import { CONNECTION_BANNER } from "~/shared/lib/labels";
 
 // §12 必須①: 初回同期後の切断・再同期はフォームを維持し、このバナーだけで知らせる。
 // 保存(push)はアウトボックスに積まれ、接続回復後に自動送信される(engine の設計)。

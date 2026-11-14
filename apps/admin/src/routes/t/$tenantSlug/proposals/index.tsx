@@ -6,7 +6,7 @@ import { Banner, Button, Tabs, toaster } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { ProposalList } from "./-components/proposal-list";
 import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
-import { currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
+import { currentCrumb, homeCrumb } from "~/shared/lib/breadcrumbs";
 import { PROPOSAL_LABELS } from "~/features/records";
 import { proposalTitle } from "./-lib/proposals";
 import type { ProposalSummary } from "~/shared/api/api-contracts";
@@ -15,10 +15,10 @@ import {
   openProposalsQueryOptions,
   proposalsQueryKey,
 } from "~/shared/api/queries";
-import { labelForRecord } from "~/lib/record-label";
-import { useSyncTypes, useTenantSync } from "~/lib/sync-context";
-import { useRecordsOfTypes } from "~/lib/use-collection";
-import { useCan } from "~/lib/use-can";
+import { labelForRecord } from "~/shared/lib/record-label";
+import { useSyncTypes, useTenantSync } from "~/shared/lib/sync-context";
+import { useRecordsOfTypes } from "~/shared/lib/use-collection";
+import { useCan } from "~/shared/lib/use-can";
 
 // 16.8(M5c、決定 57): 提案の一覧。未処理 / 処理済みのタブと、record での絞り込み(編集画面の案内から来る)
 

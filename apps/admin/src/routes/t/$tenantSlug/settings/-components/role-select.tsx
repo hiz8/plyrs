@@ -1,5 +1,5 @@
 import { Select } from "@plyrs/ui";
-import { ROLE_LABELS } from "~/lib/labels";
+import { ROLE_LABELS } from "~/shared/lib/labels";
 import { isRole, ROLES, type Role } from "~/shared/api/api-contracts";
 
 const ITEMS = ROLES.map((role) => ({ value: role, label: ROLE_LABELS[role] }));

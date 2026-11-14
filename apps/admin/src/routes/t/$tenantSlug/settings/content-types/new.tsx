@@ -12,7 +12,7 @@ import {
 } from "~/features/content-types";
 import { errorMessage } from "~/shared/api/error-messages";
 import { contentTypesQueryOptions } from "~/shared/api/queries";
-import { useCan } from "~/lib/use-can";
+import { useCan } from "~/shared/lib/use-can";
 
 export const Route = createFileRoute("/t/$tenantSlug/settings/content-types/new")({
   // 重複の検証に使う型の一覧は常に最新から取る(§11)

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
-import { ROLE_DESCRIPTIONS } from "~/lib/labels";
+import { ROLE_DESCRIPTIONS } from "~/shared/lib/labels";
 import { MEMBER_LABELS } from "../-lib/settings-labels";
 import { AddMemberDialog, type AddMemberFailure } from "./add-member-dialog";
 

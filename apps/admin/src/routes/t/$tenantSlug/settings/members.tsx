@@ -11,7 +11,7 @@ import { SettingsFrame } from "./-components/settings-frame";
 import type { MemberSummary } from "~/shared/api/admin-api";
 import { ApiError } from "~/shared/api/api-client";
 import { errorMessage } from "~/shared/api/error-messages";
-import { roleLabel } from "~/lib/labels";
+import { roleLabel } from "~/shared/lib/labels";
 import { MEMBER_LABELS } from "./-lib/settings-labels";
 import { isDowngrade, memberRows, otherOwnerEmails } from "./-lib/members";
 import type { Role } from "~/shared/api/api-contracts";

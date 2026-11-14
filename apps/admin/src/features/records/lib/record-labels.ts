@@ -1,4 +1,4 @@
-import { TERMS } from "~/lib/labels";
+import { TERMS } from "~/shared/lib/labels";
 
 // record の一覧・編集・履歴・提案の文言。record の feature だけが使うものと、履歴・提案のルートが
 // index.ts 経由で使うものを置く。複数の機能で使う文言(TERMS・TOASTS・DIALOGS など)は ~/lib/labels にある

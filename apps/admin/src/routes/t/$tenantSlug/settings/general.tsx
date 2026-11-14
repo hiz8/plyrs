@@ -10,10 +10,10 @@ import { SettingsFrame } from "./-components/settings-frame";
 import { SiteNameForm } from "./-components/site-name-form";
 import { errorMessage } from "~/shared/api/error-messages";
 import { SETTINGS_LABELS } from "./-lib/settings-labels";
-import { sidebarContentTypes } from "~/lib/navigation";
+import { sidebarContentTypes } from "~/shared/lib/navigation";
 import { publicApiBase, publicRecordsUrl, resolvePublicOrigin } from "~/shared/api/public-api";
 import { configQueryOptions } from "~/shared/api/queries";
-import { useSyncTypes, useTenantSync } from "~/lib/sync-context";
+import { useSyncTypes, useTenantSync } from "~/shared/lib/sync-context";
 
 const styles = stylex.create({
   stack: { display: "flex", flexDirection: "column", gap: space.md },

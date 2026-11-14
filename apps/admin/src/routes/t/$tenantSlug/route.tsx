@@ -14,7 +14,7 @@ import { Sidebar, type SidebarProps } from "./-shell/sidebar";
 import { TopBar } from "./-shell/top-bar";
 import { ApiError } from "~/shared/api/api-client";
 import { resetClientSession } from "~/shared/api/client-session";
-import { NAV_LABELS } from "~/lib/labels";
+import { NAV_LABELS } from "~/shared/lib/labels";
 import { legacyPathname } from "./-shell/legacy-redirect";
 import {
   meQueryOptions,
@@ -27,8 +27,8 @@ import {
   useSyncHasSynced,
   useSyncStatus,
   useSyncTypes,
-} from "~/lib/sync-context";
-import { syncIndicatorState } from "~/lib/sync-indicator";
+} from "~/shared/lib/sync-context";
+import { syncIndicatorState } from "~/shared/lib/sync-indicator";
 
 // a-navigation.md 3.4: 960px 未満でサイドバーをドロワーへ切り替え、上部バーを出す
 const NARROW = "@media (max-width: 959px)";

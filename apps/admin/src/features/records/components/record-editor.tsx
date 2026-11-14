@@ -10,12 +10,12 @@ import type { SyncRecord } from "@plyrs/sync-protocol";
 import { Banner, Button, ConfirmDialog, ICON_SIZE, RelativeTime, toaster } from "@plyrs/ui";
 import { bg, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
 import type { AssetServices } from "~/features/media";
-import { contentTypeCrumb, currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
-import { formatDateTime } from "~/lib/datetime";
+import { contentTypeCrumb, currentCrumb, homeCrumb } from "~/shared/lib/breadcrumbs";
+import { formatDateTime } from "~/shared/lib/datetime";
 import { errorMessage } from "~/shared/api/error-messages";
-import { DIALOGS, TOASTS } from "~/lib/labels";
+import { DIALOGS, TOASTS } from "~/shared/lib/labels";
 import { EDITOR_LABELS, HISTORY_LABELS, PROPOSAL_LABELS, PUBLISH_BOX } from "../lib/record-labels";
-import { labelForRecord } from "~/lib/record-label";
+import { labelForRecord } from "~/shared/lib/record-label";
 import { publishBoxView } from "../lib/publish-box";
 import {
   openProposalCountQueryOptions,
@@ -23,9 +23,9 @@ import {
   publicationsQueryKey,
 } from "~/shared/api/queries";
 import { useSaveAndPublish } from "../lib/save-and-publish";
-import { useSyncStatus, useTenantSync } from "~/lib/sync-context";
-import { useCan } from "~/lib/use-can";
-import { useLeaveGuard } from "~/lib/use-leave-guard";
+import { useSyncStatus, useTenantSync } from "~/shared/lib/sync-context";
+import { useCan } from "~/shared/lib/use-can";
+import { useLeaveGuard } from "~/shared/lib/use-leave-guard";
 import { LeaveGuardDialog } from "~/components/leave-guard-dialog";
 import { PublishBar, PublishBox } from "./publish-box";
 import { RecordForm, SaveDeferredError, type RecordFormHandle } from "./record-form";

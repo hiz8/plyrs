@@ -8,7 +8,7 @@ import type {
 import { ApiError } from "~/shared/api/api-client";
 import { UPLOAD_TOO_LARGE_MESSAGE } from "~/shared/api/error-messages";
 import { NetworkError } from "~/shared/api/network-error";
-import { labelForRecord } from "~/lib/record-label";
+import { labelForRecord } from "~/shared/lib/record-label";
 
 // 案 F 3.3・4 章: メディアライブラリの補助処理(アップロードの順次送信と、使用箇所の表示名の解決)。
 

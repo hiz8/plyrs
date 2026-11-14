@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Link, type LinkRenderProps } from "react-aria-components";
 import { Badge, RelativeTime, stylexRenderProps, type BadgeTone } from "@plyrs/ui";
 import { bg, border, focus, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
-import { formatDateTime } from "~/lib/datetime";
+import { formatDateTime } from "~/shared/lib/datetime";
 import { PROPOSAL_LABELS, type MemberName } from "~/features/records";
 import { kindLabel, stateLabel, summarizeProposal } from "../-lib/proposals";
 import type { ProposalKind, ProposalSummary } from "~/shared/api/api-contracts";

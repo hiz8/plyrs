@@ -1,4 +1,4 @@
-import { TERMS } from "~/lib/labels";
+import { TERMS } from "~/shared/lib/labels";
 
 export const MEMBER_LABELS = {
   add: "メンバーを追加",

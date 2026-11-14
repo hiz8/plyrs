@@ -6,7 +6,7 @@ import { Button, TextField } from "@plyrs/ui";
 import { colors, spacing } from "@plyrs/ui/tokens.stylex";
 import { SuperApiError } from "~/shared/api/super-api";
 import { superStyles } from "./-styles";
-import { LOADING_LABEL } from "~/lib/labels";
+import { LOADING_LABEL } from "~/shared/lib/labels";
 
 const styles = stylex.create({
   link: { color: colors.accent },

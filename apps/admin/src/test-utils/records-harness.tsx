@@ -4,7 +4,7 @@ import type { SyncRecord } from "@plyrs/sync-protocol";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { render } from "@testing-library/react";
 import { vi, expect } from "vitest";
-import type { RouterContext } from "../lib/router-context";
+import type { RouterContext } from "~/shared/lib/router-context";
 import { createAppContext, getRouter } from "../router";
 import { baseAuthedRoutes, blogTenantOf, jsonResponse, stubFetch, type Handler } from "./api-stubs";
 import { FakeSocket } from "./fake-socket";

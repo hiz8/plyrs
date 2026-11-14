@@ -11,7 +11,7 @@ import { SettingsCard } from "./-components/settings-card";
 import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
 import { ThemeSegment } from "./-account/theme-segment";
 import { ApiError } from "~/shared/api/api-client";
-import { currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
+import { currentCrumb, homeCrumb } from "~/shared/lib/breadcrumbs";
 import { errorMessage } from "~/shared/api/error-messages";
 import { ACCOUNT_LABELS } from "./-account/account-labels";
 import { meQueryOptions, tenantsQueryOptions } from "~/shared/api/queries";

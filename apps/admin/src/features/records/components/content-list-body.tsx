@@ -13,7 +13,7 @@ import {
 } from "../lib/content-list";
 import { LIST_TABS } from "../lib/list-tab";
 import { errorMessage } from "~/shared/api/error-messages";
-import { LOADING_LABEL, WORKFLOW_STATUS_LABELS } from "~/lib/labels";
+import { LOADING_LABEL, WORKFLOW_STATUS_LABELS } from "~/shared/lib/labels";
 import { LIST_LABELS } from "../lib/content-list-labels";
 import { ContentTable } from "./content-table";
 import { ListFilters } from "./list-filters";

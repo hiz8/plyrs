@@ -17,7 +17,7 @@ import {
 } from "@plyrs/ui/semantic.stylex";
 import type { ModuleSummary } from "~/shared/api/admin-api";
 import type { TenantSummary } from "~/shared/api/api-client";
-import { NAV_LABELS } from "~/lib/labels";
+import { NAV_LABELS } from "~/shared/lib/labels";
 import {
   activeNavKey,
   moduleNavGroups,
@@ -25,9 +25,9 @@ import {
   sidebarContentTypes,
   type NavEntry,
   type NavType,
-} from "~/lib/navigation";
-import { can } from "~/lib/permissions";
-import type { SyncIndicatorState } from "~/lib/sync-indicator";
+} from "~/shared/lib/navigation";
+import { can } from "~/shared/lib/permissions";
+import type { SyncIndicatorState } from "~/shared/lib/sync-indicator";
 import { AccountMenu } from "./account-menu";
 import { NavChildLink, NavHeading, NavLink } from "./nav-link";
 import { SiteSwitcher } from "./site-switcher";

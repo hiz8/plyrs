@@ -11,7 +11,7 @@ import {
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import type { ContentTypeSummary } from "~/shared/api/admin-api";
 import { ADD_FIELD_LABELS, CONTENT_TYPE_LABELS, FIELD_PANEL_LABELS } from "./content-type-labels";
-import { SLUG_KEY, kindOf, type FieldKind } from "~/lib/field-kind";
+import { SLUG_KEY, kindOf, type FieldKind } from "~/shared/lib/field-kind";
 
 // 案 E: 型設計の下書き。画面の判断はここに寄せ、部品は描くだけにする。
 

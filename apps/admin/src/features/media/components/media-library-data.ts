@@ -11,7 +11,7 @@ import {
   publicationsQueryOptions,
 } from "~/shared/api/queries";
 import type { CollectionRegistry } from "@plyrs/sync-client/tanstack";
-import { useRecordsOfTypes } from "~/lib/use-collection";
+import { useRecordsOfTypes } from "~/shared/lib/use-collection";
 import type { DeleteMediaTarget } from "./delete-media-dialog";
 import type { MediaDetailPanelProps } from "./media-detail-panel";
 

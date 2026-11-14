@@ -2,7 +2,7 @@ import type { ContentTypeDefinition, WorkflowStatus } from "@plyrs/metamodel";
 import type { SyncRecord } from "@plyrs/sync-protocol";
 import type { ModuleSummary } from "~/shared/api/admin-api";
 import { publicationStateOf, toListSearch, type ListQuery } from "~/features/records";
-import { moduleNavGroups, sidebarContentTypes } from "~/lib/navigation";
+import { moduleNavGroups, sidebarContentTypes } from "~/shared/lib/navigation";
 
 // b-home.md: ホームの集計。型をまたいだ record の並べ替え・件数・リンク先を純関数で持つ。
 

@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
-import { ROLE_DESCRIPTIONS } from "~/lib/labels";
+import { ROLE_DESCRIPTIONS } from "~/shared/lib/labels";
 import { RoleCards } from "./role-cards";
 
 it("3 つのロールの説明を出す", () => {

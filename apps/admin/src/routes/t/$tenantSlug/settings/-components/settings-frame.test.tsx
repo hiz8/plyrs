@@ -2,8 +2,8 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { expect, it, vi } from "vitest";
-import type { TenantSync } from "~/lib/sync";
-import { TenantSyncProvider } from "~/lib/sync-context";
+import type { TenantSync } from "~/shared/lib/sync";
+import { TenantSyncProvider } from "~/shared/lib/sync-context";
 import { SettingsFrame } from "./settings-frame";
 
 // SettingsFrame は useNavigate を使うため、router 無しで描けるよう差し替える

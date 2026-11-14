@@ -4,7 +4,7 @@ import { createMemoryHistory } from "@tanstack/react-router";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, type Mock } from "vitest";
-import { DIALOGS } from "~/lib/labels";
+import { DIALOGS } from "~/shared/lib/labels";
 import { createAppContext, getRouter } from "~/router";
 import { FakeSocket } from "~/test-utils/fake-socket";
 import { renderRouter } from "~/test-utils/records-harness";

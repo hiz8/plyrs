@@ -2,8 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { SyncStatus } from "@plyrs/sync-client";
 import { expect, it, vi } from "vitest";
-import type { TenantSync } from "../lib/sync";
-import { TenantSyncProvider } from "../lib/sync-context";
+import type { TenantSync } from "~/shared/lib/sync";
+import { TenantSyncProvider } from "~/shared/lib/sync-context";
 import { PageLoading, TenantPageHeader } from "./tenant-page-header";
 
 function fakeSync(status: SyncStatus, hasSynced: boolean) {

@@ -2,8 +2,8 @@ import * as stylex from "@stylexjs/stylex";
 import { Copy } from "lucide-react";
 import { Button } from "@plyrs/ui";
 import { border, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
-import { copyText } from "~/lib/clipboard";
-import { CLIPBOARD_LABELS } from "~/lib/labels";
+import { copyText } from "~/shared/lib/clipboard";
+import { CLIPBOARD_LABELS } from "~/shared/lib/labels";
 import { SETTINGS_LABELS } from "../-lib/settings-labels";
 
 const styles = stylex.create({

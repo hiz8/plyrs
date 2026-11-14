@@ -9,7 +9,7 @@ import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { HistoryDiff } from "./-components/history-diff";
 import { HistoryList } from "./-components/history-list";
 import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
-import { contentTypeCrumb, currentCrumb, homeCrumb } from "~/lib/breadcrumbs";
+import { contentTypeCrumb, currentCrumb, homeCrumb } from "~/shared/lib/breadcrumbs";
 import { errorMessage } from "~/shared/api/error-messages";
 import {
   EDITOR_LABELS,
@@ -19,8 +19,8 @@ import {
 } from "~/features/records";
 import type { HistoryEntry } from "~/shared/api/api-contracts";
 import { membersQueryOptions, publicationQueryOptions } from "~/shared/api/queries";
-import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
-import { useCan } from "~/lib/use-can";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/shared/lib/sync-context";
+import { useCan } from "~/shared/lib/use-can";
 
 // 幅 960px 未満では 1 列にする(record-editor.tsx と同じ境界)
 const NARROW = "@media (max-width: 959px)";

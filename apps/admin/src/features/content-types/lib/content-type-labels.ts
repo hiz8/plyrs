@@ -1,4 +1,4 @@
-import type { FieldKind } from "~/lib/field-kind";
+import type { FieldKind } from "~/shared/lib/field-kind";
 
 // 案 E(型設計): フィールドの種類の呼称と説明(E 3 章)
 export const FIELD_KIND_LABELS: Record<FieldKind, { name: string; description: string }> = {

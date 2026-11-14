@@ -11,7 +11,7 @@ import {
 } from "@plyrs/ui";
 import { bg, focus, font, radius, size, space, stroke, text } from "@plyrs/ui/semantic.stylex";
 import type { TenantSummary } from "~/shared/api/api-client";
-import { NAV_LABELS, roleLabel } from "~/lib/labels";
+import { NAV_LABELS, roleLabel } from "~/shared/lib/labels";
 
 // a-navigation.md 3.5: 上段。「plyrs」の下にサイト名
 const styles = stylex.create({

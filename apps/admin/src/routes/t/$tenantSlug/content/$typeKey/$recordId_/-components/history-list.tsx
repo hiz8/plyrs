@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { Badge, Button, RelativeTime } from "@plyrs/ui";
 import { accent, bg, border, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
-import { formatDateTime } from "~/lib/datetime";
+import { formatDateTime } from "~/shared/lib/datetime";
 import {
   HISTORY_LABELS,
   kindLabel,

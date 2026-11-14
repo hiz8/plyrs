@@ -10,8 +10,8 @@ import {
   Spinner,
 } from "@plyrs/ui";
 import { CircleOff, Globe, RotateCw, Trash2 } from "lucide-react";
-import { BULK_LABELS, WORKFLOW_STATUS_LABELS } from "~/lib/labels";
-import type { BulkKind } from "~/lib/use-bulk-action";
+import { BULK_LABELS, WORKFLOW_STATUS_LABELS } from "~/shared/lib/labels";
+import type { BulkKind } from "~/shared/lib/use-bulk-action";
 import { bulkBarStyles } from "~/components/bulk-bar-styles";
 
 export type BulkMenuAction =

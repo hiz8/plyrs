@@ -1,8 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
 import { Button, ModalDialog } from "@plyrs/ui";
 import { bg, border, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
-import { formatDateTime } from "~/lib/datetime";
-import { DIALOGS } from "~/lib/labels";
+import { formatDateTime } from "~/shared/lib/datetime";
+import { DIALOGS } from "~/shared/lib/labels";
 
 const styles = stylex.create({
   content: {

@@ -1,5 +1,5 @@
 import type { MediaKind } from "./media-kind";
-import { BULK_LABELS, COMMON_LABELS, DIALOGS } from "~/lib/labels";
+import { BULK_LABELS, COMMON_LABELS, DIALOGS } from "~/shared/lib/labels";
 
 // 案 F 3〜7 章・F25: メディアライブラリ(一覧・詳細・削除・アップロード)の文言
 export const MEDIA_LABELS = {

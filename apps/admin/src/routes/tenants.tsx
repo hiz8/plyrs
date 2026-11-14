@@ -15,8 +15,8 @@ import {
 } from "@plyrs/ui/semantic.stylex";
 import { ApiError } from "~/shared/api/api-client";
 import { resetClientSession } from "~/shared/api/client-session";
-import { roleLabel, SITE_SELECT } from "~/lib/labels";
-import { can } from "~/lib/permissions";
+import { roleLabel, SITE_SELECT } from "~/shared/lib/labels";
+import { can } from "~/shared/lib/permissions";
 import { meQueryOptions, tenantsQueryOptions } from "~/shared/api/queries";
 
 // サイト選択画面(a-navigation.md 8 章 / D2 S8)。所属が 1 件なら選ぶ余地が無いので転送する。

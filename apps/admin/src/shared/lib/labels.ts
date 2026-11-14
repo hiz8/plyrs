@@ -158,7 +158,7 @@ export const DIALOGS = {
 
 type BulkKindKey = "publish" | "unpublish" | "status" | "delete";
 
-// running / retry / done / failed のキーは BulkKind(lib/use-bulk-action.ts)と揃える
+// running / retry / done / failed のキーは BulkKind(shared/lib/use-bulk-action.ts)と揃える
 export const BULK_LABELS = {
   region: "一括操作",
   menu: "一括操作",

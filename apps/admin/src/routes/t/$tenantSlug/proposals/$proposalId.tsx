@@ -8,8 +8,8 @@ import { ProposalDiff } from "./-components/proposal-diff";
 import { kindTone } from "./-components/proposal-list";
 import { AcceptProposalDialog, RejectProposalDialog } from "./-components/resolve-dialogs";
 import { PageBody, PageLoading, TenantPageHeader } from "~/components/tenant-page-header";
-import { currentCrumb, homeCrumb, proposalsCrumb } from "~/lib/breadcrumbs";
-import { formatDateTime } from "~/lib/datetime";
+import { currentCrumb, homeCrumb, proposalsCrumb } from "~/shared/lib/breadcrumbs";
+import { formatDateTime } from "~/shared/lib/datetime";
 import { errorCodeOf, errorMessage } from "~/shared/api/error-messages";
 import { actorLabel, PROPOSAL_LABELS, viaLabel } from "~/features/records";
 import {
@@ -26,10 +26,10 @@ import {
   publicationQueryOptions,
   publicationsQueryKey,
 } from "~/shared/api/queries";
-import { labelForRecord } from "~/lib/record-label";
-import { useSyncTypes, useTenantSync } from "~/lib/sync-context";
-import { useCan } from "~/lib/use-can";
-import { useCollectionRows } from "~/lib/use-collection";
+import { labelForRecord } from "~/shared/lib/record-label";
+import { useSyncTypes, useTenantSync } from "~/shared/lib/sync-context";
+import { useCan } from "~/shared/lib/use-can";
+import { useCollectionRows } from "~/shared/lib/use-collection";
 
 // 16.8(M5c、決定 57): 提案の詳細。差分を見て採用・却下する。採用は自分(採用する人)の名前で書き込まれる
 

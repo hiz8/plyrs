@@ -4,7 +4,7 @@ import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import { ApiError } from "~/shared/api/api-client";
 import { SuperApiError } from "~/shared/api/super-api";
 import { errorMessage } from "~/shared/api/error-messages";
-import { ERROR_SCREEN } from "../lib/labels";
+import { ERROR_SCREEN } from "~/shared/lib/labels";
 
 const styles = stylex.create({
   screen: {

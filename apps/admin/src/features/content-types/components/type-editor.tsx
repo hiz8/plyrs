@@ -15,7 +15,7 @@ import {
   homeCrumb,
   settingsContentTypesCrumb,
   settingsCrumb,
-} from "~/lib/breadcrumbs";
+} from "~/shared/lib/breadcrumbs";
 import {
   autoFill,
   effectiveTitleField,
@@ -30,9 +30,9 @@ import {
   type TypeDraft,
 } from "../lib/content-type-form";
 import { referenceCandidates } from "../lib/content-types";
-import { DIALOGS } from "~/lib/labels";
+import { DIALOGS } from "~/shared/lib/labels";
 import { CONTENT_TYPE_LABELS } from "../lib/content-type-labels";
-import { useLeaveGuard } from "~/lib/use-leave-guard";
+import { useLeaveGuard } from "~/shared/lib/use-leave-guard";
 import { LeaveGuardDialog } from "~/components/leave-guard-dialog";
 import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
 import { AddFieldDialog } from "./add-field-dialog";

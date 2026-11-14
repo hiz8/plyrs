@@ -18,9 +18,9 @@ import {
 import { SettingsFrame } from "../-components/settings-frame";
 import { errorMessage } from "~/shared/api/error-messages";
 import { contentTypesQueryOptions, modulesQueryOptions } from "~/shared/api/queries";
-import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
-import { useCan } from "~/lib/use-can";
-import { useRecordsOfTypes } from "~/lib/use-collection";
+import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/shared/lib/sync-context";
+import { useCan } from "~/shared/lib/use-can";
+import { useRecordsOfTypes } from "~/shared/lib/use-collection";
 
 const styles = stylex.create({
   description: { margin: 0, fontSize: font.caption, color: text.muted },

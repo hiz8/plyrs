@@ -36,7 +36,7 @@ import {
   type PickedMedia,
 } from "~/features/media";
 import { RECORD_FORM_LABELS } from "../lib/record-labels";
-import { labelForRecord } from "~/lib/record-label";
+import { labelForRecord } from "~/shared/lib/record-label";
 import {
   asEditorRichTextValue,
   asRichTextValue,
@@ -48,8 +48,8 @@ import {
   type DraftValues,
 } from "../lib/record-form-values";
 import { richTextPlainText } from "@plyrs/richtext";
-import { useRecordsOfTypes } from "~/lib/use-collection";
-import { kindOf } from "~/lib/field-kind";
+import { useRecordsOfTypes } from "~/shared/lib/use-collection";
+import { kindOf } from "~/shared/lib/field-kind";
 import { AssetRelationPicker } from "./asset-picker";
 import { ConflictDialog } from "./conflict-dialog";
 

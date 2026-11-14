@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Avatar, Badge, Button, Cell, Column, Row, Table, TableBody, TableHeader } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
 import type { MemberSummary } from "~/shared/api/admin-api";
-import { formatDate } from "~/lib/datetime";
+import { formatDate } from "~/shared/lib/datetime";
 import { MEMBER_LABELS } from "../-lib/settings-labels";
 import type { MemberRow } from "../-lib/members";
 import { isRole, type Role } from "~/shared/api/api-contracts";

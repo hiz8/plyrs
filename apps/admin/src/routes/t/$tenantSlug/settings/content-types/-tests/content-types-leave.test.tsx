@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
-import { DIALOGS } from "~/lib/labels";
+import { DIALOGS } from "~/shared/lib/labels";
 import { CONTENT_TYPE_LABELS } from "~/features/content-types";
 import {
   articleType,

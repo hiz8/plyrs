@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Button, ProgressBar, Spinner } from "@plyrs/ui";
 import { status } from "@plyrs/ui/semantic.stylex";
 import { RotateCw, Trash2 } from "lucide-react";
-import { BULK_LABELS } from "~/lib/labels";
+import { BULK_LABELS } from "~/shared/lib/labels";
 import { MEDIA_LABELS } from "../lib/media-labels";
 import { bulkBarStyles } from "~/components/bulk-bar-styles";
 

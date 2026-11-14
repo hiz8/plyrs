@@ -1,5 +1,5 @@
 import type { ListTab } from "./list-tab";
-import { COMMON_LABELS } from "~/lib/labels";
+import { COMMON_LABELS } from "~/shared/lib/labels";
 
 // コンテンツの一覧(タブ・絞り込み・表・ページ送り)の文言
 export const LIST_LABELS = {

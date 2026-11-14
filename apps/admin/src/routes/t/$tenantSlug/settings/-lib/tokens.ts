@@ -1,7 +1,7 @@
 import type { GrantSummary, TokenSummary } from "~/shared/api/admin-api";
-import { formatDateTime } from "~/lib/datetime";
+import { formatDateTime } from "~/shared/lib/datetime";
 import { TOKEN_LABELS } from "./settings-labels";
-import { can, type Operation } from "~/lib/permissions";
+import { can, type Operation } from "~/shared/lib/permissions";
 import type { Role } from "~/shared/api/api-contracts";
 
 // M1-4(design-spec 16.3、論点 C5): 接続トークン(PAT)画面の純関数。
