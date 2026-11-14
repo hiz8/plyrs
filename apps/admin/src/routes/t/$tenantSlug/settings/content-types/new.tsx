@@ -3,10 +3,14 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { v7 as uuidv7 } from "uuid";
 import { toaster } from "@plyrs/ui";
-import { TypeEditor } from "~/components/content-types/type-editor";
-import { buildDefinition, emptyTypeDraft, type TypeDraft } from "~/lib/content-type-form";
+import {
+  buildDefinition,
+  CONTENT_TYPE_LABELS,
+  emptyTypeDraft,
+  TypeEditor,
+  type TypeDraft,
+} from "~/features/content-types";
 import { errorMessage } from "~/lib/error-messages";
-import { CONTENT_TYPE_LABELS } from "~/lib/content-type-labels";
 import { contentTypesQueryOptions } from "~/lib/queries";
 import { useCan } from "~/lib/use-can";
 

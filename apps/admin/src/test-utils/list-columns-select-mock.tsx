@@ -1,4 +1,4 @@
-// vi.mock("./components/content-types/list-columns-select", ...) の差し替え先。
+// vi.mock("~/features/content-types/components/list-columns-select", ...) の差し替え先。
 // RAC のセレクトは jsdom で扱いにくいので標準の select にする(先頭に空の option)
 export function ListColumnsSelectMock(props: {
   label: string;

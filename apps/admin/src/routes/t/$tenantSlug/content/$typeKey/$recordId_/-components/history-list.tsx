@@ -3,14 +3,14 @@ import { Badge, Button, RelativeTime } from "@plyrs/ui";
 import { accent, bg, border, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
 import { formatDateTime } from "~/lib/datetime";
 import {
+  HISTORY_LABELS,
   kindLabel,
   summarizeEntry,
   viaLabel,
   type HistorySelection,
   type MemberName,
-} from "~/lib/history";
+} from "~/features/records";
 import type { HistoryEntry } from "~/lib/api-contracts";
-import { HISTORY_LABELS } from "~/lib/labels";
 
 const styles = stylex.create({
   list: {

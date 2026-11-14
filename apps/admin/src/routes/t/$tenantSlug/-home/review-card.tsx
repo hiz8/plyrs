@@ -6,7 +6,7 @@ import { Button, ICON_SIZE, Skeleton } from "@plyrs/ui";
 import { accent, font, radius, space, status, text } from "@plyrs/ui/semantic.stylex";
 import { listHref, type HomeType, type StatusSummary } from "./home";
 import { HOME_LABELS } from "./home-labels";
-import { PublicationBadge, WorkflowStatusBadge } from "~/components/publication-badge";
+import { PublicationBadge, WorkflowStatusBadge } from "~/features/records";
 import { CardEmpty, CardLoadingRows, CardRow, HomeCard, TypeLinks } from "./home-card";
 
 // b-home.md 2.3: 件数チップは 24px の角丸

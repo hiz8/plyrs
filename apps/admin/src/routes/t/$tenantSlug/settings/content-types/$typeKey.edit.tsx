@@ -3,7 +3,13 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import * as stylex from "@stylexjs/stylex";
 import { toaster } from "@plyrs/ui";
 import { text } from "@plyrs/ui/semantic.stylex";
-import { TypeEditor } from "~/components/content-types/type-editor";
+import {
+  buildDefinition,
+  CONTENT_TYPE_LABELS,
+  toTypeDraft,
+  TypeEditor,
+  type TypeDraft,
+} from "~/features/content-types";
 import { PageBody, TenantPageHeader } from "~/components/tenant-page-header";
 import {
   currentCrumb,
@@ -11,9 +17,7 @@ import {
   settingsContentTypesCrumb,
   settingsCrumb,
 } from "~/lib/breadcrumbs";
-import { buildDefinition, toTypeDraft, type TypeDraft } from "~/lib/content-type-form";
 import { errorMessage } from "~/lib/error-messages";
-import { CONTENT_TYPE_LABELS } from "~/lib/content-type-labels";
 import { contentTypesQueryOptions } from "~/lib/queries";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
 import { useCan } from "~/lib/use-can";

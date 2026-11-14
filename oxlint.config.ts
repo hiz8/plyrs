@@ -8,7 +8,8 @@ import { defineConfig, type DummyRuleMap, type OxlintConfig, type OxlintOverride
 type Pattern = { group: string[]; message: string } | { regex: string; message: string };
 type PathRule = { name: string; message: string };
 
-// 管理画面の feature の設定。手順 4 で feature を追加するときは、下の FEATURES と ALLOW_CROSS を変える
+// 管理画面の feature の設定。feature を追加するときと、feature 間の依存を許可するときは、下の FEATURES を変える
+// (許可の追加はレビューで判断する)
 export interface FeatureOptions {
   // feature の一覧
   features: string[];
@@ -16,7 +17,10 @@ export interface FeatureOptions {
   allowCross: Record<string, string[]>;
 }
 
-const FEATURES: FeatureOptions = { features: [], allowCross: {} };
+const FEATURES: FeatureOptions = {
+  features: ["media", "content-types", "records"],
+  allowCross: { records: ["media"] },
+};
 
 const ADMIN = "apps/admin/src";
 

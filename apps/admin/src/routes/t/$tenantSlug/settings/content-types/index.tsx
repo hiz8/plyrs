@@ -5,18 +5,18 @@ import { LayoutGrid, Plus } from "lucide-react";
 import { useState } from "react";
 import { Button, EmptyState, toaster } from "@plyrs/ui";
 import { font, space, text } from "@plyrs/ui/semantic.stylex";
-import { DeleteTypeDialog } from "~/components/content-types/delete-type-dialog";
-import { PluginTypeGroups } from "~/components/content-types/plugin-type-groups";
-import { TypeTable } from "~/components/content-types/type-table";
-import { SettingsFrame } from "../-components/settings-frame";
 import {
+  CONTENT_TYPE_LABELS,
+  DeleteTypeDialog,
   menuOrderUpdates,
+  PluginTypeGroups,
   pluginTypeGroups,
+  TypeTable,
   userTypeRows,
   type TypeRow,
-} from "~/lib/content-types";
+} from "~/features/content-types";
+import { SettingsFrame } from "../-components/settings-frame";
 import { errorMessage } from "~/lib/error-messages";
-import { CONTENT_TYPE_LABELS } from "~/lib/content-type-labels";
 import { contentTypesQueryOptions, modulesQueryOptions } from "~/lib/queries";
 import { useSyncHasSynced, useSyncTypes, useTenantSync } from "~/lib/sync-context";
 import { useCan } from "~/lib/use-can";

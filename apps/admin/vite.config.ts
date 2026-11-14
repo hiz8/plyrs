@@ -19,6 +19,19 @@ export default defineConfig(({ command }) => ({
   css: { lightningcss: { exclude: Features.LightDark } },
   // ADR 0001: 層をまたぐ import は ~/(src)で書く。対応は tsconfig.json の paths にあり、vitest.config.ts にも同じ設定がある
   resolve: { tsconfigPaths: true },
+  // feature の公開 API(src/features/<機能>/index.ts)を「副作用なし」と指定する。指定しないと、index.ts から
+  // 1 つでも import したチャンクが feature 全体を読み込む。ルートの validateSearch などはコード分割されず
+  // エントリに残るので、全画面の初期表示に record の編集画面とメディアのコードが入ってしまう
+  // (ADR 0001 の「詳細」を参照)。index.ts には再 export だけを書く
+  build: {
+    rolldownOptions: {
+      treeshake: {
+        moduleSideEffects: [
+          { test: /\/apps\/admin\/src\/features\/[^/]+\/index\.ts$/, sideEffects: false },
+        ],
+      },
+    },
+  },
   plugins: [
     cloudflare({
       viteEnvironment: { name: "ssr" },

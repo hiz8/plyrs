@@ -14,7 +14,7 @@ import {
 // 同じ helpers/setup.ts を使うが、テナントは別(journey と衝突しない sync-tenant)。
 //
 // 実装時の検証で判明した点(self-review に詳細記載): apps/admin の record エディタ
-// (components/record-form.tsx)は §12 必須②の dirty-only 保存のため、フィールドの
+// (features/records/components/record-form.tsx)は §12 必須②の dirty-only 保存のため、フィールドの
 // defaultValues をマウント時の 1 回だけ束縛する — 他クライアントの保存が WS 経由で
 // 同じ record を更新しても、開いたままの入力欄の表示値は自動では変わらない(未保存の
 // 自分の入力を他者の変更で消さないための意図的な設計に見える)。そのため「値が現れる」

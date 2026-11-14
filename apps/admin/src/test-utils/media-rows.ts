@@ -1,5 +1,5 @@
 import type { SyncRecord } from "@plyrs/sync-protocol";
-import { buildMediaRows, type MediaRow } from "../lib/media-list";
+import { buildMediaRows, type MediaRow } from "~/features/media/lib/media-list";
 
 // UUIDv7 の時刻部が違う ID(uploadedAtOf が日時を返す)
 export const MEDIA_ID_A = "018f2b6a-7a0a-7000-8000-000000000e01";

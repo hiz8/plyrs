@@ -1,9 +1,9 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ContentTypeDefinition } from "@plyrs/metamodel";
 import { bg, border, font, radius, space, text } from "@plyrs/ui/semantic.stylex";
-import { formatFieldDiff } from "~/lib/history";
+import { formatFieldDiff, PROPOSAL_LABELS } from "~/features/records";
 import type { FieldChange, ProposalKind } from "~/lib/api-contracts";
-import { PROPOSAL_LABELS, WORKFLOW_STATUS_LABELS } from "~/lib/labels";
+import { WORKFLOW_STATUS_LABELS } from "~/lib/labels";
 
 // 16.8(M5c): 提案の差分。フィールドごとに「現在」と「提案」を並べる(履歴の差分と同じ整形)
 

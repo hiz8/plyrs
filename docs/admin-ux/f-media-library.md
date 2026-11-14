@@ -18,7 +18,7 @@ WordPress のメディアライブラリ(グリッド表示、ドラッグ&ド�
 | 公開                   | 参照元のコンテンツを公開すると一緒に公開される                                                      | `apps/api/src/do/publish.ts` の `publishRecordCore`       |
 | 使用箇所               | 1 件ごとに取得できる(参照元の型・フィールド・ID・本文中かどうか)                                    | `GET /:tenantId/assets/:assetId/usage`                    |
 | 未使用の一覧           | 取得できる                                                                                          | `GET /:tenantId/assets/orphans`                           |
-| 管理画面でのプレビュー | 認証付きでファイル全体を取得して表示                                                                | `lib/asset-services.ts` の `resolveUrl`                   |
+| 管理画面でのプレビュー | 認証付きでファイル全体を取得して表示                                                                | `features/media/lib/asset-services.ts` の `resolveUrl`    |
 
 ## 3. 画面構成
 
@@ -124,20 +124,20 @@ WordPress のメディアライブラリ(グリッド表示、ドラッグ&ド�
 - 選択したファイルの代替テキストを、ダイアログ内の詳細欄で編集できるようにする。挿入前に代替テキストを入れる流れを作るため
 - 複数選択できるかは、フィールドの「1 件だけ / 複数」の設定に従う
 - ダイアログの形(D3 で確定): 幅 1040px・高さ 720px。題「メディアを選択」の横にフィールド名と「1 件だけ / 複数選べます」、右上に「アップロード」。左に絞り込みと 140px のグリッド(複数なら左上のチェックボックスと右上の選択順の番号、1 件なら左上のラジオ)、右に幅 300px の「選択中」欄(サムネイル・ファイル名・大きさ・代替テキストの入力欄)。下部に「キャンセル」と「N 件を挿入」(1 件なら「このファイルを使う」)。ダイアログ内でアップロードしたファイルは「アップロード完了」の印付きで選択状態になり、代替テキストの入力欄にフォーカスが移る
-- (2026-10-21、V4-F) ダイアログは `components/media/media-picker-dialog.tsx` の `MediaPickerDialog`(`ModalDialog size="xl"`、左に種類 `Select` + 検索 + `TileGrid size="sm"`、右に幅 300px の「選択中」欄、右上に `FileButton`「アップロード」。F15)。ダイアログ内のアップロードは同じ `useUploads` で、完了したファイルを選択に加え、代替テキストの入力欄にフォーカスを移す(F30)。`onSelect(items: PickedMedia[])` で、挿入時にダイアログで変えた代替テキストを同期経路で保存してから渡す(保存はサーバーの確定を待たずに挿入へ進み、失敗はトースト。「画像・ファイル」の複数は、ダイアログで確定した選択の順でフィールドの値を置き換える。リッチテキストの画像挿入は 1 件。F31、2026-10-24 の決定で改定)。絞り込みの既定は `defaultKind` prop(画像挿入は `image`、「画像・ファイル」フィールドは `all`)で、並び順は新しい順固定、使用状況の絞り込みは出さない(F32)
+- (2026-10-21、V4-F) ダイアログは `features/media/components/media-picker-dialog.tsx` の `MediaPickerDialog`(`ModalDialog size="xl"`、左に種類 `Select` + 検索 + `TileGrid size="sm"`、右に幅 300px の「選択中」欄、右上に `FileButton`「アップロード」。F15)。ダイアログ内のアップロードは同じ `useUploads` で、完了したファイルを選択に加え、代替テキストの入力欄にフォーカスを移す(F30)。`onSelect(items: PickedMedia[])` で、挿入時にダイアログで変えた代替テキストを同期経路で保存してから渡す(保存はサーバーの確定を待たずに挿入へ進み、失敗はトースト。「画像・ファイル」の複数は、ダイアログで確定した選択の順でフィールドの値を置き換える。リッチテキストの画像挿入は 1 件。F31、2026-10-24 の決定で改定)。絞り込みの既定は `defaultKind` prop(画像挿入は `image`、「画像・ファイル」フィールドは `all`)で、並び順は新しい順固定、使用状況の絞り込みは出さない(F32)
 
 ## 6. 汎用の編集画面との関係
 
 - asset 型のレコードは、汎用のコンテンツ編集画面では開かない。旧 URL(`/t/:slug/records/asset/:id` と、案 A の `/t/:slug/content/asset/:id`)は、詳細パネルを開いた状態のメディア画面(`/t/:slug/media/:assetId`)へリダイレクトする
 - これにより、[案 C](./c-publish-box.md) 10 章で暫定とした「メディアの編集画面では公開関連の操作を外す」対応は、案 F の実装後に不要になる
-- (2026-10-21、V4-F) `lib/legacy-redirect.ts` の `legacyPathname` を拡張し、`/t/:slug/content/asset`・`/content/asset/new` は `/t/:slug/media` へ、`/content/asset/:id`(旧 `/records/asset/:id` も)は `/t/:slug/media/:id` へ転送する。`lib/publish-box.ts` の `isAsset` / `kind: "asset"` と `components/publish-box.tsx` の分岐、`record-editor.tsx` の `isAsset` 渡しは整理して消す(`record-form.tsx` の `locked` は残す。F26)。asset 型は `sidebarContentTypes`(`source === "user"`)で既にサイドバーに出ない(F27)
+- (2026-10-21、V4-F) `lib/legacy-redirect.ts` の `legacyPathname` を拡張し、`/t/:slug/content/asset`・`/content/asset/new` は `/t/:slug/media` へ、`/content/asset/:id`(旧 `/records/asset/:id` も)は `/t/:slug/media/:id` へ転送する。`features/records/lib/publish-box.ts` の `isAsset` / `kind: "asset"` と `features/records/components/publish-box.tsx` の分岐、`record-editor.tsx` の `isAsset` 渡しは整理して消す(`record-form.tsx` の `locked` は残す。F26)。asset 型は `sidebarContentTypes`(`source === "user"`)で既にサイドバーに出ない(F27)
 
 ## 7. 表示性能
 
-- 現状の管理画面でのプレビューは、ファイル全体(最大 20 MB)を認証付きで取得している(`lib/asset-services.ts`)。グリッドに多数の画像を並べると、表示に時間がかかり通信量も増える
+- 現状の管理画面でのプレビューは、ファイル全体(最大 20 MB)を認証付きで取得している(`features/media/lib/asset-services.ts`)。グリッドに多数の画像を並べると、表示に時間がかかり通信量も増える
 - 当面は、画面に入ったサムネイルだけを読み込む(遅延読み込み)ことと、取得済みの画像を再利用すること(現行のキャッシュを引き継ぐ)で対応する
 - サムネイル用の縮小画像を返す仕組みは 9 章の未決事項とする
-- (2026-10-21、V4-F) サムネイルは `components/media/media-thumb.tsx` の `MediaThumb` が `IntersectionObserver`(rootMargin 200px)で画面に入ってから `resolveUrl` を呼び(`IntersectionObserver` が無い環境は即時)、画像以外は種類のアイコン + 拡張子のタグを出す(F18)
+- (2026-10-21、V4-F) サムネイルは `features/media/components/media-thumb.tsx` の `MediaThumb` が `IntersectionObserver`(rootMargin 200px)で画面に入ってから `resolveUrl` を呼び(`IntersectionObserver` が無い環境は即時)、画像以外は種類のアイコン + 拡張子のタグを出す(F18)
 
 ## 8. 権限
 
