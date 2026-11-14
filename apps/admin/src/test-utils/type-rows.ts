@@ -1,5 +1,5 @@
 import type { ContentTypeSummary } from "../lib/admin-api";
-import type { TypeRow } from "../lib/content-types";
+import type { TypeRow } from "~/features/content-types/lib/content-types";
 
 // コンテンツタイプの一覧の部品テスト用の行
 export function summary(
