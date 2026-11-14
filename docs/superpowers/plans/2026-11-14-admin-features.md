@@ -562,7 +562,7 @@ Expected: 3 spec とも PASS。
 
 ---
 
-## 手順 5 への申し送り
+## 手順 5 への引き継ぎ事項
 
 - `lib/` と `components/` に残ったものを `shared/` と `app/` へ移す。手順 4 で残すと決めたものは「この計画で決めたこと」の 3 にある。`lib/bulk.ts` もここに含まれる。
 - `src/` 直下に残る `super-{login,ops,tenants}.test.tsx` は、`routes/super/-tests/` へ移せる。`router.test.tsx` と `stylex-tokens.test.ts` の置き場所は手順 5 で決める。

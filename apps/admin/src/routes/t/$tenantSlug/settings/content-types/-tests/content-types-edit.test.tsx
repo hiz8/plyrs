@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ERROR_MESSAGES } from "~/lib/error-messages";
 import { DIALOGS } from "~/lib/labels";
-import { ListColumnsSelectMock } from "~/test-utils/list-columns-select-mock";
 import {
   article,
   articleType,
@@ -15,9 +14,10 @@ import {
 } from "~/test-utils/records-harness";
 import { summary } from "~/test-utils/type-rows";
 
-vi.mock("~/features/content-types/components/list-columns-select", () => ({
-  ListColumnsSelect: ListColumnsSelectMock,
-}));
+vi.mock("~/features/content-types/components/list-columns-select", async () => {
+  const mock = await import("~/test-utils/list-columns-select-mock");
+  return { ListColumnsSelect: mock.ListColumnsSelectMock };
+});
 
 const articleSummary = summary({
   key: "article",

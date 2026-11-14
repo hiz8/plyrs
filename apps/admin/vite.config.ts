@@ -26,7 +26,9 @@ export default defineConfig(({ command }) => ({
   build: {
     rolldownOptions: {
       treeshake: {
-        moduleSideEffects: [{ test: /\/src\/features\/[^/]+\/index\.ts$/, sideEffects: false }],
+        moduleSideEffects: [
+          { test: /\/apps\/admin\/src\/features\/[^/]+\/index\.ts$/, sideEffects: false },
+        ],
       },
     },
   },

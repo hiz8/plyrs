@@ -67,9 +67,9 @@ import 関係を洗い出すと、次の問題が見つかった。
    - feature の中は、`components/`(部品)・`lib/`(純関数・フック・文言)・`index.ts`(公開 API)に分ける(手順 4 で決めた)。feature の中から自分の `index.ts` は import しない。
    - `index.ts` には再 export だけを書く。`apps/admin/vite.config.ts` で、`src/features/<機能>/index.ts` を副作用のないモジュールと指定している(`treeshake.moduleSideEffects`)。この指定がないと、`index.ts` から 1 つでも import したチャンクが feature 全体を読み込む(「公開 API のファイルとコード分割」を参照)。
    - `oxlint.config.ts` の `FEATURES` に載せた機能(records・media・content-types)の部品は、使うルートが 1 つのサブツリーだけでも feature に置く。機能の関数・文言・部品を 1 か所にまとめ、ルートのファイルは公開 API を組み立てるだけにする。それ以外の画面(ホーム・アカウント・設定・提案・履歴)は 1 に従う。
-   - 画面の流れを確かめるテストは、feature ではなくルートの `-tests/` に置く(ルーターを組み立ててよいのは routes のテストだけ)。部品を差し替えるときは、`vi.mock("~/features/<機能>/components/x", …)` と書く。`vi.mock` の文字列は lint の対象外である。
+   - 画面の流れを確かめるテストは、feature ではなくルートの `-tests/` に置く(ルーターを組み立ててよいのは routes のテストだけ)。部品を差し替えるときは、`vi.mock("~/features/<機能>/components/x", …)` と書く。`vi.mock` の文字列は lint の対象外である。feature の単体テストが、許可された他 feature の部品を差し替えるときも同じ書き方をする(records の `asset-picker.test.tsx` が、media のフィルターの部品を差し替えている)。
    - 上の `vi.mock` の factory では、差し替え先を factory の中で `await import(…)` する。`index.ts` 経由の import は feature の部品をまとめて読み込むので、ファイルの先頭で import した変数を factory から参照すると、初期化の前に触ってテストの読み込みが失敗する。
-   - 2 つ以上の feature から使うものは feature に入れず、`shared/` に置く(`record-label.ts`、一括操作の `bulk.ts`・`use-bulk-action.ts` など)。feature 間の許可を増やすより先に、こちらを検討する。
+   - 2 つ以上の feature から使うものは feature に入れず、`shared/` に置く(`record-label.ts`、一括操作の `bulk.ts`・`use-bulk-action.ts` など。手順 5 で移すまでは `lib/` にある)。feature 間の許可を増やすより先に、こちらを検討する。
    - `test-utils/` から feature を import するときは、`index.ts` を通さず深いパスで書く(単体テストが feature 全体を読み込まないようにする)。
 3. **機能に依存しないもの**: `shared/` へ置く。
 4. **アプリの起動と全体の配線**: app 層へ置く。app 層は、`src/` 直下のフレームワークのエントリと `app/` ディレクトリからなる。
