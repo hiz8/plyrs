@@ -14,7 +14,13 @@ import { contentTypeCrumb, currentCrumb, homeCrumb } from "~/shared/lib/breadcru
 import { formatDateTime } from "~/shared/lib/datetime";
 import { errorMessage } from "~/shared/api/error-messages";
 import { DIALOGS, TOASTS } from "~/shared/lib/labels";
-import { EDITOR_LABELS, HISTORY_LABELS, PROPOSAL_LABELS, PUBLISH_BOX } from "../lib/record-labels";
+import {
+  EDITOR_LABELS,
+  HISTORY_LABELS,
+  PROPOSAL_LABELS,
+  PUBLISH_BOX,
+  RECORD_DIALOGS,
+} from "../lib/record-labels";
 import { labelForRecord } from "~/shared/lib/record-label";
 import { publishBoxView } from "../lib/publish-box";
 import {
@@ -507,26 +513,26 @@ export function RecordEditor({
             )}
           </ConfirmDialog>
           <ConfirmDialog
-            title={DIALOGS.unpublish.title}
+            title={RECORD_DIALOGS.unpublish.title}
             isOpen={unpublishOpen}
             onOpenChange={setUnpublishOpen}
             tone="danger"
-            confirmLabel={DIALOGS.unpublish.confirm}
+            confirmLabel={RECORD_DIALOGS.unpublish.confirm}
             isPending={busy === "unpublish"}
             onConfirm={() => void confirmUnpublish()}
           >
-            <p>{DIALOGS.unpublish.body(labelForRecord(types, record))}</p>
+            <p>{RECORD_DIALOGS.unpublish.body(labelForRecord(types, record))}</p>
           </ConfirmDialog>
           <ConfirmDialog
-            title={DIALOGS.archivePublished.title}
+            title={RECORD_DIALOGS.archivePublished.title}
             isOpen={pendingArchive}
             onOpenChange={setPendingArchive}
             tone="danger"
-            confirmLabel={DIALOGS.archivePublished.confirm}
+            confirmLabel={RECORD_DIALOGS.archivePublished.confirm}
             isPending={busy === "archive"}
             onConfirm={() => void confirmArchive()}
           >
-            <p>{DIALOGS.archivePublished.body(contentType.name)}</p>
+            <p>{RECORD_DIALOGS.archivePublished.body(contentType.name)}</p>
           </ConfirmDialog>
         </>
       )}

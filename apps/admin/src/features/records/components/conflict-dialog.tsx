@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Button, ModalDialog } from "@plyrs/ui";
 import { bg, border, font, radius, space, stroke, text } from "@plyrs/ui/semantic.stylex";
 import { formatDateTime } from "~/shared/lib/datetime";
-import { DIALOGS } from "~/shared/lib/labels";
+import { RECORD_DIALOGS } from "../lib/record-labels";
 
 const styles = stylex.create({
   content: {
@@ -72,7 +72,7 @@ export function ConflictDialog({
   const savedAgo = formatDateTime(theirsSavedAt).text;
   return (
     <ModalDialog
-      title={DIALOGS.conflict.title}
+      title={RECORD_DIALOGS.conflict.title}
       isOpen={isOpen}
       // 閉じる操作は 3 つのボタンだけ。Esc や暗幕では閉じない
       onOpenChange={() => {}}
@@ -82,31 +82,33 @@ export function ConflictDialog({
       footer={
         <>
           <Button variant="secondary" onPress={onDecideLater}>
-            {DIALOGS.conflict.later}
+            {RECORD_DIALOGS.conflict.later}
           </Button>
           <Button variant="secondary" onPress={onAdoptTheirs}>
-            {DIALOGS.conflict.adoptTheirs}
+            {RECORD_DIALOGS.conflict.adoptTheirs}
           </Button>
           <Button variant="primary" autoFocus onPress={onKeepMine}>
-            {DIALOGS.conflict.keepMine}
+            {RECORD_DIALOGS.conflict.keepMine}
           </Button>
         </>
       }
     >
       <div {...stylex.props(styles.content)}>
-        <p {...stylex.props(styles.description)}>{DIALOGS.conflict.body(savedAgo)}</p>
+        <p {...stylex.props(styles.description)}>{RECORD_DIALOGS.conflict.body(savedAgo)}</p>
         {conflicts.map((conflict) => (
           <div key={conflict.fieldKey} {...stylex.props(styles.field)}>
             <span {...stylex.props(styles.fieldKey)}>{conflict.label}</span>
             <div {...stylex.props(styles.columns)}>
               <section {...stylex.props(styles.card)}>
-                <h3 {...stylex.props(styles.cardTitle)}>{DIALOGS.conflict.mine}</h3>
-                <p {...stylex.props(styles.cardNote)}>{DIALOGS.conflict.mineNote}</p>
+                <h3 {...stylex.props(styles.cardTitle)}>{RECORD_DIALOGS.conflict.mine}</h3>
+                <p {...stylex.props(styles.cardNote)}>{RECORD_DIALOGS.conflict.mineNote}</p>
                 <p {...stylex.props(styles.excerpt)}>{conflict.mine}</p>
               </section>
               <section {...stylex.props(styles.card)}>
-                <h3 {...stylex.props(styles.cardTitle)}>{DIALOGS.conflict.theirs}</h3>
-                <p {...stylex.props(styles.cardNote)}>{DIALOGS.conflict.theirsNote(savedAgo)}</p>
+                <h3 {...stylex.props(styles.cardTitle)}>{RECORD_DIALOGS.conflict.theirs}</h3>
+                <p {...stylex.props(styles.cardNote)}>
+                  {RECORD_DIALOGS.conflict.theirsNote(savedAgo)}
+                </p>
                 <p {...stylex.props(styles.excerpt)}>{conflict.theirs}</p>
               </section>
             </div>

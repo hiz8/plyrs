@@ -48,7 +48,7 @@ it("表示名を変えてサイドバーの一覧へ移ろうとすると確認�
   fireEvent.click(within(sidebar).getByRole("link", { name: /メディア/ }));
 
   const dialog = await screen.findByRole("alertdialog", { name: DIALOGS.leave.title });
-  expect(within(dialog).getByText(DIALOGS.leaveType.body)).toBeInTheDocument();
+  expect(within(dialog).getByText(CONTENT_TYPE_LABELS.leaveBody)).toBeInTheDocument();
   expect(router.state.location.pathname).toBe(EDIT_PATH);
 
   fireEvent.click(within(dialog).getByRole("button", { name: DIALOGS.leave.discard }));

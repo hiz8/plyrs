@@ -30,7 +30,6 @@ import {
   type TypeDraft,
 } from "../lib/content-type-form";
 import { referenceCandidates } from "../lib/content-types";
-import { DIALOGS } from "~/shared/lib/labels";
 import { CONTENT_TYPE_LABELS } from "../lib/content-type-labels";
 import { useLeaveGuard } from "~/shared/lib/use-leave-guard";
 import { LeaveGuardDialog } from "~/shared/ui/leave-guard-dialog";
@@ -403,7 +402,7 @@ export function TypeEditor({
         }}
         onCancel={() => setDeleteTarget(null)}
       />
-      <LeaveGuardDialog blocker={blocker} body={DIALOGS.leaveType.body} />
+      <LeaveGuardDialog blocker={blocker} body={CONTENT_TYPE_LABELS.leaveBody} />
     </>
   );
 }

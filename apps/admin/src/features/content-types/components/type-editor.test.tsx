@@ -292,7 +292,7 @@ it("変更があるときに離脱しようとすると確認が出て、編集�
   );
   setup();
   const dialog = await screen.findByRole("alertdialog", { name: DIALOGS.leave.title });
-  expect(within(dialog).getByText(DIALOGS.leaveType.body)).toBeInTheDocument();
+  expect(within(dialog).getByText(CONTENT_TYPE_LABELS.leaveBody)).toBeInTheDocument();
   await user.click(within(dialog).getByRole("button", { name: DIALOGS.leave.stay }));
   expect(reset).toHaveBeenCalled();
   expect(proceed).not.toHaveBeenCalled();

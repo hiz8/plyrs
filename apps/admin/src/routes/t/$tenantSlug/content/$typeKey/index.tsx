@@ -13,6 +13,7 @@ import {
   EDITOR_LABELS,
   LIST_LABELS,
   parseListQuery,
+  RECORD_DIALOGS,
   toListSearch,
   type BulkMenuAction,
   type ListQuery,
@@ -288,7 +289,7 @@ function RecordListPage() {
         isOpen={confirm === "unpublish"}
         onOpenChange={(open) => setConfirm(open ? "unpublish" : null)}
         tone="danger"
-        confirmLabel={DIALOGS.unpublish.confirm}
+        confirmLabel={RECORD_DIALOGS.unpublish.confirm}
         onConfirm={() => void runConfirmed("unpublish")}
       >
         <p>{BULK_LABELS.confirmUnpublish.body}</p>
